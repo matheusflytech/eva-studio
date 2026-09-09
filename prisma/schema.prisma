@@ -1,0 +1,102 @@
+// Eva Studio — schema real (Supabase Postgres compartilhado com o Beeno
+// Builder, mas com tabelas isoladas via prefixo eva_studio_ pra nunca
+// encostar nas tabelas do outro produto nesse mesmo banco).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  logoUrl   String?
+  createdAt DateTime @default(now())
+
+  profiles Profile[]
+  agents   Agent[]
+
+  @@map("eva_studio_organizations")
+}
+
+model Profile {
+  id        String   @id // = Supabase auth user id
+  orgId     String
+  name      String
+  email     String
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_profiles")
+}
+
+model Agent {
+  id             String   @id @default(uuid())
+  orgId          String
+  name           String
+  description    String   @default("")
+  tone           String   @default("")
+  language       String   @default("Português")
+  primaryChannel String   @default("")
+  instructions   String   @default("") @db.Text
+  guidelines     String   @default("") @db.Text
+  skills         Json     @default("[]")
+  tools          Json     @default("[]")
+  outboundUrl    String   @default("")
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  variables     AgentVariable[]
+  knowledgeBase KnowledgeDoc[]
+  flow          AgentFlow?
+
+  @@index([orgId])
+  @@map("eva_studio_agents")
+}
+
+model AgentVariable {
+  id      String @id @default(uuid())
+  agentId String
+  name    String
+  unit    String @default("")
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("eva_studio_agent_variables")
+}
+
+model KnowledgeDoc {
+  id         String   @id @default(uuid())
+  agentId    String
+  fileName   String
+  sizeBytes  Int
+  mimeType   String
+  uploadedAt DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("eva_studio_knowledge_docs")
+}
+
+// Um bloco só por agente (o canvas do Builder de conversa) — nodes/edges do
+// React Flow como JSON livre, o shape é definido no frontend (FlowNodeData).
+model AgentFlow {
+  agentId   String   @id
+  nodes     Json
+  edges     Json
+  updatedAt DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_agent_flows")
+}
