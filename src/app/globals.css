@@ -1,26 +1,138 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* matte-black surface scale */
+  --bg-base: #0a0a0a;
+  --bg-surface-1: #121212;
+  --bg-surface-2: #1a1a1a;
+  --bg-surface-3: #232323;
+
+  /* borders */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* text */
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-tertiary: rgba(255, 255, 255, 0.38);
+
+  /* accent — reserved for primary CTAs only */
+  --accent-400: #7ba3f5;
+  --accent-500: #5b8def;
+  --accent-600: #3f6fd1;
+  --accent-soft: rgba(91, 141, 239, 0.12);
+
+  /* ice-white — used for selection/active states (nav, avatar, chips) */
+  --ice: #f5f7fa;
+  --ice-soft: rgba(245, 247, 250, 0.1);
+  --ice-border: rgba(245, 247, 250, 0.3);
+
+  --danger: #f2555a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg-base: var(--bg-base);
+  --color-surface-1: var(--bg-surface-1);
+  --color-surface-2: var(--bg-surface-2);
+  --color-surface-3: var(--bg-surface-3);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-ice: var(--ice);
+  --color-ice-soft: var(--ice-soft);
+  --color-ice-border: var(--ice-border);
+
+  --color-danger: var(--danger);
+
+  --font-display: var(--font-plus-jakarta-sans);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes aperture-breathe {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(24deg); }
+}
+.animate-aperture-breathe {
+  animation: aperture-breathe 6s ease-in-out infinite;
+}
+
+/* React Flow — restyled to the matte-black/glass theme, edges kept nearly imperceptible */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__edge-path {
+  stroke: rgba(255, 255, 255, 0.14) !important;
+  stroke-width: 1.5px !important;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: rgba(255, 255, 255, 0.34) !important;
+}
+.react-flow__handle {
+  background: var(--border-strong) !important;
+  border: none !important;
+}
+.react-flow__controls {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+.react-flow__controls-button {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.react-flow__controls-button:hover {
+  background: var(--bg-surface-3);
+  color: var(--text-primary);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* subtle ambient texture so glass panels have something to read as "glass" against */
+.app-backdrop {
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(245, 247, 250, 0.06), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 100%, rgba(91, 141, 239, 0.05), transparent 60%),
+    var(--bg-base);
 }
