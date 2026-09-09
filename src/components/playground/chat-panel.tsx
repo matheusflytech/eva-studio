@@ -1,58 +1,111 @@
 "use client";
 
 import * as React from "react";
-import { Aperture, Send, RotateCcw } from "lucide-react";
+import { Aperture, Send, RotateCcw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import type { Agent } from "@/lib/data/types";
 
 interface ChatMessage {
   id: string;
   role: "user" | "agent";
   text: string;
+  isError?: boolean;
 }
 
-const SIMULATED_REPLIES = [
-  "Entendi! Em produção, essa resposta viria do seu workflow no n8n, usando as instruções e a base de conhecimento configuradas.",
-  "Anotado. Essa é uma simulação local — conecte o webhook de saída para ver respostas reais do seu agente.",
-  "Perfeito. Assim que o webhook estiver conectado, essa conversa vai fluir direto para o seu fluxo no n8n.",
-];
-
-let messageCounter = 0;
-function nextId() {
-  messageCounter += 1;
-  return `m-${messageCounter}`;
+function greeting(agent: Agent): ChatMessage {
+  return { id: generateId(), role: "agent", text: `Olá! Sou o agente "${agent.name}". Pergunte algo pra testar.` };
 }
 
 export function ChatPanel({ agent }: { agent: Agent }) {
-  const [messages, setMessages] = React.useState<ChatMessage[]>([
-    { id: nextId(), role: "agent", text: `Olá! Sou o agente "${agent.name}". Este é um teste simulado — pergunte algo para ver como a conversa flui.` },
-  ]);
+  const [messages, setMessages] = React.useState<ChatMessage[]>([greeting(agent)]);
   const [draft, setDraft] = React.useState("");
   const [isTyping, setIsTyping] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const conversationIdRef = React.useRef(generateId());
+  const webhookUrl = agent.webhook.outboundUrl.trim();
+
+  React.useEffect(() => {
+    setMessages([greeting(agent)]);
+    conversationIdRef.current = generateId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent.id]);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
-  function handleSend(e: React.FormEvent) {
+  async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text) return;
-    setMessages((prev) => [...prev, { id: nextId(), role: "user", text }]);
+    if (!text || isTyping) return;
+    setMessages((prev) => [...prev, { id: generateId(), role: "user", text }]);
     setDraft("");
+
+    if (!webhookUrl) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "agent",
+          isError: true,
+          text: 'Esse agente ainda não tem um webhook de saída configurado. Vá em Eva Studio → esse agente → "Webhook de saída" e cole a URL do seu workflow no n8n.',
+        },
+      ]);
+      return;
+    }
+
     setIsTyping(true);
-    setTimeout(() => {
-      const reply = SIMULATED_REPLIES[Math.floor(Math.random() * SIMULATED_REPLIES.length)];
-      setMessages((prev) => [...prev, { id: nextId(), role: "agent", text: reply }]);
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          conversation_id: conversationIdRef.current,
+          agent: {
+            id: agent.id,
+            name: agent.name,
+            tone: agent.tone,
+            language: agent.language,
+            instructions: agent.instructions,
+            guidelines: agent.guidelines,
+            variables: agent.variables,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
+      setMessages((prev) => [
+        ...prev,
+        reply
+          ? { id: generateId(), role: "agent", text: reply }
+          : {
+              id: generateId(),
+              role: "agent",
+              isError: true,
+              text: "O webhook respondeu, mas sem um campo \"reply\" reconhecível. Confira o formato de retorno do seu workflow no n8n.",
+            },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "agent",
+          isError: true,
+          text: "Não consegui falar com o webhook configurado. Confira se a URL está certa e se o workflow no n8n está ativo.",
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   }
 
   function handleReset() {
-    setMessages([
-      { id: nextId(), role: "agent", text: `Olá! Sou o agente "${agent.name}". Este é um teste simulado — pergunte algo para ver como a conversa flui.` },
-    ]);
+    setMessages([greeting(agent)]);
+    conversationIdRef.current = generateId();
   }
 
   return (
@@ -64,7 +117,9 @@ export function ChatPanel({ agent }: { agent: Agent }) {
           </span>
           <div>
             <p className="text-[13.5px] font-medium text-text-primary">{agent.name}</p>
-            <p className="text-[11.5px] text-text-tertiary">Conversa simulada</p>
+            <p className="text-[11.5px] text-text-tertiary">
+              {webhookUrl ? "Conectado ao seu webhook n8n" : "Sem webhook configurado"}
+            </p>
           </div>
         </div>
         <button
@@ -87,11 +142,14 @@ export function ChatPanel({ agent }: { agent: Agent }) {
                 className={cn(
                   "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
                   m.role === "user"
-                    ? "bg-ice text-bg-base"
-                    : "border border-border-subtle bg-surface-2 text-text-primary"
+                    ? "bg-accent-500 text-white"
+                    : m.isError
+                      ? "flex items-start gap-2 border border-danger/25 bg-danger/10 text-danger"
+                      : "border border-border-subtle bg-surface-2 text-text-primary"
                 )}
               >
-                {m.text}
+                {m.isError && <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
+                <span>{m.text}</span>
               </div>
             </div>
           ))}
@@ -116,8 +174,8 @@ export function ChatPanel({ agent }: { agent: Agent }) {
         />
         <button
           type="submit"
-          disabled={!draft.trim()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ice text-bg-base transition-colors hover:bg-white disabled:opacity-40"
+          disabled={!draft.trim() || isTyping}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white transition-colors hover:bg-accent-400 disabled:opacity-40"
         >
           <Send size={16} />
         </button>

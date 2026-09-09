@@ -23,6 +23,7 @@ import { FlowNode, type FlowNodeData } from "@/components/agent-studio/builder/f
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { NodeInspector } from "@/components/agent-studio/builder/node-inspector";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
+import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
@@ -66,13 +67,14 @@ export default function AgentBuilderPage() {
     [setEdges]
   );
 
-  function handleAddBlock(iconKey: IconKey, label: string) {
+  function handleAddBlock(iconKey: IconKey) {
     const id = generateId();
+    const defaults = getBlockDefault(iconKey)?.data ?? {};
     const newNode: Node<FlowNodeData> = {
       id,
       type: "flowNode",
       position: { x: 520 + ((nodes.length * 30) % 120), y: 40 + ((nodes.length * 90) % 640) },
-      data: { iconKey, label },
+      data: { iconKey, label: iconKey, ...defaults },
     };
     setNodes((nds) => [...nds, newNode]);
     setSelectedId(id);
@@ -129,7 +131,7 @@ export default function AgentBuilderPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {saveState === "saved" && <span className="text-[12.5px] text-text-tertiary">Salvo.</span>}
-          <Link href="/playground" className={buttonVariants({ variant: "secondary", size: "md" })}>
+          <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
             <PlayCircle size={15} /> Testar
           </Link>
           <button type="button" onClick={handleSave} className={buttonVariants({ variant: "solid", size: "md" })}>

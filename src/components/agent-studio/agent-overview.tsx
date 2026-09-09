@@ -40,7 +40,7 @@ export function AgentOverview({ agent }: { agent: Agent }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-        <Link href="/playground" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+        <Link href={`/playground?agent=${agent.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
           <PlayCircle size={14} /> Testar no Playground
         </Link>
         <Link href="/conversas" className={buttonVariants({ variant: "secondary", size: "sm" })}>

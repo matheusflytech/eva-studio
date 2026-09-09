@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PlayCircle } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,7 +12,9 @@ import { ChatPanel } from "@/components/playground/chat-panel";
 
 export default function PlaygroundPage() {
   const { agents, isLoaded, load } = useAgentsStore();
-  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const requestedId = searchParams.get("agent");
+  const [activeId, setActiveId] = React.useState<string | null>(requestedId);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -19,7 +22,9 @@ export default function PlaygroundPage() {
   }, [isLoaded]);
 
   React.useEffect(() => {
-    if (!activeId && agents.length > 0) setActiveId(agents[0].id);
+    if (agents.length === 0) return;
+    if (activeId && agents.some((a) => a.id === activeId)) return;
+    setActiveId(agents[0].id);
   }, [activeId, agents]);
 
   if (!isLoaded) return <div className="flex-1 p-8" />;
