@@ -53,10 +53,12 @@ model Agent {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization  Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  variables     AgentVariable[]
-  knowledgeBase KnowledgeDoc[]
-  flow          AgentFlow?
+  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  variables         AgentVariable[]
+  knowledgeBase     KnowledgeDoc[]
+  flow              AgentFlow?
+  whatsappConnection WhatsAppConnection?
+  metaConnection     MetaConnection?
 
   @@index([orgId])
   @@map("eva_studio_agents")
@@ -99,4 +101,42 @@ model AgentFlow {
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("eva_studio_agent_flows")
+}
+
+// Conexão de WhatsApp via QR code (Baileys, não a API oficial da Meta) — o
+// worker (processo separado, rodando fora da Vercel) lê/escreve essa linha
+// pra gerenciar a sessão. creds/keys são o estado de autenticação do Baileys
+// (protocolo Signal), serializado como JSON pra persistir entre reinícios do
+// worker sem precisar escanear o QR de novo.
+model WhatsAppConnection {
+  agentId     String   @id
+  status      String   @default("disconnected") // disconnected | requesting | qr_pending | connected
+  qrDataUrl   String?  @db.Text
+  phoneNumber String?
+  creds       Json?
+  keys        Json?
+  lastError   String?
+  updatedAt   DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_whatsapp_connections")
+}
+
+// Canal oficial (Meta Cloud API) — dorme até existirem credenciais de app
+// Meta configuradas (ver README do worker/META_SETUP.md); o webhook em
+// /api/webhooks/meta já está pronto pra receber assim que isso existir.
+// accessToken fica em texto puro por enquanto — antes de usar em produção
+// de verdade, trocar por um valor cifrado (não implementado ainda).
+model MetaConnection {
+  agentId       String   @id
+  phoneNumberId String   @unique
+  wabaId        String
+  accessToken   String   @db.Text
+  displayPhone  String?
+  createdAt     DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_meta_connections")
 }

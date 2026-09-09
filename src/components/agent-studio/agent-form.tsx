@@ -12,6 +12,7 @@ import { SkillsPicker } from "./skills-picker";
 import { ToolsPicker } from "./tools-picker";
 import { VariablesEditor } from "./variables-editor";
 import { WebhookConfig } from "./webhook-config";
+import { WhatsAppConnect } from "./whatsapp-connect";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
@@ -214,6 +215,16 @@ export function AgentForm({ agent }: { agent?: Agent }) {
           onOutboundChange={setOutboundUrl}
         />
       </Card>
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>WhatsApp</CardTitle>
+            <CardDescription>Conecte um número de WhatsApp direto a este agente, via QR code.</CardDescription>
+          </CardHeader>
+          <WhatsAppConnect agentId={agentId} />
+        </Card>
+      )}
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
 
