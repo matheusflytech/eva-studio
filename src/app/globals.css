@@ -93,6 +93,17 @@ body {
   animation: aperture-breathe 6s ease-in-out infinite;
 }
 
+@keyframes mtn-drift-back {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-14px); }
+}
+@keyframes mtn-drift-front {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+.animate-mtn-drift-back { animation: mtn-drift-back 22s ease-in-out infinite; }
+.animate-mtn-drift-front { animation: mtn-drift-front 18s ease-in-out infinite; }
+
 /* React Flow — restyled to the matte-black/glass theme, edges kept nearly imperceptible */
 .react-flow__attribution {
   display: none;
