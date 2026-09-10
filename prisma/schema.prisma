@@ -59,7 +59,12 @@ model Agent {
   flow              AgentFlow?
   whatsappConnection WhatsAppConnection?
   metaConnection     MetaConnection?
+  instagramConnection InstagramConnection?
   conversations      Conversation[]
+  messageTemplates   MessageTemplate[]
+  outboundQueue       OutboundQueueItem[]
+  broadcasts          Broadcast[]
+  commentAutomations  CommentAutomation[]
 
   @@index([orgId])
   @@map("eva_studio_agents")
@@ -153,15 +158,20 @@ model MetaConnection {
 // controla se o motor ainda responde sozinho ou se está pausado esperando
 // (transferido pra humano) ou já terminou.
 model Conversation {
-  id            String   @id @default(uuid())
-  agentId       String
-  channel       String // playground | whatsapp_qr | whatsapp_meta
-  contactId     String // telefone/jid, ou o id de sessão do Playground
-  currentNodeId String?
-  variables     Json     @default("{}")
-  status        String   @default("active") // active | waiting_human | ended
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                   String    @id @default(uuid())
+  agentId              String
+  channel              String // playground | whatsapp_qr | whatsapp_meta
+  contactId            String // telefone/jid, ou o id de sessão do Playground
+  currentNodeId        String?
+  variables            Json      @default("{}")
+  status               String    @default("active") // active | waiting_human | ended
+  // Última vez que o CONTATO mandou algo (texto ou toque de botão) — é o que
+  // abre/fecha a janela de 24h da Meta (regra oficial do WhatsApp Business:
+  // fora dela só se pode mandar mensagem de modelo pré-aprovado). Ver
+  // docs/CHATBOT_ENGINE.md.
+  lastContactMessageAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
   messages Message[]
@@ -170,12 +180,38 @@ model Conversation {
   @@map("eva_studio_conversations")
 }
 
-// Transcrição de verdade — cada mensagem trocada, na ordem. É o que alimenta
-// a página "Conversas" (hoje decorativa, listando dados simulados).
+// Modelo de mensagem (equivalente ao "Message Template" da Meta) — o texto de
+// verdade só é aprovado no Meta Business Manager; aqui a gente só guarda o
+// que já foi aprovado, pra poder escolher no bloco de Mensagem quando a
+// conversa estiver fora da janela de 24h. metaTemplateName/metaLanguageCode
+// têm que ser IDÊNTICOS ao que foi registrado na Meta, e variableOrder é a
+// ordem das variáveis {var} no bodyText — usada pra montar os parâmetros
+// posicionais {{1}}, {{2}}... que a API de templates da Meta exige.
+model MessageTemplate {
+  id               String   @id @default(uuid())
+  agentId          String
+  name             String
+  category         String   @default("utility") // utility | marketing | authentication
+  bodyText         String   @db.Text
+  metaTemplateName String   @default("")
+  metaLanguageCode String   @default("pt_BR")
+  variableOrder    Json     @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("eva_studio_message_templates")
+}
+
+// Transcrição de verdade — cada mensagem trocada, na ordem. Alimenta a
+// página "Conversas". role "human" = atendente respondeu manualmente (ver
+// inbox humano em §9 do CHATBOT_ENGINE.md), diferente de "bot" (motor/IA).
 model Message {
   id             String   @id @default(uuid())
   conversationId String
-  role           String // contact | bot
+  role           String // contact | bot | human
   text           String   @db.Text
   createdAt      DateTime @default(now())
 
@@ -183,4 +219,99 @@ model Message {
 
   @@index([conversationId])
   @@map("eva_studio_messages")
+}
+
+// Canal oficial de Instagram (Instagram Messaging API) — mesma ideia do
+// MetaConnection, mas com os ids/token próprios do Instagram (não são o
+// mesmo phoneNumberId/WABA do WhatsApp). Conectado via Instagram Login
+// (OAuth direto — instagram-connect.tsx) quando INSTAGRAM_APP_ID/SECRET
+// existirem, ou cadastro manual antes disso. pageAccessToken, apesar do
+// nome, é o token de acesso da conta Instagram no fluxo novo (Instagram API
+// with Instagram Login não usa mais Página do Facebook) — ver
+// docs/meta-business-runbook.html.
+model InstagramConnection {
+  agentId          String   @id
+  igBusinessId     String   @unique // Instagram-scoped business account id (ou user_id, no Instagram Login)
+  pageAccessToken  String   @db.Text
+  username         String?
+  createdAt        DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_instagram_connections")
+}
+
+// Automação "comente X e recebe DM" (igual o recurso de comentário do
+// ManyChat) — quando um comentário num post/reel do Instagram bate com o
+// gatilho, manda uma resposta pública opcional e uma mensagem privada (via
+// API de private reply da Meta). Depois disso, a conversa cai no fluxo
+// normal do Builder (currentNodeId fica null — a próxima mensagem do
+// contato entra pelo "Início" como qualquer conversa nova). Ver
+// docs/CHATBOT_ENGINE.md §12.
+model CommentAutomation {
+  id           String   @id @default(uuid())
+  agentId      String
+  name         String
+  mediaId      String   @default("") // vazio = qualquer post/reel da conta
+  keyword      String   @default("") // vazio = qualquer comentário; senão, lista separada por vírgula
+  publicReply  String   @default("") @db.Text
+  dmMessage    String   @db.Text
+  active       Boolean  @default(true)
+  triggerCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("eva_studio_comment_automations")
+}
+
+// Fila de envio pro WhatsApp via QR (Baileys) — o app principal (serverless)
+// não segura o socket do Baileys, então em vez de mandar direto, ele grava
+// aqui e o worker (processo sempre ligado) drena por polling. Usada por (1)
+// resposta manual de atendente numa conversa em waiting_human e (2) disparos
+// em massa (Disparos). Canal whatsapp_meta não passa por aqui — a Vercel
+// consegue chamar a Graph API direto, de forma síncrona.
+model OutboundQueueItem {
+  id             String    @id @default(uuid())
+  agentId        String
+  contactId      String
+  text           String    @db.Text
+  broadcastId    String?
+  status         String    @default("pending") // pending | sent | failed
+  error          String?
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+
+  agent     Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  broadcast Broadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([broadcastId])
+  @@map("eva_studio_outbound_queue")
+}
+
+// Uma campanha de disparo (mesma mensagem/modelo pra uma lista de contatos).
+// Pra whatsapp_meta o envio é síncrono (Graph API, direto na rota); pra
+// whatsapp_qr cada destinatário vira uma linha em OutboundQueueItem que o
+// worker drena — sentCount/failedCount aqui são atualizados conforme o
+// worker confirma cada envio.
+model Broadcast {
+  id          String   @id @default(uuid())
+  agentId     String
+  channel     String // whatsapp_qr | whatsapp_meta
+  text        String   @db.Text
+  templateId  String?
+  totalCount  Int      @default(0)
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+  status      String   @default("sending") // sending | done
+  createdAt   DateTime @default(now())
+
+  agent Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  queue OutboundQueueItem[]
+
+  @@index([agentId])
+  @@map("eva_studio_broadcasts")
 }

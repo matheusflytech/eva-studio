@@ -25,6 +25,7 @@ export async function GET() {
       contactId: c.contactId,
       status: c.status,
       updatedAt: c.updatedAt.toISOString(),
+      lastContactMessageAt: c.lastContactMessageAt ? c.lastContactMessageAt.toISOString() : null,
       lastMessage: c.messages[0]
         ? { text: c.messages[0].text, role: c.messages[0].role, createdAt: c.messages[0].createdAt.toISOString() }
         : null,

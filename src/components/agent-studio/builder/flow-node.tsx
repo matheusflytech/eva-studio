@@ -22,8 +22,12 @@ export interface FlowNodeData {
   waitDuration?: number;
   waitUnit?: "segundos" | "minutos" | "horas";
   variableName?: string;
+  variableExpression?: string;
   conditionExpression?: string;
   options?: MenuOption[];
+  // Modelo pra usar se essa mensagem sair fora da janela de 24h da Meta
+  // (canal whatsapp_meta) — ver docs/CHATBOT_ENGINE.md.
+  templateId?: string;
   [key: string]: unknown;
 }
 

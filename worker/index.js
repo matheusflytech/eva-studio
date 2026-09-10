@@ -225,6 +225,55 @@ async function resumeDueWaits() {
   }
 }
 
+// Se a linha pertence a uma campanha (Disparos), atualiza o contador e
+// fecha a campanha quando todo mundo já foi processado.
+async function bumpBroadcast(broadcastId, field) {
+  await pool.query(`update eva_studio_broadcasts set "${field}" = "${field}" + 1 where id = $1`, [broadcastId]);
+  const { rows } = await pool.query(
+    `select "totalCount", "sentCount", "failedCount" from eva_studio_broadcasts where id = $1`,
+    [broadcastId]
+  );
+  const b = rows[0];
+  if (b && b.sentCount + b.failedCount >= b.totalCount) {
+    await pool.query(`update eva_studio_broadcasts set status = 'done' where id = $1`, [broadcastId]);
+  }
+}
+
+// Drena a fila de saída (respostas manuais de atendente + disparos em
+// massa) pro WhatsApp via QR — o app principal grava aqui porque ele não
+// segura o socket do Baileys (ver eva_studio_outbound_queue no schema).
+async function drainOutboundQueue() {
+  try {
+    const { rows } = await pool.query(
+      `select id, "agentId", "contactId", text, "broadcastId" from eva_studio_outbound_queue where status = 'pending' order by "createdAt" asc limit 20`
+    );
+    for (const row of rows) {
+      const session = sessions.get(row.agentId);
+      if (!session?.sock) {
+        await pool.query(
+          `update eva_studio_outbound_queue set status = 'failed', error = 'WhatsApp não conectado' where id = $1`,
+          [row.id]
+        );
+        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+        continue;
+      }
+      try {
+        await session.sock.sendMessage(row.contactId, { text: row.text });
+        await pool.query(`update eva_studio_outbound_queue set status = 'sent', "sentAt" = now() where id = $1`, [row.id]);
+        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "sentCount");
+      } catch (err) {
+        await pool.query(`update eva_studio_outbound_queue set status = 'failed', error = $2 where id = $1`, [
+          row.id,
+          String(err?.message ?? err),
+        ]);
+        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Erro ao drenar fila de saída");
+  }
+}
+
 async function resumeConnectedSessions() {
   const { rows } = await pool.query(`select "agentId" from eva_studio_whatsapp_connections where status = 'connected'`);
   for (const row of rows) {
@@ -235,6 +284,7 @@ async function resumeConnectedSessions() {
 resumeConnectedSessions();
 setInterval(pollForWork, 4000);
 setInterval(resumeDueWaits, 15000);
+setInterval(drainOutboundQueue, 4000);
 
 http
   .createServer((req, res) => {

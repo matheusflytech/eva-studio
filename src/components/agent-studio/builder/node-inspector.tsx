@@ -1,24 +1,73 @@
 "use client";
 
+import * as React from "react";
 import { Trash2, X, Plus } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { Node } from "@xyflow/react";
 import type { FlowNodeData, MenuOption } from "./flow-node";
+import { VariablePicker } from "./variable-picker";
 import { generateId } from "@/lib/utils";
+import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
+
+function TemplateSelect({
+  agentId,
+  value,
+  onChange,
+}: {
+  agentId: string;
+  value: string | undefined;
+  onChange: (templateId: string | undefined) => void;
+}) {
+  const [templates, setTemplates] = React.useState<MessageTemplate[] | null>(null);
+
+  React.useEffect(() => {
+    listTemplates(agentId).then(setTemplates).catch(() => setTemplates([]));
+  }, [agentId]);
+
+  return (
+    <div>
+      <Label htmlFor="node-template">Modelo fora da janela de 24h (WhatsApp oficial)</Label>
+      <Select
+        id="node-template"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        disabled={templates === null}
+      >
+        <option value="">Nenhum (tenta texto livre mesmo assim)</option>
+        {(templates ?? []).map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </Select>
+      <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+        Se a conversa (no canal WhatsApp oficial) estiver fora da janela de 24h, esse modelo aprovado é usado em vez
+        do texto acima. Cadastre modelos na aba do agente, em &quot;Modelos de mensagem&quot;.
+      </p>
+    </div>
+  );
+}
 
 export function NodeInspector({
   node,
+  agentId,
+  variables,
   onChange,
   onDelete,
   onClose,
 }: {
   node: Node<FlowNodeData>;
+  agentId: string;
+  variables: string[];
   onChange: (data: Partial<FlowNodeData>) => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const { iconKey } = node.data;
+  const detailRef = React.useRef<HTMLTextAreaElement>(null);
+  const conditionRef = React.useRef<HTMLTextAreaElement>(null);
+  const variableExpressionRef = React.useRef<HTMLTextAreaElement>(null);
 
   return (
     <div className="glass-card w-[260px] rounded-2xl p-4">
@@ -34,20 +83,46 @@ export function NodeInspector({
           <Input id="node-label" value={node.data.label} onChange={(e) => onChange({ label: e.target.value })} />
         </div>
         <div>
-          <Label htmlFor="node-detail">Detalhe / mensagem</Label>
+          <div className="mb-2 flex items-center justify-between">
+            <Label className="mb-0" htmlFor="node-detail">Detalhe / mensagem</Label>
+            <VariablePicker
+              variables={variables}
+              targetRef={detailRef}
+              value={node.data.detail ?? ""}
+              onChange={(next) => onChange({ detail: next })}
+            />
+          </div>
           <Textarea
             id="node-detail"
+            ref={detailRef}
             rows={4}
             value={node.data.detail ?? ""}
             onChange={(e) => onChange({ detail: e.target.value })}
           />
         </div>
 
+        {iconKey === "message" && (
+          <TemplateSelect
+            agentId={agentId}
+            value={node.data.templateId}
+            onChange={(templateId) => onChange({ templateId })}
+          />
+        )}
+
         {iconKey === "condition" && (
           <div>
-            <Label htmlFor="node-condition">Condição</Label>
+            <div className="mb-2 flex items-center justify-between">
+              <Label className="mb-0" htmlFor="node-condition">Condição</Label>
+              <VariablePicker
+                variables={variables}
+                targetRef={conditionRef}
+                value={node.data.conditionExpression ?? ""}
+                onChange={(next) => onChange({ conditionExpression: next })}
+              />
+            </div>
             <Textarea
               id="node-condition"
+              ref={conditionRef}
               rows={2}
               placeholder='ex: {opcao} == "comercial"'
               value={node.data.conditionExpression ?? ""}
@@ -55,6 +130,7 @@ export function NodeInspector({
             />
             <p className="mt-1.5 text-[11.5px] text-text-tertiary">
               Conecte a saída <span className="text-emerald-400">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
+              Aceita <code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code> contra texto entre aspas ou número.
             </p>
           </div>
         )}
@@ -118,14 +194,39 @@ export function NodeInspector({
         )}
 
         {iconKey === "variable" && (
-          <div>
-            <Label htmlFor="node-variable">Nome da variável</Label>
-            <Input
-              id="node-variable"
-              placeholder="ex: nome_cliente"
-              value={node.data.variableName ?? ""}
-              onChange={(e) => onChange({ variableName: e.target.value })}
-            />
+          <div className="flex flex-col gap-3">
+            <div>
+              <Label htmlFor="node-variable">Nome da variável</Label>
+              <Input
+                id="node-variable"
+                placeholder="ex: nome_cliente"
+                value={node.data.variableName ?? ""}
+                onChange={(e) => onChange({ variableName: e.target.value })}
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="mb-0" htmlFor="node-variable-expr">Expressão (opcional)</Label>
+                <VariablePicker
+                  variables={variables}
+                  targetRef={variableExpressionRef}
+                  value={node.data.variableExpression ?? ""}
+                  onChange={(next) => onChange({ variableExpression: next })}
+                />
+              </div>
+              <Textarea
+                id="node-variable-expr"
+                ref={variableExpressionRef}
+                rows={2}
+                placeholder='ex: {preco} + {frete}  ou  {nome} {sobrenome}'
+                value={node.data.variableExpression ?? ""}
+                onChange={(e) => onChange({ variableExpression: e.target.value })}
+              />
+              <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+                Vazio: só garante que a variável existe. Com soma/subtração de dois números, calcula; qualquer outro
+                texto, concatena as variáveis interpoladas (ex: juntar nome + sobrenome).
+              </p>
+            </div>
           </div>
         )}
 

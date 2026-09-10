@@ -1,0 +1,478 @@
+<title>Meta Business Runbook</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --paper: #f6f3ec;
+    --surface: #ffffff;
+    --surface-sunken: #ece7db;
+    --line: #ddd6c6;
+    --text-primary: #201c14;
+    --text-secondary: #63594a;
+    --text-tertiary: #9c8f78;
+    --wa: #1f8f5c;
+    --wa-soft: #e3f2ea;
+    --wa-line: #bfe0cd;
+    --ig: #a83e68;
+    --ig-soft: #f7e7ee;
+    --ig-line: #edc3d5;
+    --amber: #92661b;
+    --amber-soft: #f4ebd6;
+    --amber-line: #e3cd9b;
+    --shadow: 0 1px 2px rgba(32, 28, 20, 0.04), 0 8px 24px rgba(32, 28, 20, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #13120f;
+      --surface: #1b1915;
+      --surface-sunken: #100f0c;
+      --line: #322e26;
+      --text-primary: #ece6d8;
+      --text-secondary: #b0a690;
+      --text-tertiary: #7c7360;
+      --wa: #4bc98a;
+      --wa-soft: #17251d;
+      --wa-line: #274a37;
+      --ig: #e2789e;
+      --ig-soft: #2a1a20;
+      --ig-line: #4a2933;
+      --amber: #d9b158;
+      --amber-soft: #2a2317;
+      --amber-line: #4a3c22;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 30px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #13120f;
+    --surface: #1b1915;
+    --surface-sunken: #100f0c;
+    --line: #322e26;
+    --text-primary: #ece6d8;
+    --text-secondary: #b0a690;
+    --text-tertiary: #7c7360;
+    --wa: #4bc98a;
+    --wa-soft: #17251d;
+    --wa-line: #274a37;
+    --ig: #e2789e;
+    --ig-soft: #2a1a20;
+    --ig-line: #4a2933;
+    --amber: #d9b158;
+    --amber-soft: #2a2317;
+    --amber-line: #4a3c22;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  code, .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; text-wrap: balance; }
+
+  .shell { display: flex; max-width: 1180px; margin: 0 auto; }
+
+  /* ---------- rail ---------- */
+  .rail {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    width: 232px;
+    flex-shrink: 0;
+    padding: 48px 20px 40px 32px;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .rail-brand {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 22px;
+  }
+  .rail-list { display: flex; flex-direction: column; gap: 2px; }
+  .rail-link {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 7px 10px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .rail-link:hover { background: var(--surface-sunken); color: var(--text-primary); }
+  .rail-num { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-tertiary); width: 14px; flex-shrink: 0; }
+  .rail-track {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 2px; flex-shrink: 0; align-self: center;
+  }
+
+  /* ---------- main ---------- */
+  main { flex: 1; min-width: 0; padding: 64px 56px 120px; max-width: 800px; }
+
+  .kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--text-tertiary); margin-bottom: 18px;
+  }
+  .kicker::before {
+    content: ""; width: 20px; height: 1px; background: var(--text-tertiary);
+  }
+  h1.title { font-size: 38px; font-weight: 600; margin: 0 0 14px; letter-spacing: -0.01em; }
+  .lede { font-size: 16.5px; color: var(--text-secondary); max-width: 62ch; margin: 0 0 8px; }
+  .lede + .lede { margin-top: 10px; }
+
+  .scope-row {
+    display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap;
+  }
+  .scope-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--line); background: var(--surface);
+    border-radius: 999px; padding: 6px 13px 6px 10px; font-size: 12.5px; color: var(--text-secondary);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  section.phase { margin-top: 76px; padding-top: 2px; }
+  section.phase:first-of-type { margin-top: 56px; }
+
+  .phase-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 6px; }
+  .phase-index {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text-tertiary);
+    border: 1px solid var(--line); border-radius: 7px; padding: 3px 8px; flex-shrink: 0;
+  }
+  h2.phase-title { font-size: 25px; font-weight: 600; margin: 0; }
+  .phase-sub { color: var(--text-secondary); font-size: 14.5px; margin: 10px 0 28px; max-width: 66ch; }
+
+  .step {
+    display: flex; gap: 16px; padding: 18px 0; border-top: 1px solid var(--line);
+  }
+  .step:last-child { padding-bottom: 4px; }
+  .step-marker {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--line); color: var(--text-secondary); margin-top: 2px;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-weight: 600; font-size: 15px; margin: 0 0 5px; }
+  .step-text { color: var(--text-secondary); font-size: 14px; margin: 0; }
+  .step-text + .step-text { margin-top: 8px; }
+  .step-text code { background: var(--surface-sunken); padding: 1.5px 5px; border-radius: 4px; font-size: 12.5px; }
+
+  .wa-track .step-marker { border-color: var(--wa-line); color: var(--wa); background: var(--wa-soft); }
+  .ig-track .step-marker { border-color: var(--ig-line); color: var(--ig); background: var(--ig-soft); }
+
+  .callout {
+    border: 1px solid var(--line); border-left: 3px solid var(--text-tertiary);
+    background: var(--surface); border-radius: 10px; padding: 14px 16px; margin: 18px 0;
+    font-size: 13.5px; color: var(--text-secondary);
+  }
+  .callout.warn { border-left-color: var(--amber); background: var(--amber-soft); border-color: var(--amber-line); color: var(--text-primary); }
+  .callout.wa { border-left-color: var(--wa); background: var(--wa-soft); border-color: var(--wa-line); color: var(--text-primary); }
+  .callout.ig { border-left-color: var(--ig); background: var(--ig-soft); border-color: var(--ig-line); color: var(--text-primary); }
+  .callout b { font-weight: 600; }
+  .callout-label { display: block; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 6px; font-weight: 600; }
+
+  .codeblock {
+    background: var(--surface-sunken); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; overflow-x: auto;
+    margin: 14px 0;
+  }
+  .codeblock .k { color: var(--text-tertiary); }
+  .codeblock div { white-space: pre; }
+  .codeblock div + div { margin-top: 3px; }
+
+  table.field-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  .field-table th, .field-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .field-table th { color: var(--text-tertiary); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .field-table td.mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-primary); }
+  .field-table-wrap { overflow-x: auto; }
+
+  .track-header {
+    display: flex; align-items: center; gap: 10px; margin: 40px 0 18px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  .track-header .dot { width: 10px; height: 10px; }
+  .track-header h3 { margin: 0; font-size: 17px; font-weight: 600; }
+  .track-header span.badge {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px; font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .divider-note {
+    display: flex; align-items: center; gap: 14px; margin: 44px 0; color: var(--text-tertiary); font-size: 12px;
+  }
+  .divider-note::before, .divider-note::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  footer.doc-footer {
+    margin-top: 90px; padding-top: 24px; border-top: 1px solid var(--line);
+    color: var(--text-tertiary); font-size: 12.5px;
+  }
+
+  @media (max-width: 880px) {
+    .rail { display: none; }
+    main { padding: 40px 22px 90px; }
+    h1.title { font-size: 30px; }
+  }
+</style>
+
+<div class="shell">
+  <nav class="rail">
+    <div class="rail-brand">Eva Studio · Meta</div>
+    <div class="rail-list">
+      <a class="rail-link" href="#fundacao"><span class="rail-num">00</span>Fundação</a>
+      <a class="rail-link" href="#whatsapp"><span class="rail-num">01</span><span class="rail-track" style="background:var(--wa)"></span>WhatsApp</a>
+      <a class="rail-link" href="#instagram"><span class="rail-num">02</span><span class="rail-track" style="background:var(--ig)"></span>Instagram</a>
+      <a class="rail-link" href="#eva-studio"><span class="rail-num">03</span>Ligar no Eva Studio</a>
+      <a class="rail-link" href="#producao"><span class="rail-num">04</span>Virar produção</a>
+      <a class="rail-link" href="#glossario"><span class="rail-num">·</span>Glossário</a>
+    </div>
+  </nav>
+
+  <main>
+    <p class="kicker">Runbook operacional</p>
+    <h1 class="title">Conectando o WhatsApp e o Instagram oficiais</h1>
+    <p class="lede">O caminho completo, do zero, pra sair de "conectado via QR code" pra rodar como um negócio verificado na plataforma da Meta — WhatsApp Cloud API e Instagram Messaging.</p>
+    <p class="lede">Isso não é uma tarefa de código: é um processo administrativo (documentos, verificação, revisão de app) que só a conta Meta da Beeno pode fazer. O papel do Eva Studio nisso é receber o resultado — um <code>phoneNumberId</code>, uma <code>waba</code>, um token — e usar pra falar com a API. Esse documento mapeia os dois lados.</p>
+
+    <div class="scope-row">
+      <span class="scope-pill"><span class="dot" style="background:var(--wa)"></span>WhatsApp — já tem código pronto no Eva Studio</span>
+      <span class="scope-pill"><span class="dot" style="background:var(--ig)"></span>Instagram — processo de conta mapeado, adaptador de código ainda não existe</span>
+    </div>
+
+    <!-- FUNDAÇÃO -->
+    <section class="phase" id="fundacao">
+      <div class="phase-head">
+        <span class="phase-index">00</span>
+        <h2 class="phase-title">Fundação — antes de escolher canal</h2>
+      </div>
+      <p class="phase-sub">WhatsApp e Instagram são dois "produtos" dentro do mesmo app Meta. Essa parte só se faz uma vez, e vale pros dois.</p>
+
+      <div class="step">
+        <div class="step-marker">1</div>
+        <div class="step-body">
+          <p class="step-title">Portfólio de negócios no Meta Business Manager</p>
+          <p class="step-text">Precisa existir uma conta empresarial da Beeno em <code class="mono">business.facebook.com</code> — CNPJ, endereço e um domínio próprio (o site institucional já serve). Se já existe uma pra outra finalidade (anúncios, página do Instagram), reaproveita.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-marker">2</div>
+        <div class="step-body">
+          <p class="step-title">Verificação da empresa (Business Verification)</p>
+          <p class="step-text">Dentro do portfólio: <code>Configurações do negócio → Central de segurança → Verificação do negócio</code>. Pede documento do CNPJ e prova de domínio (registro DNS ou upload de arquivo no site). É o pré-requisito que mais trava quem não se planeja com antecedência — leva de algumas horas a poucos dias.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-marker">3</div>
+        <div class="step-body">
+          <p class="step-title">Criar o app em developers.facebook.com</p>
+          <p class="step-text">Tipo "Empresa" (Business), associado ao portfólio verificado acima. É esse mesmo app que vai ganhar os produtos "WhatsApp" e "Instagram" nas próximas fases — um app único cobre os dois canais.</p>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-label">Por que isso importa desde já</span>
+        Como o Eva Studio atende <b>vários clientes diferentes</b> com o mesmo app (não é uso próprio de uma única empresa), a Meta classifica isso como app de "Tech Provider" — o que exige <b>Advanced Access</b> nas permissões de mensageria via App Review, não só o acesso padrão. Isso é decidido lá na frente (fase 04), mas a estrutura de portfólio/verificação já precisa estar certa desde o início pra não ter que refazer.
+      </div>
+    </section>
+
+    <!-- WHATSAPP -->
+    <section class="phase" id="whatsapp">
+      <div class="phase-head">
+        <span class="phase-index">01</span>
+        <h2 class="phase-title">Canal WhatsApp — Cloud API</h2>
+      </div>
+      <p class="phase-sub">O caminho recomendado hoje é sempre a Cloud API hospedada pela própria Meta (não o On-Premises, que a Meta vem descontinuando). É o canal que o Eva Studio já tem código pronto pra receber.</p>
+
+      <div class="wa-track">
+        <div class="step">
+          <div class="step-marker">1</div>
+          <div class="step-body">
+            <p class="step-title">Adicionar o produto "WhatsApp" ao app</p>
+            <p class="step-text">No painel do app: <code>Adicionar produto → WhatsApp → Configurar</code>. A Meta cria automaticamente um número de teste temporário — dá pra testar o fluxo todo antes de ter o número real da empresa.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">2</div>
+          <div class="step-body">
+            <p class="step-title">Criar a WhatsApp Business Account (WABA) e registrar o número real</p>
+            <p class="step-text">O número que os clientes vão ver (ex: o número principal da Beeno, ou um número dedicado por cliente). Precisa ser um número que ainda não tenha um app do WhatsApp comum instalado com ele, ou estar disposto a migrar.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">3</div>
+          <div class="step-body">
+            <p class="step-title">Gerar um token de acesso permanente</p>
+            <p class="step-text">Um <b>usuário de sistema</b> (System User) no Business Manager, com papel de admin na WABA, gerando um token sem expiração — o token de teste padrão do painel expira em 24h e não serve pra produção.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">4</div>
+          <div class="step-body">
+            <p class="step-title">Configurar o Webhook</p>
+            <p class="step-text">No produto WhatsApp do app: <code>Configuration → Webhook</code>. URL de callback: <code>https://&lt;seu-domínio&gt;/api/webhooks/meta</code>. "Verify token": qualquer string escolhida (vira <code>META_WEBHOOK_VERIFY_TOKEN</code>). Campo pra assinar: <code>messages</code>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">5</div>
+          <div class="step-body">
+            <p class="step-title">Cadastrar e aprovar os modelos de mensagem</p>
+            <p class="step-text">No painel Meta: <code>WhatsApp Manager → Modelos de mensagem</code>. Cada modelo (nome, idioma, texto com <code>{{1}}</code>, <code>{{2}}</code>...) leva de algumas horas a 48h pra ser aprovado. É o mesmo nome e ordem de variáveis que depois vão ser cadastrados de novo no Eva Studio (fase 03) — combine os dois na hora de criar.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout wa">
+        <span class="callout-label">Onde isso já existe no código</span>
+        <code>src/app/api/webhooks/meta/route.ts</code> já sabe validar o desafio do webhook, receber mensagens/toques de botão e responder — inclusive já decide entre texto livre e modelo aprovado sozinho, com base na janela de 24h (ver <code>docs/CHATBOT_ENGINE.md</code> §6). Falta só o que está na fase 03: as credenciais reais.
+      </div>
+    </section>
+
+    <!-- INSTAGRAM -->
+    <section class="phase" id="instagram">
+      <div class="phase-head">
+        <span class="phase-index">02</span>
+        <h2 class="phase-title">Canal Instagram — Messaging API</h2>
+      </div>
+      <p class="phase-sub">Direct messages do Instagram, pelo mesmo tipo de app Meta. Só funciona pra contas Business ou Creator — perfil pessoal não entra na API de jeito nenhum.</p>
+
+      <div class="ig-track">
+        <div class="step">
+          <div class="step-marker">1</div>
+          <div class="step-body">
+            <p class="step-title">Converter (ou confirmar) a conta como Instagram Business/Creator</p>
+            <p class="step-text">Feito direto no app do Instagram: <code>Configurações → Conta → Mudar para conta profissional</code>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">2</div>
+          <div class="step-body">
+            <p class="step-title">Escolher a via de conexão</p>
+            <p class="step-text"><b>Instagram API with Instagram Login</b> (mais nova): a conta faz login direto, sem precisar de uma Página do Facebook vinculada — caminho recomendado hoje pra quem está começando agora.</p>
+            <p class="step-text">Alternativa mais antiga (ainda ativa): vincular a conta a uma <b>Página do Facebook</b> e usar a Messenger Platform com o produto Instagram — só vale a pena se a Beeno (ou o cliente) já depende de uma Página existente pra outra coisa.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">3</div>
+          <div class="step-body">
+            <p class="step-title">Adicionar o produto "Instagram" ao mesmo app</p>
+            <p class="step-text">Painel do app → <code>Adicionar produto → Instagram</code>. Configura o login/token e o webhook (mesma ideia do WhatsApp: URL + verify token, mas endpoint e formato de payload são diferentes).</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-marker">4</div>
+          <div class="step-body">
+            <p class="step-title">Permissão <code>instagram_business_manage_messages</code></p>
+            <p class="step-text">É essa permissão específica que libera ler/enviar DM. Pra atender contas de clientes (não só a própria conta da Beeno), precisa do mesmo Advanced Access via App Review da fase 04.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout ig">
+        <span class="callout-label">A regra da janela de 24h também existe aqui</span>
+        Igual o WhatsApp: só dá pra responder livremente até 24h depois da última mensagem que a pessoa mandou. O Instagram não tem "modelo pré-aprovado" pra mandar fora da janela — passado esse prazo, simplesmente não dá pra iniciar contato ali (diferente do WhatsApp, que tem essa válvula de escape via template).
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-label">O que falta do lado do código</span>
+        O <code>src/app/api/webhooks/meta/route.ts</code> de hoje só entende o formato de payload do WhatsApp (<code>phone_number_id</code>, mensagens de texto/interativas). O Instagram manda um formato diferente (identifica pelo <code>igsid</code>, não por telefone) — vai precisar de um branch novo nessa mesma rota (ou uma rota irmã) quando for a hora de ativar de verdade. O motor de conversa (<code>advanceConversation</code>) não muda: ele já é agnóstico de canal, só o adaptador de entrada/saída é que falta.
+      </div>
+    </section>
+
+    <div class="divider-note">CONTAS PRONTAS DOS DOIS LADOS — AGORA LIGA NO EVA STUDIO</div>
+
+    <!-- EVA STUDIO -->
+    <section class="phase" id="eva-studio">
+      <div class="phase-head">
+        <span class="phase-index">03</span>
+        <h2 class="phase-title">Ligar as credenciais no Eva Studio</h2>
+      </div>
+      <p class="phase-sub">Duas partes: variáveis de ambiente (uma vez, pro app inteiro) e uma linha por agente conectado (uma vez por cliente/número).</p>
+
+      <p class="step-title" style="margin-top:28px;">Variáveis de ambiente (Vercel → Settings → Environment Variables)</p>
+      <div class="codeblock">
+<div><span class="k">META_APP_SECRET</span>=...        <span class="k"># painel do app → Configurações básicas</span></div>
+<div><span class="k">META_WEBHOOK_VERIFY_TOKEN</span>=...  <span class="k"># escolhida na fase 01, passo 4</span></div>
+      </div>
+
+      <p class="step-title" style="margin-top:32px;">Por agente conectado — tabela <code class="mono">eva_studio_meta_connections</code></p>
+      <div class="field-table-wrap">
+        <table class="field-table">
+          <thead><tr><th>Campo</th><th>De onde vem</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">phoneNumberId</td><td>WhatsApp Manager → número → "ID do número de telefone"</td></tr>
+            <tr><td class="mono">wabaId</td><td>WhatsApp Manager → visão geral da conta</td></tr>
+            <tr><td class="mono">accessToken</td><td>Token permanente do System User (fase 01, passo 3)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="step-text">Hoje isso só entra via inserção direta no banco — ainda não existe uma tela de "conectar clicando um botão" (o fluxo de Embedded Signup da Meta) pra esse canal. É um bom próximo passo quando o volume justificar, mas não bloqueia o primeiro cliente real.</p>
+
+      <p class="step-title" style="margin-top:28px;">Modelos de mensagem — cadastrar nos dois lugares</p>
+      <p class="step-text">O nome e a ordem das variáveis cadastrados no WhatsApp Manager (fase 01, passo 5) precisam ser digitados <b>de novo, idênticos</b>, na aba do agente em "Modelos de mensagem" (campos <code>metaTemplateName</code> / <code>metaLanguageCode</code>). Não existe hoje uma chamada que confirme automaticamente que os dois batem — o Eva Studio confia em quem cadastrou.</p>
+    </section>
+
+    <!-- PRODUÇÃO -->
+    <section class="phase" id="producao">
+      <div class="phase-head">
+        <span class="phase-index">04</span>
+        <h2 class="phase-title">Virar produção de verdade</h2>
+      </div>
+      <p class="phase-sub">Tudo acima já funciona em modo de desenvolvimento, só visível pros administradores do app. Pra atender clientes de verdade, falta uma etapa administrativa final.</p>
+
+      <div class="step">
+        <div class="step-marker">1</div>
+        <div class="step-body">
+          <p class="step-title">Submeter pra App Review</p>
+          <p class="step-text">Pedindo <b>Advanced Access</b> de <code>whatsapp_business_management</code> (+ <code>whatsapp_business_messaging</code>) e, se for ativar Instagram também, <code>instagram_business_manage_messages</code>. Isso é obrigatório porque o app atende WABAs/contas de clientes diferentes — não é uso interno de uma conta só.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-marker">2</div>
+        <div class="step-body">
+          <p class="step-title">Prazo esperado</p>
+          <p class="step-text">Turnaround médio de revisão em torno de 24–48h depois de submetido, desde que a verificação do negócio (fase 00) já esteja concluída — é o motivo de deixar essa parte pronta com bastante antecedência.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-marker">3</div>
+        <div class="step-body">
+          <p class="step-title">Modo Live</p>
+          <p class="step-text">Com Advanced Access aprovado, o app muda de "Em desenvolvimento" pra "Ativo" no painel — a partir daí qualquer WABA/conta Instagram de qualquer cliente pode ser conectada, não só as que estão na lista de testadores.</p>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-label">Antes de pedir revisão</span>
+        A Meta pede uma tela/vídeo mostrando o uso real do produto (o painel do Eva Studio + uma conversa real fluindo) e uma política de privacidade pública. Vale gravar isso com um agente de teste já funcionando de ponta a ponta, não deixar pra fazer às pressas na hora de submeter.
+      </div>
+    </section>
+
+    <!-- GLOSSARIO -->
+    <section class="phase" id="glossario">
+      <div class="phase-head">
+        <span class="phase-index">·</span>
+        <h2 class="phase-title">Glossário rápido</h2>
+      </div>
+      <div class="field-table-wrap">
+        <table class="field-table">
+          <tbody>
+            <tr><td class="mono" style="width:190px">WABA</td><td>WhatsApp Business Account — a conta que "dona" o(s) número(s) de telefone conectados.</td></tr>
+            <tr><td class="mono">System User</td><td>Usuário técnico do Business Manager, sem login humano — dono do token permanente.</td></tr>
+            <tr><td class="mono">Advanced Access</td><td>Nível de permissão liberado só via App Review, necessário pra atender contas de terceiros (não a própria).</td></tr>
+            <tr><td class="mono">Janela de 24h</td><td>Prazo depois da última mensagem do contato em que o negócio pode responder livremente (ver <code>docs/CHATBOT_ENGINE.md</code>).</td></tr>
+            <tr><td class="mono">igsid</td><td>Id de usuário escopado ao app, usado pelo Instagram no lugar de telefone.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="doc-footer">
+      Eva Studio — referência técnica interna. Escrito a partir da documentação pública da Meta for Developers e do estado real do código em <code>eva-agent-studio - Copia/</code> em 2026-09.
+    </footer>
+  </main>
+</div>

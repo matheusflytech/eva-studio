@@ -11,8 +11,12 @@ import { KnowledgeBaseUploader } from "./knowledge-base-uploader";
 import { SkillsPicker } from "./skills-picker";
 import { ToolsPicker } from "./tools-picker";
 import { VariablesEditor } from "./variables-editor";
+import { MessageTemplatesEditor } from "./message-templates-editor";
 import { WebhookConfig } from "./webhook-config";
 import { WhatsAppConnect } from "./whatsapp-connect";
+import { MetaWhatsAppConnect } from "./meta-whatsapp-connect";
+import { InstagramConnect } from "./instagram-connect";
+import { CommentAutomationsEditor } from "./comment-automations-editor";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
@@ -223,10 +227,50 @@ export function AgentForm({ agent }: { agent?: Agent }) {
       {isEdit && (
         <Card>
           <CardHeader>
+            <CardTitle>Modelos de mensagem</CardTitle>
+            <CardDescription>Pra usar quando a conversa no WhatsApp oficial estiver fora da janela de 24h.</CardDescription>
+          </CardHeader>
+          <MessageTemplatesEditor agentId={agentId} />
+        </Card>
+      )}
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
             <CardTitle>WhatsApp</CardTitle>
             <CardDescription>Conecte um número de WhatsApp direto a este agente, via QR code.</CardDescription>
           </CardHeader>
           <WhatsAppConnect agentId={agentId} />
+        </Card>
+      )}
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>WhatsApp oficial (Meta)</CardTitle>
+            <CardDescription>Canal oficial via Embedded Signup — recomendado pra alto volume e clientes de verdade.</CardDescription>
+          </CardHeader>
+          <MetaWhatsAppConnect agentId={agentId} />
+        </Card>
+      )}
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Instagram</CardTitle>
+            <CardDescription>Direct messages do Instagram, pela mesma conta Business/Creator.</CardDescription>
+          </CardHeader>
+          <InstagramConnect agentId={agentId} />
+        </Card>
+      )}
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Automações de comentário (Instagram)</CardTitle>
+            <CardDescription>Comente e receba DM — igual o recurso de comentário do ManyChat.</CardDescription>
+          </CardHeader>
+          <CommentAutomationsEditor agentId={agentId} />
         </Card>
       )}
 

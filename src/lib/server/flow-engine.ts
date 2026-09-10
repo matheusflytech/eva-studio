@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/extract-text";
@@ -7,6 +8,13 @@ import { truncateForPrompt } from "@/lib/server/extract-text";
 export interface OutboundMessage {
   text: string;
   options?: { id: string; label: string }[];
+  // Fora da janela de 24h e o bloco não tem modelo escolhido — a mensagem
+  // ainda é enviada como texto livre, mas quem manda de verdade (worker/rota
+  // da Meta) deve avisar, porque a Meta rejeita texto livre fora da janela.
+  requiresTemplate?: boolean;
+  // Fora da janela e o bloco tem um modelo aprovado — quem manda de verdade
+  // deve usar a API de templates da Meta com esses dados em vez de texto.
+  template?: { name: string; languageCode: string; parameters: string[] };
 }
 
 export interface AdvanceInput {
@@ -31,16 +39,41 @@ function interpolate(template: string, variables: Variables): string {
   });
 }
 
-// Suporta "{variavel} == \"valor\"", "{variavel} != \"valor\"" ou só "{variavel}"
-// (checa se é "verdadeiro" — não vazio/zero/false). Sem eval — é comparação de
-// string simples, propositalmente limitado.
+// Suporta "{variavel} <op> \"valor\"" (op: == != > < >= <=), "{variavel} <op> 123"
+// (compara numérico se os dois lados forem número) ou só "{variavel}" (checa
+// se é "verdadeiro" — não vazio/zero/false). Sem eval — é regex + comparação
+// simples, propositalmente limitado (ver docs/CHATBOT_ENGINE.md §7).
 function evaluateCondition(expression: string, variables: Variables): boolean {
   const expr = (expression ?? "").trim();
-  const comparison = expr.match(/^\{(\w+)\}\s*(==|!=)\s*"([^"]*)"$/);
+  const comparison = expr.match(/^\{(\w+)\}\s*(==|!=|>=|<=|>|<)\s*(?:"([^"]*)"|(-?\d+(?:\.\d+)?))$/);
   if (comparison) {
-    const [, key, op, expected] = comparison;
-    const actual = String(variables[key] ?? "");
-    return op === "==" ? actual === expected : actual !== expected;
+    const [, key, op, quoted, numeric] = comparison;
+    const actual = variables[key];
+
+    if (numeric !== undefined) {
+      const actualNum = Number(actual);
+      const expectedNum = Number(numeric);
+      if (Number.isNaN(actualNum)) return op === "!=";
+      switch (op) {
+        case "==": return actualNum === expectedNum;
+        case "!=": return actualNum !== expectedNum;
+        case ">": return actualNum > expectedNum;
+        case "<": return actualNum < expectedNum;
+        case ">=": return actualNum >= expectedNum;
+        default: return actualNum <= expectedNum; // "<="
+      }
+    }
+
+    const actualStr = String(actual ?? "");
+    const expected = quoted ?? "";
+    switch (op) {
+      case "==": return actualStr === expected;
+      case "!=": return actualStr !== expected;
+      case ">": return actualStr > expected;
+      case "<": return actualStr < expected;
+      case ">=": return actualStr >= expected;
+      default: return actualStr <= expected; // "<="
+    }
   }
   const bare = expr.match(/^\{(\w+)\}$/);
   if (bare) {
@@ -48,6 +81,21 @@ function evaluateCondition(expression: string, variables: Variables): boolean {
     return Boolean(value) && value !== "0" && value !== "false";
   }
   return false;
+}
+
+// Resolve o bloco Variável quando tem uma expressão configurada: interpola
+// todo {var} primeiro (isso já cobre concatenação, ex: "{nome} {sobrenome}"),
+// e se o resultado virar uma soma/subtração simples de dois números
+// ("10 + 5"), calcula. Continua sem eval de verdade — só esses dois casos.
+function resolveVariableExpression(expression: string, variables: Variables): string {
+  const interpolated = interpolate(expression, variables);
+  const arithmetic = interpolated.match(/^(-?\d+(?:\.\d+)?)\s*([+-])\s*(-?\d+(?:\.\d+)?)$/);
+  if (arithmetic) {
+    const [, a, op, b] = arithmetic;
+    const result = op === "+" ? Number(a) + Number(b) : Number(a) - Number(b);
+    return String(result);
+  }
+  return interpolated;
 }
 
 interface AgentForWebhook {
@@ -103,12 +151,57 @@ async function callAgentWebhook(
   }
 }
 
+const WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Janela de 24h da Meta: enquanto ela estiver aberta, o negócio pode mandar
+// texto livre em resposta; fora dela, só mensagem de modelo pré-aprovado.
+// Só importa pro canal whatsapp_meta — WhatsApp via QR (Baileys) e Playground
+// não são a API oficial, então essa regra não existe pra eles.
+function isOutsideWindow(lastContactMessageAt: Date | null): boolean {
+  return !lastContactMessageAt || Date.now() - lastContactMessageAt.getTime() > WINDOW_MS;
+}
+
+// Resolve o que mandar num bloco de Mensagem: se a janela tá aberta (ou não é
+// canal Meta), manda o texto normal. Se tá fechada, usa o modelo escolhido no
+// bloco (se tiver) montando os parâmetros posicionais na ordem certa; sem
+// modelo escolhido, ainda manda o texto mas marca requiresTemplate pra quem
+// for enviar de verdade saber que a Meta provavelmente vai rejeitar.
+async function resolveOutboundMessage(
+  node: Node<FlowNodeData>,
+  variables: Variables,
+  agentId: string,
+  outsideWindow: boolean
+): Promise<OutboundMessage> {
+  const text = interpolate(node.data.detail ?? "", variables);
+  if (!outsideWindow) return { text };
+
+  if (node.data.templateId) {
+    const tpl = await prisma.messageTemplate.findFirst({ where: { id: node.data.templateId, agentId } });
+    if (tpl && tpl.metaTemplateName) {
+      const order = (tpl.variableOrder as unknown as string[]) ?? [];
+      return {
+        text: interpolate(tpl.bodyText, variables),
+        template: {
+          name: tpl.metaTemplateName,
+          languageCode: tpl.metaLanguageCode,
+          parameters: order.map((name) => String(variables[name] ?? "")),
+        },
+      };
+    }
+    if (tpl) return { text: interpolate(tpl.bodyText, variables), requiresTemplate: true };
+  }
+
+  return { text, requiresTemplate: true };
+}
+
 function findNode(nodes: Node<FlowNodeData>[], id: string | null): Node<FlowNodeData> | null {
   if (!id) return null;
   return nodes.find((n) => n.id === id) ?? null;
 }
 
-function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string | null): string | null {
+// Exportado também pro endpoint de "retomar bot" (fase de inbox humano) —
+// resolve qual bloco vem depois de um dado nó, mesma lógica usada aqui dentro.
+export function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string | null): string | null {
   const edge = edges.find((e) => e.source === fromId && (sourceHandle == null || e.sourceHandle === sourceHandle));
   return edge?.target ?? null;
 }
@@ -143,6 +236,9 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {});
     const messages = reply ? [{ text: reply }] : [];
     await logMessages(conversation.id, input.text, messages);
+    if (input.text !== undefined || input.optionId !== undefined) {
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { lastContactMessageAt: new Date() } });
+    }
     return { messages, status: "active" };
   }
 
@@ -165,10 +261,24 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   let status: AdvanceResult["status"] = "active";
   const inboundText = input.text ?? (input.optionId ? `[opção: ${input.optionId}]` : undefined);
 
+  // Uma mensagem/toque de verdade do contato sempre reabre a janela de 24h —
+  // por isso, quando isGenuineInbound é true, outsideWindow fica sempre false
+  // (a resposta de agora conta como dentro da janela). Só fica true quando o
+  // motor é acordado sem nada vindo do contato (ex: retomada de um Esperar
+  // vencido) e o último contato de verdade já passou de 24h.
+  const isGenuineInbound = input.text !== undefined || input.optionId !== undefined;
+  const outsideWindow = input.channel === "whatsapp_meta" && !isGenuineInbound && isOutsideWindow(conversation.lastContactMessageAt);
+
   async function finish(): Promise<AdvanceResult> {
     await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { currentNodeId: currentId, variables, status, updatedAt: new Date() },
+      data: {
+        currentNodeId: currentId,
+        variables: variables as Prisma.InputJsonValue,
+        status,
+        updatedAt: new Date(),
+        lastContactMessageAt: isGenuineInbound ? new Date() : conversation.lastContactMessageAt,
+      },
     });
     await logMessages(conversation.id, inboundText, messages);
     return { messages, status };
@@ -232,7 +342,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const kind = node.data.iconKey;
 
     if (kind === "message") {
-      messages.push({ text: interpolate(node.data.detail ?? "", variables) });
+      messages.push(await resolveOutboundMessage(node, variables, input.agentId, outsideWindow));
       currentId = nextNodeId(edges, node.id);
       continue;
     }
@@ -254,8 +364,12 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
 
     if (kind === "variable") {
-      if (node.data.variableName && !(node.data.variableName in variables)) {
-        variables[node.data.variableName] = "";
+      if (node.data.variableName) {
+        if (node.data.variableExpression) {
+          variables[node.data.variableName] = resolveVariableExpression(node.data.variableExpression, variables);
+        } else if (!(node.data.variableName in variables)) {
+          variables[node.data.variableName] = "";
+        }
       }
       currentId = nextNodeId(edges, node.id);
       continue;
@@ -297,7 +411,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     if (kind === "human") {
       if (node.data.detail) messages.push({ text: interpolate(node.data.detail, variables) });
       status = "waiting_human";
-      currentId = null;
+      // Fica "parado" no próprio bloco (em vez de null) — é o que permite o
+      // atendente clicar "Retomar bot" depois e o motor saber pra onde ir a
+      // seguir (nextNodeId a partir daqui), em vez de perder a posição.
+      currentId = node.id;
       break;
     }
 

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -25,6 +25,9 @@ import { NodeInspector } from "@/components/agent-studio/builder/node-inspector"
 import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
+import { autoLayoutNodes } from "@/components/agent-studio/builder/auto-layout";
+import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-template-gallery";
+import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
@@ -40,6 +43,7 @@ export default function AgentBuilderPage() {
   const [flowLoaded, setFlowLoaded] = React.useState(false);
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [showPreview, setShowPreview] = React.useState(true);
+  const [showTemplateGallery, setShowTemplateGallery] = React.useState(false);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
@@ -64,6 +68,17 @@ export default function AgentBuilderPage() {
 
   const agent = agents.find((a) => a.id === agentId);
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
+
+  // Nomes de variável já usados em blocos de Captura de input, Variável e
+  // Chamar webhook — é isso que alimenta o seletor visual no inspector, pra
+  // não precisar decorar/digitar o {nome} certo na mão em outros blocos.
+  const availableVariables = React.useMemo(() => {
+    const set = new Set<string>();
+    nodes.forEach((n) => {
+      if (n.data.variableName) set.add(n.data.variableName);
+    });
+    return Array.from(set).sort();
+  }, [nodes]);
 
   const onConnect = React.useCallback(
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
@@ -121,6 +136,21 @@ export default function AgentBuilderPage() {
     setSelectedId(null);
   }
 
+  function handleAutoLayout() {
+    setNodes((nds) => autoLayoutNodes(nds, edges));
+  }
+
+  function handlePickTemplate(template: FlowTemplate) {
+    if (!confirm(`Substituir o canvas atual pelo modelo "${template.name}"? As alterações não salvas se perdem.`)) {
+      return;
+    }
+    const { nodes: newNodes, edges: newEdges } = template.build();
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setSelectedId(null);
+    setShowTemplateGallery(false);
+  }
+
   const nodeTypes = React.useMemo(
     () => ({
       flowNode: (props: NodeProps<Node<FlowNodeData>>) => (
@@ -173,6 +203,21 @@ export default function AgentBuilderPage() {
           </span>
           <button
             type="button"
+            onClick={() => setShowTemplateGallery(true)}
+            className={buttonVariants({ variant: "secondary", size: "md" })}
+          >
+            <LayoutTemplate size={15} /> Modelos
+          </button>
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            className={buttonVariants({ variant: "secondary", size: "md" })}
+            title="Reorganiza os blocos automaticamente"
+          >
+            <LayoutGrid size={15} /> Organizar
+          </button>
+          <button
+            type="button"
             onClick={() => setShowPreview((v) => !v)}
             className={buttonVariants({ variant: "secondary", size: "md" })}
           >
@@ -209,6 +254,8 @@ export default function AgentBuilderPage() {
                 {selectedNode && (
                   <NodeInspector
                     node={selectedNode}
+                    agentId={agentId}
+                    variables={availableVariables}
                     onChange={handleNodeDataChange}
                     onDelete={handleDeleteNode}
                     onClose={() => setSelectedId(null)}
@@ -222,6 +269,10 @@ export default function AgentBuilderPage() {
 
         {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
       </div>
+
+      {showTemplateGallery && (
+        <FlowTemplateGallery onPick={handlePickTemplate} onClose={() => setShowTemplateGallery(false)} />
+      )}
     </div>
   );
 }
