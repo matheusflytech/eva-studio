@@ -1,42 +1,69 @@
 "use client";
 
 import * as React from "react";
-import { Upload, FileText, X, Loader2 } from "lucide-react";
-import { generateId, formatBytes } from "@/lib/utils";
+import { Upload, FileText, X, Loader2, AlertTriangle } from "lucide-react";
+import { formatBytes } from "@/lib/utils";
 import type { KnowledgeDoc } from "@/lib/data/types";
 
+function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function KnowledgeBaseUploader({
+  agentId,
   docs,
   onChange,
 }: {
+  agentId: string;
   docs: KnowledgeDoc[];
   onChange: (docs: KnowledgeDoc[]) => void;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [uploadingNames, setUploadingNames] = React.useState<string[]>([]);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  function handleFiles(fileList: FileList | null) {
+  async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
-    setUploadingNames(files.map((f) => f.name));
+    setError(null);
+    setUploadingNames((prev) => [...prev, ...files.map((f) => f.name)]);
 
-    // Simulated upload delay for perceived robustness — no file content is read or stored.
-    setTimeout(() => {
-      const newDocs: KnowledgeDoc[] = files.map((file) => ({
-        id: generateId(),
-        fileName: file.name,
-        sizeBytes: file.size,
-        mimeType: file.type || "application/octet-stream",
-        uploadedAt: new Date().toISOString(),
-      }));
-      onChange([...docs, ...newDocs]);
-      setUploadingNames([]);
-    }, 650);
+    for (const file of files) {
+      try {
+        const dataBase64 = await toBase64(file);
+        const res = await fetch(`/api/agents/${agentId}/knowledge`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: file.name, mimeType: file.type, dataBase64 }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Falha no upload.");
+        onChange([...docs, data.doc]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Não consegui enviar esse arquivo.");
+      } finally {
+        setUploadingNames((prev) => prev.filter((n) => n !== file.name));
+      }
+    }
   }
 
-  function removeDoc(id: string) {
+  async function removeDoc(id: string) {
+    const previous = docs;
     onChange(docs.filter((d) => d.id !== id));
+    const res = await fetch(`/api/agents/${agentId}/knowledge/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      onChange(previous); // desfaz se a remoção falhar de verdade no servidor
+      setError("Não consegui remover esse documento.");
+    }
   }
 
   return (
@@ -67,10 +94,20 @@ export function KnowledgeBaseUploader({
           ref={inputRef}
           type="file"
           multiple
+          accept=".pdf,.docx,.txt"
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
       </button>
+
+      {error && (
+        <p className="flex items-center gap-1.5 text-[12.5px] text-danger">
+          <AlertTriangle size={13} /> {error}
+        </p>
+      )}
 
       {(docs.length > 0 || uploadingNames.length > 0) && (
         <ul className="flex flex-col gap-2">

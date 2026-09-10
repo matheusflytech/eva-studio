@@ -177,7 +177,11 @@ export function AgentForm({ agent }: { agent?: Agent }) {
           <CardTitle>Base de conhecimento</CardTitle>
           <CardDescription>Documentos que o agente vai usar como referência.</CardDescription>
         </CardHeader>
-        <KnowledgeBaseUploader docs={knowledgeBase} onChange={setKnowledgeBase} />
+        {isEdit ? (
+          <KnowledgeBaseUploader agentId={agentId} docs={knowledgeBase} onChange={setKnowledgeBase} />
+        ) : (
+          <p className="text-[13px] text-text-tertiary">Crie o agente primeiro pra poder anexar documentos.</p>
+        )}
       </Card>
 
       <Card>

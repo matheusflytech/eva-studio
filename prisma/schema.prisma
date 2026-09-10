@@ -77,12 +77,17 @@ model AgentVariable {
   @@map("eva_studio_agent_variables")
 }
 
+// content = texto já extraído do arquivo (PDF/DOCX/TXT), pronto pra ser
+// injetado no prompt do agente. Não é busca semântica (sem embeddings/vetor)
+// — pra poucos documentos pequenos, mandar o texto inteiro já resolve bem;
+// ver docs/CHATBOT_ENGINE.md sobre o porquê dessa escolha.
 model KnowledgeDoc {
   id         String   @id @default(uuid())
   agentId    String
   fileName   String
   sizeBytes  Int
   mimeType   String
+  content    String   @default("") @db.Text
   uploadedAt DateTime @default(now())
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -158,8 +163,24 @@ model Conversation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  messages Message[]
 
   @@unique([agentId, channel, contactId])
   @@map("eva_studio_conversations")
+}
+
+// Transcrição de verdade — cada mensagem trocada, na ordem. É o que alimenta
+// a página "Conversas" (hoje decorativa, listando dados simulados).
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String // contact | bot
+  text           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("eva_studio_messages")
 }

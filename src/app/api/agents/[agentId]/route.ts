@@ -25,8 +25,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ agen
 
   const body = await request.json();
 
+  // Variáveis continuam no padrão "apaga e recria" (não têm conteúdo pesado
+  // pra perder). Documentos da base de conhecimento NÃO entram aqui — eles
+  // têm seus próprios endpoints (POST/DELETE em /knowledge), upload e remoção
+  // são imediatos, não esperam o "Salvar alterações" do formulário. Se
+  // fizéssemos apaga-e-recria aqui também, qualquer edição de nome/tom do
+  // agente apagaria o texto já extraído dos arquivos (o formulário não tem
+  // esse texto pra mandar de volta).
   await prisma.agentVariable.deleteMany({ where: { agentId } });
-  await prisma.knowledgeDoc.deleteMany({ where: { agentId } });
 
   const row = await prisma.agent.update({
     where: { id: agentId },
@@ -42,13 +48,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ agen
       tools: body.tools ?? [],
       outboundUrl: body.outboundUrl ?? "",
       variables: { create: (body.variables ?? []).map((v: { name: string; unit: string }) => ({ name: v.name, unit: v.unit })) },
-      knowledgeBase: {
-        create: (body.knowledgeBase ?? []).map((d: { fileName: string; sizeBytes: number; mimeType: string }) => ({
-          fileName: d.fileName,
-          sizeBytes: d.sizeBytes,
-          mimeType: d.mimeType,
-        })),
-      },
     },
     include,
   });

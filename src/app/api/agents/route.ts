@@ -36,13 +36,8 @@ export async function POST(request: Request) {
       tools: body.tools ?? [],
       outboundUrl: body.outboundUrl ?? "",
       variables: { create: (body.variables ?? []).map((v: { name: string; unit: string }) => ({ name: v.name, unit: v.unit })) },
-      knowledgeBase: {
-        create: (body.knowledgeBase ?? []).map((d: { fileName: string; sizeBytes: number; mimeType: string }) => ({
-          fileName: d.fileName,
-          sizeBytes: d.sizeBytes,
-          mimeType: d.mimeType,
-        })),
-      },
+      // Documentos da base de conhecimento não entram na criação — sempre
+      // vêm depois, via upload real em /api/agents/[agentId]/knowledge.
     },
     include,
   });

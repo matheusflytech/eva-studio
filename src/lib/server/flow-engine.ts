@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
+import { truncateForPrompt } from "@/lib/server/extract-text";
 
 export interface OutboundMessage {
   text: string;
@@ -49,14 +50,33 @@ function evaluateCondition(expression: string, variables: Variables): boolean {
   return false;
 }
 
+interface AgentForWebhook {
+  id: string;
+  name: string;
+  tone: string;
+  language: string;
+  instructions: string;
+  guidelines: string;
+  outboundUrl: string;
+}
+
+// Busca o texto já extraído dos documentos desse agente e injeta no payload
+// pro n8n usar como contexto (ver docs/CHATBOT_ENGINE.md — não é busca
+// vetorial, é o texto inteiro dos documentos, truncado por segurança).
+async function getKnowledgeBaseContext(agentId: string): Promise<string[]> {
+  const docs = await prisma.knowledgeDoc.findMany({ where: { agentId }, select: { fileName: true, content: true } });
+  return docs.filter((d) => d.content.trim()).map((d) => `# ${d.fileName}\n${truncateForPrompt(d.content)}`);
+}
+
 async function callAgentWebhook(
-  agent: { id: string; name: string; tone: string; language: string; instructions: string; guidelines: string; outboundUrl: string },
+  agent: AgentForWebhook,
   message: string,
   conversationId: string,
   variables: Variables
 ): Promise<string | null> {
   if (!agent.outboundUrl) return null;
   try {
+    const knowledgeBaseContext = await getKnowledgeBaseContext(agent.id);
     const res = await fetch(agent.outboundUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,6 +92,7 @@ async function callAgentWebhook(
           guidelines: agent.guidelines,
         },
         variables,
+        knowledgeBaseContext,
       }),
     });
     if (!res.ok) return null;
@@ -94,6 +115,15 @@ function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string | null)
 
 const MAX_HOPS = 25;
 
+// Grava a transcrição real (pra página Conversas) — a mensagem que chegou
+// (se teve) e cada mensagem que o bot mandou nessa rodada, na ordem.
+async function logMessages(conversationId: string, inboundText: string | undefined, outbound: OutboundMessage[]) {
+  const rows: { conversationId: string; role: string; text: string }[] = [];
+  if (inboundText) rows.push({ conversationId, role: "contact", text: inboundText });
+  for (const m of outbound) rows.push({ conversationId, role: "bot", text: m.text });
+  if (rows.length > 0) await prisma.message.createMany({ data: rows });
+}
+
 export async function advanceConversation(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
@@ -101,14 +131,19 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   const flow = await prisma.agentFlow.findUnique({ where: { agentId: input.agentId } });
 
   // Sem fluxo salvo: comportamento antigo, direto pro webhook do agente —
-  // mantém compatível quem nunca configurou o Builder.
+  // mantém compatível quem nunca configurou o Builder. Ainda assim regista a
+  // transcrição, pra Conversas mostrar dado real mesmo nesse modo.
   if (!flow) {
     const conversationId = `${input.channel}:${input.contactId}`;
+    const conversation = await prisma.conversation.upsert({
+      where: { agentId_channel_contactId: { agentId: input.agentId, channel: input.channel, contactId: input.contactId } },
+      create: { agentId: input.agentId, channel: input.channel, contactId: input.contactId, variables: {} },
+      update: { updatedAt: new Date() },
+    });
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {});
-    return {
-      messages: reply ? [{ text: reply }] : [],
-      status: "active",
-    };
+    const messages = reply ? [{ text: reply }] : [];
+    await logMessages(conversation.id, input.text, messages);
+    return { messages, status: "active" };
   }
 
   const nodes = flow.nodes as unknown as Node<FlowNodeData>[];
@@ -128,6 +163,16 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   const messages: OutboundMessage[] = [];
   let currentId = conversation.currentNodeId;
   let status: AdvanceResult["status"] = "active";
+  const inboundText = input.text ?? (input.optionId ? `[opção: ${input.optionId}]` : undefined);
+
+  async function finish(): Promise<AdvanceResult> {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { currentNodeId: currentId, variables, status, updatedAt: new Date() },
+    });
+    await logMessages(conversation.id, inboundText, messages);
+    return { messages, status };
+  }
 
   // Resolve o nó em que a conversa estava parada (Captura, Agente de IA ou
   // Esperar) usando a mensagem que acabou de chegar, antes de continuar
@@ -152,11 +197,8 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         text: interpolate(parkedNode.data.detail ?? "", variables),
         options: options.map((o) => ({ id: o.id, label: o.label })),
       });
-      await prisma.conversation.update({
-        where: { id: conversation.id },
-        data: { currentNodeId: parkedNode.id, variables, updatedAt: new Date() },
-      });
-      return { messages, status: "active" };
+      currentId = parkedNode.id;
+      return finish();
     }
 
     if (parkedNode.data.variableName) {
@@ -169,15 +211,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const conversationId = `${input.channel}:${input.contactId}`;
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables);
     if (reply) messages.push({ text: reply });
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { variables, updatedAt: new Date() },
-    });
-    return { messages, status: "active" };
+    return finish();
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
-      return { messages: [], status: "active" }; // ainda não é hora, ignora essa mensagem
+      return { messages: [], status: "active" }; // ainda não é hora, ignora essa mensagem (não regista transcrição)
     }
     delete variables.__wait_until;
     currentId = nextNodeId(edges, parkedNode.id);
@@ -283,10 +321,5 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     currentId = nextNodeId(edges, node.id);
   }
 
-  await prisma.conversation.update({
-    where: { id: conversation.id },
-    data: { currentNodeId: currentId, variables, status, updatedAt: new Date() },
-  });
-
-  return { messages, status };
+  return finish();
 }
