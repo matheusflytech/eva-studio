@@ -59,6 +59,7 @@ model Agent {
   flow              AgentFlow?
   whatsappConnection WhatsAppConnection?
   metaConnection     MetaConnection?
+  conversations      Conversation[]
 
   @@index([orgId])
   @@map("eva_studio_agents")
@@ -139,4 +140,26 @@ model MetaConnection {
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@map("eva_studio_meta_connections")
+}
+
+// Estado de uma conversa (um contato falando com um agente, em um canal).
+// currentNodeId = onde parou no fluxo; variables = tudo que já foi capturado
+// (respostas de Captura de input, resultado de Chamar webhook, etc.); status
+// controla se o motor ainda responde sozinho ou se está pausado esperando
+// (transferido pra humano) ou já terminou.
+model Conversation {
+  id            String   @id @default(uuid())
+  agentId       String
+  channel       String // playground | whatsapp_qr | whatsapp_meta
+  contactId     String // telefone/jid, ou o id de sessão do Playground
+  currentNodeId String?
+  variables     Json     @default("{}")
+  status        String   @default("active") // active | waiting_human | ended
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, channel, contactId])
+  @@map("eva_studio_conversations")
 }

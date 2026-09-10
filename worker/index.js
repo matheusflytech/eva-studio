@@ -18,6 +18,13 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
+const EVA_STUDIO_URL = process.env.EVA_STUDIO_URL;
+const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET;
+if (!EVA_STUDIO_URL || !INTERNAL_API_SECRET) {
+  console.error("EVA_STUDIO_URL e/ou INTERNAL_API_SECRET não definidas. Encerrando.");
+  process.exit(1);
+}
+
 const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 
@@ -35,12 +42,29 @@ function extractText(msg) {
   );
 }
 
-async function getAgent(agentId) {
-  const { rows } = await pool.query(
-    `select id, name, tone, language, instructions, guidelines, "outboundUrl" from eva_studio_agents where id = $1`,
-    [agentId]
-  );
-  return rows[0] ?? null;
+// Toque em botão/lista chega num formato especial, não como texto — extrai o
+// id da opção selecionada (o "gatilho") em vez do texto livre.
+function extractOptionId(msg) {
+  const m = msg.message;
+  return m?.buttonsResponseMessage?.selectedButtonId ?? m?.listResponseMessage?.singleSelectReply?.selectedRowId ?? null;
+}
+
+// Fala com o motor de fluxo no app principal (Next.js/Vercel) — o worker não
+// decide mais nada sozinho sobre o que responder, só repassa mensagens.
+async function advanceViaEngine(agentId, contactId, { text, optionId }) {
+  try {
+    const res = await fetch(`${EVA_STUDIO_URL}/api/conversations/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
+      body: JSON.stringify({ agentId, channel: "whatsapp_qr", contactId, text, optionId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.messages ?? [];
+  } catch (err) {
+    logger.error({ err, agentId }, "Falha ao chamar o motor de fluxo");
+    return [];
+  }
 }
 
 async function setConnectionState(agentId, patch) {
@@ -52,31 +76,26 @@ async function setConnectionState(agentId, patch) {
   );
 }
 
-async function replyViaAgentWebhook(agent, text, conversationId) {
-  if (!agent.outboundUrl) return "Esse agente ainda não tem um webhook de saída configurado no Eva Studio.";
+// Manda uma mensagem — texto puro, ou com botões nativos do WhatsApp se a
+// resposta do motor trouxer opções (bloco de Captura com menu). Compatibilidade
+// de botão nativo varia por versão do WhatsApp do destinatário; por isso o
+// texto já vem numerado também, como plano B (ver flow-engine.ts, que aceita
+// resposta por número ou por rótulo, não só pelo toque no botão).
+async function sendReply(sock, jid, message) {
+  if (!message.options || message.options.length === 0) {
+    await sock.sendMessage(jid, { text: message.text });
+    return;
+  }
+  const numbered = message.options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   try {
-    const res = await fetch(agent.outboundUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        conversation_id: conversationId,
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          tone: agent.tone,
-          language: agent.language,
-          instructions: agent.instructions,
-          guidelines: agent.guidelines,
-        },
-      }),
+    await sock.sendMessage(jid, {
+      text: `${message.text}\n\n${numbered}`,
+      footer: "Toque numa opção ou digite o número",
+      buttons: message.options.slice(0, 3).map((o) => ({ buttonId: o.id, buttonText: { displayText: o.label }, type: 1 })),
+      headerType: 1,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
-  } catch (err) {
-    logger.error({ err }, "Falha ao chamar o webhook do agente");
-    return null;
+  } catch {
+    await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` });
   }
 }
 
@@ -134,17 +153,14 @@ async function startSession(agentId) {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe || !msg.message) continue;
+      const optionId = extractOptionId(msg);
       const text = extractText(msg);
-      if (!text) continue;
-
-      const agent = await getAgent(agentId);
-      if (!agent) continue;
+      if (!optionId && !text) continue;
 
       const remoteJid = msg.key.remoteJid;
-      const conversationId = `whatsapp:${remoteJid}`;
-      const reply = await replyViaAgentWebhook(agent, text, conversationId);
-      if (reply) {
-        await sock.sendMessage(remoteJid, { text: reply });
+      const replies = await advanceViaEngine(agentId, remoteJid, { text, optionId });
+      for (const reply of replies) {
+        await sendReply(sock, remoteJid, reply);
       }
     }
   });
@@ -184,6 +200,31 @@ async function pollForWork() {
   }
 }
 
+// Blocos "Esperar" ficam parados até alguém escrever de novo (o motor só
+// reage a eventos). Como esse worker fica ligado 24/7, aproveita o mesmo
+// polling pra cutucar as conversas cujo prazo já venceu, sem precisar de
+// mensagem nova do contato.
+async function resumeDueWaits() {
+  try {
+    const { rows } = await pool.query(
+      `select "agentId", "contactId" from eva_studio_conversations
+       where channel = 'whatsapp_qr' and status = 'active'
+         and variables ? '__wait_until'
+         and (variables->>'__wait_until')::timestamptz <= now()`
+    );
+    for (const row of rows) {
+      const session = sessions.get(row.agentId);
+      if (!session?.sock) continue;
+      const replies = await advanceViaEngine(row.agentId, row.contactId, {});
+      for (const reply of replies) {
+        await sendReply(session.sock, row.contactId, reply);
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Erro ao retomar esperas vencidas");
+  }
+}
+
 async function resumeConnectedSessions() {
   const { rows } = await pool.query(`select "agentId" from eva_studio_whatsapp_connections where status = 'connected'`);
   for (const row of rows) {
@@ -193,6 +234,7 @@ async function resumeConnectedSessions() {
 
 resumeConnectedSessions();
 setInterval(pollForWork, 4000);
+setInterval(resumeDueWaits, 15000);
 
 http
   .createServer((req, res) => {

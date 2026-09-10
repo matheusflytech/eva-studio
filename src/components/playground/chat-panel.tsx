@@ -11,6 +11,7 @@ interface ChatMessage {
   role: "user" | "agent";
   text: string;
   isError?: boolean;
+  options?: { id: string; label: string }[];
 }
 
 function greeting(agent: Agent): ChatMessage {
@@ -23,7 +24,6 @@ export function ChatPanel({ agent }: { agent: Agent }) {
   const [isTyping, setIsTyping] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const conversationIdRef = React.useRef(generateId());
-  const webhookUrl = agent.webhook.outboundUrl.trim();
 
   React.useEffect(() => {
     setMessages([greeting(agent)]);
@@ -35,59 +35,38 @@ export function ChatPanel({ agent }: { agent: Agent }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text || isTyping) return;
-    setMessages((prev) => [...prev, { id: generateId(), role: "user", text }]);
-    setDraft("");
-
-    if (!webhookUrl) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: generateId(),
-          role: "agent",
-          isError: true,
-          text: 'Esse agente ainda não tem um webhook de saída configurado. Vá em Eva Studio → esse agente → "Webhook de saída" e cole a URL do seu workflow no n8n.',
-        },
-      ]);
-      return;
-    }
-
+  async function send(payload: { text?: string; optionId?: string }) {
     setIsTyping(true);
     try {
-      const res = await fetch(webhookUrl, {
+      const res = await fetch("/api/conversations/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text,
-          conversation_id: conversationIdRef.current,
-          agent: {
-            id: agent.id,
-            name: agent.name,
-            tone: agent.tone,
-            language: agent.language,
-            instructions: agent.instructions,
-            guidelines: agent.guidelines,
-            variables: agent.variables,
-          },
+          agentId: agent.id,
+          channel: "playground",
+          contactId: conversationIdRef.current,
+          ...payload,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const reply = typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
-      setMessages((prev) => [
-        ...prev,
-        reply
-          ? { id: generateId(), role: "agent", text: reply }
-          : {
-              id: generateId(),
-              role: "agent",
-              isError: true,
-              text: "O webhook respondeu, mas sem um campo \"reply\" reconhecível. Confira o formato de retorno do seu workflow no n8n.",
-            },
-      ]);
+      const replies: { text: string; options?: { id: string; label: string }[] }[] = data.messages ?? [];
+      if (replies.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateId(),
+            role: "agent",
+            isError: true,
+            text: 'Sem resposta configurada ainda. Desenhe um fluxo no Builder ou cole uma URL em "Webhook de saída".',
+          },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options })),
+        ]);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -95,12 +74,27 @@ export function ChatPanel({ agent }: { agent: Agent }) {
           id: generateId(),
           role: "agent",
           isError: true,
-          text: "Não consegui falar com o webhook configurado. Confira se a URL está certa e se o workflow no n8n está ativo.",
+          text: "Não consegui processar essa mensagem. Confira o fluxo/webhook desse agente.",
         },
       ]);
     } finally {
       setIsTyping(false);
     }
+  }
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text || isTyping) return;
+    setMessages((prev) => [...prev, { id: generateId(), role: "user", text }]);
+    setDraft("");
+    await send({ text });
+  }
+
+  async function handleOptionClick(optionId: string, label: string) {
+    if (isTyping) return;
+    setMessages((prev) => [...prev, { id: generateId(), role: "user", text: label }]);
+    await send({ optionId });
   }
 
   function handleReset() {
@@ -117,9 +111,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
           </span>
           <div>
             <p className="text-[13.5px] font-medium text-text-primary">{agent.name}</p>
-            <p className="text-[11.5px] text-text-tertiary">
-              {webhookUrl ? "Conectado ao seu webhook n8n" : "Sem webhook configurado"}
-            </p>
+            <p className="text-[11.5px] text-text-tertiary">Conversa via motor de fluxo</p>
           </div>
         </div>
         <button
@@ -134,10 +126,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
         <div className="flex flex-col gap-3">
           {messages.map((m) => (
-            <div
-              key={m.id}
-              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
-            >
+            <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
               <div
                 className={cn(
                   "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
@@ -151,6 +140,21 @@ export function ChatPanel({ agent }: { agent: Agent }) {
                 {m.isError && <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
                 <span>{m.text}</span>
               </div>
+              {m.options && m.options.length > 0 && (
+                <div className="mt-2 flex max-w-[75%] flex-wrap gap-1.5">
+                  {m.options.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleOptionClick(opt.id, opt.label)}
+                      disabled={isTyping}
+                      className="rounded-full border border-accent-500/40 bg-accent-soft px-3 py-1.5 text-[12.5px] font-medium text-accent-400 transition-colors hover:bg-accent-500/20 disabled:opacity-40"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {isTyping && (

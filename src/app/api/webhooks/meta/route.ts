@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { advanceConversation, type OutboundMessage } from "@/lib/server/flow-engine";
 
 // Handshake de verificação exigido pela Meta ao configurar o webhook no
 // painel do app (Settings > Webhooks). Só funciona depois que
@@ -23,32 +24,49 @@ export async function GET(request: Request) {
   return NextResponse.json({ error: "Verificação inválida." }, { status: 403 });
 }
 
-interface MetaValue {
-  metadata?: { phone_number_id?: string };
-  messages?: { from: string; text?: { body?: string }; type: string }[];
+interface MetaMessage {
+  from: string;
+  type: string;
+  text?: { body?: string };
+  interactive?: {
+    button_reply?: { id: string };
+    list_reply?: { id: string };
+  };
 }
 
-async function sendMetaMessage(phoneNumberId: string, accessToken: string, to: string, text: string) {
+interface MetaValue {
+  metadata?: { phone_number_id?: string };
+  messages?: MetaMessage[];
+}
+
+async function sendMetaMessage(phoneNumberId: string, accessToken: string, to: string, message: OutboundMessage) {
+  const body =
+    message.options && message.options.length > 0
+      ? {
+          messaging_product: "whatsapp",
+          to,
+          type: "interactive",
+          interactive: {
+            type: "button",
+            body: { text: message.text },
+            action: {
+              buttons: message.options.slice(0, 3).map((o) => ({ type: "reply", reply: { id: o.id, title: o.label.slice(0, 20) } })),
+            },
+          },
+        }
+      : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text } };
+
   await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: text },
-    }),
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 
 export async function POST(request: Request) {
   // Sem credenciais de app Meta configuradas, esse canal não recebe nada de
   // verdade ainda — mas o código já fica pronto pra funcionar assim que
-  // existir. Ver [[project_eva_agent_studio]] no histórico pra o desenho
-  // completo (embedded signup, criptografia de token) quando for retomar.
+  // existir. Ver worker/META_SETUP.md pros pré-requisitos.
   if (!process.env.META_APP_SECRET) {
     return NextResponse.json({ received: false, reason: "not_configured" });
   }
@@ -62,39 +80,23 @@ export async function POST(request: Request) {
       const phoneNumberId = value.metadata?.phone_number_id;
       if (!phoneNumberId || !value.messages) continue;
 
-      const connection = await prisma.metaConnection.findUnique({
-        where: { phoneNumberId },
-        include: { agent: true },
-      });
+      const connection = await prisma.metaConnection.findUnique({ where: { phoneNumberId } });
       if (!connection) continue;
 
       for (const message of value.messages) {
-        if (message.type !== "text" || !message.text?.body) continue;
-
-        const conversationId = `whatsapp-meta:${message.from}`;
-        const agent = connection.agent;
-        if (!agent.outboundUrl) continue;
+        const optionId = message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id;
+        const text = message.text?.body;
+        if (!optionId && !text) continue;
 
         try {
-          const res = await fetch(agent.outboundUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message: message.text.body,
-              conversation_id: conversationId,
-              agent: {
-                id: agent.id,
-                name: agent.name,
-                tone: agent.tone,
-                language: agent.language,
-                instructions: agent.instructions,
-                guidelines: agent.guidelines,
-              },
-            }),
+          const result = await advanceConversation({
+            agentId: connection.agentId,
+            channel: "whatsapp_meta",
+            contactId: message.from,
+            text,
+            optionId,
           });
-          const data = await res.json();
-          const reply = typeof data?.reply === "string" ? data.reply : null;
-          if (reply) {
+          for (const reply of result.messages) {
             await sendMetaMessage(phoneNumberId, connection.accessToken, message.from, reply);
           }
         } catch {

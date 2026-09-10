@@ -4,6 +4,11 @@ import { Handle, Position } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 
+export interface MenuOption {
+  id: string;
+  label: string;
+}
+
 export interface FlowNodeData {
   iconKey: IconKey;
   label: string;
@@ -16,6 +21,7 @@ export interface FlowNodeData {
   waitUnit?: "segundos" | "minutos" | "horas";
   variableName?: string;
   conditionExpression?: string;
+  options?: MenuOption[];
   [key: string]: unknown;
 }
 
@@ -35,6 +41,8 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
 export function FlowNode({ data, selected }: { data: FlowNodeData; selected?: boolean }) {
   const Icon = ICON_REGISTRY[data.iconKey] ?? ICON_REGISTRY.message;
   const isCondition = data.iconKey === "condition";
+  const options = data.iconKey === "capture" ? data.options ?? [] : [];
+  const isMenu = options.length > 0;
 
   return (
     <div
@@ -58,6 +66,16 @@ export function FlowNode({ data, selected }: { data: FlowNodeData; selected?: bo
       {data.detail && <p className="mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-secondary">{data.detail}</p>}
       <ConfigPreview data={data} />
 
+      {isMenu && (
+        <div className="mt-2.5 flex flex-col gap-1">
+          {options.map((opt) => (
+            <div key={opt.id} className="truncate rounded-lg border border-border-subtle bg-surface-3 px-2 py-1 text-[11px] text-text-secondary">
+              {opt.label || "(sem texto)"}
+            </div>
+          ))}
+        </div>
+      )}
+
       {isCondition ? (
         <>
           <div className="pointer-events-none mt-3 flex justify-between text-[10px] font-medium">
@@ -79,6 +97,17 @@ export function FlowNode({ data, selected }: { data: FlowNodeData; selected?: bo
             className="!h-1.5 !w-1.5 !border-none !bg-danger"
           />
         </>
+      ) : isMenu ? (
+        options.map((opt, i) => (
+          <Handle
+            key={opt.id}
+            id={opt.id}
+            type="source"
+            position={Position.Bottom}
+            style={{ left: `${((i + 1) / (options.length + 1)) * 100}%` }}
+            className="!h-1.5 !w-1.5 !border-none !bg-accent-500"
+          />
+        ))
       ) : (
         data.hasSource !== false && (
           <Handle type="source" position={Position.Bottom} className="!h-1.5 !w-1.5 !border-none !bg-border-strong" />
