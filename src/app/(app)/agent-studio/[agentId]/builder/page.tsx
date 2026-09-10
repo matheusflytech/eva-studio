@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, PlayCircle } from "lucide-react";
+import { ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -14,7 +14,7 @@ import {
   useNodesState,
   useEdgesState,
 } from "@xyflow/react";
-import type { Connection, Node } from "@xyflow/react";
+import type { Connection, Node, NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { buttonVariants } from "@/components/ui/button";
@@ -22,13 +22,14 @@ import { Badge } from "@/components/ui/badge";
 import { FlowNode, type FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { NodeInspector } from "@/components/agent-studio/builder/node-inspector";
+import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 
-const NODE_TYPES = { flowNode: FlowNode };
+type SaveState = "idle" | "pending" | "saved" | "error";
 
 export default function AgentBuilderPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -37,7 +38,9 @@ export default function AgentBuilderPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(SAMPLE_EDGES);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [flowLoaded, setFlowLoaded] = React.useState(false);
-  const [saveState, setSaveState] = React.useState<"idle" | "saved">("idle");
+  const [saveState, setSaveState] = React.useState<SaveState>("idle");
+  const [showPreview, setShowPreview] = React.useState(true);
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -67,6 +70,28 @@ export default function AgentBuilderPage() {
     [setEdges]
   );
 
+  // Autosave: qualquer mudança no canvas dispara um salvamento silencioso
+  // depois de 900ms sem novas mudanças — sem botão "Salvar" pra lembrar de
+  // clicar, e é o que faz a prévia ao vivo sempre bater com o que tá na tela.
+  React.useEffect(() => {
+    if (!flowLoaded) return;
+    setSaveState("pending");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await saveFlow(agentId, { nodes, edges });
+        setSaveState("saved");
+        setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        setSaveState("error");
+      }
+    }, 900);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, flowLoaded, agentId]);
+
   function handleAddBlock(iconKey: IconKey) {
     const id = generateId();
     const defaults = getBlockDefault(iconKey)?.data ?? {};
@@ -80,9 +105,13 @@ export default function AgentBuilderPage() {
     setSelectedId(id);
   }
 
+  function handleNodeDataChangeById(id: string, partial: Partial<FlowNodeData>) {
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...partial } } : n)));
+  }
+
   function handleNodeDataChange(partial: Partial<FlowNodeData>) {
     if (!selectedId) return;
-    setNodes((nds) => nds.map((n) => (n.id === selectedId ? { ...n, data: { ...n.data, ...partial } } : n)));
+    handleNodeDataChangeById(selectedId, partial);
   }
 
   function handleDeleteNode() {
@@ -92,11 +121,18 @@ export default function AgentBuilderPage() {
     setSelectedId(null);
   }
 
-  async function handleSave() {
-    await saveFlow(agentId, { nodes, edges });
-    setSaveState("saved");
-    setTimeout(() => setSaveState("idle"), 1800);
-  }
+  const nodeTypes = React.useMemo(
+    () => ({
+      flowNode: (props: NodeProps<Node<FlowNodeData>>) => (
+        <FlowNode
+          data={props.data}
+          selected={props.selected}
+          onDetailChange={(text) => handleNodeDataChangeById(props.id, { detail: text })}
+        />
+      ),
+    }),
+    []
+  );
 
   if (!isLoaded || !flowLoaded) return <div className="flex-1 p-8" />;
 
@@ -130,49 +166,61 @@ export default function AgentBuilderPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {saveState === "saved" && <span className="text-[12.5px] text-text-tertiary">Salvo.</span>}
-          <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
-            <PlayCircle size={15} /> Testar
-          </Link>
-          <button type="button" onClick={handleSave} className={buttonVariants({ variant: "solid", size: "md" })}>
-            Salvar
+          <span className="text-[12.5px] text-text-tertiary">
+            {saveState === "pending" && "Salvando..."}
+            {saveState === "saved" && "Salvo."}
+            {saveState === "error" && <span className="text-danger">Erro ao salvar.</span>}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowPreview((v) => !v)}
+            className={buttonVariants({ variant: "secondary", size: "md" })}
+          >
+            {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />} Prévia
           </button>
+          <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
+            <PlayCircle size={15} /> Playground
+          </Link>
         </div>
       </div>
 
-      <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={(_, node) => setSelectedId(node.id)}
-          onPaneClick={() => setSelectedId(null)}
-          nodeTypes={NODE_TYPES}
-          defaultEdgeOptions={{ type: "smoothstep" }}
-          fitView
-          fitViewOptions={{ padding: 0.25 }}
-          minZoom={0.4}
-          maxZoom={1.5}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
-          <Controls showInteractive={false} position="bottom-left" />
-          <Panel position="top-right">
-            <div className="flex flex-col items-end gap-3">
-              {selectedNode && (
-                <NodeInspector
-                  node={selectedNode}
-                  onChange={handleNodeDataChange}
-                  onDelete={handleDeleteNode}
-                  onClose={() => setSelectedId(null)}
-                />
-              )}
-              <BlockPalette onAdd={handleAddBlock} />
-            </div>
-          </Panel>
-        </ReactFlow>
+      <div className="flex flex-1 gap-4 overflow-hidden">
+        <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, node) => setSelectedId(node.id)}
+            onPaneClick={() => setSelectedId(null)}
+            nodeTypes={nodeTypes}
+            defaultEdgeOptions={{ type: "smoothstep" }}
+            fitView
+            fitViewOptions={{ padding: 0.25 }}
+            minZoom={0.4}
+            maxZoom={1.5}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
+            <Controls showInteractive={false} position="bottom-left" />
+            <Panel position="top-right">
+              <div className="flex flex-col items-end gap-3">
+                {selectedNode && (
+                  <NodeInspector
+                    node={selectedNode}
+                    onChange={handleNodeDataChange}
+                    onDelete={handleDeleteNode}
+                    onClose={() => setSelectedId(null)}
+                  />
+                )}
+                <BlockPalette onAdd={handleAddBlock} />
+              </div>
+            </Panel>
+          </ReactFlow>
+        </div>
+
+        {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
       </div>
     </div>
   );

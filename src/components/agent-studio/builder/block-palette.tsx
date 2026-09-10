@@ -1,5 +1,6 @@
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { BLOCK_DEFAULTS } from "./block-defaults";
+import { BLOCK_STYLES } from "./block-styles";
 
 export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
   return (
@@ -9,6 +10,7 @@ export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
       <div className="flex flex-col gap-1">
         {BLOCK_DEFAULTS.map(({ key, paletteLabel }) => {
           const Icon = ICON_REGISTRY[key];
+          const style = BLOCK_STYLES[key];
           return (
             <button
               key={key}
@@ -16,7 +18,7 @@ export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
               onClick={() => onAdd(key)}
               className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
             >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-text-tertiary">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${style.badgeBg} ${style.badgeText}`}>
                 <Icon size={14} />
               </span>
               {paletteLabel}

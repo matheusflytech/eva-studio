@@ -1,8 +1,10 @@
 "use client";
 
+import * as React from "react";
 import { Handle, Position } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
+import { BLOCK_STYLES } from "./block-styles";
 
 export interface MenuOption {
   id: string;
@@ -38,24 +40,63 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
   return null;
 }
 
-export function FlowNode({ data, selected }: { data: FlowNodeData; selected?: boolean }) {
+function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: string) => void }) {
+  const [draft, setDraft] = React.useState(value);
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => setDraft(value), [value]);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+
+  return (
+    <textarea
+      ref={ref}
+      value={draft}
+      rows={1}
+      placeholder="Digite o texto..."
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => onCommit(draft)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      className="nodrag mt-2.5 w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-[12px] leading-relaxed text-text-secondary outline-none transition-colors hover:border-border-subtle focus:border-accent-500/50 focus:bg-surface-3"
+    />
+  );
+}
+
+export function FlowNode({
+  data,
+  selected,
+  onDetailChange,
+}: {
+  data: FlowNodeData;
+  selected?: boolean;
+  onDetailChange?: (text: string) => void;
+}) {
   const Icon = ICON_REGISTRY[data.iconKey] ?? ICON_REGISTRY.message;
+  const style = BLOCK_STYLES[data.iconKey] ?? BLOCK_STYLES.message;
   const isCondition = data.iconKey === "condition";
   const options = data.iconKey === "capture" ? data.options ?? [] : [];
   const isMenu = options.length > 0;
+  const editableDetail = onDetailChange && data.iconKey !== "condition" && data.iconKey !== "start";
 
   return (
     <div
       className={cn(
-        "glass-card w-[220px] cursor-pointer rounded-2xl p-3.5 transition-colors",
-        selected ? "border-border-strong" : "border-border-subtle"
+        "glass-card w-[230px] cursor-pointer rounded-2xl border-l-[3px] p-3.5 transition-colors",
+        style.border,
+        selected ? "border-border-strong ring-1 ring-white/15" : "border-border-subtle"
       )}
     >
       {data.hasTarget !== false && (
         <Handle type="target" position={Position.Top} className="!h-1.5 !w-1.5 !border-none !bg-border-strong" />
       )}
       <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-text-tertiary">
+        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", style.badgeBg, style.badgeText)}>
           <Icon size={15} />
         </span>
         <div className="min-w-0">
@@ -63,7 +104,13 @@ export function FlowNode({ data, selected }: { data: FlowNodeData; selected?: bo
           {data.kind && <p className="truncate text-[11px] text-text-tertiary">{data.kind}</p>}
         </div>
       </div>
-      {data.detail && <p className="mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-secondary">{data.detail}</p>}
+
+      {editableDetail ? (
+        <AutoTextarea value={data.detail ?? ""} onCommit={(text) => onDetailChange!(text)} />
+      ) : (
+        data.detail && <p className="mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-secondary">{data.detail}</p>
+      )}
+
       <ConfigPreview data={data} />
 
       {isMenu && (
