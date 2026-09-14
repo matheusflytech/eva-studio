@@ -16,6 +16,7 @@ import {
   PlayCircle,
   PanelLeftClose,
   PanelLeftOpen,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarNavItem } from "./sidebar-nav-item";
@@ -62,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Acompanhamento",
     items: [
+      { href: "/leads", label: "Leads", icon: Users },
       { href: "/conversas", label: "Conversas", icon: MessageSquare, badge: "+99" },
       { href: "/playground", label: "Playground", icon: PlayCircle },
     ],

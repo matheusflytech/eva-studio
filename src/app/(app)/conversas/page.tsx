@@ -30,6 +30,8 @@ const CHANNEL_LABEL: Record<string, string> = {
   playground: "Playground",
   whatsapp_qr: "WhatsApp (QR)",
   whatsapp_meta: "WhatsApp (Meta)",
+  instagram: "Instagram",
+  website: "Site (widget)",
 };
 
 const STATUS_VARIANT: Record<string, "success" | "danger" | "neutral"> = {

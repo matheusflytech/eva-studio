@@ -17,6 +17,7 @@ import { WhatsAppConnect } from "./whatsapp-connect";
 import { MetaWhatsAppConnect } from "./meta-whatsapp-connect";
 import { InstagramConnect } from "./instagram-connect";
 import { CommentAutomationsEditor } from "./comment-automations-editor";
+import { WidgetConnect } from "./widget-connect";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
@@ -223,6 +224,16 @@ export function AgentForm({ agent }: { agent?: Agent }) {
           onOutboundChange={setOutboundUrl}
         />
       </Card>
+
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Widget do site</CardTitle>
+            <CardDescription>Chat que puxa assunto sozinho no seu site e manda os leads pra página Leads.</CardDescription>
+          </CardHeader>
+          <WidgetConnect agentId={agentId} />
+        </Card>
+      )}
 
       {isEdit && (
         <Card>

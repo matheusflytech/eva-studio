@@ -50,6 +50,9 @@ model Agent {
   tools          Json     @default("[]")
   outboundUrl    String   @default("")
   status         String   @default("active")
+  // Widget de chat pra colar em qualquer site (canal "website") — puxa
+  // assunto sozinho e alimenta a página Leads. Ver docs/CHATBOT_ENGINE.md §13.
+  widgetEnabled  Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -160,8 +163,8 @@ model MetaConnection {
 model Conversation {
   id                   String    @id @default(uuid())
   agentId              String
-  channel              String // playground | whatsapp_qr | whatsapp_meta
-  contactId            String // telefone/jid, ou o id de sessão do Playground
+  channel              String // playground | whatsapp_qr | whatsapp_meta | instagram | website
+  contactId            String // telefone/jid, id de sessão do Playground, ou id gerado no navegador do visitante (website)
   currentNodeId        String?
   variables            Json      @default("{}")
   status               String    @default("active") // active | waiting_human | ended
@@ -170,6 +173,9 @@ model Conversation {
   // fora dela só se pode mandar mensagem de modelo pré-aprovado). Ver
   // docs/CHATBOT_ENGINE.md.
   lastContactMessageAt DateTime?
+  // Estágio do lead pro CRM interno (canal "website") — null = "Novo". Não
+  // tem efeito nenhum no motor de fluxo, é só pra organizar a página Leads.
+  leadStage            String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

@@ -14,7 +14,7 @@ export function FlowTemplateGallery({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
       <div
-        className="glass-card w-full max-w-lg rounded-3xl p-5"
+        className="glass-card w-full max-w-lg rounded-3xl bg-surface-1 p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1 flex items-center justify-between">

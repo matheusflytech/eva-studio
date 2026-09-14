@@ -242,11 +242,47 @@ simulação), passando pelo motor real.
 `api.instagram.com`/`graph.instagram.com` — dorme até `INSTAGRAM_APP_ID`/`INSTAGRAM_APP_SECRET`/
 `NEXT_PUBLIC_INSTAGRAM_APP_ID` existirem) ou cadastro manual como fallback.
 
-## 12. Arquivos-chave
+## 12. Widget do site + Leads (CRM interno)
+
+Canal `website` — chat embutível pra captar lead direto do site, sem depender de WhatsApp/Instagram. Pensado
+pro uso interno da Beeno (centralizar leads em vez de planilha), mas funciona pra qualquer agente.
+
+**Widget** (`Agent.widgetEnabled`, ligado/desligado em `POST /api/agents/[agentId]/widget`): o embed é uma
+única linha (`<script src=".../api/widget/[agentId]/script.js">`) — `src/app/api/widget/[agentId]/script.js/route.ts`
+gera o JS na hora, já com o nome do agente e a origem da API embutidos (sem chamada extra). Roda em **Shadow
+DOM** pra não vazar/receber CSS do site hospedeiro, e não depende de nenhuma lib (nem React) — só JS puro,
+pra poder ser colado em qualquer stack.
+
+**Conversa proativa**: na primeira visita (sem `contactId` salvo no `localStorage`), o widget espera ~6s e
+chama `POST /api/widget/[agentId]/message` **sem texto**. Isso já funciona sem nenhuma mudança no motor — pra
+uma conversa nova (`parkedNode` nulo), `advanceConversation` sempre recomeça do "Início" independente de ter
+vindo texto ou não, então a "puxada de assunto" é só o comportamento normal do fluxo, disparado sem esperar o
+visitante escrever primeiro.
+
+**Rota pública** (`api/widget/[agentId]/message/route.ts`): sem sessão nem `X-Internal-Secret` — a única
+"chave" é o próprio `agentId` (igual todo widget embutível de mercado), por isso exige
+`agent.widgetEnabled === true` antes de fazer qualquer coisa. CORS aberto (`Access-Control-Allow-Origin: *`),
+já que roda em qualquer origem de terceiro.
+
+**Leads = uma leitura de `Conversation`, não uma tabela nova**: `GET /api/leads` lista conversas
+`channel: "website"` do org, com `variables` (o que os blocos de Captura do fluxo já pegaram — nome,
+telefone, interesse...) e um `Conversation.leadStage` opcional (`novo` | `contatado` | `qualificado` |
+`ganho` | `perdido`, editável via `PATCH /api/leads/[id]`, sem efeito nenhum no motor — é só organização da
+página). UI em `src/app/(app)/leads/page.tsx`: lista + busca + filtro por estágio + exportar CSV (client-side,
+sem passar pelo servidor).
+
+**Desenhando o fluxo pro widget**: começa com `message`/`capture` (não `agent` direto) — o primeiro
+`advanceConversation` chamado pelo widget manda `text: ""` se cair num bloco `agent`, o que é um input estranho
+pro n8n do agente. Um fluxo típico: mensagem de boas-vindas → captura de nome → captura de telefone/e-mail →
+captura de interesse → (opcional) webhook pro CRM externo, se tiver → Agente de IA ou encerramento.
+
+## 13. Arquivos-chave
 
 | Arquivo | Responsabilidade |
 |---|---|
 | `prisma/schema.prisma` | Modelos `Agent`, `AgentFlow`, `Conversation`, `Message`, `MessageTemplate`, `WhatsAppConnection`, `MetaConnection`, `InstagramConnection`, `OutboundQueueItem`, `Broadcast`, `CommentAutomation` |
+| `src/app/api/widget/[agentId]/message/route.ts`, `.../script.js/route.ts` | Widget embutível (canal `website`) — §12 |
+| `src/app/api/leads/route.ts`, `.../[id]/route.ts` | Leads (CRM interno) — §12 |
 | `src/lib/server/flow-engine.ts` | `advanceConversation` — o motor inteiro, único lugar com a lógica de conversa |
 | `src/app/api/conversations/message/route.ts` | Entrada HTTP autenticada (sessão OU segredo interno) |
 | `src/app/api/conversations/[id]/reply/route.ts`, `.../resume/route.ts` | Inbox humano — §9 |
