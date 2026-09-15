@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Download, X, Mail, Phone, Plus, Trash2, Code2 } from "lucide-react";
+import { Download, X, Mail, Phone, Plus, Trash2, Code2, MessageCircle, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -64,6 +64,18 @@ function leadPhone(lead: Lead): string | null {
   return pick(lead.variables, ["telefone", "telefone_cliente", "phone", "whatsapp"]);
 }
 
+// Cada canal de captura usa seu próprio prefixo de contactId (ver
+// api/leads/route.ts e os scripts do site) — mais confiável que o nome do
+// agente pra diferenciar a origem, já que o agente pode ser renomeado.
+type LeadSource = "chat" | "form" | "manual";
+function leadSource(lead: Lead): LeadSource {
+  if (lead.contactId.startsWith("site-")) return "chat";
+  if (lead.contactId.startsWith("landing_")) return "form";
+  return "manual";
+}
+const SOURCE_LABEL: Record<LeadSource, string> = { chat: "Chat do site", form: "Formulário", manual: "Manual / API" };
+const SOURCE_ICON: Record<LeadSource, typeof MessageCircle> = { chat: MessageCircle, form: Smartphone, manual: Code2 };
+
 function exportCsv(leads: Lead[]) {
   const varKeys = Array.from(new Set(leads.flatMap((l) => Object.keys(l.variables ?? {})))).filter((k) => !k.startsWith("__"));
   const header = ["Agente", "Estágio", "Criado em", ...varKeys];
@@ -83,17 +95,35 @@ function exportCsv(leads: Lead[]) {
   URL.revokeObjectURL(url);
 }
 
-function LeadCard({ lead, onOpen, onDragStart }: { lead: Lead; onOpen: () => void; onDragStart: (e: React.DragEvent) => void }) {
+function LeadCard({
+  lead, onOpen, onDragStart, selected, onToggleSelect,
+}: {
+  lead: Lead; onOpen: () => void; onDragStart: (e: React.DragEvent) => void; selected: boolean; onToggleSelect: () => void;
+}) {
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
+  const source = leadSource(lead);
+  const SourceIcon = SOURCE_ICON[source];
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onClick={onOpen}
-      className="flex cursor-grab flex-col gap-1.5 rounded-2xl border border-border-default bg-surface-2 p-3 transition-colors hover:border-border-strong active:cursor-grabbing"
+      className={cn(
+        "flex cursor-grab flex-col gap-1.5 rounded-2xl border p-3 transition-colors hover:border-border-strong active:cursor-grabbing",
+        selected ? "border-accent-500 bg-accent-soft" : "border-border-default bg-surface-2"
+      )}
     >
-      <p className="truncate text-[13px] font-medium text-text-primary">{leadName(lead)}</p>
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={selected}
+          onClick={(e) => e.stopPropagation()}
+          onChange={onToggleSelect}
+          className="mt-1 h-3.5 w-3.5 shrink-0 accent-accent-500"
+        />
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-text-primary">{leadName(lead)}</p>
+      </div>
       {email && (
         <p className="flex items-center gap-1.5 truncate text-[11.5px] text-text-tertiary">
           <Mail size={11} /> {email}
@@ -105,7 +135,12 @@ function LeadCard({ lead, onOpen, onDragStart }: { lead: Lead; onOpen: () => voi
         </p>
       )}
       {lead.lastMessage && <p className="truncate text-[12px] text-text-secondary">{lead.lastMessage.text}</p>}
-      <p className="text-[10.5px] text-text-tertiary">{lead.agentName} · {formatRelativeDate(lead.updatedAt)}</p>
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant={source === "chat" ? "accent" : source === "form" ? "success" : "neutral"} className="text-[10px]">
+          <SourceIcon size={10} /> {SOURCE_LABEL[source]}
+        </Badge>
+        <p className="shrink-0 text-[10.5px] text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</p>
+      </div>
     </div>
   );
 }
@@ -124,7 +159,12 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
       <div className="glass-card glass-card-solid flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
           <div>
-            <p className="text-[14px] font-medium text-text-primary">{leadName(lead)}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[14px] font-medium text-text-primary">{leadName(lead)}</p>
+              <Badge variant={leadSource(lead) === "chat" ? "accent" : leadSource(lead) === "form" ? "success" : "neutral"} className="text-[10px]">
+                {SOURCE_LABEL[leadSource(lead)]}
+              </Badge>
+            </div>
             <p className="text-[11.5px] text-text-tertiary">{lead.agentName} · {formatRelativeDate(lead.createdAt)}</p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -380,6 +420,8 @@ export default function LeadsPage() {
   const [dragOverStage, setDragOverStage] = React.useState<string | null>(null);
   const [showNewLead, setShowNewLead] = React.useState(false);
   const [apiInfoStage, setApiInfoStage] = React.useState<(typeof STAGES)[number] | null>(null);
+  const [sourceFilter, setSourceFilter] = React.useState<LeadSource | "all">("all");
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   const load = React.useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -406,14 +448,35 @@ export default function LeadsPage() {
     if (!window.confirm("Excluir esse lead? Essa ação não pode ser desfeita.")) return;
     setLeads((prev) => (prev ?? []).filter((l) => l.id !== id));
     setOpenId(null);
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
     await fetch(`/api/leads/${id}`, { method: "DELETE" });
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Excluir ${selectedIds.size} lead(s) selecionado(s)? Essa ação não pode ser desfeita.`)) return;
+    const ids = Array.from(selectedIds);
+    setLeads((prev) => (prev ?? []).filter((l) => !selectedIds.has(l.id)));
+    setSelectedIds(new Set());
+    await Promise.all(ids.map((id) => fetch(`/api/leads/${id}`, { method: "DELETE" })));
   }
 
   if (leads === null) return <div className="flex-1 p-8" />;
 
-  const filtered = search.trim()
-    ? leads.filter((l) => `${leadName(l)} ${JSON.stringify(l.variables)}`.toLowerCase().includes(search.trim().toLowerCase()))
-    : leads;
+  const filtered = leads.filter((l) => {
+    if (sourceFilter !== "all" && leadSource(l) !== sourceFilter) return false;
+    if (search.trim() && !`${leadName(l)} ${JSON.stringify(l.variables)}`.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
 
   const opened = leads.find((l) => l.id === openId) ?? null;
 
@@ -422,9 +485,20 @@ export default function LeadsPage() {
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Leads</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contatos capturados pelo widget de chat do seu site — arraste entre colunas pra mudar o estágio.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contatos capturados pelo chat e pelo formulário do seu site — arraste entre colunas pra mudar o estágio.</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button type="button" variant="secondary" size="sm" onClick={handleBulkDelete} className="text-danger">
+              <Trash2 size={14} /> Excluir {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
+            </Button>
+          )}
+          <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as LeadSource | "all")} className="w-[150px]">
+            <option value="all">Todas as origens</option>
+            <option value="chat">{SOURCE_LABEL.chat}</option>
+            <option value="form">{SOURCE_LABEL.form}</option>
+            <option value="manual">{SOURCE_LABEL.manual}</option>
+          </Select>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-[200px]" />
           <Button type="button" variant="secondary" size="sm" onClick={() => setApiInfoStage("novo")}>
             <Code2 size={14} /> Via API
@@ -485,6 +559,8 @@ export default function LeadsPage() {
                       lead={lead}
                       onOpen={() => setOpenId(lead.id)}
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", lead.id)}
+                      selected={selectedIds.has(lead.id)}
+                      onToggleSelect={() => toggleSelect(lead.id)}
                     />
                   ))
                 )}
