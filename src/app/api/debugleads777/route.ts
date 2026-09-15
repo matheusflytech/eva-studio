@@ -7,5 +7,11 @@ export async function GET() {
     select: { contactId: true, agentId: true, leadStage: true, variables: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json({ count: rows.length, rows });
+  var dbHost = "unknown";
+  try {
+    dbHost = new URL(process.env.DATABASE_URL || "").hostname;
+  } catch {}
+  const agentCount = await prisma.agent.count();
+  const totalConvCount = await prisma.conversation.count();
+  return NextResponse.json({ dbHost, agentCount, totalConvCount, count: rows.length, rows });
 }
