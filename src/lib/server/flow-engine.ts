@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
+import { safeFetch } from "@/lib/server/ssrf";
 
 export interface OutboundMessage {
   text: string;
@@ -36,6 +37,15 @@ export interface AdvanceResult {
 }
 
 type Variables = Record<string, unknown>;
+
+// Nomes de variável vêm do Builder (usuário) e viram chaves de objeto. Bloqueia
+// chaves que poluiriam o prototype (__proto__, constructor, prototype) —
+// defesa em profundidade contra prototype pollution.
+const UNSAFE_VAR_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+function setVar(variables: Variables, name: string | undefined, value: unknown): void {
+  if (!name || UNSAFE_VAR_KEYS.has(name)) return;
+  variables[name] = value;
+}
 
 function interpolate(template: string, variables: Variables): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
@@ -131,7 +141,9 @@ async function callAgentWebhook(
   if (!agent.outboundUrl) return null;
   try {
     const knowledgeBaseContext = await getKnowledgeBaseContext(agent.id);
-    const res = await fetch(agent.outboundUrl, {
+    // safeFetch: bloqueia SSRF (URL configurada pelo usuário não pode apontar
+    // pra rede interna) e aplica timeout.
+    const res = await safeFetch(agent.outboundUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -319,8 +331,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
 
     if (parkedNode.data.variableName) {
-      variables[parkedNode.data.variableName] =
-        options.length > 0 ? options.find((o) => o.id === resolvedOptionId)?.label ?? resolvedOptionId : input.text;
+      setVar(
+        variables,
+        parkedNode.data.variableName,
+        options.length > 0 ? options.find((o) => o.id === resolvedOptionId)?.label ?? resolvedOptionId : input.text
+      );
     }
     const handle = options.length > 0 ? resolvedOptionId : undefined;
     currentId = nextNodeId(edges, parkedNode.id, handle);
@@ -371,11 +386,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
 
     if (kind === "variable") {
-      if (node.data.variableName) {
+      if (node.data.variableName && !UNSAFE_VAR_KEYS.has(node.data.variableName)) {
         if (node.data.variableExpression) {
-          variables[node.data.variableName] = resolveVariableExpression(node.data.variableExpression, variables);
+          setVar(variables, node.data.variableName, resolveVariableExpression(node.data.variableExpression, variables));
         } else if (!(node.data.variableName in variables)) {
-          variables[node.data.variableName] = "";
+          setVar(variables, node.data.variableName, "");
         }
       }
       currentId = nextNodeId(edges, node.id);
@@ -385,7 +400,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     if (kind === "webhook") {
       if (node.data.webhookUrl) {
         try {
-          const res = await fetch(node.data.webhookUrl, {
+          const res = await safeFetch(node.data.webhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ variables, contactId: input.contactId, agentId: input.agentId }),
@@ -398,7 +413,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           } catch {
             // resposta não era JSON, usa o texto puro mesmo
           }
-          if (node.data.variableName) variables[node.data.variableName] = value;
+          if (node.data.variableName) setVar(variables, node.data.variableName, value);
         } catch {
           // um webhook falhando não deve travar o fluxo inteiro
         }

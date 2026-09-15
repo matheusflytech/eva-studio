@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { decryptSecret } from "@/lib/server/crypto";
 
 // Resposta manual de um atendente numa conversa parada em waiting_human. Não
 // passa pelo motor de fluxo (advanceConversation) — é canal direto: grava na
@@ -31,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     try {
       await fetch(`https://graph.facebook.com/v21.0/${conn.phoneNumberId}/messages`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${conn.accessToken}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${decryptSecret(conn.accessToken)}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           messaging_product: "whatsapp",
           to: conversation.contactId,

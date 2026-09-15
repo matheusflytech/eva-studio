@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 
 // Leads = conversas do canal "website" — tanto as que vieram do widget de
 // chat quanto as adicionadas na mão ou via API (mesmo canal, mesma tabela,
@@ -47,7 +48,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const secretHeader = request.headers.get("x-internal-secret");
   const expectedSecret = process.env.INTERNAL_API_SECRET;
-  const viaSecret = !!expectedSecret && secretHeader === expectedSecret;
+  const viaSecret = !!expectedSecret && timingSafeEqualStr(secretHeader, expectedSecret);
 
   let orgId: string | null = null;
   if (!viaSecret) {

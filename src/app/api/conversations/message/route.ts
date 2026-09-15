@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { advanceConversation } from "@/lib/server/flow-engine";
+import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 
 // Dois jeitos de chamar essa rota:
 // 1) O worker do WhatsApp / webhook da Meta (processos externos, sem sessão
@@ -11,7 +12,7 @@ import { advanceConversation } from "@/lib/server/flow-engine";
 async function authorize(request: Request, agentId: string): Promise<boolean> {
   const secretHeader = request.headers.get("x-internal-secret");
   const expected = process.env.INTERNAL_API_SECRET;
-  if (expected && secretHeader === expected) return true;
+  if (expected && timingSafeEqualStr(secretHeader, expected)) return true;
 
   const orgId = await requireOrgId();
   if (!orgId) return false;
