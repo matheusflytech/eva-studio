@@ -25,7 +25,15 @@ if (!EVA_STUDIO_URL || !INTERNAL_API_SECRET) {
   process.exit(1);
 }
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+// Valida o certificado TLS do Postgres por padrão (evita MITM). Se o provedor
+// usar cert self-signed e não der pra fornecer a CA, dá pra desligar
+// explicitamente com DATABASE_SSL_REJECT_UNAUTHORIZED=false — decisão
+// consciente, não o default silencioso de antes.
+const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
+const pool = new pg.Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized, ca: process.env.DATABASE_SSL_CA || undefined },
+});
 const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 
 const sessions = new Map(); // agentId -> { sock }

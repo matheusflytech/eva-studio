@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { encryptSecret } from "@/lib/server/crypto";
 
 // Ainda não tem um fluxo de login/Embedded Signup próprio pro Instagram (o
 // da Meta hoje só cobre WhatsApp) — conexão manual mesmo, com o id da conta
@@ -34,10 +35,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "igBusinessId e pageAccessToken são obrigatórios." }, { status: 400 });
   }
 
+  const encryptedToken = encryptSecret(pageAccessToken.trim());
   await prisma.instagramConnection.upsert({
     where: { agentId },
-    create: { agentId, igBusinessId: igBusinessId.trim(), pageAccessToken: pageAccessToken.trim(), username: username?.trim() || null },
-    update: { igBusinessId: igBusinessId.trim(), pageAccessToken: pageAccessToken.trim(), username: username?.trim() || null },
+    create: { agentId, igBusinessId: igBusinessId.trim(), pageAccessToken: encryptedToken, username: username?.trim() || null },
+    update: { igBusinessId: igBusinessId.trim(), pageAccessToken: encryptedToken, username: username?.trim() || null },
   });
 
   return NextResponse.json({ ok: true });

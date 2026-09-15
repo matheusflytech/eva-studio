@@ -39,6 +39,25 @@ export async function PATCH(request: Request) {
 
   const { orgName, orgLogoUrl, name } = await request.json();
 
+  // Validação leve: logo tem que ser data:image ou https (evita javascript: e
+  // afins guardados e renderizados depois), e limites de tamanho pra não
+  // gravar payload gigante. Só afeta a própria org do usuário, mas defesa em
+  // profundidade não custa.
+  if (orgLogoUrl !== undefined && orgLogoUrl !== null) {
+    if (typeof orgLogoUrl !== "string" || orgLogoUrl.length > 1_500_000) {
+      return NextResponse.json({ error: "Logo inválido." }, { status: 400 });
+    }
+    if (!/^(data:image\/|https:\/\/)/i.test(orgLogoUrl)) {
+      return NextResponse.json({ error: "Logo precisa ser uma imagem (data:image/ ou https://)." }, { status: 400 });
+    }
+  }
+  if (orgName !== undefined && (typeof orgName !== "string" || orgName.length > 200)) {
+    return NextResponse.json({ error: "Nome da organização inválido." }, { status: 400 });
+  }
+  if (name !== undefined && (typeof name !== "string" || name.length > 200)) {
+    return NextResponse.json({ error: "Nome inválido." }, { status: 400 });
+  }
+
   const profile = await prisma.profile.findUnique({ where: { id: user.id } });
   if (!profile) return NextResponse.json({ error: "Perfil não encontrado." }, { status: 404 });
 

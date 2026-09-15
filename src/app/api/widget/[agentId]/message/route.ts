@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
+import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+
+// Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
+const MAX_TEXT = 4000;
+const MAX_CONTACT_ID = 128;
+const MAX_OPTION_ID = 128;
 
 // Rota pública (sem sessão) — o widget roda no site de um visitante
 // qualquer, então não tem cookie de login nem X-Internal-Secret pra
@@ -27,11 +33,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Widget não disponível." }, { status: 404, headers: CORS_HEADERS });
   }
 
-  const { contactId, text, optionId, lang } = await request.json();
-  if (!contactId) {
-    return NextResponse.json({ error: "contactId é obrigatório." }, { status: 400, headers: CORS_HEADERS });
+  // Rota pública sem sessão — sem rate limit, qualquer um com o agentId (que
+  // fica embutido no script.js público) poderia floodar e amplificar chamadas
+  // ao webhook/IA da org. Limita por IP e por agente.
+  const ip = getClientIp(request);
+  const [byIp, byAgent] = await Promise.all([
+    checkRateLimit(`widget:${agentId}:${ip}`, 20, 60), // 20/min por IP+agente
+    checkRateLimit(`widget:${agentId}`, 600, 60), // 600/min por agente (teto global)
+  ]);
+  if (!byIp.allowed || !byAgent.allowed) {
+    return NextResponse.json({ error: "Muitas mensagens. Aguarde um instante." }, { status: 429, headers: CORS_HEADERS });
   }
 
-  const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId, lang });
+  const { contactId, text, optionId, lang } = await request.json();
+  if (!contactId || typeof contactId !== "string" || contactId.length > MAX_CONTACT_ID) {
+    return NextResponse.json({ error: "contactId inválido." }, { status: 400, headers: CORS_HEADERS });
+  }
+  if (text !== undefined && (typeof text !== "string" || text.length > MAX_TEXT)) {
+    return NextResponse.json({ error: "Mensagem muito longa." }, { status: 400, headers: CORS_HEADERS });
+  }
+  if (optionId !== undefined && (typeof optionId !== "string" || optionId.length > MAX_OPTION_ID)) {
+    return NextResponse.json({ error: "optionId inválido." }, { status: 400, headers: CORS_HEADERS });
+  }
+  const safeLang = typeof lang === "string" ? lang.slice(0, 8) : undefined;
+
+  const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId, lang: safeLang });
   return NextResponse.json(result, { headers: CORS_HEADERS });
 }

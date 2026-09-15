@@ -140,8 +140,10 @@ model WhatsAppConnection {
 // Canal oficial (Meta Cloud API) — dorme até existirem credenciais de app
 // Meta configuradas (ver README do worker/META_SETUP.md); o webhook em
 // /api/webhooks/meta já está pronto pra receber assim que isso existir.
-// accessToken fica em texto puro por enquanto — antes de usar em produção
-// de verdade, trocar por um valor cifrado (não implementado ainda).
+// accessToken é cifrado em repouso (AES-256-GCM) via src/lib/server/crypto.ts
+// quando TOKEN_ENCRYPTION_KEY existe — grava/lê pelas rotas, nunca em texto
+// puro em produção. Linhas antigas em texto puro continuam legíveis (migração
+// sem downtime) e passam a ser cifradas no próximo update.
 model MetaConnection {
   agentId       String   @id
   phoneNumberId String   @unique
@@ -320,4 +322,16 @@ model Broadcast {
 
   @@index([agentId])
   @@map("eva_studio_broadcasts")
+}
+
+// Contador de rate limit (janela fixa). Usado por src/lib/server/rate-limit.ts
+// pra proteger rotas públicas/abusáveis (widget, signup) sem depender de
+// Redis externo. `key` = identificador da janela (ex: "signup:<ip>",
+// "widget:<agentId>:<ip>"); `count` reinicia quando `windowStart` vence.
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+
+  @@map("eva_studio_rate_limits")
 }

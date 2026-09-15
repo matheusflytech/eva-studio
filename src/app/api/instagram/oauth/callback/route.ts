@@ -1,20 +1,34 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { encryptSecret } from "@/lib/server/crypto";
 
-// Callback do Instagram Login (OAuth direto — "Instagram API with Instagram
-// Login", não precisa mais de Página do Facebook). `state` carrega o
-// agentId; a validação de propriedade acontece via cookie de sessão normal
-// (é o navegador do usuário logado voltando do redirect da Meta, não uma
-// chamada de servidor a servidor). Ver docs/meta-business-runbook.html.
+const STATE_COOKIE = "ig_oauth_state";
+
+// Callback do Instagram Login. Proteção CSRF: o `state` é um nonce aleatório
+// gerado em /api/instagram/oauth/start e guardado num cookie httpOnly junto do
+// agentId (formato "<agentId>|<nonce>"). Aqui a gente confia no agentId que
+// veio do COOKIE (não do parâmetro da URL) e exige que o nonce bata — assim um
+// atacante não consegue forjar um callback que vincule a conta dele ao agente
+// de outra pessoa. A validação de propriedade (org) continua via sessão.
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const agentId = url.searchParams.get("state");
+  const stateNonce = url.searchParams.get("state");
   const errorParam = url.searchParams.get("error");
 
-  if (!agentId) {
-    return NextResponse.json({ error: "state (agentId) ausente." }, { status: 400 });
+  const cookieStore = await cookies();
+  const stateCookie = cookieStore.get(STATE_COOKIE)?.value ?? "";
+  const sep = stateCookie.lastIndexOf("|");
+  const agentId = sep > 0 ? stateCookie.slice(0, sep) : "";
+  const cookieNonce = sep > 0 ? stateCookie.slice(sep + 1) : "";
+
+  // Consome o cookie de uma vez (single-use), independente do resultado.
+  cookieStore.delete(STATE_COOKIE);
+
+  if (!agentId || !cookieNonce || !stateNonce || cookieNonce !== stateNonce) {
+    return NextResponse.json({ error: "state inválido (possível CSRF)." }, { status: 400 });
   }
 
   const redirectBack = new URL(`/agent-studio/${agentId}`, url.origin);
@@ -71,10 +85,11 @@ export async function GET(request: Request) {
       return NextResponse.redirect(redirectBack);
     }
 
+    const encryptedToken = encryptSecret(accessToken);
     await prisma.instagramConnection.upsert({
       where: { agentId },
-      create: { agentId, igBusinessId, pageAccessToken: accessToken, username: me?.username ?? null },
-      update: { igBusinessId, pageAccessToken: accessToken, username: me?.username ?? null },
+      create: { agentId, igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
+      update: { igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
     });
 
     redirectBack.searchParams.set("instagram", "connected");
