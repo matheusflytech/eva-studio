@@ -24,7 +24,7 @@ export function ModalContent({
       <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity" />
       <Dialog.Content
         className={cn(
-          "glass-card fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-surface-1/90 p-7 shadow-2xl outline-none backdrop-blur-2xl",
+          "glass-card glass-card-solid fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl p-7 shadow-2xl outline-none",
           className
         )}
       >

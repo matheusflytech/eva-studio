@@ -110,7 +110,7 @@ function LeadCard({ lead, onOpen, onDragStart }: { lead: Lead; onOpen: () => voi
   );
 }
 
-function LeadDetail({ lead, onClose, onStageChange }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void }) {
+function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void }) {
   const [messages, setMessages] = React.useState<Message[]>([]);
 
   React.useEffect(() => {
@@ -121,7 +121,7 @@ function LeadDetail({ lead, onClose, onStageChange }: { lead: Lead; onClose: () 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-surface-1" onClick={(e) => e.stopPropagation()}>
+      <div className="glass-card glass-card-solid flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
           <div>
             <p className="text-[14px] font-medium text-text-primary">{leadName(lead)}</p>
@@ -141,7 +141,15 @@ function LeadDetail({ lead, onClose, onStageChange }: { lead: Lead; onClose: () 
                 {STAGE_LABEL[s]}
               </button>
             ))}
-            <button type="button" onClick={onClose} className="ml-1 text-text-tertiary hover:text-text-primary">
+            <button
+              type="button"
+              onClick={onDelete}
+              title="Excluir lead"
+              className="ml-1 rounded-lg p-1 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+            >
+              <Trash2 size={15} />
+            </button>
+            <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
               <X size={16} />
             </button>
           </div>
@@ -248,7 +256,7 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card flex w-full max-w-md flex-col gap-4 rounded-3xl bg-surface-1 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="glass-card glass-card-solid flex w-full max-w-md flex-col gap-4 rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-[15px] font-semibold text-text-primary">Novo lead</p>
           <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
@@ -328,7 +336,7 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card flex w-full max-w-lg flex-col gap-3 rounded-3xl bg-surface-1 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="glass-card glass-card-solid flex w-full max-w-lg flex-col gap-3 rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-[15px] font-semibold text-text-primary">
             Adicionar lead via API {stage && <span className="text-text-tertiary">— direto em &quot;{STAGE_LABEL[stage]}&quot;</span>}
@@ -392,6 +400,13 @@ export default function LeadsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadStage }),
     });
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Excluir esse lead? Essa ação não pode ser desfeita.")) return;
+    setLeads((prev) => (prev ?? []).filter((l) => l.id !== id));
+    setOpenId(null);
+    await fetch(`/api/leads/${id}`, { method: "DELETE" });
   }
 
   if (leads === null) return <div className="flex-1 p-8" />;
@@ -484,6 +499,7 @@ export default function LeadsPage() {
           lead={opened}
           onClose={() => setOpenId(null)}
           onStageChange={(stage) => handleStageChange(opened.id, stage)}
+          onDelete={() => handleDelete(opened.id)}
         />
       )}
 

@@ -78,12 +78,19 @@ body {
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--glass-card-bg, rgba(255, 255, 255, 0.035));
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-subtle);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
+
+/* Dialogs/overlays need a fully opaque backing (content sitting behind them
+   must not show through). Tailwind's own bg-* utilities can't do this here:
+   they live in Tailwind's utilities @layer, which always loses to this
+   plain (unlayered) .glass-card rule regardless of class order — so a
+   dedicated modifier class is what actually wins the cascade. */
+.glass-card-solid { --glass-card-bg: var(--bg-surface-1); }
 
 @keyframes aperture-breathe {
   0%, 100% { transform: rotate(0deg); }
