@@ -27,11 +27,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Widget não disponível." }, { status: 404, headers: CORS_HEADERS });
   }
 
-  const { contactId, text, optionId } = await request.json();
+  const { contactId, text, optionId, lang } = await request.json();
   if (!contactId) {
     return NextResponse.json({ error: "contactId é obrigatório." }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId });
+  const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId, lang });
   return NextResponse.json(result, { headers: CORS_HEADERS });
 }

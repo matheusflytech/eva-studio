@@ -23,6 +23,11 @@ export interface AdvanceInput {
   contactId: string;
   text?: string;
   optionId?: string;
+  // Idioma escolhido pelo visitante (ex: "pt", "en", "es") — hoje só o
+  // widget do site manda isso (o seletor de idioma da Eva Holding); repassado
+  // pro webhook do agente pra ele responder no idioma certo. Opcional e sem
+  // efeito nenhum no motor em si, só passa adiante.
+  lang?: string;
 }
 
 export interface AdvanceResult {
@@ -120,7 +125,8 @@ async function callAgentWebhook(
   agent: AgentForWebhook,
   message: string,
   conversationId: string,
-  variables: Variables
+  variables: Variables,
+  lang?: string
 ): Promise<string | null> {
   if (!agent.outboundUrl) return null;
   try {
@@ -131,6 +137,7 @@ async function callAgentWebhook(
       body: JSON.stringify({
         message,
         conversation_id: conversationId,
+        lang,
         agent: {
           id: agent.id,
           name: agent.name,
@@ -233,7 +240,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       create: { agentId: input.agentId, channel: input.channel, contactId: input.contactId, variables: {} },
       update: { updatedAt: new Date() },
     });
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {});
+    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
     await logMessages(conversation.id, input.text, messages);
     if (input.text !== undefined || input.optionId !== undefined) {
@@ -319,7 +326,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     currentId = nextNodeId(edges, parkedNode.id, handle);
   } else if (parkedNode?.data.iconKey === "agent") {
     const conversationId = `${input.channel}:${input.contactId}`;
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables);
+    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
     if (reply) messages.push({ text: reply });
     return finish();
   } else if (parkedNode?.data.iconKey === "wait") {
@@ -402,7 +409,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 
     if (kind === "agent") {
       const conversationId = `${input.channel}:${input.contactId}`;
-      const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables);
+      const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
       if (reply) messages.push({ text: reply });
       currentId = node.id; // fica "alugado" pra IA livre até o contato parar de responder
       break;
