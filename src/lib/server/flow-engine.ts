@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
-import { truncateForPrompt } from "@/lib/server/extract-text";
+import { truncateForPrompt } from "@/lib/server/prompt-utils";
 
 export interface OutboundMessage {
   text: string;
