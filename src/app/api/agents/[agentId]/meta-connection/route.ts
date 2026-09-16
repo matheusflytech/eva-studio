@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { encryptSecret } from "@/lib/server/crypto";
 
 // Embedded Signup da Meta: o widget do Facebook devolve um "code" de curta
 // duração pro navegador (via FB.login) — essa rota troca esse code por um
@@ -53,10 +54,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       // não crítico — a conexão já funciona sem isso, só não mostra o número na UI
     }
 
+    const encryptedToken = encryptSecret(accessToken);
     await prisma.metaConnection.upsert({
       where: { agentId },
-      create: { agentId, phoneNumberId, wabaId, accessToken, displayPhone },
-      update: { phoneNumberId, wabaId, accessToken, displayPhone },
+      create: { agentId, phoneNumberId, wabaId, accessToken: encryptedToken, displayPhone },
+      update: { phoneNumberId, wabaId, accessToken: encryptedToken, displayPhone },
     });
 
     return NextResponse.json({ ok: true });

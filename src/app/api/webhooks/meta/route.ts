@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation, type OutboundMessage } from "@/lib/server/flow-engine";
 import { matchCommentAutomation } from "@/lib/server/comment-automation";
+import { verifyMetaSignature } from "@/lib/server/meta-signature";
+import { decryptSecret } from "@/lib/server/crypto";
+import { checkRateLimit } from "@/lib/server/rate-limit";
+
+// Idempotência: a Meta pode reentregar o mesmo evento. Guarda o id do evento
+// por 24h (reusa a tabela de rate limit como store de "já visto") e ignora
+// reentregas — evita DM/resposta duplicada. Retorna true se é NOVO.
+async function isFirstDelivery(eventId: string | undefined): Promise<boolean> {
+  if (!eventId) return true; // sem id não dá pra deduplicar; processa
+  const { count } = await checkRateLimit(`evt:${eventId}`, 1, 86_400);
+  return count <= 1;
+}
 
 // Handshake de verificação exigido pela Meta ao configurar o webhook no
 // painel do app (Settings > Webhooks). Só funciona depois que
@@ -26,6 +38,7 @@ export async function GET(request: Request) {
 }
 
 interface MetaMessage {
+  id?: string;
   from: string;
   type: string;
   text?: { body?: string };
@@ -142,6 +155,7 @@ async function handleWhatsAppEntries(entries: unknown[]) {
         const optionId = message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id;
         const text = message.text?.body;
         if (!optionId && !text) continue;
+        if (!(await isFirstDelivery(message.id))) continue; // reentrega da Meta, ignora
 
         try {
           const result = await advanceConversation({
@@ -152,7 +166,7 @@ async function handleWhatsAppEntries(entries: unknown[]) {
             optionId,
           });
           for (const reply of result.messages) {
-            await sendMetaMessage(phoneNumberId, connection.accessToken, message.from, reply);
+            await sendMetaMessage(phoneNumberId, decryptSecret(connection.accessToken), message.from, reply);
           }
         } catch {
           // Falha isolada por mensagem não deve derrubar o resto do batch.
@@ -208,6 +222,7 @@ async function handleInstagramEntries(entries: unknown[]) {
 
     const connection = await prisma.instagramConnection.findUnique({ where: { igBusinessId } });
     if (!connection) continue;
+    const igAccessToken = decryptSecret(connection.pageAccessToken);
 
     for (const event of entry.messaging ?? []) {
       const from = event.sender?.id;
@@ -222,7 +237,7 @@ async function handleInstagramEntries(entries: unknown[]) {
           text,
         });
         for (const reply of result.messages) {
-          await sendInstagramMessage(igBusinessId, connection.pageAccessToken, from, reply.text);
+          await sendInstagramMessage(igBusinessId, igAccessToken, from, reply.text);
         }
       } catch {
         // Falha isolada por mensagem não deve derrubar o resto do batch.
@@ -236,6 +251,7 @@ async function handleInstagramEntries(entries: unknown[]) {
       const commenterId = comment.from?.id;
       const text = comment.text;
       if (!commentId || !commenterId || !text) continue;
+      if (!(await isFirstDelivery(commentId))) continue; // reentrega da Meta, ignora
 
       try {
         const automations = await prisma.commentAutomation.findMany({ where: { agentId: connection.agentId } });
@@ -245,7 +261,7 @@ async function handleInstagramEntries(entries: unknown[]) {
         await handleMatchedComment(
           connection.agentId,
           igBusinessId,
-          connection.pageAccessToken,
+          igAccessToken,
           match.id,
           commentId,
           commenterId,
@@ -268,7 +284,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: false, reason: "not_configured" });
   }
 
-  const body = await request.json();
+  // Assinatura obrigatória: lê o corpo CRU e valida o HMAC antes de confiar em
+  // qualquer coisa. Sem isso, eventos forjados dirigiriam o bot com os tokens
+  // reais da org. Ler como texto (não .json()) é essencial — o HMAC é sobre os
+  // bytes exatos que a Meta assinou.
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!verifyMetaSignature(rawBody, signature)) {
+    return NextResponse.json({ error: "Assinatura inválida." }, { status: 401 });
+  }
+
+  let body: { object?: string; entry?: unknown[] };
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Corpo inválido." }, { status: 400 });
+  }
   const entries = body?.entry ?? [];
 
   // WhatsApp manda object: "whatsapp_business_account"; Instagram manda

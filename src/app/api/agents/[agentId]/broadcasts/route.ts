@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { decryptSecret } from "@/lib/server/crypto";
 
 // Envio pro WhatsApp oficial (Meta) é síncrono aqui mesmo (a Vercel consegue
 // chamar a Graph API direto) — capado num tamanho razoável de lista pra não
@@ -105,7 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     let failedCount = 0;
     for (const to of recipients) {
       try {
-        await sendMetaTemplate(agent.metaConnection.phoneNumberId, agent.metaConnection.accessToken, to, template.metaTemplateName, template.metaLanguageCode, parameters);
+        await sendMetaTemplate(agent.metaConnection.phoneNumberId, decryptSecret(agent.metaConnection.accessToken), to, template.metaTemplateName, template.metaLanguageCode, parameters);
         sentCount += 1;
       } catch {
         failedCount += 1;

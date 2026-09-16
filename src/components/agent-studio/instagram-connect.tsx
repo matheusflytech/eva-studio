@@ -12,7 +12,6 @@ interface Connection {
 }
 
 const INSTAGRAM_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-const INSTAGRAM_SCOPES = "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments";
 
 export function InstagramConnect({ agentId }: { agentId: string }) {
   const [connection, setConnection] = React.useState<Connection | null | undefined>(undefined);
@@ -90,12 +89,9 @@ export function InstagramConnect({ agentId }: { agentId: string }) {
     );
   }
 
-  const authorizeUrl =
-    INSTAGRAM_APP_ID && typeof window !== "undefined"
-      ? `https://www.instagram.com/oauth/authorize?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(
-          `${window.location.origin}/api/instagram/oauth/callback`
-        )}&scope=${INSTAGRAM_SCOPES}&response_type=code&state=${agentId}`
-      : null;
+  // Passa pela rota server-side, que valida sessão/posse do agente e cria o
+  // nonce anti-CSRF (state) num cookie httpOnly antes de ir pra Meta.
+  const authorizeUrl = INSTAGRAM_APP_ID ? `/api/instagram/oauth/start?agentId=${encodeURIComponent(agentId)}` : null;
 
   return (
     <div className="flex flex-col gap-3">

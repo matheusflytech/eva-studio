@@ -8,6 +8,7 @@ import { getCredentialSecret } from "@/lib/server/credentials";
 import { callGroqWithTools, type GroqTool, type GroqToolCall } from "@/lib/server/groq";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
+import { safeFetch } from "@/lib/server/ssrf";
 
 export interface OutboundMessage {
   text: string;
@@ -40,6 +41,15 @@ export interface AdvanceResult {
 }
 
 type Variables = Record<string, unknown>;
+
+// Nomes de variável vêm do Builder (usuário) e viram chaves de objeto. Bloqueia
+// chaves que poluiriam o prototype (__proto__, constructor, prototype) —
+// defesa em profundidade contra prototype pollution.
+const UNSAFE_VAR_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+function setVar(variables: Variables, name: string | undefined, value: unknown): void {
+  if (!name || UNSAFE_VAR_KEYS.has(name)) return;
+  variables[name] = value;
+}
 
 function interpolate(template: string, variables: Variables): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
@@ -152,7 +162,7 @@ async function performHttpRequest(data: FlowNodeData, variables: Variables): Pro
     }
 
     const hasBody = method !== "GET" && method !== "DELETE" && data.httpBody;
-    const res = await fetch(url.toString(), {
+    const res = await safeFetch(url.toString(), {
       method,
       headers,
       body: hasBody ? interpolate(data.httpBody ?? "", variables) : undefined,
@@ -299,7 +309,7 @@ async function runAiAgent(
           for (const v of collectVars) {
             const value = call.arguments[v.key];
             if (value !== undefined && String(value).trim()) {
-              variables[v.key] = value;
+              setVar(variables, v.key, value);
               saved.push(v.key);
             }
           }
@@ -332,7 +342,9 @@ async function callAgentWebhook(
   if (!agent.outboundUrl) return null;
   try {
     const knowledgeBaseContext = await getKnowledgeBaseContext(agent.id);
-    const res = await fetch(agent.outboundUrl, {
+    // safeFetch: bloqueia SSRF (URL configurada pelo usuário não pode apontar
+    // pra rede interna) e aplica timeout.
+    const res = await safeFetch(agent.outboundUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -538,8 +550,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
 
     if (parkedNode.data.variableName) {
-      variables[parkedNode.data.variableName] =
-        options.length > 0 ? options.find((o) => o.id === resolvedOptionId)?.label ?? resolvedOptionId : input.text;
+      setVar(
+        variables,
+        parkedNode.data.variableName,
+        options.length > 0 ? options.find((o) => o.id === resolvedOptionId)?.label ?? resolvedOptionId : input.text
+      );
     }
     const handle = options.length > 0 ? resolvedOptionId : undefined;
     currentId = nextNodeId(edges, parkedNode.id, handle);
@@ -602,11 +617,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
 
     if (kind === "variable") {
-      if (node.data.variableName) {
+      if (node.data.variableName && !UNSAFE_VAR_KEYS.has(node.data.variableName)) {
         if (node.data.variableExpression) {
-          variables[node.data.variableName] = resolveVariableExpression(node.data.variableExpression, variables);
+          setVar(variables, node.data.variableName, resolveVariableExpression(node.data.variableExpression, variables));
         } else if (!(node.data.variableName in variables)) {
-          variables[node.data.variableName] = "";
+          setVar(variables, node.data.variableName, "");
         }
       }
       pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
@@ -619,7 +634,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       let stepError: string | undefined;
       if (node.data.webhookUrl) {
         try {
-          const res = await fetch(node.data.webhookUrl, {
+          const res = await safeFetch(node.data.webhookUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ variables, contactId: input.contactId, agentId: input.agentId }),
@@ -632,7 +647,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           } catch {
             // resposta não era JSON, usa o texto puro mesmo
           }
-          if (node.data.variableName) variables[node.data.variableName] = value;
+          if (node.data.variableName) setVar(variables, node.data.variableName, value);
         } catch (err) {
           // um webhook falhando não deve travar o fluxo inteiro
           stepError = err instanceof Error ? err.message : String(err);
@@ -646,7 +661,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     if (kind === "http") {
       const startedAt = Date.now();
       const result = await performHttpRequest(node.data, variables);
-      if (node.data.variableName) variables[node.data.variableName] = result.value;
+      if (node.data.variableName) setVar(variables, node.data.variableName, result.value);
       pushStep(node, { output: result.error ? undefined : JSON.stringify(result.value ?? null), error: result.error }, startedAt);
       currentId = nextNodeId(edges, node.id);
       continue;
