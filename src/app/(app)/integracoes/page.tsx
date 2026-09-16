@@ -2,6 +2,7 @@
 
 import { MessageCircle, AtSign, Globe, Mail, Calendar, Users, FileSpreadsheet } from "lucide-react";
 import { IntegrationCard } from "@/components/integrations/integration-card";
+import { CredentialsPanel } from "@/components/integrations/credentials-panel";
 
 const CHANNELS = [
   { id: "whatsapp", icon: MessageCircle, name: "WhatsApp Business", description: "Recebe e responde conversas do WhatsApp." },
@@ -36,7 +37,7 @@ export default function IntegracoesPage() {
         </div>
       </div>
 
-      <div>
+      <div className="mb-8">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Fontes de dados</p>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {DATA_SOURCES.map((c) => (
@@ -44,6 +45,8 @@ export default function IntegracoesPage() {
           ))}
         </div>
       </div>
+
+      <CredentialsPanel />
     </div>
   );
 }

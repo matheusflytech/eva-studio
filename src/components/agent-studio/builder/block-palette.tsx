@@ -4,7 +4,7 @@ import { BLOCK_STYLES } from "./block-styles";
 
 export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
   return (
-    <div className="glass-card w-[220px] shrink-0 rounded-3xl p-4">
+    <div className="glass-card glass-card-solid w-[220px] shrink-0 rounded-3xl p-4">
       <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Blocos</p>
       <p className="mb-3 px-1 text-[11.5px] text-text-tertiary">Clique para adicionar ao canvas.</p>
       <div className="flex flex-col gap-1">

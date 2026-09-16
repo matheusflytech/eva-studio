@@ -1,13 +1,14 @@
 import type { Node, Edge } from "@xyflow/react";
 
-const ROW_HEIGHT = 170;
-const COL_WIDTH = 260;
+const COL_WIDTH = 320;
+const ROW_HEIGHT = 150;
 
 // Layout em camadas por BFS a partir dos nós sem entrada (normalmente só o
-// "Início") — profundidade = linha (y), ordem de visita = coluna (x),
-// centralizado por linha. Não usa nenhuma lib de grafo (dagre/elkjs): fluxos
-// de chatbot são majoritariamente árvores rasas, então BFS simples já
-// organiza bem sem trazer dependência nova pro projeto.
+// "Início") — profundidade = coluna (x), ordem de visita = linha (y),
+// centralizado por coluna. Canvas horizontal (esquerda→direita, igual n8n).
+// Não usa nenhuma lib de grafo (dagre/elkjs): fluxos de chatbot são
+// majoritariamente árvores rasas, então BFS simples já organiza bem sem
+// trazer dependência nova pro projeto.
 export function autoLayoutNodes<T extends Record<string, unknown>>(
   nodes: Node<T>[],
   edges: Edge[]
@@ -42,27 +43,27 @@ export function autoLayoutNodes<T extends Record<string, unknown>>(
     }
   }
 
-  // Blocos soltos (sem ligação com o Início) vão numa linha extra no final,
+  // Blocos soltos (sem ligação com o Início) vão numa coluna extra no final,
   // em vez de sumirem do layout.
   const unreached = nodes.filter((n) => !visited.has(n.id));
   const maxDepth = Math.max(0, ...Array.from(depth.values()));
   unreached.forEach((n) => depth.set(n.id, maxDepth + 1));
   order.push(...unreached.map((n) => n.id));
 
-  const colByRow = new Map<number, number>();
-  const col = new Map<string, number>();
+  const rowByCol = new Map<number, number>();
+  const row = new Map<string, number>();
   order.forEach((id) => {
     const d = depth.get(id) ?? 0;
-    const c = colByRow.get(d) ?? 0;
-    colByRow.set(d, c + 1);
-    col.set(id, c);
+    const r = rowByCol.get(d) ?? 0;
+    rowByCol.set(d, r + 1);
+    row.set(id, r);
   });
 
   return nodes.map((n) => {
     const d = depth.get(n.id) ?? 0;
-    const rowCount = colByRow.get(d) ?? 1;
-    const rowWidth = (rowCount - 1) * COL_WIDTH;
-    const c = col.get(n.id) ?? 0;
-    return { ...n, position: { x: c * COL_WIDTH - rowWidth / 2 + 400, y: d * ROW_HEIGHT } };
+    const colCount = rowByCol.get(d) ?? 1;
+    const colHeight = (colCount - 1) * ROW_HEIGHT;
+    const r = row.get(n.id) ?? 0;
+    return { ...n, position: { x: d * COL_WIDTH, y: r * ROW_HEIGHT - colHeight / 2 + 250 } };
   });
 }

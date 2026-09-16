@@ -17,10 +17,30 @@ model Organization {
   logoUrl   String?
   createdAt DateTime @default(now())
 
-  profiles Profile[]
-  agents   Agent[]
+  profiles    Profile[]
+  agents      Agent[]
+  credentials Credential[]
 
   @@map("eva_studio_organizations")
+}
+
+// Chave de API reutilizável entre agentes (Groq, Resend, ...) — cadastrada
+// uma vez pela org, referenciada por nome em qualquer bloco que precise dela
+// (Agente de IA, Enviar e-mail). O valor fica cifrado (ver src/lib/server/crypto.ts),
+// nunca volta em texto puro pro cliente depois de criado.
+model Credential {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  type      String // "groq" | "resend"
+  secretEnc String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_credentials")
 }
 
 model Profile {
@@ -68,9 +88,27 @@ model Agent {
   outboundQueue       OutboundQueueItem[]
   broadcasts          Broadcast[]
   commentAutomations  CommentAutomation[]
+  executions          FlowExecution[]
 
   @@index([orgId])
   @@map("eva_studio_agents")
+}
+
+// Uma linha por "rodada" da conversa (cada vez que advanceConversation roda),
+// gravando o caminho percorrido no fluxo — pra existir uma aba de Execuções
+// tipo n8n em vez de só o estado atual (Conversation.currentNodeId).
+model FlowExecution {
+  id             String   @id @default(uuid())
+  agentId        String
+  conversationId String
+  status         String // "success" | "error"
+  steps          Json // [{nodeId, kind, label, input, output, error?, ms}]
+  createdAt      DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt])
+  @@map("eva_studio_flow_executions")
 }
 
 model AgentVariable {

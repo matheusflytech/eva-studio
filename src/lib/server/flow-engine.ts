@@ -2,8 +2,12 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
-import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
+import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
+import { getCredentialSecret } from "@/lib/server/credentials";
+import { callGroqWithTools, type GroqTool, type GroqToolCall } from "@/lib/server/groq";
+import { sendEmail } from "@/lib/server/resend";
+import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 
 export interface OutboundMessage {
   text: string;
@@ -119,6 +123,203 @@ interface AgentForWebhook {
 async function getKnowledgeBaseContext(agentId: string): Promise<string[]> {
   const docs = await prisma.knowledgeDoc.findMany({ where: { agentId }, select: { fileName: true, content: true } });
   return docs.filter((d) => d.content.trim()).map((d) => `# ${d.fileName}\n${truncateForPrompt(d.content)}`);
+}
+
+// Executa um bloco HTTP (ou a variante tool-http) — monta método, URL+query,
+// headers+auth e corpo, interpola {variavel} em tudo, e devolve o corpo da
+// resposta (como JSON se der, texto puro senão). Uma falha de rede nunca
+// derruba o fluxo/a ferramenta, só devolve null.
+async function performHttpRequest(data: FlowNodeData, variables: Variables): Promise<{ value: unknown; error?: string }> {
+  const method = data.httpMethod ?? "GET";
+  const baseUrl = interpolate(data.httpUrl ?? "", variables);
+  if (!baseUrl) return { value: null, error: "URL vazia." };
+
+  try {
+    const url = new URL(baseUrl);
+    for (const row of data.httpQueryParams ?? []) {
+      if (row.key) url.searchParams.set(interpolate(row.key, variables), interpolate(row.value, variables));
+    }
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    for (const row of data.httpHeaders ?? []) {
+      if (row.key) headers[interpolate(row.key, variables)] = interpolate(row.value, variables);
+    }
+    if (data.httpAuthType === "bearer" && data.httpAuthValue) {
+      headers.Authorization = `Bearer ${interpolate(data.httpAuthValue, variables)}`;
+    } else if (data.httpAuthType === "header" && data.httpAuthValue) {
+      const [name, ...rest] = data.httpAuthValue.split(":");
+      if (name && rest.length) headers[name.trim()] = interpolate(rest.join(":").trim(), variables);
+    }
+
+    const hasBody = method !== "GET" && method !== "DELETE" && data.httpBody;
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: hasBody ? interpolate(data.httpBody ?? "", variables) : undefined,
+    });
+    const raw = await res.text();
+    try {
+      return { value: JSON.parse(raw) };
+    } catch {
+      return { value: raw };
+    }
+  } catch (err) {
+    return { value: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// Nome de função válido pro function-calling da Groq (só [a-zA-Z0-9_-], sem
+// espaço) — derivado do nome do bloco de ferramenta no canvas.
+function toToolFunctionName(label: string, fallback: string): string {
+  const slug = (label || fallback).toLowerCase().trim().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+  return slug || fallback;
+}
+
+// Qualquer {placeholder} usado na URL/headers/query/corpo de uma ferramenta
+// HTTP que NÃO seja uma variável já capturada na conversa vira um parâmetro
+// que o próprio modelo decide preencher ao chamar a ferramenta — reaproveita
+// a mesma sintaxe {} já usada em todo o motor, só que "ao contrário".
+function extractToolParams(data: FlowNodeData, variables: Variables): string[] {
+  const haystack = [
+    data.httpUrl ?? "",
+    data.httpBody ?? "",
+    ...(data.httpHeaders ?? []).flatMap((r: KeyValueRow) => [r.key, r.value]),
+    ...(data.httpQueryParams ?? []).flatMap((r: KeyValueRow) => [r.key, r.value]),
+  ].join(" ");
+  const found = new Set<string>();
+  for (const match of haystack.matchAll(/\{(\w+)\}/g)) {
+    if (!(match[1] in variables)) found.add(match[1]);
+  }
+  return Array.from(found);
+}
+
+// Janela deslizante de memória (igual "Buffer Window Memory" do n8n/Flowise):
+// busca as últimas N mensagens JÁ GRAVADAS dessa conversa (a mensagem atual
+// ainda não foi persistida nesse ponto — só entra depois, em finish()/
+// logMessages — então não precisa filtrar duplicata aqui) e devolve em ordem
+// cronológica no formato que a Groq espera.
+async function loadConversationHistory(
+  conversationId: string,
+  windowSize: number
+): Promise<{ role: "user" | "assistant"; content: string }[]> {
+  if (windowSize <= 0) return [];
+  const rows = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "desc" },
+    take: windowSize,
+  });
+  return rows.reverse().map((m) => ({ role: m.role === "contact" ? ("user" as const) : ("assistant" as const), content: m.text }));
+}
+
+const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
+
+// Roda o Agente de IA nativo (bloco "ai-agent"): junta as ferramentas
+// conectadas na porta "tools" (tool-http/tool-knowledge), monta a chamada
+// pra Groq com function-calling — incluindo memória da conversa e a
+// ferramenta interna de coleta de variáveis (collectVars) — e devolve o texto
+// final já depois do loop de tool-calling (ver src/lib/server/groq.ts).
+async function runAiAgent(
+  node: Node<FlowNodeData>,
+  agentId: string,
+  userMessage: string,
+  variables: Variables,
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  conversationId: string
+): Promise<{ text: string | null; error?: string }> {
+  const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
+  if (!apiKey) return { text: null, error: "Credencial Groq não configurada nesse bloco." };
+
+  const toolNodes = edges
+    .filter((e) => e.target === node.id && e.targetHandle === "tools")
+    .map((e) => findNode(nodes, e.source))
+    .filter((n): n is Node<FlowNodeData> => !!n);
+
+  const tools: GroqTool[] = toolNodes.map((tn, i) =>
+    tn.data.iconKey === "tool-knowledge"
+      ? {
+          name: toToolFunctionName(tn.data.label, `buscar_conhecimento_${i}`),
+          description: tn.data.detail || "Busca os trechos mais relevantes na base de conhecimento do agente a partir de uma consulta.",
+          params: [{ name: "consulta", description: "O que buscar — palavras-chave ou a pergunta do usuário." }],
+        }
+      : {
+          name: toToolFunctionName(tn.data.label, `ferramenta_${i}`),
+          description: tn.data.detail || `Chama ${tn.data.httpMethod ?? "GET"} ${tn.data.httpUrl ?? ""}`,
+          params: extractToolParams(tn.data, variables).map((p) => ({ name: p })),
+        }
+  );
+  const toolNodeByName = new Map(tools.map((t, i) => [t.name, toolNodes[i]]));
+
+  // Coleta estruturada de variáveis (estilo "slots" do Rasa + function-calling
+  // do Dify): cada linha configurada vira um campo opcional de uma ferramenta
+  // interna que o modelo chama assim que identifica um valor na conversa — o
+  // system prompt lista o que já foi coletado e o que ainda falta, pra ele
+  // perguntar ativamente em vez de só esperar o usuário se oferecer.
+  const collectVars = (node.data.collectVars ?? []).filter((v) => v.key.trim());
+  const missingVars = collectVars.filter((v) => !String(variables[v.key] ?? "").trim());
+  const collectedVars = collectVars.filter((v) => String(variables[v.key] ?? "").trim());
+
+  if (collectVars.length > 0) {
+    tools.push({
+      name: SAVE_SLOTS_TOOL,
+      description:
+        "Chame sempre que o usuário informar (ou corrigir) qualquer um dos dados que você precisa coletar nesta conversa — pode preencher só os campos que acabou de descobrir, não precisa saber todos de uma vez.",
+      params: collectVars.map((v) => ({ name: v.key, description: v.value, required: false })),
+    });
+  }
+
+  let systemPrompt = node.data.detail || "Você é um assistente útil.";
+  if (collectVars.length > 0) {
+    const lines = ["", "## Dados que você precisa coletar nesta conversa"];
+    if (collectedVars.length) lines.push(`Já coletados: ${collectedVars.map((v) => `${v.key}=${variables[v.key]}`).join(", ")}.`);
+    if (missingVars.length) {
+      lines.push(`Ainda faltam: ${missingVars.map((v) => `${v.key} (${v.value})`).join(", ")}.`);
+      lines.push(
+        `Sempre que o usuário informar um desses dados, chame a ferramenta "${SAVE_SLOTS_TOOL}" com os campos que identificou, e continue a conversa naturalmente perguntando pelo que ainda falta.`
+      );
+    } else {
+      lines.push("Todos os dados já foram coletados — não precisa mais perguntar por eles.");
+    }
+    systemPrompt += lines.join("\n");
+  }
+
+  const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
+
+  try {
+    const text = await callGroqWithTools({
+      apiKey,
+      model: node.data.aiModel || "llama-3.3-70b-versatile",
+      systemPrompt,
+      userMessage,
+      history,
+      tools,
+      executeTool: async (call: GroqToolCall) => {
+        if (call.name === SAVE_SLOTS_TOOL) {
+          const saved: string[] = [];
+          for (const v of collectVars) {
+            const value = call.arguments[v.key];
+            if (value !== undefined && String(value).trim()) {
+              variables[v.key] = value;
+              saved.push(v.key);
+            }
+          }
+          return saved.length > 0 ? `Salvo: ${saved.join(", ")}.` : "Nenhum campo novo recebido.";
+        }
+        const toolNode = toolNodeByName.get(call.name);
+        if (!toolNode) return "Ferramenta não encontrada.";
+        if (toolNode.data.iconKey === "tool-knowledge") {
+          const query = String(call.arguments.consulta ?? userMessage);
+          const chunks = await searchKnowledgeBase(agentId, query, 4);
+          return chunks.join("\n\n") || "Nenhum trecho relevante encontrado na base de conhecimento.";
+        }
+        const result = await performHttpRequest(toolNode.data, { ...variables, ...call.arguments });
+        return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
+      },
+    });
+    return { text, error: text ? undefined : "Groq não devolveu resposta." };
+  } catch (err) {
+    return { text: null, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 async function callAgentWebhook(
@@ -268,6 +469,14 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   let status: AdvanceResult["status"] = "active";
   const inboundText = input.text ?? (input.optionId ? `[opção: ${input.optionId}]` : undefined);
 
+  // Passo a passo da execução (aba "Execuções") — um registro leve por bloco
+  // visitado, não a variável inteira (evita vazar dado sensível no log).
+  interface FlowStep { nodeId: string; kind: string; label: string; output?: string; error?: string; ms: number }
+  const steps: FlowStep[] = [];
+  function pushStep(node: Node<FlowNodeData>, extra: { output?: string; error?: string } = {}, startedAt = Date.now()) {
+    steps.push({ nodeId: node.id, kind: node.data.iconKey, label: node.data.label, ms: Date.now() - startedAt, ...extra });
+  }
+
   // Uma mensagem/toque de verdade do contato sempre reabre a janela de 24h —
   // por isso, quando isGenuineInbound é true, outsideWindow fica sempre false
   // (a resposta de agora conta como dentro da janela). Só fica true quando o
@@ -288,6 +497,16 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       },
     });
     await logMessages(conversation.id, inboundText, messages);
+    if (steps.length > 0) {
+      await prisma.flowExecution.create({
+        data: {
+          agentId: input.agentId,
+          conversationId: `${input.channel}:${input.contactId}`,
+          status: steps.some((s) => s.error) ? "error" : "success",
+          steps: steps as unknown as Prisma.InputJsonValue,
+        },
+      });
+    }
     return { messages, status };
   }
 
@@ -328,6 +547,12 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const conversationId = `${input.channel}:${input.contactId}`;
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
     if (reply) messages.push({ text: reply });
+    pushStep(parkedNode, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" });
+    return finish();
+  } else if (parkedNode?.data.iconKey === "ai-agent") {
+    const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id);
+    if (reply.text) messages.push({ text: reply.text });
+    pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     return finish();
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
@@ -349,23 +574,29 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const kind = node.data.iconKey;
 
     if (kind === "message") {
-      messages.push(await resolveOutboundMessage(node, variables, input.agentId, outsideWindow));
+      const startedAt = Date.now();
+      const resolved = await resolveOutboundMessage(node, variables, input.agentId, outsideWindow);
+      messages.push(resolved);
+      pushStep(node, { output: resolved.text }, startedAt);
       currentId = nextNodeId(edges, node.id);
       continue;
     }
 
     if (kind === "capture") {
       const options = node.data.options ?? [];
+      const text = interpolate(node.data.detail ?? "", variables);
       messages.push({
-        text: interpolate(node.data.detail ?? "", variables),
+        text,
         options: options.length > 0 ? options.map((o) => ({ id: o.id, label: o.label })) : undefined,
       });
+      pushStep(node, { output: text });
       currentId = node.id; // fica parado aqui esperando a resposta
       break;
     }
 
     if (kind === "condition") {
       const result = evaluateCondition(node.data.conditionExpression ?? "", variables);
+      pushStep(node, { output: result ? "Sim" : "Não" });
       currentId = nextNodeId(edges, node.id, result ? "true" : "false");
       continue;
     }
@@ -378,11 +609,14 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           variables[node.data.variableName] = "";
         }
       }
+      pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
       currentId = nextNodeId(edges, node.id);
       continue;
     }
 
     if (kind === "webhook") {
+      const startedAt = Date.now();
+      let stepError: string | undefined;
       if (node.data.webhookUrl) {
         try {
           const res = await fetch(node.data.webhookUrl, {
@@ -399,24 +633,68 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
             // resposta não era JSON, usa o texto puro mesmo
           }
           if (node.data.variableName) variables[node.data.variableName] = value;
-        } catch {
+        } catch (err) {
           // um webhook falhando não deve travar o fluxo inteiro
+          stepError = err instanceof Error ? err.message : String(err);
         }
       }
+      pushStep(node, { error: stepError }, startedAt);
       currentId = nextNodeId(edges, node.id);
       continue;
     }
 
+    if (kind === "http") {
+      const startedAt = Date.now();
+      const result = await performHttpRequest(node.data, variables);
+      if (node.data.variableName) variables[node.data.variableName] = result.value;
+      pushStep(node, { output: result.error ? undefined : JSON.stringify(result.value ?? null), error: result.error }, startedAt);
+      currentId = nextNodeId(edges, node.id);
+      continue;
+    }
+
+    if (kind === "email") {
+      const startedAt = Date.now();
+      const apiKey = node.data.emailCredentialId ? await getCredentialSecret(node.data.emailCredentialId) : null;
+      let stepError: string | undefined;
+      if (!apiKey) {
+        stepError = "Credencial Resend não configurada nesse bloco.";
+      } else {
+        const result = await sendEmail({
+          apiKey,
+          from: interpolate(node.data.emailFrom ?? "", variables),
+          to: interpolate(node.data.emailTo ?? "", variables),
+          subject: interpolate(node.data.emailSubject ?? "", variables),
+          html: interpolate(node.data.emailBody ?? "", variables),
+        });
+        if (!result.ok) stepError = result.error;
+      }
+      pushStep(node, { error: stepError, output: stepError ? undefined: "e-mail enviado" }, startedAt);
+      currentId = nextNodeId(edges, node.id);
+      continue;
+    }
+
+    if (kind === "ai-agent") {
+      const startedAt = Date.now();
+      const reply = await runAiAgent(node, agent.id, input.text ?? "", variables, nodes, edges, conversation.id);
+      if (reply.text) messages.push({ text: reply.text });
+      pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
+      currentId = node.id; // fica "alugado" pra IA nativa até o contato parar de responder
+      break;
+    }
+
     if (kind === "agent") {
+      const startedAt = Date.now();
       const conversationId = `${input.channel}:${input.contactId}`;
       const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
       if (reply) messages.push({ text: reply });
+      pushStep(node, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" }, startedAt);
       currentId = node.id; // fica "alugado" pra IA livre até o contato parar de responder
       break;
     }
 
     if (kind === "human") {
       if (node.data.detail) messages.push({ text: interpolate(node.data.detail, variables) });
+      pushStep(node);
       status = "waiting_human";
       // Fica "parado" no próprio bloco (em vez de null) — é o que permite o
       // atendente clicar "Retomar bot" depois e o motor saber pra onde ir a
@@ -430,12 +708,14 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         (node.data.waitDuration ?? 1) *
         (node.data.waitUnit === "horas" ? 3_600_000 : node.data.waitUnit === "segundos" ? 1000 : 60_000);
       variables.__wait_until = new Date(Date.now() + durationMs).toISOString();
+      pushStep(node, { output: `até ${variables.__wait_until}` });
       currentId = node.id;
       break;
     }
 
     if (kind === "end") {
       if (node.data.detail) messages.push({ text: interpolate(node.data.detail, variables) });
+      pushStep(node);
       status = "ended";
       currentId = null;
       break;

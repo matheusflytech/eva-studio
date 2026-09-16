@@ -9,30 +9,38 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  MiniMap,
   Panel,
   addEdge,
   useNodesState,
   useEdgesState,
 } from "@xyflow/react";
-import type { Connection, Node, NodeProps } from "@xyflow/react";
+import type { Connection, Edge, Node, NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { FlowNode, type FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { NodeInspector } from "@/components/agent-studio/builder/node-inspector";
 import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
+import { BLOCK_MINIMAP_COLOR } from "@/components/agent-studio/builder/block-styles";
 import { autoLayoutNodes } from "@/components/agent-studio/builder/auto-layout";
 import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-template-gallery";
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
+import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
+import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 
 type SaveState = "idle" | "pending" | "saved" | "error";
+type BuilderTab = "editor" | "executions";
+
+const edgeTypes = { plusEdge: FlowEdge };
 
 export default function AgentBuilderPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -44,6 +52,7 @@ export default function AgentBuilderPage() {
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
   const [showPreview, setShowPreview] = React.useState(true);
   const [showTemplateGallery, setShowTemplateGallery] = React.useState(false);
+  const [tab, setTab] = React.useState<BuilderTab>("editor");
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
@@ -140,6 +149,31 @@ export default function AgentBuilderPage() {
     setNodes((nds) => autoLayoutNodes(nds, edges));
   }
 
+  // Botão "+" no meio de uma conexão (flow-edge.tsx) — insere o bloco escolhido
+  // no meio dela, plugando automaticamente antes/depois, igual n8n.
+  function handleInsertOnEdge(edge: Edge, iconKey: IconKey) {
+    const sourceNode = nodes.find((n) => n.id === edge.source);
+    const targetNode = nodes.find((n) => n.id === edge.target);
+    const id = generateId();
+    const defaults = getBlockDefault(iconKey)?.data ?? {};
+    const newNode: Node<FlowNodeData> = {
+      id,
+      type: "flowNode",
+      position: {
+        x: sourceNode && targetNode ? (sourceNode.position.x + targetNode.position.x) / 2 : 400,
+        y: sourceNode && targetNode ? (sourceNode.position.y + targetNode.position.y) / 2 : 200,
+      },
+      data: { iconKey, label: iconKey, ...defaults },
+    };
+    setNodes((nds) => [...nds, newNode]);
+    setEdges((eds) => [
+      ...eds.filter((e) => e.id !== edge.id),
+      { id: generateId(), source: edge.source, sourceHandle: edge.sourceHandle, target: id },
+      { id: generateId(), source: id, target: edge.target, targetHandle: edge.targetHandle },
+    ]);
+    setSelectedId(id);
+  }
+
   function handlePickTemplate(template: FlowTemplate) {
     if (!confirm(`Substituir o canvas atual pelo modelo "${template.name}"? As alterações não salvas se perdem.`)) {
       return;
@@ -150,6 +184,17 @@ export default function AgentBuilderPage() {
     setSelectedId(null);
     setShowTemplateGallery(false);
   }
+
+  const edgesForCanvas = React.useMemo(
+    () =>
+      edges.map((e) =>
+        e.targetHandle === "tools"
+          ? e
+          : { ...e, type: "plusEdge", data: { onInsert: (iconKey: IconKey) => handleInsertOnEdge(e, iconKey) } }
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges]
+  );
 
   const nodeTypes = React.useMemo(
     () => ({
@@ -196,79 +241,119 @@ export default function AgentBuilderPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-[12.5px] text-text-tertiary">
-            {saveState === "pending" && "Salvando..."}
-            {saveState === "saved" && "Salvo."}
-            {saveState === "error" && <span className="text-danger">Erro ao salvar.</span>}
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowTemplateGallery(true)}
-            className={buttonVariants({ variant: "secondary", size: "md" })}
-          >
-            <LayoutTemplate size={15} /> Modelos
-          </button>
-          <button
-            type="button"
-            onClick={handleAutoLayout}
-            className={buttonVariants({ variant: "secondary", size: "md" })}
-            title="Reorganiza os blocos automaticamente"
-          >
-            <LayoutGrid size={15} /> Organizar
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPreview((v) => !v)}
-            className={buttonVariants({ variant: "secondary", size: "md" })}
-          >
-            {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />} Prévia
-          </button>
+          {tab === "editor" && (
+            <span className="text-[12.5px] text-text-tertiary">
+              {saveState === "pending" && "Salvando..."}
+              {saveState === "saved" && "Salvo."}
+              {saveState === "error" && <span className="text-danger">Erro ao salvar.</span>}
+            </span>
+          )}
+          {tab === "editor" && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowTemplateGallery(true)}
+                className={buttonVariants({ variant: "secondary", size: "md" })}
+              >
+                <LayoutTemplate size={15} /> Modelos
+              </button>
+              <button
+                type="button"
+                onClick={handleAutoLayout}
+                className={buttonVariants({ variant: "secondary", size: "md" })}
+                title="Reorganiza os blocos automaticamente"
+              >
+                <LayoutGrid size={15} /> Organizar
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPreview((v) => !v)}
+                className={buttonVariants({ variant: "secondary", size: "md" })}
+              >
+                {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />} Prévia
+              </button>
+            </>
+          )}
           <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
             <PlayCircle size={15} /> Playground
           </Link>
         </div>
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-hidden">
-        <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedId(node.id)}
-            onPaneClick={() => setSelectedId(null)}
-            nodeTypes={nodeTypes}
-            defaultEdgeOptions={{ type: "smoothstep" }}
-            fitView
-            fitViewOptions={{ padding: 0.25 }}
-            minZoom={0.4}
-            maxZoom={1.5}
-            proOptions={{ hideAttribution: true }}
+      <div className="mb-4 flex items-center gap-1 border-b border-border-subtle">
+        {([
+          { key: "editor", label: "Editor" },
+          { key: "executions", label: "Execuções" },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              "border-b-2 px-3 py-2 text-[13px] font-medium transition-colors",
+              tab === t.key
+                ? "border-accent-500 text-text-primary"
+                : "border-transparent text-text-tertiary hover:text-text-primary"
+            )}
           >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
-            <Controls showInteractive={false} position="bottom-left" />
-            <Panel position="top-right">
-              <div className="flex flex-col items-end gap-3">
-                {selectedNode && (
-                  <NodeInspector
-                    node={selectedNode}
-                    agentId={agentId}
-                    variables={availableVariables}
-                    onChange={handleNodeDataChange}
-                    onDelete={handleDeleteNode}
-                    onClose={() => setSelectedId(null)}
-                  />
-                )}
-                <BlockPalette onAdd={handleAddBlock} />
-              </div>
-            </Panel>
-          </ReactFlow>
-        </div>
-
-        {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {tab === "editor" ? (
+        <div className="flex flex-1 gap-4 overflow-hidden">
+          <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
+            <ReactFlow
+              nodes={nodes}
+              edges={edgesForCanvas}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={(_, node) => setSelectedId(node.id)}
+              onPaneClick={() => setSelectedId(null)}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              defaultEdgeOptions={{ type: "smoothstep" }}
+              fitView
+              fitViewOptions={{ padding: 0.25 }}
+              minZoom={0.4}
+              maxZoom={1.5}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
+              <Controls showInteractive={false} position="bottom-left" />
+              <MiniMap
+                position="bottom-right"
+                pannable
+                zoomable
+                nodeColor={(node) => BLOCK_MINIMAP_COLOR[(node.data as FlowNodeData).iconKey] ?? "#666"}
+                nodeStrokeWidth={0}
+                maskColor="rgba(0,0,0,0.55)"
+              />
+              <Panel position="top-right">
+                <div className="flex flex-col items-end gap-3">
+                  {selectedNode && (
+                    <NodeInspector
+                      node={selectedNode}
+                      agentId={agentId}
+                      variables={availableVariables}
+                      onChange={handleNodeDataChange}
+                      onDelete={handleDeleteNode}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  )}
+                  <BlockPalette onAdd={handleAddBlock} />
+                </div>
+              </Panel>
+            </ReactFlow>
+          </div>
+
+          {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
+        </div>
+      ) : (
+        <ExecutionsPanel agentId={agentId} />
+      )}
 
       {showTemplateGallery && (
         <FlowTemplateGallery onPick={handlePickTemplate} onClose={() => setShowTemplateGallery(false)} />

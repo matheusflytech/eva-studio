@@ -128,23 +128,35 @@ body {
   border: none !important;
 }
 .react-flow__controls {
-  background: transparent;
-  box-shadow: none;
-  border: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 .react-flow__controls-button {
-  background: var(--bg-surface-2);
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  border-radius: 10px;
-  margin-bottom: 6px;
+  background: var(--bg-surface-2) !important;
+  border: 1px solid var(--border-default) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 10px !important;
+  margin-bottom: 6px !important;
 }
 .react-flow__controls-button:hover {
-  background: var(--bg-surface-3);
-  color: var(--text-primary);
+  background: var(--bg-surface-3) !important;
+  color: var(--text-primary) !important;
 }
 .react-flow__controls-button svg {
-  fill: currentColor;
+  fill: currentColor !important;
+}
+
+/* Minimapa — nó colorido igual o bloco real (ver nodeColor no MiniMap), fundo
+   e moldura combinando com o resto do canvas em vez do cinza padrão. */
+.react-flow__minimap {
+  background: var(--bg-surface-2) !important;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.55) !important;
+  stroke: var(--border-strong) !important;
 }
 
 /* subtle ambient texture so glass panels have something to read as "glass" against */

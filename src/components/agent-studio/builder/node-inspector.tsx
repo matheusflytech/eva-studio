@@ -9,6 +9,15 @@ import type { FlowNodeData, MenuOption } from "./flow-node";
 import { VariablePicker } from "./variable-picker";
 import { generateId } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
+import { CredentialSelect } from "./credential-select";
+import { KeyValueList } from "./key-value-list";
+
+const GROQ_MODELS = [
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "openai/gpt-oss-120b",
+  "moonshotai/kimi-k2-instruct",
+];
 
 function TemplateSelect({
   agentId,
@@ -70,7 +79,7 @@ export function NodeInspector({
   const variableExpressionRef = React.useRef<HTMLTextAreaElement>(null);
 
   return (
-    <div className="glass-card w-[260px] rounded-2xl p-4">
+    <div className="glass-card glass-card-solid w-[260px] rounded-2xl p-4">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Bloco selecionado</p>
         <button type="button" onClick={onClose} className="text-text-tertiary transition-colors hover:text-text-primary">
@@ -248,6 +257,201 @@ export function NodeInspector({
               onChange={(e) => onChange({ variableName: e.target.value })}
             />
           </div>
+        )}
+
+        {(iconKey === "http" || iconKey === "tool-http") && (
+          <div className="flex flex-col gap-3">
+            {iconKey === "tool-http" && (
+              <p className="text-[11.5px] text-text-tertiary">
+                Qualquer <code>{"{parametro}"}</code> usado abaixo que não seja uma variável já capturada vira algo
+                que o próprio Agente de IA decide preencher na hora de chamar essa ferramenta.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <div className="w-[100px] shrink-0">
+                <Label htmlFor="node-http-method">Método</Label>
+                <Select
+                  id="node-http-method"
+                  value={node.data.httpMethod ?? "GET"}
+                  onChange={(e) => onChange({ httpMethod: e.target.value as FlowNodeData["httpMethod"] })}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="PATCH">PATCH</option>
+                  <option value="DELETE">DELETE</option>
+                </Select>
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="node-http-url">URL</Label>
+                <Input
+                  id="node-http-url"
+                  placeholder="https://api.exemplo.com/recurso"
+                  className="font-mono text-[12.5px]"
+                  value={node.data.httpUrl ?? ""}
+                  onChange={(e) => onChange({ httpUrl: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="node-http-auth">Autenticação</Label>
+              <Select
+                id="node-http-auth"
+                value={node.data.httpAuthType ?? "none"}
+                onChange={(e) => onChange({ httpAuthType: e.target.value as FlowNodeData["httpAuthType"] })}
+              >
+                <option value="none">Nenhuma</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="header">Header customizado</option>
+              </Select>
+              {node.data.httpAuthType && node.data.httpAuthType !== "none" && (
+                <Input
+                  className="mt-1.5 font-mono text-[12.5px]"
+                  placeholder={node.data.httpAuthType === "bearer" ? "token" : "Nome-do-Header: valor"}
+                  value={node.data.httpAuthValue ?? ""}
+                  onChange={(e) => onChange({ httpAuthValue: e.target.value })}
+                />
+              )}
+            </div>
+
+            <KeyValueList
+              label="Headers"
+              rows={node.data.httpHeaders ?? []}
+              onChange={(rows) => onChange({ httpHeaders: rows })}
+            />
+            <KeyValueList
+              label="Query params"
+              rows={node.data.httpQueryParams ?? []}
+              onChange={(rows) => onChange({ httpQueryParams: rows })}
+            />
+
+            <div>
+              <Label htmlFor="node-http-body">Corpo (JSON)</Label>
+              <Textarea
+                id="node-http-body"
+                rows={3}
+                className="font-mono text-[12px]"
+                placeholder='{"nome": "{nome_cliente}"}'
+                value={node.data.httpBody ?? ""}
+                onChange={(e) => onChange({ httpBody: e.target.value })}
+              />
+            </div>
+
+            {iconKey === "http" && (
+              <div>
+                <Label htmlFor="node-http-var">Guardar resposta na variável</Label>
+                <Input
+                  id="node-http-var"
+                  placeholder="ex: resposta_api"
+                  value={node.data.variableName ?? ""}
+                  onChange={(e) => onChange({ variableName: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {iconKey === "email" && (
+          <div className="flex flex-col gap-3">
+            <CredentialSelect
+              type="resend"
+              label="Credencial Resend"
+              value={node.data.emailCredentialId}
+              onChange={(id) => onChange({ emailCredentialId: id })}
+            />
+            <div>
+              <Label htmlFor="node-email-from">De</Label>
+              <Input
+                id="node-email-from"
+                placeholder="contato@seudominio.com"
+                value={node.data.emailFrom ?? ""}
+                onChange={(e) => onChange({ emailFrom: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node-email-to">Para</Label>
+              <Input
+                id="node-email-to"
+                placeholder="{email_cliente}"
+                value={node.data.emailTo ?? ""}
+                onChange={(e) => onChange({ emailTo: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node-email-subject">Assunto</Label>
+              <Input
+                id="node-email-subject"
+                value={node.data.emailSubject ?? ""}
+                onChange={(e) => onChange({ emailSubject: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node-email-body">Corpo</Label>
+              <Textarea
+                id="node-email-body"
+                rows={4}
+                value={node.data.emailBody ?? ""}
+                onChange={(e) => onChange({ emailBody: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {iconKey === "ai-agent" && (
+          <div className="flex flex-col gap-3">
+            <CredentialSelect
+              type="groq"
+              label="Credencial Groq"
+              value={node.data.aiCredentialId}
+              onChange={(id) => onChange({ aiCredentialId: id })}
+            />
+            <div>
+              <Label htmlFor="node-ai-model">Modelo</Label>
+              <Select
+                id="node-ai-model"
+                value={node.data.aiModel ?? GROQ_MODELS[0]}
+                onChange={(e) => onChange({ aiModel: e.target.value })}
+              >
+                {GROQ_MODELS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
+              <Input
+                id="node-ai-memory"
+                type="number"
+                min={0}
+                placeholder="20"
+                value={node.data.aiMemoryWindow ?? ""}
+                onChange={(e) => onChange({ aiMemoryWindow: e.target.value ? Number(e.target.value) : undefined })}
+              />
+            </div>
+            <KeyValueList
+              label="Variáveis para coletar"
+              rows={node.data.collectVars ?? []}
+              onChange={(rows) => onChange({ collectVars: rows })}
+              keyPlaceholder="nome_variavel"
+              valuePlaceholder="descrição — o que é e como reconhecer"
+            />
+            <p className="text-[11.5px] text-text-tertiary">
+              O texto em &quot;Detalhe / mensagem&quot; acima é o system prompt (instruções) do agente. Conecte blocos
+              de Ferramenta na porta roxa embaixo desse card pra dar ferramentas a ele — ele decide sozinho quando
+              usar cada uma. Nas &quot;Variáveis para coletar&quot;, cada linha vira um dado que o agente tenta
+              extrair da conversa (o modelo chama uma ferramenta interna sempre que identifica um valor) e pergunta
+              ativamente pelo que ainda falta.
+            </p>
+          </div>
+        )}
+
+        {iconKey === "tool-knowledge" && (
+          <p className="text-[11.5px] text-text-tertiary">
+            Sem configuração — quando conectado a um Agente de IA, ele pode buscar nos documentos já carregados na
+            base de conhecimento desse agente sempre que achar relevante. A busca rankeia os trechos mais relevantes
+            pra pergunta (não manda o documento inteiro), então funciona bem mesmo com bases maiores.
+          </p>
         )}
 
         {iconKey === "wait" && (

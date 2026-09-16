@@ -16,7 +16,7 @@ export function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         sideOffset={8}
         className={cn(
-          "glass-card z-50 min-w-[200px] rounded-2xl bg-surface-2/90 p-1.5 shadow-2xl outline-none backdrop-blur-2xl",
+          "glass-card glass-card-solid z-50 min-w-[200px] rounded-2xl p-1.5 shadow-2xl outline-none",
           className
         )}
         {...props}
