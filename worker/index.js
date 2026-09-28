@@ -30,8 +30,13 @@ if (!EVA_STUDIO_URL || !INTERNAL_API_SECRET) {
 // explicitamente com DATABASE_SSL_REJECT_UNAUTHORIZED=false — decisão
 // consciente, não o default silencioso de antes.
 const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== "false";
+// Teto de conexões. Sem isto o node-postgres abre até 10, e este processo
+// sozinho comia 10 das 15 vagas do pooler em modo sessão — sobrava quase nada
+// pro app. O worker faz polling curto e sequencial; duas conexões bastam.
 const pool = new pg.Pool({
   connectionString: DATABASE_URL,
+  max: Number(process.env.DATABASE_POOL_MAX || 2),
+  idleTimeoutMillis: 10_000,
   ssl: { rejectUnauthorized, ca: process.env.DATABASE_SSL_CA || undefined },
 });
 const logger = pino({ level: process.env.LOG_LEVEL || "warn" });

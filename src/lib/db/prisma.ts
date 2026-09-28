@@ -7,6 +7,38 @@ declare global {
   var __evaStudioPrisma: PrismaClient | undefined;
 }
 
+/**
+ * O app fala com o pooler em modo TRANSAÇÃO, sempre.
+ *
+ * O Supavisor do Supabase atende os dois modos em portas diferentes: 5432 é
+ * modo sessão (cada cliente segura uma conexão do Postgres pra vida inteira,
+ * teto de 15) e 6543 é modo transação (multiplexa, teto muito maior). Função
+ * serverless com modo sessão é combinação que não fecha: cada instância viva
+ * reserva conexão, e a partir da sexta instância TODA rota que toca o banco
+ * responde 500 com EMAXCONNSESSION. Foi o que derrubou a produção em
+ * 28/09/2026, e não é um caso raro — é o comportamento esperado.
+ *
+ * Por isso a porta é corrigida aqui em vez de depender de alguém lembrar de
+ * configurar certo: é a recomendação da própria Supabase pra serverless, e o
+ * custo de errar é o app inteiro fora do ar. Migração continua indo pela
+ * conexão direta (DIRECT_URL, ver prisma.config.ts), que precisa de sessão.
+ *
+ * Pra desligar: DATABASE_FORCE_POOL_TRANSACAO=false.
+ */
+function urlDoPooler(bruta: string): string {
+  if (process.env.DATABASE_FORCE_POOL_TRANSACAO === "false") return bruta;
+  try {
+    const u = new URL(bruta);
+    if (u.hostname.includes("pooler.supabase.com") && u.port === "5432") {
+      u.port = "6543";
+      return u.toString();
+    }
+  } catch {
+    // URL malformada não é problema deste helper: deixa o driver reclamar.
+  }
+  return bruta;
+}
+
 function createPrismaClient() {
   // ---------------------------------------------------------------------
   // Teto de conexões por instância.
@@ -26,7 +58,7 @@ function createPrismaClient() {
   // pooler multiplexa. A 5432 é modo sessão e existe para migração.
   // ---------------------------------------------------------------------
   const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
+    connectionString: urlDoPooler(process.env.DATABASE_URL!),
     max: Number(process.env.DATABASE_POOL_MAX ?? 3),
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
