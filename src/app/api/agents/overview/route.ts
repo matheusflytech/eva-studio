@@ -22,6 +22,12 @@ import { lerEstadoWorker } from "@/lib/server/heartbeat";
 // esta tela continuar de pé mesmo antes da migração do CRM ser aplicada.
 // ---------------------------------------------------------------------------
 
+interface LinhaDia {
+  agentId: string;
+  dia: Date;
+  total: number;
+}
+
 const SETE_DIAS = 7 * 24 * 60 * 60 * 1000;
 const UM_DIA = 24 * 60 * 60 * 1000;
 
@@ -48,12 +54,13 @@ export async function GET() {
   const desde7 = new Date(Date.now() - SETE_DIAS);
   const desde1 = new Date(Date.now() - UM_DIA);
 
-  const [worker, conversas, aguardando, mensagens, erros, execucoes] = await Promise.all([
+  const [worker, conversas, aguardando, mensagens, erros, execucoes, porDia] = await Promise.all([
     lerEstadoWorker(),
     prisma.conversation.groupBy({
       by: ["agentId"],
-      where: { agentId: { in: ids }, updatedAt: { gte: desde7 } },
+      where: { agentId: { in: ids } },
       _count: { _all: true },
+      _max: { updatedAt: true },
     }),
     prisma.conversation.groupBy({
       by: ["agentId"],
@@ -75,12 +82,40 @@ export async function GET() {
       where: { agentId: { in: ids }, createdAt: { gte: desde1 } },
       _count: { _all: true },
     }),
+    ids.length === 0
+      ? Promise.resolve([] as LinhaDia[])
+      : prisma.$queryRaw<LinhaDia[]>`
+          SELECT "agentId",
+                 date_trunc('day', "updatedAt")::date AS dia,
+                 COUNT(*)::int AS total
+            FROM eva_studio_conversations
+           WHERE "agentId" = ANY(${ids})
+             AND "updatedAt" >= ${desde7}
+           GROUP BY 1, 2
+        `,
   ]);
+
+  // Sete baldes, do mais antigo para hoje. Um vetor de tamanho fixo evita que
+  // o gráfico "encolha" quando um dia não teve conversa nenhuma.
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const indiceDoDia = (d: Date) => 6 - Math.round((hoje.getTime() - d.setHours(0, 0, 0, 0)) / UM_DIA);
+
+  const serie = new Map<string, number[]>();
+  for (const linha of porDia) {
+    const vetor = serie.get(linha.agentId) ?? new Array(7).fill(0);
+    const i = indiceDoDia(new Date(linha.dia));
+    if (i >= 0 && i < 7) vetor[i] = Number(linha.total);
+    serie.set(linha.agentId, vetor);
+  }
 
   const porAgente = (linhas: { agentId: string; _count: { _all: number } }[]) =>
     new Map(linhas.map((l) => [l.agentId, l._count._all]));
 
-  const nConversas = porAgente(conversas);
+  const nConversasTotal = porAgente(conversas);
+  const ultimaAtividade = new Map(
+    conversas.map((c) => [c.agentId, c._max?.updatedAt?.toISOString() ?? null])
+  );
   const nAguardando = porAgente(aguardando);
   const nErros = porAgente(erros);
   const nExecucoes = porAgente(execucoes);
@@ -146,7 +181,10 @@ export async function GET() {
       // Agente sem canal e sem fluxo ainda está em rascunho, mesmo marcado
       // como ativo. É a distinção que a tela antiga não fazia.
       emRascunho: canais.length === 0 || !temFluxo,
-      conversas7d: nConversas.get(agent.id) ?? 0,
+      conversas7d: (serie.get(agent.id) ?? []).reduce((a, b) => a + b, 0),
+      conversasTotal: nConversasTotal.get(agent.id) ?? 0,
+      serie7d: serie.get(agent.id) ?? new Array(7).fill(0),
+      ultimaAtividadeAt: ultimaAtividade.get(agent.id) ?? null,
       aguardandoHumano: nAguardando.get(agent.id) ?? 0,
       execucoes24h: nExecucoes.get(agent.id) ?? 0,
       erros24h: nErros.get(agent.id) ?? 0,
