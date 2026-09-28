@@ -9,6 +9,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // DIRECT_URL, não DATABASE_URL: migração abre transação longa e cria tipo,
+    // o que o pooler em modo transação não aguenta. O app usa o pooler; a
+    // migração fala direto com o banco.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
