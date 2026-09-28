@@ -20,6 +20,9 @@ import { prisma } from "@/lib/db/prisma";
 // ---------------------------------------------------------------------------
 
 const CHAVE = "heartbeat:scheduler";
+const TRAVA = "lock:scheduler";
+/** Janela da trava. Maior que a duração normal de uma rodada, menor que o intervalo entre batidas. */
+const TRAVA_SEGUNDOS = 45;
 
 /** Chamado pelo scheduler a cada batida do worker. Nunca deve derrubar a rota. */
 export async function registrarBatida(): Promise<void> {
@@ -31,6 +34,39 @@ export async function registrarBatida(): Promise<void> {
     });
   } catch (error) {
     console.error("[heartbeat] falha ao registrar batida", error);
+  }
+}
+
+/**
+ * Trava de relógio: garante que só uma rodada do scheduler roda por vez.
+ *
+ * Existe porque agora pode haver mais de um relógio batendo na mesma rota — o
+ * pg_cron do Supabase (prisma/relogio.sql) e o worker de WhatsApp, quando está
+ * no ar. Duas rodadas simultâneas leriam a mesma inscrição vencida e mandariam
+ * a mesma mensagem duas vezes para a mesma pessoa, que é o tipo de erro que o
+ * cliente vê e a gente não.
+ *
+ * A trava é um UPDATE condicional: quem consegue mudar a linha ganha. Um SELECT
+ * seguido de UPDATE não serviria — as duas rodadas leriam "livre" antes de
+ * qualquer uma escrever.
+ */
+export async function tentarTravarRelogio(): Promise<boolean> {
+  try {
+    const linhas = await prisma.$queryRaw<{ key: string }[]>`
+      INSERT INTO eva_studio_rate_limits (key, count, "windowStart")
+           VALUES (${TRAVA}, 1, now())
+      ON CONFLICT (key) DO UPDATE
+              SET "windowStart" = now(),
+                  count = eva_studio_rate_limits.count + 1
+            WHERE eva_studio_rate_limits."windowStart" < now() - make_interval(secs => ${TRAVA_SEGUNDOS}::int)
+        RETURNING key
+    `;
+    return linhas.length > 0;
+  } catch (error) {
+    // Falhar fechado deixaria a régua parada para sempre por causa de um erro
+    // de banco; falhar aberto no máximo repete uma rodada.
+    console.error("[heartbeat] falha ao travar o relogio", error);
+    return true;
   }
 }
 

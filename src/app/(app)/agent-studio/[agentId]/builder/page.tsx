@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate } from "lucide-react";
+import {
+  ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, History,
+} from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -21,7 +23,7 @@ import { useAgentsStore } from "@/lib/stores/agents-store";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { FlowNode, type FlowNodeData } from "@/components/agent-studio/builder/flow-node";
+import { FlowNode, type FlowNodeData, type NodeRunState } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { IssuesPanel } from "@/components/agent-studio/builder/issues-panel";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
@@ -43,6 +45,12 @@ import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 type SaveState = "idle" | "pending" | "saved" | "error";
 type BuilderTab = "editor" | "conversa" | "executions";
 
+interface UltimaExecucao {
+  createdAt: string;
+  status: "success" | "error";
+  porNo: Record<string, NodeRunState>;
+}
+
 const edgeTypes = { plusEdge: FlowEdge };
 
 export default function AgentBuilderPage() {
@@ -56,6 +64,8 @@ export default function AgentBuilderPage() {
   const [showPreview, setShowPreview] = React.useState(true);
   const [showTemplateGallery, setShowTemplateGallery] = React.useState(false);
   const [tab, setTab] = React.useState<BuilderTab>("editor");
+  const [ultimaExecucao, setUltimaExecucao] = React.useState<UltimaExecucao | null>(null);
+  const [mostrarExecucao, setMostrarExecucao] = React.useState(true);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
@@ -77,6 +87,28 @@ export default function AgentBuilderPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, flowLoaded]);
+
+  // Última execução, pra pintar o canvas. Recarrega junto com a aba Editor
+  // em vez de ficar em polling: quem quer acompanhar ao vivo usa o Playground.
+  React.useEffect(() => {
+    if (!agentId) return;
+    let vivo = true;
+    fetch(`/api/agents/${agentId}/executions?limit=1`)
+      .then((r) => r.json())
+      .then((d) => {
+        const ex = d.executions?.[0];
+        if (!vivo || !ex) return;
+        const porNo: Record<string, NodeRunState> = {};
+        for (const passo of ex.steps ?? []) {
+          // Um mesmo nó pode aparecer duas vezes (laço). Fica a última, que é
+          // o estado em que a conversa realmente parou.
+          porNo[passo.nodeId] = { ok: !passo.error, ms: passo.ms ?? 0, error: passo.error };
+        }
+        setUltimaExecucao({ createdAt: ex.createdAt, status: ex.status, porNo });
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [agentId, tab]);
 
   const agent = agents.find((a) => a.id === agentId);
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
@@ -251,11 +283,13 @@ export default function AgentBuilderPage() {
         <FlowNode
           data={props.data}
           selected={props.selected}
+          run={mostrarExecucao ? ultimaExecucao?.porNo[props.id] : undefined}
           onDetailChange={(text) => handleNodeDataChangeById(props.id, { detail: text })}
         />
       ),
     }),
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mostrarExecucao, ultimaExecucao]
   );
 
   const issues = validateFlow(nodes, edges);
@@ -319,6 +353,23 @@ export default function AgentBuilderPage() {
               >
                 <LayoutGrid size={15} /> Organizar
               </button>
+              {ultimaExecucao && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarExecucao((v) => !v)}
+                  title={`Última execução em ${new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}`}
+                  className={cn(
+                    buttonVariants({ variant: "secondary", size: "md" }),
+                    mostrarExecucao && "border-accent-500/40 text-text-primary"
+                  )}
+                >
+                  <History size={15} />
+                  Última execução
+                  {ultimaExecucao.status === "error" && (
+                    <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowPreview((v) => !v)}

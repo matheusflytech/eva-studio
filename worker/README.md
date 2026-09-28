@@ -25,8 +25,17 @@ para Railway.
 - **Fila de saída**: resposta de atendente e disparo por WhatsApp via QR
 - **Esperas vencidas**: retoma conversa parada num bloco Esperar
 - **Relógio do produto** (`tickScheduler`, a cada 60s): chama `/api/internal/scheduler` no app, que entrega
-  os passos de sequência vencidos e os disparos agendados. A Vercel no plano grátis só dá cron 1x por dia,
-  então esse relógio precisa morar aqui.
+  os passos de sequência vencidos e os disparos agendados.
+
+  **Desde 28/09/2026 este não é mais o relógio principal.** Ele virou reserva: o relógio de verdade é o
+  `pg_cron` dentro do Postgres do Supabase (`prisma/relogio.sql`), que não depende de nenhum processo
+  ficar acordado. Os dois batendo juntos não duplicam entrega — a rota tem trava de 45s
+  (`tentarTravarRelogio` em `src/lib/server/heartbeat.ts`) e o segundo a chegar recebe
+  `{skipped:true}` sem entregar nada.
+
+  O motivo da troca: o worker no plano grátis do Render hiberna, precisa de ping externo pra acordar, e
+  quando o deploy automático não dispara ele fica rodando código velho — foi exatamente o que aconteceu.
+  Sequência parada em silêncio é o pior modo de falha que existe, porque ninguém percebe.
 
 ## Rodando local pra testar
 

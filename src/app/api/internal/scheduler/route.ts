@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { processDueEnrollments, enrollBySegments, enrollByDealStage } from "@/lib/server/sequences";
 import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
-import { registrarBatida } from "@/lib/server/heartbeat";
+import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -39,9 +39,16 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
 
   // Carimba o sinal de vida antes de qualquer trabalho: se o scheduler
-  // demorar ou falhar no meio, ainda assim fica registrado que o worker
+  // demorar ou falhar no meio, ainda assim fica registrado que o relógio
   // chegou até aqui autenticado.
   await registrarBatida();
+
+  // Mais de um relógio pode estar batendo aqui (o pg_cron do banco e o worker
+  // de WhatsApp). Quem chega dentro da janela da rodada em andamento vai
+  // embora sem entregar nada — a batida acima já contou como sinal de vida.
+  if (!(await tentarTravarRelogio())) {
+    return NextResponse.json({ ok: true, skipped: true, ms: Date.now() - startedAt });
+  }
 
   // Primeiro inscreve quem passou a bater com um segmento, depois entrega os
   // passos vencidos — nessa ordem, quem acabou de entrar já começa a contar o

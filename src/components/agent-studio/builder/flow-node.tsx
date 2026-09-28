@@ -182,13 +182,28 @@ import { validateNode } from "./block-validation";
 
 const HANDLE_DOT = "!h-2.5 !w-2.5 !border-2 !border-surface-1 !bg-border-strong";
 
+/**
+ * O que a última execução fez neste bloco.
+ *
+ * Fluxo que não mostra o que rodou obriga a pessoa a ler log noutra aba e
+ * casar id de nó na mão. Com o anel no próprio bloco, "onde quebrou" é uma
+ * olhada, não uma investigação.
+ */
+export interface NodeRunState {
+  ok: boolean;
+  ms: number;
+  error?: string;
+}
+
 export function FlowNode({
   data,
   selected,
+  run,
   onDetailChange,
 }: {
   data: FlowNodeData;
   selected?: boolean;
+  run?: NodeRunState;
   onDetailChange?: (text: string) => void;
 }) {
   const Icon = ICON_REGISTRY[data.iconKey] ?? ICON_REGISTRY.message;
@@ -213,9 +228,23 @@ export function FlowNode({
         "glass-card relative w-[230px] cursor-pointer rounded-2xl border-l-[3px] p-3.5 transition-colors",
         style.border,
         selected ? "border-border-strong ring-1 ring-white/15" : "border-border-subtle",
-        problema && !selected && "ring-1 ring-amber-400/35"
+        problema && !selected && "ring-1 ring-amber-400/35",
+        // A execução fala mais alto que o aviso de configuração: um bloco que
+        // acabou de quebrar em produção importa mais que um campo em branco.
+        run && !selected && (run.ok ? "ring-1 ring-emerald-400/45" : "ring-2 ring-danger/70")
       )}
     >
+      {run && (
+        <span
+          title={run.error ?? `Rodou em ${run.ms} ms na última execução`}
+          className={cn(
+            "absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9.5px] font-medium tabular-nums",
+            run.ok ? "bg-emerald-400 text-black" : "bg-danger text-white"
+          )}
+        >
+          {run.ok ? `${run.ms} ms` : "erro"}
+        </span>
+      )}
       {problema && (
         <span
           title={problema}

@@ -111,13 +111,14 @@ export default function AgentStudioPage() {
           <div className="min-w-0 flex-1">
             <p className="text-[13.5px] font-medium text-amber-300">
               {worker.ultimaBatida
-                ? `O worker não dá sinal há ${formatarEspera(worker.segundosAtras)}.`
-                : "O worker nunca se conectou."}
+                ? `O relógio do produto não bate há ${formatarEspera(worker.segundosAtras)}.`
+                : "O relógio do produto nunca bateu."}
             </p>
             <p className="mt-1 text-[12.5px] text-text-secondary">
-              Enquanto isso, sequências e disparos agendados não são entregues, e o WhatsApp por QR code não
-              recebe mensagem. Verifique se o processo está no ar e se o <code className="font-mono text-[11.5px]">INTERNAL_API_SECRET</code>{" "}
-              dele é igual ao da Vercel.
+              Sem ele, passo de sequência vencido e disparo agendado ficam parados na fila: a hora chega e
+              ninguém entrega. Quem bate é o <code className="font-mono text-[11.5px]">pg_cron</code> do Supabase,
+              de minuto em minuto — o SQL que agenda está em{" "}
+              <code className="font-mono text-[11.5px]">prisma/relogio.sql</code>.
             </p>
           </div>
         </div>
