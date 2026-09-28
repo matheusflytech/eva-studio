@@ -5,12 +5,28 @@ serverless da Vercel. Este worker só precisa da mesma `DATABASE_URL` do app pri
 o app e o worker acontece através das tabelas `eva_studio_whatsapp_connections` (o worker faz polling a cada
 4s) — não existe API própria além de um health check em `/`.
 
-## Deploy no Railway
+## Deploy
+
+Hoje roda no Render (plano grátis, mantido acordado por ping externo). O passo a passo vale igual
+para Railway.
 
 1. Novo projeto → Deploy from GitHub repo → aponte pra este repositório, **root directory: `worker`**
-2. Variável de ambiente: `DATABASE_URL` (a mesma da Vercel)
+2. Variáveis de ambiente — as três são obrigatórias, o processo **encerra na partida** sem as duas últimas:
+   - `DATABASE_URL` — a mesma da Vercel
+   - `EVA_STUDIO_URL` — a URL pública do app (hoje `https://evapp.vercel.app`), sem barra no fim
+   - `INTERNAL_API_SECRET` — **idêntico** ao configurado no projeto da Vercel; é o que autentica o worker
+     nas rotas internas. Valores diferentes nos dois lados fazem tudo responder 401 em silêncio.
 3. Start command já vem do `package.json` (`npm start` → `node index.js`)
-4. Sem porta fixa necessária — o worker escuta em `process.env.PORT` (Railway injeta isso sozinho)
+4. Sem porta fixa necessária — o worker escuta na porta que o provedor injetar (Render e Railway fazem isso)
+
+## O que o worker faz
+
+- **Sessão do Baileys** por agente, com QR e reconexão (polling de 4s)
+- **Fila de saída**: resposta de atendente e disparo por WhatsApp via QR
+- **Esperas vencidas**: retoma conversa parada num bloco Esperar
+- **Relógio do produto** (`tickScheduler`, a cada 60s): chama `/api/internal/scheduler` no app, que entrega
+  os passos de sequência vencidos e os disparos agendados. A Vercel no plano grátis só dá cron 1x por dia,
+  então esse relógio precisa morar aqui.
 
 ## Rodando local pra testar
 
