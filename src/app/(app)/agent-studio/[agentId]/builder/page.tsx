@@ -61,7 +61,8 @@ export default function AgentBuilderPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [flowLoaded, setFlowLoaded] = React.useState(false);
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
-  const [showPreview, setShowPreview] = React.useState(true);
+  const [showPreview, setShowPreview] = React.useState(false);
+  const [paletaRecolhida, setPaletaRecolhida] = React.useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = React.useState(false);
   const [tab, setTab] = React.useState<BuilderTab>("editor");
   const [ultimaExecucao, setUltimaExecucao] = React.useState<UltimaExecucao | null>(null);
@@ -151,17 +152,49 @@ export default function AgentBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, flowLoaded, agentId]);
 
+  /**
+   * Onde o próximo bloco se pendura: o bloco selecionado, ou a ponta do fluxo.
+   *
+   * Antes o bloco caía numa posição semi-aleatória e desconectado, e a pessoa
+   * tinha que descobrir sozinha que precisava arrastar um fio da borda. Era o
+   * maior motivo de o builder parecer difícil: cada bloco adicionado criava
+   * uma tarefa extra em vez de continuar o trabalho.
+   */
+  const ancora = React.useMemo(() => {
+    if (selectedId && nodes.some((n) => n.id === selectedId)) return selectedId;
+    if (nodes.length === 0) return null;
+    // Ponta: alguém sem saída, que não seja ferramenta pendurada num agente.
+    const pontas = nodes.filter(
+      (n) => !edges.some((e) => e.source === n.id) && !n.data.iconKey.startsWith("tool-")
+    );
+    return pontas[pontas.length - 1]?.id ?? nodes[nodes.length - 1].id;
+  }, [selectedId, nodes, edges]);
+
   function handleAddBlock(iconKey: IconKey) {
-    const id = generateId();
-    const defaults = getBlockDefault(iconKey)?.data ?? {};
-    const newNode: Node<FlowNodeData> = {
-      id,
-      type: "flowNode",
-      position: { x: 520 + ((nodes.length * 30) % 120), y: 40 + ((nodes.length * 90) % 640) },
-      data: { iconKey, label: iconKey, ...defaults },
-    };
-    setNodes((nds) => [...nds, newNode]);
-    setSelectedId(id);
+    handleAddAfter(ancora, iconKey);
+  }
+
+  /**
+   * Uma vaga livre a partir de (x, y).
+   *
+   * Sem isto o bloco novo nasce exatamente onde já tem outro e some por baixo
+   * dele: a pessoa clica, "não acontece nada", clica de novo, e agora tem dois
+   * blocos escondidos. Desce até achar espaço, que é o que qualquer editor de
+   * diagrama faz.
+   */
+  function vagaLivre(x: number, y: number): { x: number; y: number } {
+    const LARGURA = 260;
+    const ALTURA = 130;
+    let candidatoY = y;
+    for (let tentativa = 0; tentativa < 40; tentativa += 1) {
+      const ocupada = nodes.some(
+        (n) =>
+          Math.abs(n.position.x - x) < LARGURA && Math.abs(n.position.y - candidatoY) < ALTURA
+      );
+      if (!ocupada) return { x, y: candidatoY };
+      candidatoY += ALTURA + 20;
+    }
+    return { x, y: candidatoY };
   }
 
   function handleAddAfter(afterNodeId: string | null, iconKey: IconKey) {
@@ -172,8 +205,8 @@ export default function AgentBuilderPage() {
       id,
       type: "flowNode",
       position: anterior
-        ? { x: anterior.position.x + 320, y: anterior.position.y }
-        : { x: 120, y: 120 },
+        ? vagaLivre(anterior.position.x + 320, anterior.position.y)
+        : vagaLivre(120, 120),
       data: { iconKey, label: iconKey, ...defaults },
     };
     setNodes((nds) => [...nds, novo]);
@@ -294,6 +327,23 @@ export default function AgentBuilderPage() {
 
   const issues = validateFlow(nodes, edges);
 
+  const viewportInicial = React.useMemo(() => {
+    const ZOOM = 0.85;
+    const inicio =
+      nodes.find((n) => n.data.iconKey === "start") ??
+      nodes.find((n) => !edges.some((e) => e.target === n.id)) ??
+      nodes[0];
+    if (!inicio) return { x: 0, y: 0, zoom: ZOOM };
+    return {
+      x: -inicio.position.x * ZOOM + 90,
+      y: -inicio.position.y * ZOOM + 150,
+      zoom: ZOOM,
+    };
+    // Só na carga: recalcular a cada mexida no nó faria o canvas pular
+    // debaixo da mão de quem está arrastando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowLoaded]);
+
   if (!isLoaded || !flowLoaded) return <div className="flex-1 p-8" />;
 
   if (!agent) {
@@ -309,23 +359,39 @@ export default function AgentBuilderPage() {
 
   return (
     <div className="flex flex-1 flex-col p-8">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href={`/agent-studio/${agentId}`}
-            className="mb-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary"
+            title="Voltar para o agente"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-text-secondary transition-colors hover:text-text-primary"
           >
-            <ArrowLeft size={15} /> {agent.name}
+            <ArrowLeft size={16} />
           </Link>
-          <div className="flex items-center gap-2">
-            <h1 className="font-display text-xl font-semibold text-text-primary">Builder de conversa</h1>
-            <Badge variant="neutral">Beta</Badge>
+          <h1 className="truncate font-display text-lg font-semibold text-text-primary">{agent.name}</h1>
+
+          {/* As abas moram no cabeçalho: uma barra só em vez de duas. */}
+          <div className="flex items-center gap-0.5 rounded-xl bg-surface-2 p-1">
+            {([
+              { key: "editor", label: "Editor" },
+              { key: "conversa", label: "Conversa" },
+              { key: "executions", label: "Execuções" },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                  tab === t.key
+                    ? "bg-surface-3 text-text-primary"
+                    : "text-text-tertiary hover:text-text-primary"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <p className="mt-1 text-[13px] text-text-secondary">
-            {tab === "conversa"
-              ? "O fluxo visto como a conversa que o cliente vai ter. Clique numa bolha pra editar o bloco."
-              : "Clique num bloco pra editar, arraste das bordas pra conectar, adicione blocos pela paleta."}
-          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
@@ -341,17 +407,18 @@ export default function AgentBuilderPage() {
               <button
                 type="button"
                 onClick={() => setShowTemplateGallery(true)}
-                className={buttonVariants({ variant: "secondary", size: "md" })}
+                title="Começar de um modelo pronto"
+                className={buttonVariants({ variant: "secondary", size: "icon" })}
               >
-                <LayoutTemplate size={15} /> Modelos
+                <LayoutTemplate size={15} />
               </button>
               <button
                 type="button"
                 onClick={handleAutoLayout}
-                className={buttonVariants({ variant: "secondary", size: "md" })}
                 title="Reorganiza os blocos automaticamente"
+                className={buttonVariants({ variant: "secondary", size: "icon" })}
               >
-                <LayoutGrid size={15} /> Organizar
+                <LayoutGrid size={15} />
               </button>
               {ultimaExecucao && (
                 <button
@@ -359,23 +426,27 @@ export default function AgentBuilderPage() {
                   onClick={() => setMostrarExecucao((v) => !v)}
                   title={`Última execução em ${new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}`}
                   className={cn(
-                    buttonVariants({ variant: "secondary", size: "md" }),
+                    buttonVariants({ variant: "secondary", size: "icon" }),
+                    "relative",
                     mostrarExecucao && "border-accent-500/40 text-text-primary"
                   )}
                 >
                   <History size={15} />
-                  Última execução
                   {ultimaExecucao.status === "error" && (
-                    <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger" />
                   )}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setShowPreview((v) => !v)}
-                className={buttonVariants({ variant: "secondary", size: "md" })}
+                title={showPreview ? "Esconder a prévia" : "Testar a conversa ao vivo"}
+                className={cn(
+                  buttonVariants({ variant: "secondary", size: "icon" }),
+                  showPreview && "border-accent-500/40 text-text-primary"
+                )}
               >
-                {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />} Prévia
+                {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
               </button>
             </>
           )}
@@ -385,30 +456,14 @@ export default function AgentBuilderPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-1 border-b border-border-subtle">
-        {([
-          { key: "editor", label: "Editor" },
-          { key: "conversa", label: "Modo Conversa" },
-          { key: "executions", label: "Execuções" },
-        ] as const).map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cn(
-              "border-b-2 px-3 py-2 text-[13px] font-medium transition-colors",
-              tab === t.key
-                ? "border-accent-500 text-text-primary"
-                : "border-transparent text-text-tertiary hover:text-text-primary"
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {tab === "editor" ? (
-        <div className="flex flex-1 gap-4 overflow-hidden">
+        <div className="flex flex-1 gap-3 overflow-hidden">
+          <BlockPalette
+            onAdd={handleAddBlock}
+            ancora={ancora ? nodes.find((n) => n.id === ancora)?.data.label ?? null : null}
+            recolhida={paletaRecolhida}
+            onToggle={() => setPaletaRecolhida((v) => !v)}
+          />
           <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
             <ReactFlow
               nodes={nodes}
@@ -421,9 +476,8 @@ export default function AgentBuilderPage() {
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               defaultEdgeOptions={{ type: "smoothstep" }}
-              fitView
-              fitViewOptions={{ padding: 0.25 }}
-              minZoom={0.4}
+              defaultViewport={viewportInicial}
+              minZoom={0.3}
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
             >
@@ -449,7 +503,6 @@ export default function AgentBuilderPage() {
                       onClose={() => setSelectedId(null)}
                     />
                   )}
-                  <BlockPalette onAdd={handleAddBlock} />
                 </div>
               </Panel>
             </ReactFlow>

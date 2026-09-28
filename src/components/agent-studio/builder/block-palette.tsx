@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, ChevronDown, X, CornerDownRight } from "lucide-react";
+import { Search, ChevronDown, X, CornerDownRight, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { BLOCK_STYLES } from "./block-styles";
 import { PALETTE_GROUPS, searchable, type PaletteItem } from "./palette-groups";
@@ -47,7 +47,18 @@ function ItemButton({ item, onAdd }: { item: PaletteItem; onAdd: (key: IconKey) 
   );
 }
 
-export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
+export function BlockPalette({
+  onAdd,
+  ancora,
+  recolhida,
+  onToggle,
+}: {
+  onAdd: (iconKey: IconKey) => void;
+  /** Nome do bloco em que o próximo vai se pendurar. null = começo do fluxo. */
+  ancora: string | null;
+  recolhida: boolean;
+  onToggle: () => void;
+}) {
   const [query, setQuery] = React.useState("");
   const [fechados, setFechados] = React.useState<Record<string, boolean>>(() =>
     Object.fromEntries(PALETTE_GROUPS.filter((g) => g.collapsed).map((g) => [g.id, true]))
@@ -68,11 +79,52 @@ export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
 
   const totalEncontrado = grupos.reduce((n, g) => n + g.items.length, 0);
 
-  return (
-    <div className="glass-card glass-card-solid flex w-[256px] shrink-0 flex-col rounded-3xl">
-      <div className="border-b border-border-subtle p-3">
-        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+  // Recolhida vira uma faixa estreita: o canvas ganha o espaço inteiro e o
+  // caminho de volta continua à vista.
+  if (recolhida) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        title="Mostrar blocos"
+        className="glass-card glass-card-solid flex w-11 shrink-0 flex-col items-center gap-2 rounded-3xl py-3 text-text-tertiary transition-colors hover:text-text-primary"
+      >
+        <PanelLeftOpen size={16} />
+        <span className="[writing-mode:vertical-rl] text-[11px] font-semibold uppercase tracking-wide">
           Blocos
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="glass-card glass-card-solid flex w-[250px] shrink-0 flex-col overflow-hidden rounded-3xl">
+      <div className="border-b border-border-subtle p-3">
+        <div className="mb-2 flex items-center justify-between px-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+            Blocos
+          </p>
+          <button
+            type="button"
+            onClick={onToggle}
+            title="Recolher"
+            className="text-text-tertiary transition-colors hover:text-text-primary"
+          >
+            <PanelLeftClose size={14} />
+          </button>
+        </div>
+
+        {/* Dizer onde o bloco vai cair é o que transforma "clicou e apareceu um
+            retângulo solto no canto" em "clicou e o fluxo continuou". */}
+        <p className="mb-2 flex items-center gap-1.5 rounded-lg bg-surface-2 px-2 py-1.5 text-[11px] text-text-tertiary">
+          <Plus size={11} className="shrink-0 text-accent-400" />
+          <span className="min-w-0 truncate">
+            {ancora ? (
+              <>entra depois de <span className="text-text-secondary">{ancora}</span></>
+            ) : (
+              "começa o fluxo"
+            )}
+          </span>
         </p>
         <div className="relative">
           <Search
@@ -101,9 +153,7 @@ export function BlockPalette({ onAdd }: { onAdd: (iconKey: IconKey) => void }) {
         </div>
       </div>
 
-      {/* Altura limitada com rolagem: a paleta divide o canto do canvas com o
-          Inspector, e sem teto ela empurraria o Inspector para fora da tela. */}
-      <div className="max-h-[52vh] overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto p-2">
         {totalEncontrado === 0 ? (
           <p className="px-2 py-6 text-center text-[12px] text-text-tertiary">
             Nenhum bloco com “{query}”.
