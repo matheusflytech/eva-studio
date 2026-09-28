@@ -5,6 +5,7 @@ import { getProvider } from "@/lib/llm-providers";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
+import { lerEstadoWorker } from "@/lib/server/heartbeat";
 
 // ---------------------------------------------------------------------------
 // Painel de operação dos agentes.
@@ -47,7 +48,8 @@ export async function GET() {
   const desde7 = new Date(Date.now() - SETE_DIAS);
   const desde1 = new Date(Date.now() - UM_DIA);
 
-  const [conversas, aguardando, mensagens, erros, execucoes] = await Promise.all([
+  const [worker, conversas, aguardando, mensagens, erros, execucoes] = await Promise.all([
+    lerEstadoWorker(),
     prisma.conversation.groupBy({
       by: ["agentId"],
       where: { agentId: { in: ids }, updatedAt: { gte: desde7 } },
@@ -166,6 +168,7 @@ export async function GET() {
 
   return NextResponse.json({
     agents: lista,
+    worker,
     resumo: {
       total: lista.length,
       ativos: lista.filter((a) => a.status === "active" && !a.emRascunho).length,

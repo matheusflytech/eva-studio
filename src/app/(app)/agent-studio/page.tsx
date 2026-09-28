@@ -2,13 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, Search, AlertTriangle, UserCheck, MessageSquare, Bot } from "lucide-react";
+import { Plus, Search, AlertTriangle, UserCheck, MessageSquare, Bot, RadioTower } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { AgentEmptyState } from "@/components/agent-studio/agent-empty-state";
 import { AgentOperationsCard, type AgentOverview } from "@/components/agent-studio/agent-operations-card";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+interface EstadoWorker {
+  ultimaBatida: string | null;
+  segundosAtras: number | null;
+  saudavel: boolean;
+  batidas: number;
+}
 
 interface Resumo {
   total: number;
@@ -28,6 +35,7 @@ export default function AgentStudioPage() {
   const { agents, isLoaded, load } = useAgentsStore();
   const [overview, setOverview] = React.useState<AgentOverview[] | null>(null);
   const [resumo, setResumo] = React.useState<Resumo | null>(null);
+  const [worker, setWorker] = React.useState<EstadoWorker | null>(null);
   const [busca, setBusca] = React.useState("");
   const [filtro, setFiltro] = React.useState<Filtro>("todos");
 
@@ -47,6 +55,7 @@ export default function AgentStudioPage() {
         const data = await res.json();
         setOverview(data.agents ?? []);
         setResumo(data.resumo ?? null);
+        setWorker(data.worker ?? null);
       } catch {
         // rede caiu: mantém o que já está na tela
       }
@@ -95,6 +104,24 @@ export default function AgentStudioPage() {
           <Plus size={16} /> Novo agente
         </Link>
       </div>
+
+      {worker && !worker.saudavel && (
+        <div className="mb-5 flex flex-wrap items-start gap-3 rounded-2xl bg-amber-400/10 px-4 py-3.5 ring-1 ring-amber-400/25">
+          <RadioTower size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-medium text-amber-300">
+              {worker.ultimaBatida
+                ? `O worker não dá sinal há ${formatarEspera(worker.segundosAtras)}.`
+                : "O worker nunca se conectou."}
+            </p>
+            <p className="mt-1 text-[12.5px] text-text-secondary">
+              Enquanto isso, sequências e disparos agendados não são entregues, e o WhatsApp por QR code não
+              recebe mensagem. Verifique se o processo está no ar e se o <code className="font-mono text-[11.5px]">INTERNAL_API_SECRET</code>{" "}
+              dele é igual ao da Vercel.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Resumo da operação. O que precisa de gente vem primeiro, porque é a
           única linha que pede ação agora. */}
@@ -178,6 +205,17 @@ export default function AgentStudioPage() {
       )}
     </div>
   );
+}
+
+/** "há 3 minutos" em vez de 180 segundos. */
+function formatarEspera(segundos: number | null): string {
+  if (segundos === null) return "um tempo";
+  if (segundos < 120) return `${segundos} segundos`;
+  const min = Math.round(segundos / 60);
+  if (min < 120) return `${min} minutos`;
+  const horas = Math.round(min / 60);
+  if (horas < 48) return `${horas} horas`;
+  return `${Math.round(horas / 24)} dias`;
 }
 
 function Tile({

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { processDueEnrollments, enrollBySegments } from "@/lib/server/sequences";
 import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
+import { registrarBatida } from "@/lib/server/heartbeat";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -36,6 +37,11 @@ export async function POST(request: Request) {
   }
 
   const startedAt = Date.now();
+
+  // Carimba o sinal de vida antes de qualquer trabalho: se o scheduler
+  // demorar ou falhar no meio, ainda assim fica registrado que o worker
+  // chegou até aqui autenticado.
+  await registrarBatida();
 
   // Primeiro inscreve quem passou a bater com um segmento, depois entrega os
   // passos vencidos — nessa ordem, quem acabou de entrar já começa a contar o
