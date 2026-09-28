@@ -13,6 +13,14 @@ import {
   Mail,
   BrainCircuit,
   BookOpen,
+  Plug,
+  Handshake,
+  MoveRight,
+  CheckSquare,
+  Tag,
+  StickyNote,
+  Search,
+  Building2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +40,14 @@ export const ICON_REGISTRY = {
   "ai-agent": BrainCircuit,
   "tool-http": Globe,
   "tool-knowledge": BookOpen,
+  "tool-mcp": Plug,
+  "crm-deal": Handshake,
+  "crm-stage": MoveRight,
+  "crm-task": CheckSquare,
+  "crm-tag": Tag,
+  "crm-note": StickyNote,
+  "crm-lookup": Search,
+  "tool-crm": Building2,
 } satisfies Record<string, LucideIcon>;
 
 export type IconKey = keyof typeof ICON_REGISTRY;

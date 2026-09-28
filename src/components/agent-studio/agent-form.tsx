@@ -8,6 +8,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { KnowledgeBaseUploader } from "./knowledge-base-uploader";
+import { SemanticSearchConfig } from "./semantic-search-config";
 import { SkillsPicker } from "./skills-picker";
 import { ToolsPicker } from "./tools-picker";
 import { VariablesEditor } from "./variables-editor";
@@ -16,6 +17,8 @@ import { WebhookConfig } from "./webhook-config";
 import { WhatsAppConnect } from "./whatsapp-connect";
 import { MetaWhatsAppConnect } from "./meta-whatsapp-connect";
 import { InstagramConnect } from "./instagram-connect";
+import { TelegramConnect } from "./telegram-connect";
+import { MessengerConnect, TikTokConnect } from "./channel-connect";
 import { CommentAutomationsEditor } from "./comment-automations-editor";
 import { WidgetConnect } from "./widget-connect";
 import { useAgentsStore } from "@/lib/stores/agents-store";
@@ -189,6 +192,8 @@ export function AgentForm({ agent }: { agent?: Agent }) {
         )}
       </Card>
 
+      {isEdit && <SemanticSearchConfig agentId={agentId} />}
+
       <Card>
         <CardHeader>
           <CardTitle>Habilidades</CardTitle>
@@ -274,6 +279,12 @@ export function AgentForm({ agent }: { agent?: Agent }) {
           <InstagramConnect agentId={agentId} />
         </Card>
       )}
+
+      {isEdit && <TelegramConnect agentId={agentId} />}
+
+      {isEdit && <MessengerConnect agentId={agentId} />}
+
+      {isEdit && <TikTokConnect agentId={agentId} />}
 
       {isEdit && (
         <Card>

@@ -1,51 +1,45 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { chunkText, semanticSearch, hasSemanticIndex, type SearchHit } from "@/lib/server/embeddings";
 
-// Busca com ranking (sem vector DB nem embeddings): quebra os documentos em
-// pedaços e pontua cada pedaço com o full-text search nativo do Postgres
-// (to_tsvector/ts_rank_cd, dicionário "portuguese" — já lida com plural,
-// conjugação etc. sem precisar de stemmer próprio). É o meio-termo pragmático
-// entre "manda o documento inteiro" (o que o motor fazia antes) e montar uma
-// infra de embeddings/vetor só pra isso — zero dependência nova, o Postgres
-// que já usamos faz o trabalho.
+// Busca na base de conhecimento do agente.
+//
+// Dois motores, combinados quando os dois existem:
+//
+//   full-text (Postgres to_tsvector/ts_rank_cd, dicionário "portuguese")
+//       casa PALAVRA. Imbatível em nome próprio, código de produto, número
+//       de artigo, sigla — coisas que embedding erra com frequência.
+//
+//   semântico (pgvector, §19)  — opcional, ligado por agente
+//       casa SENTIDO. "vocês parcelam?" encontra "aceitamos em até 12x",
+//       que não tem uma palavra em comum.
+//
+// Quando os dois estão disponíveis, o resultado é fundido por RRF (Reciprocal
+// Rank Fusion): cada trecho ganha 1/(k+posição) em cada lista e os pontos
+// somam. É o método padrão pra juntar rankings de escalas diferentes sem ter
+// que normalizar score de cosseno contra score de ts_rank, que não são
+// comparáveis entre si.
 
-const CHUNK_SIZE = 800;
-const CHUNK_OVERLAP = 100;
+const RRF_K = 60;
 
-function chunkText(content: string): string[] {
-  const clean = content.replace(/\r\n/g, "\n").trim();
-  if (clean.length <= CHUNK_SIZE) return clean ? [clean] : [];
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < clean.length) {
-    const end = Math.min(start + CHUNK_SIZE, clean.length);
-    chunks.push(clean.slice(start, end));
-    if (end === clean.length) break;
-    start = end - CHUNK_OVERLAP;
-  }
-  return chunks;
-}
+async function fullTextSearch(agentId: string, query: string, topK: number): Promise<SearchHit[]> {
+  const docs = await prisma.knowledgeDoc.findMany({
+    where: { agentId },
+    select: { fileName: true, content: true },
+  });
 
-// Devolve os `topK` trechos mais relevantes pra `query` entre todos os
-// documentos desse agente. Sem nenhum trecho relevante (score 0 em todos),
-// cai pra devolver os primeiros pedaços em vez de nada — melhor dar algum
-// contexto do que devolver vazio pro agente.
-export async function searchKnowledgeBase(agentId: string, query: string, topK = 4): Promise<string[]> {
-  const docs = await prisma.knowledgeDoc.findMany({ where: { agentId }, select: { fileName: true, content: true } });
-
-  const chunks: { docLabel: string; text: string }[] = [];
+  const chunks: SearchHit[] = [];
   for (const doc of docs) {
     if (!doc.content.trim()) continue;
     for (const text of chunkText(doc.content)) chunks.push({ docLabel: doc.fileName, text });
   }
   if (chunks.length === 0) return [];
-  if (!query.trim()) return chunks.slice(0, topK).map((c) => `# ${c.docLabel}\n${c.text}`);
+  if (!query.trim()) return chunks.slice(0, topK);
 
   const texts = chunks.map((c) => c.text);
-  // plainto_tsquery une os termos da pergunta com E (AND) — bom pra busca
-  // exata, ruim pra ranking de relevância (um trecho só entra se tiver TODOS
-  // os termos). Troca por OU (|) pra pontuar qualquer sobreposição parcial,
-  // deixando o ts_rank_cd decidir o peso de cada trecho.
+  // plainto_tsquery une os termos com E (AND) — bom pra busca exata, ruim pra
+  // ranking (um trecho só entra se tiver TODOS os termos). Troca por OU (|)
+  // e deixa o ts_rank_cd decidir o peso.
   const ranked = await prisma.$queryRaw<{ idx: number; score: number }[]>`
     SELECT (ordinality - 1)::int AS idx,
            ts_rank_cd(
@@ -58,5 +52,43 @@ export async function searchKnowledgeBase(agentId: string, query: string, topK =
 
   const relevant = ranked.filter((r) => r.score > 0).slice(0, topK);
   const picked = relevant.length > 0 ? relevant : ranked.slice(0, topK);
-  return picked.map((r) => `# ${chunks[r.idx].docLabel}\n${chunks[r.idx].text}`);
+  return picked.map((r) => chunks[r.idx]);
+}
+
+function fuse(lists: SearchHit[][], topK: number): SearchHit[] {
+  const scores = new Map<string, { hit: SearchHit; score: number }>();
+  for (const list of lists) {
+    list.forEach((hit, position) => {
+      // Chaveia pelo texto: o mesmo trecho pode aparecer nas duas listas e
+      // precisa somar, não duplicar.
+      const key = hit.text;
+      const current = scores.get(key) ?? { hit, score: 0 };
+      current.score += 1 / (RRF_K + position + 1);
+      scores.set(key, current);
+    });
+  }
+  return [...scores.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((s) => s.hit);
+}
+
+/**
+ * Devolve os `topK` trechos mais relevantes, já formatados com o nome do
+ * arquivo de origem (o modelo cita melhor quando sabe de onde veio).
+ */
+export async function searchKnowledgeBase(agentId: string, query: string, topK = 4): Promise<string[]> {
+  const semanticOn = await hasSemanticIndex(agentId);
+
+  // Puxa um pouco mais de cada motor do que o necessário: a fusão só tem o
+  // que escolher se cada lista trouxer candidatos além do corte final.
+  const perEngine = semanticOn ? topK * 2 : topK;
+
+  const [textHits, vectorHits] = await Promise.all([
+    fullTextSearch(agentId, query, perEngine),
+    semanticOn ? semanticSearch(agentId, query, perEngine) : Promise.resolve([] as SearchHit[]),
+  ]);
+
+  const picked = vectorHits.length > 0 ? fuse([vectorHits, textHits], topK) : textHits.slice(0, topK);
+  return picked.map((h) => `# ${h.docLabel}\n${h.text}`);
 }

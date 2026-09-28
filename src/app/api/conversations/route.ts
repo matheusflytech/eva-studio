@@ -11,6 +11,7 @@ export async function GET() {
     include: {
       agent: { select: { name: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      assignedTo: { select: { id: true, name: true } },
     },
     orderBy: { updatedAt: "desc" },
     take: 100,
@@ -24,6 +25,7 @@ export async function GET() {
       channel: c.channel,
       contactId: c.contactId,
       status: c.status,
+      assignedTo: c.assignedTo ? { id: c.assignedTo.id, name: c.assignedTo.name } : null,
       updatedAt: c.updatedAt.toISOString(),
       lastContactMessageAt: c.lastContactMessageAt ? c.lastContactMessageAt.toISOString() : null,
       lastMessage: c.messages[0]

@@ -289,10 +289,36 @@ async function resumeConnectedSessions() {
   }
 }
 
+// Relógio das sequências (drip) e dos disparos agendados. Quem faz o trabalho
+// é o app (a rota /api/internal/scheduler), porque é lá que vivem as regras de
+// janela de 24h, modelo aprovado e envio pela Graph API. O worker só entra
+// aqui como batida de relógio: a Vercel no plano grátis dá cron 1x por dia, e
+// esse processo já fica ligado o tempo todo de qualquer forma.
+async function tickScheduler() {
+  try {
+    const res = await fetch(EVA_STUDIO_URL + "/api/internal/scheduler", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status }, "Scheduler respondeu com erro");
+      return;
+    }
+    const data = await res.json();
+    const entregues = (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0);
+    if (entregues > 0) logger.info(data, "Scheduler entregou mensagens");
+  } catch (err) {
+    logger.error({ err }, "Erro ao chamar o scheduler");
+  }
+}
+
 resumeConnectedSessions();
 setInterval(pollForWork, 4000);
 setInterval(resumeDueWaits, 15000);
 setInterval(drainOutboundQueue, 4000);
+// 60s: passo de régua e disparo agendado são medidos em minutos, não em
+// segundos — varrer mais rápido só gastaria conexão do banco à toa.
+setInterval(tickScheduler, 60000);
 
 http
   .createServer((req, res) => {

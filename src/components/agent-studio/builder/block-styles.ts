@@ -26,6 +26,14 @@ export const BLOCK_STYLES: Record<IconKey, BlockStyle> = {
   "ai-agent": { badgeBg: "bg-purple-500/15", badgeText: "text-purple-400", border: "border-purple-500/30", dot: "bg-purple-400" },
   "tool-http": { badgeBg: "bg-teal-500/10", badgeText: "text-teal-300", border: "border-teal-500/20", dot: "bg-teal-300" },
   "tool-knowledge": { badgeBg: "bg-purple-500/10", badgeText: "text-purple-300", border: "border-purple-500/20", dot: "bg-purple-300" },
+  "tool-mcp": { badgeBg: "bg-sky-500/10", badgeText: "text-sky-300", border: "border-sky-500/20", dot: "bg-sky-300" },
+  "crm-deal": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "crm-stage": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "crm-task": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "crm-tag": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "crm-note": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "crm-lookup": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
+  "tool-crm": { badgeBg: "bg-orange-500/10", badgeText: "text-orange-300", border: "border-orange-500/20", dot: "bg-orange-300" },
 };
 
 // Mesma cor de `dot` acima, mas em hex — o minimapa do React Flow (nodeColor)
@@ -46,4 +54,12 @@ export const BLOCK_MINIMAP_COLOR: Record<IconKey, string> = {
   "ai-agent": "#c084fc",
   "tool-http": "#5eead4",
   "tool-knowledge": "#d8b4fe",
+  "tool-mcp": "#7dd3fc",
+  "crm-deal": "#fcd34d",
+  "crm-stage": "#fcd34d",
+  "crm-task": "#fcd34d",
+  "crm-tag": "#fcd34d",
+  "crm-note": "#fcd34d",
+  "crm-lookup": "#fcd34d",
+  "tool-crm": "#fdba74",
 };

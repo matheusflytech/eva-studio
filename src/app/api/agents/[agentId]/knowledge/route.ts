@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
 import { extractText } from "@/lib/server/extract-text";
+import { indexDocument } from "@/lib/server/embeddings";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB, igual o limite já anunciado na UI
 
@@ -40,7 +41,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     },
   });
 
+  // Indexa pra busca semantica. Nao bloqueia o upload: se o agente nao tem
+  // embedding configurado, indexDocument devolve 0; se a API do provedor
+  // falhar, o documento continua valendo pelo full-text.
+  let indexedChunks = 0;
+  try {
+    indexedChunks = await indexDocument(agentId, doc.id, content);
+  } catch (error) {
+    console.error("[knowledge] falha ao indexar documento", error);
+  }
+
   return NextResponse.json({
+    indexedChunks,
     doc: {
       id: doc.id,
       fileName: doc.fileName,

@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { FlowNode, type FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
+import { IssuesPanel } from "@/components/agent-studio/builder/issues-panel";
+import { validateFlow } from "@/components/agent-studio/builder/block-validation";
 import { NodeInspector } from "@/components/agent-studio/builder/node-inspector";
 import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
@@ -209,6 +211,8 @@ export default function AgentBuilderPage() {
     []
   );
 
+  const issues = validateFlow(nodes, edges);
+
   if (!isLoaded || !flowLoaded) return <div className="flex-1 p-8" />;
 
   if (!agent) {
@@ -241,6 +245,7 @@ export default function AgentBuilderPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
           {tab === "editor" && (
             <span className="text-[12.5px] text-text-tertiary">
               {saveState === "pending" && "Salvando..."}

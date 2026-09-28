@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { MembersPanel } from "@/components/layout/members-panel";
 
 export default function ConfiguracoesPage() {
   const router = useRouter();
@@ -117,6 +118,8 @@ export default function ConfiguracoesPage() {
             </div>
           </form>
         </Card>
+
+        <MembersPanel />
 
         <Card>
           <CardHeader>

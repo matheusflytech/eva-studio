@@ -5,10 +5,25 @@ import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
-import { callGroqWithTools, type GroqTool, type GroqToolCall } from "@/lib/server/groq";
+import { callLlmWithTools, type LlmTool, type LlmToolCall } from "@/lib/server/llm";
+import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
+import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
+import { decryptSecret } from "@/lib/server/crypto";
+import {
+  createDeal,
+  moveDealStage,
+  createTask,
+  addNote,
+  findOpenDealForContact,
+  lookupCrmForContact,
+  parseRelativeDue,
+} from "@/lib/server/crm";
 import { safeFetch } from "@/lib/server/ssrf";
+import { syncContactFromConversation } from "@/lib/server/contacts";
+import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
+import { registerBroadcastReply } from "@/lib/server/outbound";
 
 export interface OutboundMessage {
   text: string;
@@ -228,6 +243,118 @@ const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
 // pra Groq com function-calling — incluindo memória da conversa e a
 // ferramenta interna de coleta de variáveis (collectVars) — e devolve o texto
 // final já depois do loop de tool-calling (ver src/lib/server/groq.ts).
+/**
+ * Executa uma ferramenta de CRM pedida pelo modelo, aplicando as travas
+ * configuradas no bloco.
+ *
+ * Por que as travas existem: o modelo decide sozinho quando agir, e uma
+ * conversa animada é motivo suficiente pra ele querer marcar "Ganho". Sem
+ * limite de etapa e de valor, a IA suja o funil em vez de ajudar.
+ */
+async function runCrmTool(
+  call: LlmToolCall,
+  node: Node<FlowNodeData>,
+  orgId: string,
+  contactId: string
+): Promise<string> {
+  const args = call.arguments ?? {};
+
+  if (call.name === "crm_buscar") {
+    const crm = await lookupCrmForContact(contactId);
+    return JSON.stringify({
+      empresa: crm.contact?.company?.name ?? null,
+      etiquetas: (crm.contact?.tags ?? []).map((t) => t.tag.name),
+      negocio: crm.deal
+        ? { nome: crm.deal.name, etapa: crm.deal.stage.name, valor: crm.deal.amountCents / 100 }
+        : null,
+      tarefas_abertas: crm.openTasks,
+    });
+  }
+
+  if (call.name === "crm_criar_negocio") {
+    const amountCents = Math.round(Number(String(args.valor ?? "").replace(/[^\d.]/g, "")) * 100) || 0;
+
+    // Trava de valor: acima do teto, cria mesmo assim (perder o negócio seria
+    // pior) mas marca pra revisão humana em vez de seguir como se nada fosse.
+    const ceiling = Number(String(node.data.crmMaxAmount ?? "").replace(/[^\d.]/g, "")) * 100;
+    const overCeiling = ceiling > 0 && amountCents > ceiling;
+
+    const deal = await createDeal({
+      orgId,
+      name: String(args.nome ?? "Negócio"),
+      contactId,
+      amountCents,
+      description: overCeiling ? "Valor acima do teto configurado — revisar." : "",
+    });
+
+    if (overCeiling) {
+      await createTask({
+        orgId,
+        contactId,
+        dealId: deal.id,
+        type: "outro",
+        text: `Revisar negócio "${deal.name}" criado pela IA acima do teto.`,
+        dueAt: new Date(Date.now() + 86_400_000),
+      });
+      return `Negócio criado e marcado para revisão humana (valor acima do teto).`;
+    }
+    return `Negócio "${deal.name}" criado.`;
+  }
+
+  if (call.name === "crm_mover_etapa") {
+    const deal = await findOpenDealForContact(contactId);
+    if (!deal) return "Essa pessoa não tem negócio aberto.";
+
+    const stages = await prisma.pipelineStage.findMany({ where: { pipelineId: deal.pipelineId } });
+    const wanted = String(args.etapa ?? "").trim().toLowerCase();
+    const stage = stages.find((s) => s.name.toLowerCase() === wanted);
+    if (!stage) return `Etapa não encontrada. Disponíveis: ${stages.map((s) => s.name).join(", ")}.`;
+
+    // Trava de etapa: lista vazia significa "nenhuma", não "todas". O padrão
+    // seguro é a IA não mover nada até alguém liberar explicitamente.
+    const allowedStages = node.data.crmAllowedStageIds ?? [];
+    if (!allowedStages.includes(stage.id)) {
+      return "Não tenho permissão para mover o negócio para essa etapa. Um humano precisa fazer isso.";
+    }
+
+    await moveDealStage(deal.id, stage.id);
+    return `Negócio movido para ${stage.name}.`;
+  }
+
+  if (call.name === "crm_criar_tarefa") {
+    const deal = await findOpenDealForContact(contactId);
+    await createTask({
+      orgId,
+      contactId,
+      dealId: deal?.id ?? null,
+      text: String(args.texto ?? ""),
+      dueAt: parseRelativeDue(String(args.prazo ?? "+1 dia")),
+    });
+    return "Tarefa criada.";
+  }
+
+  if (call.name === "crm_etiquetar") {
+    const wanted = String(args.etiqueta ?? "").trim();
+    const tag = await prisma.tag.findFirst({
+      where: { orgId, name: { equals: wanted, mode: "insensitive" } },
+    });
+    if (!tag) {
+      const all = await prisma.tag.findMany({ where: { orgId }, select: { name: true } });
+      return `Etiqueta não existe. Disponíveis: ${all.map((t) => t.name).join(", ") || "nenhuma"}.`;
+    }
+    const { applyTag } = await import("@/lib/server/contacts");
+    await applyTag(contactId, tag.id);
+    return `Etiqueta "${tag.name}" aplicada.`;
+  }
+
+  if (call.name === "crm_nota") {
+    await addNote({ orgId, contactId, text: String(args.texto ?? "") });
+    return "Nota registrada.";
+  }
+
+  return "Ação de CRM desconhecida.";
+}
+
 async function runAiAgent(
   node: Node<FlowNodeData>,
   agentId: string,
@@ -235,30 +362,162 @@ async function runAiAgent(
   variables: Variables,
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
-  conversationId: string
+  conversationId: string,
+  // Contexto de CRM: quem é a pessoa e em que org. Só é usado quando há um
+  // bloco "Ferramenta: CRM" ligado neste agente.
+  crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> }
 ): Promise<{ text: string | null; error?: string }> {
+  const provider = getProvider(node.data.aiProvider);
   const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
-  if (!apiKey) return { text: null, error: "Credencial Groq não configurada nesse bloco." };
+  if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.` };
 
   const toolNodes = edges
     .filter((e) => e.target === node.id && e.targetHandle === "tools")
     .map((e) => findNode(nodes, e.source))
     .filter((n): n is Node<FlowNodeData> => !!n);
 
-  const tools: GroqTool[] = toolNodes.map((tn, i) =>
-    tn.data.iconKey === "tool-knowledge"
-      ? {
-          name: toToolFunctionName(tn.data.label, `buscar_conhecimento_${i}`),
-          description: tn.data.detail || "Busca os trechos mais relevantes na base de conhecimento do agente a partir de uma consulta.",
-          params: [{ name: "consulta", description: "O que buscar — palavras-chave ou a pergunta do usuário." }],
-        }
-      : {
-          name: toToolFunctionName(tn.data.label, `ferramenta_${i}`),
-          description: tn.data.detail || `Chama ${tn.data.httpMethod ?? "GET"} ${tn.data.httpUrl ?? ""}`,
-          params: extractToolParams(tn.data, variables).map((p) => ({ name: p })),
-        }
-  );
-  const toolNodeByName = new Map(tools.map((t, i) => [t.name, toolNodes[i]]));
+  const tools: LlmTool[] = [];
+  const toolNodeByName = new Map<string, Node<FlowNodeData>>();
+
+  // Um bloco MCP vira N ferramentas (as que o servidor anuncia), diferente
+  // dos outros blocos, que viram uma. Por isso a montagem é imperativa aqui
+  // em vez de um map direto.
+  const mcpSessions = new Map<string, McpSession>();
+  const mcpToolRealName = new Map<string, string>();
+
+  for (let i = 0; i < toolNodes.length; i += 1) {
+    const tn = toolNodes[i];
+
+    if (tn.data.iconKey === "tool-mcp") {
+      const serverId = tn.data.mcpServerId;
+      if (!serverId) continue;
+      const server = await prisma.mcpServer.findUnique({ where: { id: serverId } });
+      if (!server || !server.active) continue;
+
+      let discovered: McpToolDef[] = [];
+      try {
+        const session = await openMcpSession(server.url, decryptSecret(server.authHeader));
+        mcpSessions.set(serverId, session);
+        discovered = await session.listTools();
+      } catch (error) {
+        // Servidor fora do ar não derruba o turno: o agente segue com as
+        // outras ferramentas e o erro fica registrado na aba Execuções.
+        console.error("[mcp] falha ao conectar", server.name, error);
+        continue;
+      }
+
+      const allowed = tn.data.mcpTools ?? [];
+      for (const mcpTool of discovered) {
+        if (allowed.length > 0 && !allowed.includes(mcpTool.name)) continue;
+        // Prefixo com o id do bloco evita colisão quando dois servidores
+        // expõem uma ferramenta com o mesmo nome.
+        const exposedName = toToolFunctionName(`mcp_${i}_${mcpTool.name}`, `mcp_${i}`);
+        const properties = mcpTool.inputSchema?.properties ?? {};
+        const required = mcpTool.inputSchema?.required ?? [];
+        tools.push({
+          name: exposedName,
+          description: mcpTool.description || `Ferramenta ${mcpTool.name} do servidor ${server.name}.`,
+          params: Object.entries(properties).map(([name, spec]) => ({
+            name,
+            description: spec?.description,
+            required: required.includes(name),
+          })),
+        });
+        toolNodeByName.set(exposedName, tn);
+        mcpToolRealName.set(exposedName, mcpTool.name);
+      }
+      continue;
+    }
+
+    if (tn.data.iconKey === "tool-crm") {
+      if (!crmContext) continue;
+
+      const allowed = tn.data.crmToolActions ?? [];
+      const can = (action: string) => allowed.length === 0 || allowed.includes(action);
+
+      // Catálogo de verbos. Cada um só entra se estiver liberado no bloco —
+      // é a primeira das três travas: sem elas, IA com permissão de escrita
+      // no CRM vira geradora de lixo.
+      const crmTools: { action: string; tool: LlmTool }[] = [
+        {
+          action: "buscar",
+          tool: {
+            name: "crm_buscar",
+            description: "Consulta o CRM sobre a pessoa desta conversa: empresa, negócio aberto, etapa, valor e etiquetas.",
+            params: [],
+          },
+        },
+        {
+          action: "criar_negocio",
+          tool: {
+            name: "crm_criar_negocio",
+            description: "Cria um negócio no funil para a pessoa desta conversa. Use quando houver intenção real de compra.",
+            params: [
+              { name: "nome", description: "Nome curto do negócio." },
+              { name: "valor", description: "Valor em reais, só números. Deixe vazio se não souber.", required: false },
+            ],
+          },
+        },
+        {
+          action: "mover_etapa",
+          tool: {
+            name: "crm_mover_etapa",
+            description: "Move o negócio aberto da pessoa para outra etapa do funil.",
+            params: [{ name: "etapa", description: "Nome exato da etapa de destino." }],
+          },
+        },
+        {
+          action: "criar_tarefa",
+          tool: {
+            name: "crm_criar_tarefa",
+            description: "Cria uma tarefa de acompanhamento para a equipe.",
+            params: [
+              { name: "texto", description: "O que precisa ser feito." },
+              { name: "prazo", description: 'Prazo relativo, ex: "+2 dias", "3h".', required: false },
+            ],
+          },
+        },
+        {
+          action: "etiquetar",
+          tool: {
+            name: "crm_etiquetar",
+            description: "Aplica uma etiqueta ao contato. Etiqueta pode iniciar uma régua de acompanhamento.",
+            params: [{ name: "etiqueta", description: "Nome exato da etiqueta." }],
+          },
+        },
+        {
+          action: "nota",
+          tool: {
+            name: "crm_nota",
+            description: "Registra uma observação na linha do tempo do contato.",
+            params: [{ name: "texto", description: "A observação." }],
+          },
+        },
+      ];
+
+      for (const entry of crmTools) {
+        if (!can(entry.action)) continue;
+        tools.push(entry.tool);
+        toolNodeByName.set(entry.tool.name, tn);
+      }
+      continue;
+    }
+
+    const tool: LlmTool =
+      tn.data.iconKey === "tool-knowledge"
+        ? {
+            name: toToolFunctionName(tn.data.label, `buscar_conhecimento_${i}`),
+            description: tn.data.detail || "Busca os trechos mais relevantes na base de conhecimento do agente a partir de uma consulta.",
+            params: [{ name: "consulta", description: "O que buscar — palavras-chave ou a pergunta do usuário." }],
+          }
+        : {
+            name: toToolFunctionName(tn.data.label, `ferramenta_${i}`),
+            description: tn.data.detail || `Chama ${tn.data.httpMethod ?? "GET"} ${tn.data.httpUrl ?? ""}`,
+            params: extractToolParams(tn.data, variables).map((p) => ({ name: p })),
+          };
+    tools.push(tool);
+    toolNodeByName.set(tool.name, tn);
+  }
 
   // Coleta estruturada de variáveis (estilo "slots" do Rasa + function-calling
   // do Dify): cada linha configurada vira um campo opcional de uma ferramenta
@@ -296,14 +555,16 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const text = await callGroqWithTools({
+    const result = await callLlmWithTools({
+      provider: provider.id as LlmProvider,
       apiKey,
-      model: node.data.aiModel || "llama-3.3-70b-versatile",
+      model: node.data.aiModel || provider.models[0].id,
+      effort: node.data.aiEffort,
       systemPrompt,
       userMessage,
       history,
       tools,
-      executeTool: async (call: GroqToolCall) => {
+      executeTool: async (call: LlmToolCall) => {
         if (call.name === SAVE_SLOTS_TOOL) {
           const saved: string[] = [];
           for (const v of collectVars) {
@@ -317,6 +578,27 @@ async function runAiAgent(
         }
         const toolNode = toolNodeByName.get(call.name);
         if (!toolNode) return "Ferramenta não encontrada.";
+
+        if (toolNode.data.iconKey === "tool-crm" && crmContext) {
+          try {
+            const contactId = await crmContext.resolveContactId();
+            if (!contactId) return "Não consegui identificar o contato desta conversa.";
+            return await runCrmTool(call, toolNode, crmContext.orgId, contactId);
+          } catch (error) {
+            return `Erro no CRM: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        }
+
+        if (toolNode.data.iconKey === "tool-mcp") {
+          const session = toolNode.data.mcpServerId ? mcpSessions.get(toolNode.data.mcpServerId) : undefined;
+          const realName = mcpToolRealName.get(call.name);
+          if (!session || !realName) return "Servidor MCP indisponível.";
+          try {
+            return await session.callTool(realName, call.arguments);
+          } catch (error) {
+            return `Erro ao chamar a ferramenta MCP: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        }
         if (toolNode.data.iconKey === "tool-knowledge") {
           const query = String(call.arguments.consulta ?? userMessage);
           const chunks = await searchKnowledgeBase(agentId, query, 4);
@@ -326,7 +608,7 @@ async function runAiAgent(
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     });
-    return { text, error: text ? undefined : "Groq não devolveu resposta." };
+    return { text: result.text, error: result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`) };
   } catch (err) {
     return { text: null, error: err instanceof Error ? err.message : String(err) };
   }
@@ -441,6 +723,33 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
 
+  // Espelha a conversa no CRM de contatos (Contact) e, quando o contato
+  // falou de verdade, tira ele de qualquer sequencia com stopOnReply. Roda
+  // depois de tudo e nunca derruba a resposta: se o CRM falhar, a conversa
+  // continua — o pior caso e uma ficha desatualizada, nao um bot mudo.
+  async function syncContact(
+    conversationId: string,
+    variables: Record<string, unknown>,
+    isInbound: boolean
+  ): Promise<void> {
+    try {
+      const contactId = await syncContactFromConversation({
+        agentId: input.agentId,
+        channel: input.channel,
+        externalId: input.contactId,
+        conversationId,
+        variables,
+        isInbound,
+      });
+      if (contactId && isInbound) {
+        await stopEnrollmentsOnReply(contactId);
+        await registerBroadcastReply(input.agentId, input.contactId);
+      }
+    } catch (error) {
+      console.error("[flow-engine] falha ao sincronizar contato", error);
+    }
+  }
+
   const flow = await prisma.agentFlow.findUnique({ where: { agentId: input.agentId } });
 
   // Sem fluxo salvo: comportamento antigo, direto pro webhook do agente —
@@ -456,9 +765,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
     await logMessages(conversation.id, input.text, messages);
-    if (input.text !== undefined || input.optionId !== undefined) {
+    const inboundNoFlow = input.text !== undefined || input.optionId !== undefined;
+    if (inboundNoFlow) {
       await prisma.conversation.update({ where: { id: conversation.id }, data: { lastContactMessageAt: new Date() } });
     }
+    await syncContact(conversation.id, {}, inboundNoFlow);
     return { messages, status: "active" };
   }
 
@@ -480,6 +791,39 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   let currentId = conversation.currentNodeId;
   let status: AdvanceResult["status"] = "active";
   const inboundText = input.text ?? (input.optionId ? `[opção: ${input.optionId}]` : undefined);
+
+  // Ficha do contato resolvida sob demanda. O finish() sincroniza no fim de
+  // toda rodada, mas um bloco de CRM no meio do fluxo precisa do id ANTES
+  // disso — senão o negócio nasceria sem dono. Memoiza pra não sincronizar
+  // duas vezes na mesma rodada.
+  let resolvedContactId: string | null = null;
+  async function ensureContactId(): Promise<string | null> {
+    if (resolvedContactId) return resolvedContactId;
+    if (conversation.contactRecordId) {
+      resolvedContactId = conversation.contactRecordId;
+      return resolvedContactId;
+    }
+    resolvedContactId = await syncContactFromConversation({
+      agentId: input.agentId,
+      channel: input.channel,
+      externalId: input.contactId,
+      conversationId: conversation.id,
+      variables,
+      isInbound: false,
+    });
+    return resolvedContactId;
+  }
+
+  // Valor em texto ("R$ 1.500,00", "{orcamento}") vira centavos. Aceita o
+  // formato brasileiro (vírgula decimal, ponto de milhar), que é o que o
+  // cliente digita numa conversa.
+  function toCents(expression: string | undefined): number {
+    const raw = interpolate(expression ?? "", variables).replace(/[^\d,.-]/g, "").trim();
+    if (!raw) return 0;
+    const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+    const value = Number(normalized);
+    return Number.isFinite(value) ? Math.round(value * 100) : 0;
+  }
 
   // Passo a passo da execução (aba "Execuções") — um registro leve por bloco
   // visitado, não a variável inteira (evita vazar dado sensível no log).
@@ -509,6 +853,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       },
     });
     await logMessages(conversation.id, inboundText, messages);
+    await syncContact(conversation.id, variables, isGenuineInbound);
     if (steps.length > 0) {
       await prisma.flowExecution.create({
         data: {
@@ -565,7 +910,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     pushStep(parkedNode, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" });
     return finish();
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id);
+    const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+      orgId: agent.orgId,
+      resolveContactId: ensureContactId,
+    });
     if (reply.text) messages.push({ text: reply.text });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     return finish();
@@ -625,6 +973,105 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         }
       }
       pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
+      currentId = nextNodeId(edges, node.id);
+      continue;
+    }
+
+    if (kind.startsWith("crm-")) {
+      const startedAt = Date.now();
+      let output: string | undefined;
+      let stepError: string | undefined;
+
+      try {
+        const contactId = await ensureContactId();
+        if (!contactId) throw new Error("Não foi possível resolver o contato da conversa.");
+
+        if (kind === "crm-deal") {
+          const deal = await createDeal({
+            orgId: agent.orgId,
+            name: interpolate(node.data.crmDealName || "Negócio de {nome}", variables),
+            pipelineId: node.data.crmPipelineId || undefined,
+            stageId: node.data.crmStageId || undefined,
+            contactId,
+            amountCents: toCents(node.data.crmDealAmount),
+            description: interpolate(node.data.crmDealDescription ?? "", variables),
+          });
+          // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
+          if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
+          output = `negócio ${deal.name}`;
+        }
+
+        if (kind === "crm-stage") {
+          const deal = await findOpenDealForContact(contactId);
+          if (!deal) throw new Error("O contato não tem negócio aberto para mover.");
+          if (!node.data.crmStageId) throw new Error("Etapa de destino não configurada no bloco.");
+          const moved = await moveDealStage(
+            deal.id,
+            node.data.crmStageId,
+            interpolate(node.data.crmLostReason ?? "", variables)
+          );
+          output = `negócio movido (prob. ${moved.probability}%)`;
+        }
+
+        if (kind === "crm-task") {
+          const deal = await findOpenDealForContact(contactId);
+          const task = await createTask({
+            orgId: agent.orgId,
+            text: interpolate(node.data.crmTaskText ?? "", variables),
+            type: node.data.crmTaskType ?? "ligar",
+            contactId,
+            dealId: deal?.id ?? null,
+            assignedToId: node.data.crmTaskAssigneeId || null,
+            dueAt: parseRelativeDue(node.data.crmTaskDue ?? ""),
+          });
+          output = `tarefa ${task.type}`;
+        }
+
+        if (kind === "crm-tag") {
+          if (!node.data.crmTagId) throw new Error("Etiqueta não escolhida no bloco.");
+          if (node.data.crmTagAction === "remove") {
+            const { removeTag } = await import("@/lib/server/contacts");
+            await removeTag(contactId, node.data.crmTagId);
+            output = "etiqueta removida";
+          } else {
+            const { applyTag } = await import("@/lib/server/contacts");
+            await applyTag(contactId, node.data.crmTagId);
+            output = "etiqueta aplicada";
+          }
+        }
+
+        if (kind === "crm-note") {
+          const deal = await findOpenDealForContact(contactId);
+          await addNote({
+            orgId: agent.orgId,
+            text: interpolate(node.data.crmNoteText ?? "", variables),
+            contactId,
+            dealId: deal?.id ?? null,
+          });
+          output = "nota registrada";
+        }
+
+        if (kind === "crm-lookup") {
+          // Carrega o estado do CRM em variáveis para o bloco de Condição
+          // poder ramificar. Sem isso o fluxo escreveria no CRM mas nunca
+          // leria, e não daria pra fazer "se já tem negócio aberto, ...".
+          const crm = await lookupCrmForContact(contactId);
+          setVar(variables, "crm_empresa", crm.contact?.company?.name ?? "");
+          setVar(variables, "crm_tem_negocio", crm.deal ? "sim" : "nao");
+          setVar(variables, "crm_negocio_id", crm.deal?.id ?? "");
+          setVar(variables, "crm_negocio_etapa", crm.deal?.stage.name ?? "");
+          setVar(variables, "crm_negocio_valor", crm.deal ? (crm.deal.amountCents / 100).toFixed(2) : "0");
+          setVar(variables, "crm_tarefas_abertas", String(crm.openTasks));
+          setVar(variables, "crm_etiquetas", (crm.contact?.tags ?? []).map((t) => t.tag.name).join(", "));
+          output = crm.deal ? `negócio em ${crm.deal.stage.name}` : "sem negócio aberto";
+        }
+      } catch (err) {
+        // Falha de CRM não trava a conversa: o cliente continua sendo
+        // atendido e o erro aparece na aba Execuções.
+        stepError = err instanceof Error ? err.message : String(err);
+      }
+
+      pushStep(node, { output, error: stepError }, startedAt);
       currentId = nextNodeId(edges, node.id);
       continue;
     }
@@ -690,7 +1137,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent.id, input.text ?? "", variables, nodes, edges, conversation.id);
+      const reply = await runAiAgent(node, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+      orgId: agent.orgId,
+      resolveContactId: ensureContactId,
+    });
       if (reply.text) messages.push({ text: reply.text });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       currentId = node.id; // fica "alugado" pra IA nativa até o contato parar de responder

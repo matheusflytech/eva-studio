@@ -3,13 +3,19 @@
 // encostar nas tabelas do outro produto nesse mesmo banco).
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
+
+// pgvector entra via previewFeatures no generator acima; o tipo em si e
+// declarado como Unsupported porque o Prisma nao tem um mapeamento nativo —
+// leitura e escrita de embedding sao feitas em SQL cru (src/lib/server/embeddings.ts).
 
 model Organization {
   id        String   @id @default(uuid())
@@ -20,8 +26,41 @@ model Organization {
   profiles    Profile[]
   agents      Agent[]
   credentials Credential[]
+  apiKeys     ApiKey[]
+  mcpServers  McpServer[]
+  contacts    Contact[]
+  companies   Company[]
+  tags        Tag[]
+  segments    Segment[]
+  pipelines   Pipeline[]
+  deals       Deal[]
+  tasks       Task[]
+  notes       Note[]
 
   @@map("eva_studio_organizations")
+}
+
+// Chave de API pública (igual Stripe/HubSpot/Salesforce) — dá acesso
+// programático aos dados dessa org via /api/v1/*, sem precisar de sessão
+// logada. Só o hash é guardado (SHA-256); a chave em si só existe uma vez,
+// no momento em que é criada — depois disso é irrecuperável, só dá pra
+// revogar e gerar outra (mesmo modelo de "copie agora, não mostramos de
+// novo" que toda API séria usa).
+model ApiKey {
+  id         String    @id @default(uuid())
+  orgId      String
+  name       String // "Produção", "Integração n8n", etc. — só pra identificar
+  keyPrefix  String // primeiros caracteres, tipo "evs_live_4f2a9b" — pra reconhecer qual é qual sem descriptografar nada
+  keyHash    String // SHA-256 da chave inteira
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([keyHash])
+  @@map("eva_studio_api_keys")
 }
 
 // Chave de API reutilizável entre agentes (Groq, Resend, ...) — cadastrada
@@ -48,9 +87,20 @@ model Profile {
   orgId     String
   name      String
   email     String
+  // Papel dentro da organização (RBAC). "owner" = quem criou a org, não pode
+  // ser rebaixado nem removido; "admin" = mexe em tudo; "agent" = atendente,
+  // só Conversas/Contatos e responder; "viewer" = só leitura. Checagem
+  // central em src/lib/server/permissions.ts.
+  role      String   @default("owner") // owner | admin | agent | viewer
   createdAt DateTime @default(now())
 
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  organization    Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  conversations   Conversation[] @relation("ConversationAssignee")
+  ownedContacts   Contact[]      @relation("ContactOwner")
+  ownedCompanies  Company[]      @relation("CompanyOwner")
+  ownedDeals      Deal[]         @relation("DealOwner")
+  assignedTasks   Task[]         @relation("TaskAssignee")
+  authoredNotes   Note[]         @relation("NoteAuthor")
 
   @@index([orgId])
   @@map("eva_studio_profiles")
@@ -71,8 +121,13 @@ model Agent {
   outboundUrl    String   @default("")
   status         String   @default("active")
   // Widget de chat pra colar em qualquer site (canal "website") — puxa
-  // assunto sozinho e alimenta a página Leads. Ver docs/CHATBOT_ENGINE.md §13.
+  // assunto sozinho e alimenta a página Leads. Ver docs/CHATBOT_ENGINE.md §12.
   widgetEnabled  Boolean  @default(false)
+  // Busca semantica na base de conhecimento (§19). Vazio = desligada, e a
+  // busca cai no full-text do Postgres, que era o comportamento anterior.
+  embeddingProvider     String  @default("")
+  embeddingCredentialId String  @default("")
+  embeddingModel        String  @default("")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -89,6 +144,12 @@ model Agent {
   broadcasts          Broadcast[]
   commentAutomations  CommentAutomation[]
   executions          FlowExecution[]
+  contactChannels     ContactChannel[]
+  sequences           Sequence[]
+  telegramConnection  TelegramConnection?
+  messengerConnection MessengerConnection?
+  tiktokConnection    TikTokConnection?
+  knowledgeChunks     KnowledgeChunk[]
 
   @@index([orgId])
   @@map("eva_studio_agents")
@@ -136,10 +197,43 @@ model KnowledgeDoc {
   content    String   @default("") @db.Text
   uploadedAt DateTime @default(now())
 
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent  Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  chunks KnowledgeChunk[]
 
   @@index([agentId])
   @@map("eva_studio_knowledge_docs")
+}
+
+// Pedaco de documento com embedding (busca semantica). Um documento vira N
+// chunks; cada chunk guarda o vetor do texto dele.
+//
+// Por que chunk separado do documento: o KnowledgeDoc guarda o texto inteiro
+// (usado pelo modo antigo, sem vetor); aqui a granularidade e a que a busca
+// precisa. Os dois convivem — desligar embeddings volta pro full-text sem
+// perder nada.
+//
+// O campo embedding e Unsupported porque o Prisma nao tem tipo vector: insercao e
+// busca por distancia sao SQL cru em src/lib/server/embeddings.ts. A dimensao
+// e fixa em 1536 pra um indice servir a todos os provedores — os modelos
+// usados ou sao 1536 nativos ou aceitam pedir 1536.
+model KnowledgeChunk {
+  id         String                       @id @default(uuid())
+  agentId    String
+  docId      String
+  chunkIndex Int
+  text       String                       @db.Text
+  embedding  Unsupported("vector(1536)")?
+  // Modelo que gerou o vetor — vetor de modelo diferente nao e comparavel,
+  // entao reindexar ao trocar de modelo depende de saber isso.
+  model      String                       @default("")
+  createdAt  DateTime                     @default(now())
+
+  agent Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  doc   KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([docId])
+  @@map("eva_studio_knowledge_chunks")
 }
 
 // Um bloco só por agente (o canvas do Builder de conversa) — nodes/edges do
@@ -216,13 +310,23 @@ model Conversation {
   // Estágio do lead pro CRM interno (canal "website") — null = "Novo". Não
   // tem efeito nenhum no motor de fluxo, é só pra organizar a página Leads.
   leadStage            String?
+  // Ficha do contato (Contact) por trás dessa conversa — preenchida na
+  // primeira vez que a conversa roda. Conversas antigas ficam null até o
+  // próximo advanceConversation. Ver docs/CHATBOT_ENGINE.md §13.
+  contactRecordId      String?
+  // Atendente responsável (inbox humano). null = ninguém pegou ainda.
+  assignedToId         String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  messages Message[]
+  agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  contact    Contact?  @relation(fields: [contactRecordId], references: [id], onDelete: SetNull)
+  assignedTo Profile?  @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@unique([agentId, channel, contactId])
+  @@index([contactRecordId])
+  @@index([assignedToId])
   @@map("eva_studio_conversations")
 }
 
@@ -325,16 +429,27 @@ model OutboundQueueItem {
   contactId      String
   text           String    @db.Text
   broadcastId    String?
+  variantId      String?
+  // Preenchido quando o item veio de uma Sequencia (drip) — serve pra
+  // contabilizar entrega por passo e pra nao reenviar o mesmo passo.
+  enrollmentId   String?
   status         String    @default("pending") // pending | sent | failed
   error          String?
   createdAt      DateTime  @default(now())
   sentAt         DateTime?
+  // Quando o contato respondeu depois de receber esse item. So e usado pelo
+  // placar do teste A/B, e por isso e gravado uma vez so (segunda resposta
+  // nao conta de novo).
+  repliedAt      DateTime?
 
-  agent     Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  broadcast Broadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  agent     Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  broadcast Broadcast?        @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+  variant   BroadcastVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([broadcastId])
+  @@index([variantId])
+  @@index([agentId, contactId, sentAt])
   @@map("eva_studio_outbound_queue")
 }
 
@@ -346,20 +461,62 @@ model OutboundQueueItem {
 model Broadcast {
   id          String   @id @default(uuid())
   agentId     String
-  channel     String // whatsapp_qr | whatsapp_meta
+  channel     String // whatsapp_qr | whatsapp_meta | telegram
   text        String   @db.Text
   templateId  String?
   totalCount  Int      @default(0)
   sentCount   Int      @default(0)
   failedCount Int      @default(0)
-  status      String   @default("sending") // sending | done
+  status      String   @default("sending") // scheduled | sending | done | canceled
+  // Como o publico foi escolhido: "manual" = lista colada a mao (comportamento
+  // antigo, continua valendo), "segment" = todos os contatos que batem com um
+  // Segment salvo, "tags" = contatos que tem as etiquetas de tagIds.
+  audience    String   @default("manual") // manual | segment | tags
+  segmentId   String?
+  tagIds      Json     @default("[]")
+  // Lista colada a mao (audience="manual"). Fica guardada pra que um
+  // disparo manual tambem possa ser agendado — senao "manual" seria o unico
+  // publico que nao aceita hora marcada, sem motivo bom.
+  manualRecipients Json @default("[]")
+  // Quando disparar. null = agora (comportamento antigo). Com data no futuro
+  // o status nasce "scheduled" e quem envia de verdade e o worker, que faz
+  // polling — a Vercel no plano gratis so permite cron 1x/dia, entao o
+  // agendamento NAO vive la. Ver docs/CHATBOT_ENGINE.md §15.
+  scheduledAt DateTime?
   createdAt   DateTime @default(now())
 
-  agent Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  queue OutboundQueueItem[]
+  agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  queue    OutboundQueueItem[]
+  segment  Segment?            @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  variants BroadcastVariant[]
 
   @@index([agentId])
+  @@index([status, scheduledAt])
   @@map("eva_studio_broadcasts")
+}
+
+// Variante de um teste A/B de disparo. Se um Broadcast tem variantes, cada
+// destinatario recebe UMA delas (sorteio ponderado por weight) e o placar de
+// entrega fica por variante — e assim que se compara duas mensagens de
+// verdade, em vez de no olho. Sem variantes, o disparo usa Broadcast.text
+// normalmente.
+model BroadcastVariant {
+  id          String   @id @default(uuid())
+  broadcastId String
+  label       String // "A", "B", ...
+  text        String   @db.Text
+  templateId  String?
+  weight      Int      @default(1)
+  sentCount   Int      @default(0)
+  failedCount Int      @default(0)
+  replyCount  Int      @default(0) // quantos responderam depois de receber essa variante
+  createdAt   DateTime @default(now())
+
+  broadcast Broadcast           @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  queue     OutboundQueueItem[]
+
+  @@index([broadcastId])
+  @@map("eva_studio_broadcast_variants")
 }
 
 // Contador de rate limit (janela fixa). Usado por src/lib/server/rate-limit.ts
@@ -372,4 +529,499 @@ model RateLimit {
   windowStart DateTime @default(now())
 
   @@map("eva_studio_rate_limits")
+}
+
+
+// ---------------------------------------------------------------------------
+// CRM de contatos (§13 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+// Ficha do contato — a pessoa por tras das conversas, nao a conversa em si.
+// Antes disso o "contato" era so a string Conversation.contactId (telefone,
+// igsid, id de visitante) e tudo que o fluxo capturava ficava num JSON solto
+// dentro da conversa, invisivel pro resto do app. Agora nome/e-mail/telefone
+// sao colunas de verdade, o resto vira customFields, e o bloco de Captura
+// escreve aqui automaticamente quando o nome da variavel bate (ver
+// CAPTURE_FIELD_MAP em src/lib/server/contacts.ts).
+model Contact {
+  id           String    @id @default(uuid())
+  orgId        String
+  companyId    String?
+  // Vendedor/atendente dono da ficha (o "sales_id" do Atomic CRM).
+  ownerId      String?
+  name         String    @default("")
+  jobTitle     String    @default("")
+  // Principais — continuam colunas pra busca, filtro de segmento e pra
+  // interpolar {email}/{telefone} em mensagem sem ter que ler JSON.
+  email        String    @default("")
+  phone        String    @default("")
+  // Secundarios, com rotulo: [{ value, label }]. Lead tem dois telefones o
+  // tempo todo, e antes disso a gente sobrescrevia o primeiro.
+  emails       Json      @default("[]")
+  phones       Json      @default("[]")
+  linkedinUrl  String    @default("")
+  background   String    @default("") @db.Text
+  notes        String    @default("") @db.Text
+  customFields Json      @default("{}")
+  source       String    @default("conversa")
+  optIn        Boolean   @default(true)
+  optOutAt     DateTime?
+  lastSeenAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization  Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company       Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  owner         Profile?             @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  channels      ContactChannel[]
+  conversations Conversation[]
+  tags          ContactTag[]
+  deals         DealContact[]
+  tasks         Task[]
+  crmNotes      Note[]
+  enrollments   SequenceEnrollment[]
+
+  @@index([orgId])
+  @@index([orgId, email])
+  @@index([orgId, phone])
+  @@index([companyId])
+  @@map("eva_studio_contacts")
+}
+
+// Onde falar com a pessoa. Foi extraido de Contact pra que a mesma pessoa
+// no WhatsApp e no Instagram seja UMA ficha, e pra que Empresa e Negocio
+// tenham onde se pendurar sem ficarem presos a um chatbot.
+model ContactChannel {
+  id         String   @id @default(uuid())
+  contactId  String
+  agentId    String
+  channel    String // whatsapp_qr | whatsapp_meta | instagram | telegram | messenger | tiktok | website | playground
+  externalId String // telefone, igsid, chat_id, id de visitante
+  createdAt  DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  agent   Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // A chave unica que era de Contact migrou inteira pra ca.
+  @@unique([agentId, channel, externalId])
+  @@index([contactId])
+  @@map("eva_studio_contact_channels")
+}
+
+// Etiqueta (igual "tag" do ManyChat) — o jeito mais simples de segmentar.
+// Aplicar uma etiqueta e o gatilho mais usado pra entrar numa sequencia.
+model Tag {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  color     String   @default("slate")
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contacts     ContactTag[]
+  sequences    Sequence[]   @relation("SequenceTriggerTag")
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@map("eva_studio_tags")
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  addedAt   DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([tagId])
+  @@map("eva_studio_contact_tags")
+}
+
+// Publico salvo. rules e uma lista de condicoes combinadas por "match"
+// (all = E, any = OU): [{ field, op, value }] onde field pode ser um campo
+// da ficha (name/email/phone/optIn/createdAt), "tag" (tem/nao tem a etiqueta)
+// ou "custom:<chave>". A traducao pra consulta Prisma vive em
+// src/lib/server/segments.ts — nada de SQL montado com string.
+model Segment {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  match     String   @default("all") // all | any
+  rules     Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  broadcasts   Broadcast[]
+  sequences    Sequence[]   @relation("SequenceTriggerSegment")
+
+  @@index([orgId])
+  @@map("eva_studio_segments")
+}
+
+// ---------------------------------------------------------------------------
+// Sequencias / drip (§14 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+// Uma regua de mensagens com espera entre elas. O contato entra sozinho
+// (auto-enrollment) quando ganha uma etiqueta ou passa a bater com um
+// segmento, ou entra a mao pela tela de Contatos.
+model Sequence {
+  id               String   @id @default(uuid())
+  agentId          String
+  name             String
+  channel          String   @default("whatsapp_meta")
+  active           Boolean  @default(false)
+  // "tag" = quando a etiqueta triggerTagId e aplicada; "segment" = quando o
+  // contato passa a bater com triggerSegmentId; "manual" = so inscricao a mao.
+  trigger          String   @default("manual") // tag | segment | manual
+  triggerTagId     String?
+  triggerSegmentId String?
+  // Nao reinscreve quem ja passou pela sequencia.
+  allowReentry     Boolean  @default(false)
+  // Sai da sequencia se o contato responder qualquer coisa — o padrao certo
+  // pra follow-up, senao a regua continua cutucando quem ja respondeu.
+  stopOnReply      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  agent          Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  steps          SequenceStep[]
+  enrollments    SequenceEnrollment[]
+  triggerTag     Tag?                 @relation("SequenceTriggerTag", fields: [triggerTagId], references: [id], onDelete: SetNull)
+  triggerSegment Segment?             @relation("SequenceTriggerSegment", fields: [triggerSegmentId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@map("eva_studio_sequences")
+}
+
+// Um passo da regua. delayMinutes conta a partir do passo anterior (ou da
+// inscricao, no passo 1). Fora da janela de 24h o passo precisa de
+// templateId, mesma regra do bloco de Mensagem.
+model SequenceStep {
+  id           String   @id @default(uuid())
+  sequenceId   String
+  order        Int
+  delayMinutes Int      @default(60)
+  text         String   @db.Text
+  templateId   String?
+  // Etiqueta aplicada ao contato quando esse passo e entregue — permite
+  // encadear uma sequencia na outra.
+  applyTagId   String?
+  createdAt    DateTime @default(now())
+
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, order])
+  @@index([sequenceId])
+  @@map("eva_studio_sequence_steps")
+}
+
+// Inscricao de um contato numa sequencia. nextRunAt e o relogio: o worker
+// procura inscricoes ativas com nextRunAt vencido e entrega o proximo passo.
+model SequenceEnrollment {
+  id            String   @id @default(uuid())
+  sequenceId    String
+  contactId     String
+  currentStep   Int      @default(0) // ultimo passo entregue; 0 = nenhum ainda
+  nextRunAt     DateTime
+  status        String   @default("active") // active | done | stopped
+  stoppedReason String? // "respondeu" | "opt-out" | "manual"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, contactId])
+  @@index([status, nextRunAt])
+  @@index([contactId])
+  @@map("eva_studio_sequence_enrollments")
+}
+
+// ---------------------------------------------------------------------------
+// Canal Telegram (§16 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+// Telegram e o canal mais simples que existe: um token de bot do @BotFather,
+// um webhook registrado e pronto — sem App Review, sem janela de 24h, sem
+// modelo aprovado. botToken e cifrado em repouso igual aos tokens da Meta.
+model TelegramConnection {
+  agentId     String   @id
+  botToken    String   @db.Text
+  botUsername String   @default("")
+  webhookSet  Boolean  @default(false)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_telegram_connections")
+}
+
+
+// ---------------------------------------------------------------------------
+// Servidores MCP (Model Context Protocol) — §20 do CHATBOT_ENGINE.md
+// ---------------------------------------------------------------------------
+
+// Um servidor MCP cadastrado pela organizacao. MCP e o protocolo aberto que
+// padroniza "aqui estao minhas ferramentas" — em vez de configurar uma
+// chamada HTTP por integracao, o servidor se apresenta e o agente descobre
+// sozinho o que da pra fazer.
+//
+// Ficam na organizacao, nao no agente: o mesmo servidor normalmente serve
+// varios agentes, e cadastrar a credencial uma vez so e o ponto.
+//
+// authHeader guarda o cabecalho inteiro ja pronto (ex: "Bearer xyz"),
+// cifrado em repouso igual aos outros segredos do app.
+model McpServer {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  url         String
+  authHeader  String   @default("") @db.Text
+  // Ultimo inventario de ferramentas visto, pra tela e Builder mostrarem o
+  // que existe sem ter que bater no servidor a cada render.
+  toolsCache  Json     @default("[]")
+  lastCheckAt DateTime?
+  lastError   String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_mcp_servers")
+}
+
+
+// ---------------------------------------------------------------------------
+// Facebook Messenger (§21 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+// Messenger e o canal mais parecido com o que ja existe: mesma Graph API,
+// mesmo webhook compartilhado (/api/webhooks/meta), so muda o body.object
+// ("page") e o envio (/me/messages com recipient.id em vez de "to").
+//
+// pageId e unico porque o webhook da Meta descobre o agente por ele, do mesmo
+// jeito que o WhatsApp descobre pelo phoneNumberId.
+model MessengerConnection {
+  agentId         String   @id
+  pageId          String   @unique
+  pageAccessToken String   @db.Text
+  pageName        String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_messenger_connections")
+}
+
+// ---------------------------------------------------------------------------
+// TikTok Business Messaging (§22 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+// TikTok usa a Business API (business-api.tiktok.com/open_api/v1.3), com
+// OAuth proprio e token de vida curta: o access token vale ~24h e o refresh
+// ~30 dias, entao a renovacao e parte do funcionamento normal, nao um caso
+// de excecao.
+//
+// Duas travas que nao dependem da gente: a API e restrita por regiao (nao
+// atende conta registrada no EEE, Suica e Reino Unido) e exige aprovacao do
+// app no portal de desenvolvedor.
+model TikTokConnection {
+  agentId       String    @id
+  businessId    String    @unique
+  accessToken   String    @db.Text
+  refreshToken  String    @default("") @db.Text
+  expiresAt     DateTime?
+  displayName   String    @default("")
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_tiktok_connections")
+}
+
+
+// ---------------------------------------------------------------------------
+// CRM de vendas (§24 do CHATBOT_ENGINE.md)
+// ---------------------------------------------------------------------------
+
+model Company {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  // tax_identifier do Atomic CRM; aqui e CNPJ, e state_abbr virou uf.
+  cnpj        String   @default("")
+  sector      String   @default("")
+  size        Int?
+  website     String   @default("")
+  phone       String   @default("")
+  linkedinUrl String   @default("")
+  address     String   @default("")
+  city        String   @default("")
+  uf          String   @default("")
+  zipcode     String   @default("")
+  description String   @default("") @db.Text
+  revenue     String   @default("")
+  logoUrl     String   @default("")
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner        Profile?     @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  contacts     Contact[]
+  deals        Deal[]
+
+  @@index([orgId])
+  @@index([orgId, cnpj])
+  @@map("eva_studio_companies")
+}
+
+// Funil. O Atomic CRM tem um so, com a etapa como texto solto — aqui e
+// entidade pra existir mais de um funil (Vendas, Pos-venda, Recuperacao)
+// com etapas proprias.
+model Pipeline {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  isDefault Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  stages       PipelineStage[]
+  deals        Deal[]
+
+  @@index([orgId])
+  @@map("eva_studio_pipelines")
+}
+
+model PipelineStage {
+  id         String @id @default(uuid())
+  pipelineId String
+  name       String
+  position   Int    @default(0)
+  // Probabilidade padrao da etapa: o negocio herda ao entrar e pode
+  // sobrescrever. E o que faz sair previsao ponderada sem digitar nada.
+  probability Int   @default(0)
+  // "open" | "won" | "lost". Sem isso o sistema nao sabe qual etapa
+  // significa ganho, e nao da pra calcular taxa de conversao.
+  type       String @default("open")
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+
+  @@index([pipelineId])
+  @@map("eva_studio_pipeline_stages")
+}
+
+model Deal {
+  id                String    @id @default(uuid())
+  orgId             String
+  pipelineId        String
+  stageId           String
+  companyId         String?
+  ownerId           String?
+  name              String
+  description       String    @default("") @db.Text
+  category          String    @default("")
+  // Centavos, nao decimal: dinheiro em float e bug esperando acontecer.
+  amountCents       Int       @default(0)
+  currency          String    @default("BRL")
+  probability       Int       @default(0)
+  lostReason        String    @default("")
+  expectedClosingAt DateTime?
+  closedAt          DateTime?
+  archivedAt        DateTime?
+  // Ordem do card dentro da coluna do kanban (o "index" do Atomic CRM).
+  position          Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stage        PipelineStage @relation(fields: [stageId], references: [id])
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  owner        Profile?      @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  contacts     DealContact[]
+  tasks        Task[]
+  notes        Note[]
+
+  @@index([orgId, stageId])
+  @@index([pipelineId])
+  @@index([companyId])
+  @@map("eva_studio_deals")
+}
+
+model DealContact {
+  dealId    String
+  contactId String
+  role      String @default("") // "decisor", "tecnico", "financeiro"...
+
+  deal    Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@id([dealId, contactId])
+  @@index([contactId])
+  @@map("eva_studio_deal_contacts")
+}
+
+// No Atomic CRM a tarefa so amarra em contato e contact_id e obrigatorio.
+// Aqui os dois sao opcionais: tarefa pode ser de um contato, de um negocio
+// ou dos dois.
+model Task {
+  id           String    @id @default(uuid())
+  orgId        String
+  contactId    String?
+  dealId       String?
+  assignedToId String?
+  type         String    @default("ligar") // ligar | email | reuniao | outro
+  text         String    @db.Text
+  dueAt        DateTime?
+  doneAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assignedTo   Profile?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, doneAt, dueAt])
+  @@index([assignedToId, doneAt])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("eva_studio_tasks")
+}
+
+// O Atomic CRM tem contact_notes e deal_notes separadas: e a mesma coisa
+// duas vezes, e toda tela que mostra as duas junta na mao.
+model Note {
+  id          String   @id @default(uuid())
+  orgId       String
+  contactId   String?
+  dealId      String?
+  authorId    String?
+  text        String   @db.Text
+  attachments Json     @default("[]")
+  createdAt   DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author       Profile?     @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, createdAt])
+  @@index([dealId, createdAt])
+  @@map("eva_studio_notes")
 }

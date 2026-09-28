@@ -109,6 +109,93 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     },
   },
   {
+    key: "tool-mcp",
+    paletteLabel: "Ferramenta: MCP",
+    data: {
+      label: "Servidor MCP",
+      kind: "Conecta na porta de baixo de um Agente de IA",
+      detail: "O agente descobre sozinho as ferramentas que o servidor oferece.",
+      mcpServerId: "",
+      mcpTools: [],
+      hasTarget: false,
+    },
+  },
+  {
+    key: "crm-deal",
+    paletteLabel: "CRM: Criar negócio",
+    data: {
+      label: "Criar negócio",
+      kind: "CRM",
+      detail: "Cria um negócio no funil e vincula o contato da conversa.",
+      crmDealName: "Negócio de {nome}",
+      crmDealAmount: "",
+      variableName: "negocio_id",
+    },
+  },
+  {
+    key: "crm-stage",
+    paletteLabel: "CRM: Mover etapa",
+    data: {
+      label: "Mover etapa",
+      kind: "CRM",
+      detail: "Move o negócio aberto do contato para outra etapa do funil.",
+    },
+  },
+  {
+    key: "crm-task",
+    paletteLabel: "CRM: Criar tarefa",
+    data: {
+      label: "Criar tarefa",
+      kind: "CRM",
+      detail: "Cria uma tarefa no inbox do responsável.",
+      crmTaskType: "ligar",
+      crmTaskText: "Retornar contato de {nome}",
+      crmTaskDue: "+1 dia",
+    },
+  },
+  {
+    key: "crm-tag",
+    paletteLabel: "CRM: Etiquetar",
+    data: {
+      label: "Etiquetar contato",
+      kind: "CRM",
+      detail: "Aplica ou remove uma etiqueta. Etiqueta aplicada pode disparar uma sequência.",
+      crmTagAction: "add",
+    },
+  },
+  {
+    key: "crm-note",
+    paletteLabel: "CRM: Registrar nota",
+    data: {
+      label: "Registrar nota",
+      kind: "CRM",
+      detail: "Escreve na linha do tempo do contato.",
+      crmNoteText: "",
+    },
+  },
+  {
+    key: "crm-lookup",
+    paletteLabel: "CRM: Buscar dados",
+    data: {
+      label: "Buscar no CRM",
+      kind: "CRM",
+      detail: "Carrega empresa, negócio e tarefas do contato em variáveis, pra Condição poder ramificar.",
+    },
+  },
+  {
+    key: "tool-crm",
+    paletteLabel: "Ferramenta: CRM",
+    data: {
+      label: "Ferramentas de CRM",
+      kind: "Conecta na porta de baixo de um Agente de IA",
+      detail: "Deixa o agente criar negócio, mover etapa, criar tarefa e etiquetar sozinho.",
+      crmToolActions: ["buscar", "criar_negocio", "criar_tarefa", "etiquetar"],
+      crmAllowedStageIds: [],
+      crmMaxAmount: "",
+      hasTarget: false,
+    },
+  },
+  {
     key: "human",
     paletteLabel: "Transferir p/ humano",
     data: { label: "Transferir p/ humano", kind: "Exceção", detail: "Descreva quando esse bloco deve transferir pra um atendente." },

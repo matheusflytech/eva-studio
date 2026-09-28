@@ -12,7 +12,11 @@ interface CredentialOption {
   createdAt: string;
 }
 
-const TYPE_LABEL: Record<string, string> = { groq: "Groq", resend: "Resend" };
+import { CREDENTIAL_TYPES } from "@/lib/llm-providers";
+
+const TYPE_LABEL: Record<string, string> = Object.fromEntries(
+  CREDENTIAL_TYPES.map((t) => [t.value, t.label])
+);
 
 // Select de credencial (Groq/Resend) com "+ Nova credencial" inline — igual o
 // jeito que o n8n deixa criar uma credencial sem sair do node. A chave em si
@@ -23,7 +27,7 @@ export function CredentialSelect({
   onChange,
   label,
 }: {
-  type: "groq" | "resend";
+  type: string;
   value: string | undefined;
   onChange: (id: string | undefined) => void;
   label: string;

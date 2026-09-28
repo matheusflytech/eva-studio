@@ -11,13 +11,10 @@ import { generateId } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
 import { KeyValueList } from "./key-value-list";
+import { McpToolPicker } from "./mcp-tool-picker";
+import { CrmBlockFields } from "./crm-block-fields";
 
-const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "openai/gpt-oss-120b",
-  "moonshotai/kimi-k2-instruct",
-];
+import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
 
 function TemplateSelect({
   agentId,
@@ -400,9 +397,30 @@ export function NodeInspector({
 
         {iconKey === "ai-agent" && (
           <div className="flex flex-col gap-3">
+            <div>
+              <Label htmlFor="node-ai-provider">Provedor</Label>
+              <Select
+                id="node-ai-provider"
+                value={node.data.aiProvider ?? "groq"}
+                onChange={(e) => {
+                  // Trocar de provedor invalida modelo e credencial: o modelo
+                  // não existe no outro, e a chave é de outro serviço.
+                  const next = getProvider(e.target.value);
+                  onChange({
+                    aiProvider: next.id,
+                    aiModel: next.models[0].id,
+                    aiCredentialId: undefined,
+                  });
+                }}
+              >
+                {LLM_PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </Select>
+            </div>
             <CredentialSelect
-              type="groq"
-              label="Credencial Groq"
+              type={getProvider(node.data.aiProvider).credentialType}
+              label={`Credencial ${getProvider(node.data.aiProvider).label}`}
               value={node.data.aiCredentialId}
               onChange={(id) => onChange({ aiCredentialId: id })}
             />
@@ -410,14 +428,28 @@ export function NodeInspector({
               <Label htmlFor="node-ai-model">Modelo</Label>
               <Select
                 id="node-ai-model"
-                value={node.data.aiModel ?? GROQ_MODELS[0]}
+                value={node.data.aiModel ?? getProvider(node.data.aiProvider).models[0].id}
                 onChange={(e) => onChange({ aiModel: e.target.value })}
               >
-                {GROQ_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                {getProvider(node.data.aiProvider).models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
               </Select>
             </div>
+            {getProvider(node.data.aiProvider).format === "anthropic" && (
+              <div>
+                <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
+                <Select
+                  id="node-ai-effort"
+                  value={node.data.aiEffort ?? "low"}
+                  onChange={(e) => onChange({ aiEffort: e.target.value as "low" | "medium" | "high" })}
+                >
+                  <option value="low">Baixo — resposta rápida (recomendado para chat)</option>
+                  <option value="medium">Médio</option>
+                  <option value="high">Alto — pensa mais, demora mais</option>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
               <Input
@@ -442,6 +474,25 @@ export function NodeInspector({
               usar cada uma. Nas &quot;Variáveis para coletar&quot;, cada linha vira um dado que o agente tenta
               extrair da conversa (o modelo chama uma ferramenta interna sempre que identifica um valor) e pergunta
               ativamente pelo que ainda falta.
+            </p>
+          </div>
+        )}
+
+        {(iconKey.startsWith("crm-") || iconKey === "tool-crm") && (
+          <CrmBlockFields iconKey={iconKey} data={node.data} onChange={onChange} />
+        )}
+
+        {iconKey === "tool-mcp" && (
+          <div className="flex flex-col gap-3">
+            <McpToolPicker
+              serverId={node.data.mcpServerId}
+              selectedTools={node.data.mcpTools ?? []}
+              onChange={onChange}
+            />
+            <p className="text-[11.5px] text-text-tertiary">
+              Conecte este bloco na porta roxa embaixo de um Agente de IA. O agente lê a descrição de cada
+              ferramenta que o servidor anuncia e decide sozinho quando chamar cada uma — você não precisa
+              configurar parâmetro nenhum aqui.
             </p>
           </div>
         )}

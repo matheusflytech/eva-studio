@@ -3,7 +3,9 @@ import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
 import { encryptSecret } from "@/lib/server/crypto";
 
-const VALID_TYPES = ["groq", "resend"];
+import { CREDENTIAL_TYPES } from "@/lib/llm-providers";
+
+const VALID_TYPES = CREDENTIAL_TYPES.map((t) => t.value);
 
 // Nunca devolve o segredo decifrado — só metadado (id/nome/tipo/data), pra
 // popular os Selects de "qual credencial usar" nos blocos do Builder.
@@ -28,7 +30,10 @@ export async function POST(request: Request) {
 
   const { name, type, secret } = await request.json();
   if (!name?.trim() || !VALID_TYPES.includes(type) || !secret?.trim()) {
-    return NextResponse.json({ error: "name, type (groq|resend) e secret são obrigatórios." }, { status: 400 });
+    return NextResponse.json(
+      { error: `name, type (${VALID_TYPES.join("|")}) e secret são obrigatórios.` },
+      { status: 400 }
+    );
   }
 
   const credential = await prisma.credential.create({

@@ -52,10 +52,14 @@ export interface FlowNodeData {
   emailTo?: string;
   emailSubject?: string;
   emailBody?: string;
-  // Bloco Agente de IA nativo (via credencial Groq) — "detail" é reaproveitado
-  // como o system prompt/instruções.
+  // Bloco Agente de IA nativo — "detail" é reaproveitado como o system
+  // prompt/instruções. Provedor vazio = Groq, que era o único antes do
+  // multi-LLM (mantém fluxo antigo funcionando sem migração).
+  aiProvider?: string;
   aiCredentialId?: string;
   aiModel?: string;
+  // Só a Anthropic expõe controle de esforço; os outros provedores ignoram.
+  aiEffort?: "low" | "medium" | "high";
   // Quantas mensagens anteriores da conversa entram no contexto (janela
   // deslizante, sem sumarização — ver runAiAgent em flow-engine.ts).
   aiMemoryWindow?: number;
@@ -63,6 +67,32 @@ export interface FlowNodeData {
   // nome da variável, valor = descrição/como reconhecer) — reaproveita
   // KeyValueRow em vez de um tipo novo.
   collectVars?: KeyValueRow[];
+  // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
+  // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
+  mcpServerId?: string;
+  mcpTools?: string[];
+  // ── Blocos de CRM ──────────────────────────────────────────────────────
+  // Funil e etapa escolhidos em seletor, nunca digitados: id de etapa em
+  // campo de texto é erro garantido depois que alguém renomeia a coluna.
+  crmPipelineId?: string;
+  crmStageId?: string;
+  crmDealName?: string;
+  crmDealAmount?: string; // aceita {variavel}, convertido em centavos no motor
+  crmDealDescription?: string;
+  crmTaskType?: string;
+  crmTaskText?: string;
+  crmTaskDue?: string; // prazo relativo: "+2 dias", "3h"
+  crmTaskAssigneeId?: string;
+  crmTagId?: string;
+  crmTagAction?: "add" | "remove";
+  crmNoteText?: string;
+  crmLostReason?: string;
+  // ── Ferramenta de CRM para o Agente de IA ─────────────────────────────
+  // Sem essas três travas, IA com permissão de escrita no CRM vira geradora
+  // de lixo: fecha negócio como Ganho porque a conversa foi simpática.
+  crmToolActions?: string[];     // verbos liberados
+  crmAllowedStageIds?: string[]; // etapas para onde a IA pode mover
+  crmMaxAmount?: string;         // teto de valor; acima disso, só cria marcado para revisão
   [key: string]: unknown;
 }
 
@@ -105,6 +135,15 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
       </p>
     );
   }
+  if (data.iconKey === "tool-mcp") {
+    const count = (data.mcpTools ?? []).length;
+    return (
+      <p className="truncate text-[11px] text-text-tertiary">
+        {count > 0 ? `${count} ferramenta(s) selecionada(s)` : "todas as ferramentas do servidor"}
+      </p>
+    );
+  }
+
   if (data.iconKey === "tool-knowledge") {
     return <p className="mt-2 text-[11px] text-text-tertiary">Busca na base de conhecimento do agente</p>;
   }
@@ -139,6 +178,8 @@ function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: str
   );
 }
 
+import { validateNode } from "./block-validation";
+
 const HANDLE_DOT = "!h-2.5 !w-2.5 !border-2 !border-surface-1 !bg-border-strong";
 
 export function FlowNode({
@@ -154,7 +195,14 @@ export function FlowNode({
   const style = BLOCK_STYLES[data.iconKey] ?? BLOCK_STYLES.message;
   const isCondition = data.iconKey === "condition";
   const isAiAgent = data.iconKey === "ai-agent";
-  const isTool = data.iconKey === "tool-http" || data.iconKey === "tool-knowledge";
+  const isTool =
+    data.iconKey === "tool-http" ||
+    data.iconKey === "tool-knowledge" ||
+    data.iconKey === "tool-mcp" ||
+    data.iconKey === "tool-crm";
+  // Motivo pelo qual o bloco não vai funcionar, se houver. Aparece como um
+  // ponto âmbar no card e o texto ao passar o mouse.
+  const problema = validateNode(data);
   const options = data.iconKey === "capture" ? data.options ?? [] : [];
   const isMenu = options.length > 0;
   const editableDetail = onDetailChange && data.iconKey !== "condition" && data.iconKey !== "start";
@@ -162,11 +210,21 @@ export function FlowNode({
   return (
     <div
       className={cn(
-        "glass-card w-[230px] cursor-pointer rounded-2xl border-l-[3px] p-3.5 transition-colors",
+        "glass-card relative w-[230px] cursor-pointer rounded-2xl border-l-[3px] p-3.5 transition-colors",
         style.border,
-        selected ? "border-border-strong ring-1 ring-white/15" : "border-border-subtle"
+        selected ? "border-border-strong ring-1 ring-white/15" : "border-border-subtle",
+        problema && !selected && "ring-1 ring-amber-400/35"
       )}
     >
+      {problema && (
+        <span
+          title={problema}
+          aria-label={problema}
+          className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-black"
+        >
+          !
+        </span>
+      )}
       {/* Fluxo principal: horizontal (esquerda→direita), igual n8n. Ferramentas
           de um Agente de IA são a exceção — continuam verticais (porta embaixo),
           mesma convenção do n8n pros sub-inputs de IA (modelo/ferramenta/memória). */}

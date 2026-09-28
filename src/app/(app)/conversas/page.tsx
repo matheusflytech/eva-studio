@@ -4,6 +4,7 @@ import * as React from "react";
 import { MessageSquare, UserCheck, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn, formatRelativeDate } from "@/lib/utils";
 
@@ -14,6 +15,7 @@ interface ConversationSummary {
   channel: string;
   contactId: string;
   status: string;
+  assignedTo: { id: string; name: string } | null;
   updatedAt: string;
   lastContactMessageAt: string | null;
   lastMessage: { text: string; role: string; createdAt: string } | null;
@@ -26,7 +28,16 @@ interface Message {
   createdAt: string;
 }
 
+interface Member {
+  id: string;
+  name: string;
+  isMe: boolean;
+}
+
 const CHANNEL_LABEL: Record<string, string> = {
+  telegram: "Telegram",
+  messenger: "Messenger",
+  tiktok: "TikTok",
   playground: "Playground",
   whatsapp_qr: "WhatsApp (QR)",
   whatsapp_meta: "WhatsApp (Meta)",
@@ -59,6 +70,36 @@ export default function ConversasPage() {
   const [draft, setDraft] = React.useState("");
   const [isSending, setIsSending] = React.useState(false);
   const [isResuming, setIsResuming] = React.useState(false);
+  // Quem pode assumir uma conversa = membros da organização. Carregado uma
+  // vez: a lista muda raramente e é a mesma pra todas as conversas.
+  const [members, setMembers] = React.useState<Member[]>([]);
+  const [isAssigning, setIsAssigning] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/members")
+      .then((r) => r.json())
+      .then((d) => setMembers(d.members ?? []))
+      .catch(() => setMembers([]));
+  }, []);
+
+  async function handleAssign(conversationId: string, assignedToId: string | null) {
+    setIsAssigning(true);
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedToId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setConversations((prev) =>
+          (prev ?? []).map((c) => (c.id === conversationId ? { ...c, assignedTo: data.assignedTo } : c))
+        );
+      }
+    } finally {
+      setIsAssigning(false);
+    }
+  }
 
   const load = React.useCallback(async () => {
     const res = await fetch("/api/conversations");
@@ -180,6 +221,22 @@ export default function ConversasPage() {
             </div>
             <div className="flex items-center gap-2">
               {windowLabel(selected) && <Badge variant={windowLabel(selected)!.variant}>{windowLabel(selected)!.text}</Badge>}
+              {/* Sem atribuição, dois atendentes respondem a mesma pessoa —
+                  é o primeiro problema de qualquer caixa compartilhada. */}
+              <Select
+                aria-label="Responsável pela conversa"
+                className="h-8 w-[160px] text-[12.5px]"
+                value={selected.assignedTo?.id ?? ""}
+                disabled={isAssigning}
+                onChange={(e) => handleAssign(selected.id, e.target.value || null)}
+              >
+                <option value="">Sem responsável</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.isMe ? `${m.name} (você)` : m.name}
+                  </option>
+                ))}
+              </Select>
               {selected.status === "waiting_human" && (
                 <Button type="button" variant="secondary" size="sm" onClick={() => handleResume(selected.id)} disabled={isResuming}>
                   <PlayCircle size={13} /> {isResuming ? "Retomando..." : "Retomar bot"}

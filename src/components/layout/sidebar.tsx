@@ -17,6 +17,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Users,
+  Contact,
+  Repeat,
+  Building2,
+  Handshake,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarNavItem } from "./sidebar-nav-item";
@@ -50,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/agent-studio", label: "Eva Studio", icon: Aperture, animated: true },
       { href: "/aprovacoes", label: "Aprovações", icon: CheckCheck },
       { href: "/disparos", label: "Disparos", icon: Send },
+      { href: "/sequencias", label: "Sequências", icon: Repeat },
     ],
   },
   {
@@ -58,6 +64,15 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/memory-base", label: "Memory base", icon: LayoutGrid },
       { href: "/biblioteca", label: "Biblioteca", icon: BookOpen },
       { href: "/integracoes", label: "Integrações", icon: Plug },
+    ],
+  },
+  {
+    label: "CRM",
+    items: [
+      { href: "/contatos", label: "Contatos", icon: Contact },
+      { href: "/empresas", label: "Empresas", icon: Building2 },
+      { href: "/negocios", label: "Negócios", icon: Handshake },
+      { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
     ],
   },
   {

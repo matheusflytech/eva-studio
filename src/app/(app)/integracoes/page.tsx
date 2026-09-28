@@ -3,6 +3,8 @@
 import { MessageCircle, AtSign, Globe, Mail, Calendar, Users, FileSpreadsheet } from "lucide-react";
 import { IntegrationCard } from "@/components/integrations/integration-card";
 import { CredentialsPanel } from "@/components/integrations/credentials-panel";
+import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
+import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 
 const CHANNELS = [
   { id: "whatsapp", icon: MessageCircle, name: "WhatsApp Business", description: "Recebe e responde conversas do WhatsApp." },
@@ -47,6 +49,12 @@ export default function IntegracoesPage() {
       </div>
 
       <CredentialsPanel />
+
+      <div className="mt-8">
+        <McpServersPanel />
+
+        <ApiKeysPanel />
+      </div>
     </div>
   );
 }

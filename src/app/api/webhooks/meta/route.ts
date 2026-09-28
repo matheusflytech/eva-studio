@@ -211,6 +211,67 @@ async function handleMatchedComment(
   await prisma.commentAutomation.update({ where: { id: automationId }, data: { triggerCount: { increment: 1 } } });
 }
 
+// Messenger usa /me/messages com recipient.id, não o "to" do WhatsApp — é a
+// diferença de formato entre os dois produtos dentro da mesma Graph API.
+async function sendMessengerMessage(pageAccessToken: string, to: string, text: string) {
+  await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: { id: to },
+      messaging_type: "RESPONSE",
+      message: { text },
+    }),
+  });
+}
+
+interface MessengerEvent {
+  sender?: { id?: string };
+  message?: { text?: string; is_echo?: boolean };
+  postback?: { payload?: string };
+}
+
+// Entradas do Messenger (body.object === "page"). A entry.id é o id da
+// Página, que é como a conexão do agente é descoberta — mesmo papel que o
+// phone_number_id tem no WhatsApp e o igBusinessId no Instagram.
+async function handleMessengerEntries(entries: unknown[]) {
+  for (const entry of entries as { id?: string; messaging?: MessengerEvent[] }[]) {
+    const pageId = entry.id;
+    if (!pageId) continue;
+
+    const connection = await prisma.messengerConnection.findUnique({ where: { pageId } });
+    if (!connection) continue;
+    const token = decryptSecret(connection.pageAccessToken);
+
+    for (const event of entry.messaging ?? []) {
+      const from = event.sender?.id;
+      // is_echo é a própria Página aparecendo no webhook ao enviar; entrar no
+      // fluxo com isso faria o bot conversar sozinho.
+      if (!from || event.message?.is_echo) continue;
+
+      const text = event.message?.text;
+      // Botão tocado: o payload carrega o id da opção do bloco de Captura.
+      const optionId = event.postback?.payload;
+      if (!text && !optionId) continue;
+
+      try {
+        const result = await advanceConversation({
+          agentId: connection.agentId,
+          channel: "messenger",
+          contactId: from,
+          text,
+          optionId,
+        });
+        for (const reply of result.messages) {
+          await sendMessengerMessage(token, from, reply.text);
+        }
+      } catch {
+        // Falha isolada por mensagem não derruba o resto do lote.
+      }
+    }
+  }
+}
+
 async function handleInstagramEntries(entries: unknown[]) {
   for (const entry of entries as {
     id?: string;
@@ -302,11 +363,13 @@ export async function POST(request: Request) {
   }
   const entries = body?.entry ?? [];
 
-  // WhatsApp manda object: "whatsapp_business_account"; Instagram manda
-  // object: "instagram" — mesmo webhook, payloads diferentes (ver §9 do
-  // CHATBOT_ENGINE.md).
+  // Um webhook, três produtos: WhatsApp manda object "whatsapp_business_account",
+  // Instagram manda "instagram" e Messenger manda "page" — mesma Graph API,
+  // payloads e formas de envio diferentes (§9 e §21 do CHATBOT_ENGINE.md).
   if (body?.object === "instagram") {
     await handleInstagramEntries(entries);
+  } else if (body?.object === "page") {
+    await handleMessengerEntries(entries);
   } else {
     await handleWhatsAppEntries(entries);
   }

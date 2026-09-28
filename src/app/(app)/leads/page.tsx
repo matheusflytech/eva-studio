@@ -1,11 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Download, X, Mail, Phone, Plus, Trash2, Code2, MessageCircle, Smartphone } from "lucide-react";
+import {
+  Download, X, Mail, Phone, Plus, Trash2, Code2, MessageCircle, Smartphone,
+  MoreHorizontal, Zap, ChevronDown, ChevronRight, Inbox,
+} from "lucide-react";
+import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { cn, formatRelativeDate, generateId } from "@/lib/utils";
 
@@ -28,6 +35,22 @@ interface Message {
   createdAt: string;
 }
 
+interface FlowStep {
+  nodeId: string;
+  kind: string;
+  label: string;
+  output?: string;
+  error?: string;
+  ms: number;
+}
+
+interface FlowExecutionRow {
+  id: string;
+  status: "success" | "error";
+  steps: FlowStep[];
+  createdAt: string;
+}
+
 const STAGES = ["novo", "contatado", "qualificado", "ganho", "perdido"] as const;
 
 const STAGE_LABEL: Record<string, string> = {
@@ -38,13 +61,39 @@ const STAGE_LABEL: Record<string, string> = {
   perdido: "Perdido",
 };
 
-const STAGE_DOT: Record<string, string> = {
-  novo: "bg-text-tertiary",
-  contatado: "bg-ice",
-  qualificado: "bg-accent-400",
-  ganho: "bg-emerald-400",
-  perdido: "bg-danger",
+// Só um ponto discreto por estágio no cabeçalho da coluna — sem barra de cor
+// decorativa (esse padrão de "faixa colorida no topo do card" é exatamente o
+// que faz uma tela parecer "gerada", não desenhada). Neutro por padrão,
+// destaque reservado só pra Ganho/Perdido, que são os dois estados que
+// realmente importa bater o olho e reconhecer.
+const STAGE_ACCENT: Record<string, { dot: string; ring: string }> = {
+  novo: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
+  contatado: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
+  qualificado: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
+  ganho: { dot: "bg-emerald-400", ring: "ring-emerald-400/40" },
+  perdido: { dot: "bg-danger", ring: "ring-danger/40" },
 };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Avatar monocromático (cinza neutro) — nada de cor por hash do nome. Uma
+// tela com "toda pessoa tem uma cor diferente" é bonita numa demo e cansativa
+// no uso real; enterprise de verdade (Linear, Stripe) usa uma cor só.
+function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-surface-3 font-semibold text-text-secondary"
+      style={{ width: size, height: size, fontSize: size * 0.36 }}
+    >
+      {initials(name)}
+    </span>
+  );
+}
 
 function pick(vars: Record<string, unknown>, candidates: string[]): string | null {
   for (const key of candidates) {
@@ -62,6 +111,9 @@ function leadEmail(lead: Lead): string | null {
 }
 function leadPhone(lead: Lead): string | null {
   return pick(lead.variables, ["telefone", "telefone_cliente", "phone", "whatsapp"]);
+}
+function capturedVarCount(lead: Lead): number {
+  return Object.keys(lead.variables ?? {}).filter((k) => !k.startsWith("__")).length;
 }
 
 // Cada canal de captura usa seu próprio prefixo de contactId (ver
@@ -95,51 +147,173 @@ function exportCsv(leads: Lead[]) {
   URL.revokeObjectURL(url);
 }
 
-function LeadCard({
-  lead, onOpen, onDragStart, selected, onToggleSelect,
+function LeadCardContent({
+  lead, anySelected, selected, onToggleSelect,
 }: {
-  lead: Lead; onOpen: () => void; onDragStart: (e: React.DragEvent) => void; selected: boolean; onToggleSelect: () => void;
+  lead: Lead; anySelected: boolean; selected: boolean; onToggleSelect?: (e: React.MouseEvent) => void;
 }) {
   const email = leadEmail(lead);
   const phone = leadPhone(lead);
   const source = leadSource(lead);
   const SourceIcon = SOURCE_ICON[source];
+  const varCount = capturedVarCount(lead);
+  const name = leadName(lead);
+
+  return (
+    <>
+      <div className="flex items-start gap-2.5">
+        <Avatar name={name} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-text-primary">{name}</p>
+          <p className="text-[10.5px] text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</p>
+        </div>
+        <span
+          onClick={onToggleSelect}
+          className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-opacity",
+            selected ? "border-accent-500 bg-accent-500 text-white opacity-100" : "border-border-default opacity-0 group-hover:opacity-100",
+            anySelected && "opacity-100"
+          )}
+        >
+          {selected && <span className="text-[10px] leading-none">✓</span>}
+        </span>
+      </div>
+
+      {(email || phone) && (
+        <div className="mt-2 flex flex-col gap-1">
+          {email && (
+            <p className="flex items-center gap-1.5 truncate text-[11px] text-text-tertiary">
+              <Mail size={10.5} /> {email}
+            </p>
+          )}
+          {phone && (
+            <p className="flex items-center gap-1.5 truncate text-[11px] text-text-tertiary">
+              <Phone size={10.5} /> {phone}
+            </p>
+          )}
+        </div>
+      )}
+
+      {lead.lastMessage && (
+        <p className="mt-2 line-clamp-2 text-[11.5px] leading-snug text-text-secondary">
+          {lead.lastMessage.text}
+        </p>
+      )}
+
+      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border-subtle pt-2">
+        <span className="flex items-center gap-1 text-[10.5px] text-text-tertiary">
+          <SourceIcon size={11} /> {SOURCE_LABEL[source]}
+        </span>
+        {varCount > 0 && (
+          <span className="shrink-0 text-[10.5px] text-text-tertiary">
+            {varCount} dado{varCount === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+    </>
+  );
+}
+
+function DraggableLeadCard({
+  lead, onOpen, selected, onToggleSelect, anySelected,
+}: {
+  lead: Lead; onOpen: () => void; selected: boolean; onToggleSelect: () => void; anySelected: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id, data: { lead } });
+
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{ transform: transform ? CSS.Translate.toString(transform) : undefined, opacity: isDragging ? 0.35 : 1 }}
       onClick={onOpen}
+      className="group flex cursor-grab flex-col rounded-2xl border border-border-default bg-surface-2 p-3 shadow-sm transition-colors hover:border-border-strong hover:shadow-md active:cursor-grabbing"
+    >
+      <LeadCardContent
+        lead={lead}
+        selected={selected}
+        anySelected={anySelected}
+        onToggleSelect={(e) => {
+          e.stopPropagation();
+          onToggleSelect();
+        }}
+      />
+    </div>
+  );
+}
+
+function DroppableColumn({ stage, isOver, children }: { stage: string; isOver: boolean; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: stage });
+  const accent = STAGE_ACCENT[stage];
+  return (
+    <div
+      ref={setNodeRef}
       className={cn(
-        "flex cursor-grab flex-col gap-1.5 rounded-2xl border p-3 transition-colors hover:border-border-strong active:cursor-grabbing",
-        selected ? "border-accent-500 bg-accent-soft" : "border-border-default bg-surface-2"
+        "glass-card relative flex w-[272px] shrink-0 flex-col overflow-hidden rounded-3xl p-3 transition-shadow",
+        isOver && `ring-2 ${accent.ring}`
       )}
     >
-      <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={selected}
-          onClick={(e) => e.stopPropagation()}
-          onChange={onToggleSelect}
-          className="mt-1 h-3.5 w-3.5 shrink-0 accent-accent-500"
-        />
-        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-text-primary">{leadName(lead)}</p>
-      </div>
-      {email && (
-        <p className="flex items-center gap-1.5 truncate text-[11.5px] text-text-tertiary">
-          <Mail size={11} /> {email}
-        </p>
-      )}
-      {phone && (
-        <p className="flex items-center gap-1.5 truncate text-[11.5px] text-text-tertiary">
-          <Phone size={11} /> {phone}
-        </p>
-      )}
-      {lead.lastMessage && <p className="truncate text-[12px] text-text-secondary">{lead.lastMessage.text}</p>}
-      <div className="flex items-center justify-between gap-2">
-        <Badge variant={source === "chat" ? "accent" : source === "form" ? "success" : "neutral"} className="text-[10px]">
-          <SourceIcon size={10} /> {SOURCE_LABEL[source]}
-        </Badge>
-        <p className="shrink-0 text-[10.5px] text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</p>
+      {children}
+    </div>
+  );
+}
+
+function LeadExecutions({ agentId, contactId }: { agentId: string; contactId: string }) {
+  const [executions, setExecutions] = React.useState<FlowExecutionRow[] | null>(null);
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const conversationId = `website:${contactId}`;
+    fetch(`/api/agents/${agentId}/executions?conversationId=${encodeURIComponent(conversationId)}&limit=5`)
+      .then((res) => res.json())
+      .then((data) => setExecutions(data.executions ?? []))
+      .catch(() => setExecutions([]));
+  }, [agentId, contactId]);
+
+  if (!executions || executions.length === 0) return null;
+
+  return (
+    <div className="mt-5">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+        <Zap size={11} /> O que a IA fez nessa conversa
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {executions.map((exec) => {
+          const expanded = expandedId === exec.id;
+          return (
+            <div key={exec.id} className="rounded-xl border border-border-subtle bg-surface-3/60">
+              <button
+                type="button"
+                onClick={() => setExpandedId(expanded ? null : exec.id)}
+                className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+              >
+                {expanded ? <ChevronDown size={12} className="shrink-0 text-text-tertiary" /> : <ChevronRight size={12} className="shrink-0 text-text-tertiary" />}
+                <span className={cn("text-[11px] font-medium", exec.status === "success" ? "text-emerald-400" : "text-danger")}>
+                  {exec.status === "success" ? "Sucesso" : "Erro"}
+                </span>
+                <span className="text-[10.5px] text-text-tertiary">
+                  {exec.steps.length} passo{exec.steps.length === 1 ? "" : "s"}
+                </span>
+                <span className="ml-auto shrink-0 text-[10.5px] text-text-tertiary">{formatRelativeDate(exec.createdAt)}</span>
+              </button>
+              {expanded && (
+                <div className="flex flex-col gap-1.5 border-t border-border-subtle p-2.5">
+                  {exec.steps.map((step, i) => (
+                    <div key={`${step.nodeId}-${i}`} className="text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-text-secondary">{step.label}</span>
+                        <span className="text-text-tertiary">{step.ms}ms</span>
+                      </div>
+                      {step.output && <p className="truncate text-text-tertiary">{step.output}</p>}
+                      {step.error && <p className="truncate text-danger">{step.error}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -147,6 +321,7 @@ function LeadCard({
 
 function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void }) {
   const [messages, setMessages] = React.useState<Message[]>([]);
+  const name = leadName(lead);
 
   React.useEffect(() => {
     fetch(`/api/conversations/${lead.id}/messages`)
@@ -156,16 +331,25 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card glass-card-solid flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl" onClick={(e) => e.stopPropagation()}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.15 }}
+        className="glass-card glass-card-solid flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-[14px] font-medium text-text-primary">{leadName(lead)}</p>
-              <Badge variant={leadSource(lead) === "chat" ? "accent" : leadSource(lead) === "form" ? "success" : "neutral"} className="text-[10px]">
-                {SOURCE_LABEL[leadSource(lead)]}
-              </Badge>
+          <div className="flex items-center gap-3">
+            <Avatar name={name} size={38} />
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-[14px] font-medium text-text-primary">{name}</p>
+                <Badge variant="neutral" className="text-[10px]">
+                  {SOURCE_LABEL[leadSource(lead)]}
+                </Badge>
+              </div>
+              <p className="text-[11.5px] text-text-tertiary">{lead.agentName} · {formatRelativeDate(lead.createdAt)}</p>
             </div>
-            <p className="text-[11.5px] text-text-tertiary">{lead.agentName} · {formatRelativeDate(lead.createdAt)}</p>
           </div>
           <div className="flex items-center gap-1.5">
             {STAGES.map((s) => (
@@ -195,22 +379,23 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
           </div>
         </div>
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[220px] shrink-0 overflow-y-auto border-r border-border-subtle p-4">
+          <div className="w-[240px] shrink-0 overflow-y-auto border-r border-border-subtle p-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Dados capturados</p>
-            {Object.keys(lead.variables ?? {}).filter((k) => !k.startsWith("__")).length === 0 ? (
+            {capturedVarCount(lead) === 0 ? (
               <p className="text-[12px] text-text-tertiary">Nenhum dado capturado ainda.</p>
             ) : (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
                 {Object.entries(lead.variables ?? {})
                   .filter(([key]) => !key.startsWith("__"))
                   .map(([key, value]) => (
-                    <div key={key}>
-                      <p className="text-[10.5px] uppercase tracking-wide text-text-tertiary">{key}</p>
-                      <p className="text-[13px] text-text-primary">{String(value)}</p>
+                    <div key={key} className="rounded-lg border border-border-subtle bg-surface-2 px-2.5 py-1.5">
+                      <p className="text-[10px] uppercase tracking-wide text-text-tertiary">{key}</p>
+                      <p className="truncate text-[12.5px] text-text-primary">{String(value)}</p>
                     </div>
                   ))}
               </div>
             )}
+            <LeadExecutions agentId={lead.agentId} contactId={lead.contactId} />
           </div>
           <div className="flex-1 overflow-y-auto p-5">
             <div className="flex flex-col gap-3">
@@ -218,7 +403,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
                 <div key={m.id} className={cn("flex", m.role === "contact" ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
+                      "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-sm",
                       m.role === "contact" ? "bg-accent-500 text-white" : "border border-border-subtle bg-surface-2 text-text-primary"
                     )}
                   >
@@ -229,7 +414,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -379,17 +564,17 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
       <div className="glass-card glass-card-solid flex w-full max-w-lg flex-col gap-3 rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-[15px] font-semibold text-text-primary">
-            Adicionar lead via API {stage && <span className="text-text-tertiary">— direto em &quot;{STAGE_LABEL[stage]}&quot;</span>}
+            Adicionar lead via API {stage && <span className="text-text-tertiary">(direto em &quot;{STAGE_LABEL[stage]}&quot;)</span>}
           </p>
           <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
             <X size={16} />
           </button>
         </div>
         <p className="text-[12.5px] text-text-secondary">
-          Pra mandar lead de um n8n, formulário externo, etc. — mesmo <code className="font-mono">INTERNAL_API_SECRET</code> que
+          Pra mandar lead de um n8n, formulário externo, etc., use o mesmo <code className="font-mono">INTERNAL_API_SECRET</code> que
           já está no seu <code className="font-mono">.env.local</code>. <code className="font-mono">variables</code> aceita
           qualquer campo, não só os do exemplo. Cada etapa do funil tem seu próprio valor de{" "}
-          <code className="font-mono">leadStage</code> — clique no ícone <code className="font-mono">{"</>"}</code> de outra
+          <code className="font-mono">leadStage</code>, clique no ícone <code className="font-mono">{"</>"}</code> de outra
           coluna do Kanban pra pegar o exemplo já configurado pra ela.
         </p>
         <div className="grid grid-cols-5 gap-1.5">
@@ -417,11 +602,14 @@ export default function LeadsPage() {
   const [leads, setLeads] = React.useState<Lead[] | null>(null);
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
-  const [dragOverStage, setDragOverStage] = React.useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = React.useState<string | null>(null);
+  const [overStage, setOverStage] = React.useState<string | null>(null);
   const [showNewLead, setShowNewLead] = React.useState(false);
   const [apiInfoStage, setApiInfoStage] = React.useState<(typeof STAGES)[number] | null>(null);
   const [sourceFilter, setSourceFilter] = React.useState<LeadSource | "all">("all");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const load = React.useCallback(async () => {
     const res = await fetch("/api/leads");
@@ -470,6 +658,25 @@ export default function LeadsPage() {
     await Promise.all(ids.map((id) => fetch(`/api/leads/${id}`, { method: "DELETE" })));
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDragId(String(event.active.id));
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    setOverStage(event.over ? String(event.over.id) : null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const id = String(event.active.id);
+    const stage = event.over ? String(event.over.id) : null;
+    setActiveDragId(null);
+    setOverStage(null);
+    if (stage && STAGES.includes(stage as (typeof STAGES)[number])) {
+      const current = leads?.find((l) => l.id === id);
+      if (current && (current.leadStage || "novo") !== stage) handleStageChange(id, stage);
+    }
+  }
+
   if (leads === null) return <div className="flex-1 p-8" />;
 
   const filtered = leads.filter((l) => {
@@ -479,17 +686,19 @@ export default function LeadsPage() {
   });
 
   const opened = leads.find((l) => l.id === openId) ?? null;
+  const activeLead = leads.find((l) => l.id === activeDragId) ?? null;
+  const anySelected = selectedIds.size > 0;
 
   return (
     <div className="flex flex-1 flex-col p-8">
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Leads</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contatos capturados pelo chat e pelo formulário do seu site — arraste entre colunas pra mudar o estágio.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contatos capturados pelo chat e pelo formulário do seu site. Arraste entre colunas pra mudar o estágio.</p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedIds.size > 0 && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleBulkDelete} className="text-danger">
+          {anySelected && (
+            <Button type="button" variant="danger" size="sm" onClick={handleBulkDelete}>
               <Trash2 size={14} /> Excluir {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
             </Button>
           )}
@@ -500,75 +709,89 @@ export default function LeadsPage() {
             <option value="manual">{SOURCE_LABEL.manual}</option>
           </Select>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-[200px]" />
-          <Button type="button" variant="secondary" size="sm" onClick={() => setApiInfoStage("novo")}>
-            <Code2 size={14} /> Via API
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => exportCsv(filtered)}>
-            <Download size={14} /> Exportar CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" title="Mais ações">
+                <MoreHorizontal size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setApiInfoStage("novo")}>
+                <Code2 size={14} /> Adicionar via API
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => exportCsv(filtered)}>
+                <Download size={14} /> Exportar CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button type="button" size="sm" onClick={() => setShowNewLead(true)}>
             <Plus size={14} /> Novo lead
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
-        {STAGES.map((stage) => {
-          const stageLeads = filtered.filter((l) => (l.leadStage || "novo") === stage);
-          return (
-            <div
-              key={stage}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOverStage(stage);
-              }}
-              onDragLeave={() => setDragOverStage((s) => (s === stage ? null : s))}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverStage(null);
-                const id = e.dataTransfer.getData("text/plain");
-                if (id) handleStageChange(id, stage);
-              }}
-              className={cn(
-                "glass-card flex w-[264px] shrink-0 flex-col rounded-3xl p-3 transition-colors",
-                dragOverStage === stage && "ring-2 ring-accent-500/50"
-              )}
-            >
-              <div className="mb-2 flex items-center gap-2 px-1">
-                <span className={cn("h-2 w-2 rounded-full", STAGE_DOT[stage])} />
-                <p className="text-[12.5px] font-semibold text-text-primary">{STAGE_LABEL[stage]}</p>
-                <button
-                  type="button"
-                  onClick={() => setApiInfoStage(stage)}
-                  title={`Criar via API direto em "${STAGE_LABEL[stage]}"`}
-                  className="rounded p-0.5 text-text-tertiary hover:text-accent-400"
-                >
-                  <Code2 size={12} />
-                </button>
-                <Badge variant="neutral" className="ml-auto">{stageLeads.length}</Badge>
-              </div>
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-                {stageLeads.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border-default p-4 text-center text-[11.5px] text-text-tertiary">
-                    Nenhum lead aqui ainda.
-                  </p>
-                ) : (
-                  stageLeads.map((lead) => (
-                    <LeadCard
-                      key={lead.id}
-                      lead={lead}
-                      onOpen={() => setOpenId(lead.id)}
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", lead.id)}
-                      selected={selectedIds.has(lead.id)}
-                      onToggleSelect={() => toggleSelect(lead.id)}
-                    />
-                  ))
-                )}
-              </div>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
+          {STAGES.map((stage) => {
+            const stageLeads = filtered.filter((l) => (l.leadStage || "novo") === stage);
+            const accent = STAGE_ACCENT[stage];
+            return (
+              <DroppableColumn key={stage} stage={stage} isOver={overStage === stage}>
+                <div className="mb-2 flex items-center gap-2 px-1">
+                  <span className={cn("h-2 w-2 rounded-full", accent.dot)} />
+                  <p className="text-[12.5px] font-semibold text-text-primary">{STAGE_LABEL[stage]}</p>
+                  <button
+                    type="button"
+                    onClick={() => setApiInfoStage(stage)}
+                    title={`Criar via API direto em "${STAGE_LABEL[stage]}"`}
+                    className="rounded p-0.5 text-text-tertiary hover:text-accent-400"
+                  >
+                    <Code2 size={12} />
+                  </button>
+                  <Badge variant="neutral" className="ml-auto">{stageLeads.length}</Badge>
+                </div>
+                <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+                  <AnimatePresence initial={false}>
+                    {stageLeads.length === 0 ? (
+                      <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-border-default p-6 text-center">
+                        <Inbox size={16} className="text-text-tertiary" />
+                        <p className="text-[11.5px] text-text-tertiary">Nenhum lead aqui ainda.</p>
+                      </div>
+                    ) : (
+                      stageLeads.map((lead) => (
+                        <motion.div
+                          key={lead.id}
+                          layout
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.96 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <DraggableLeadCard
+                            lead={lead}
+                            onOpen={() => setOpenId(lead.id)}
+                            selected={selectedIds.has(lead.id)}
+                            onToggleSelect={() => toggleSelect(lead.id)}
+                            anySelected={anySelected}
+                          />
+                        </motion.div>
+                      ))
+                    )}
+                  </AnimatePresence>
+                </div>
+              </DroppableColumn>
+            );
+          })}
+        </div>
+
+        <DragOverlay>
+          {activeLead && (
+            <div className="w-[272px] rotate-2 rounded-2xl border border-border-strong bg-surface-2 p-3 shadow-2xl">
+              <LeadCardContent lead={activeLead} selected={false} anySelected={false} />
             </div>
-          );
-        })}
-      </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {opened && (
         <LeadDetail

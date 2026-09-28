@@ -15,9 +15,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 200);
+  // Filtro opcional — a página de Leads usa isso pra mostrar só as execuções
+  // daquele contato específico (conversationId = "<canal>:<contactId>", ver
+  // finish() em flow-engine.ts), em vez de todas as execuções do agente.
+  const conversationId = searchParams.get("conversationId") ?? undefined;
 
   const executions = await prisma.flowExecution.findMany({
-    where: { agentId },
+    where: { agentId, ...(conversationId ? { conversationId } : {}) },
     orderBy: { createdAt: "desc" },
     take: limit,
   });

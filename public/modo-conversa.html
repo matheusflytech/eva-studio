@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Modo Conversa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+/* Tokens do globals.css do Eva Studio. O protótipo tem que parecer a mesma
+   aplicação. Design assumidamente escuro: o app não tem tema claro. */
+:root {
+  color-scheme: dark;
+
+  --bg-base: #0a0a0a;
+  --surface-1: #121212;
+  --surface-2: #1a1a1a;
+  --surface-3: #232323;
+
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.16);
+
+  --text-primary: rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.60);
+  --text-tertiary: rgba(255,255,255,0.38);
+
+  --accent-400: #7ba3f5;
+  --accent-500: #5b8def;
+  --accent-soft: rgba(91,141,239,0.12);
+
+  --ice: #f5f7fa;
+  --danger: #f2555a;
+  --ok: #34d399;
+  --warn: #fbbf24;
+
+  /* Canal: só dentro do telefone. */
+  --wa-bg: #0b141a;
+  --wa-header: #202c33;
+  --wa-in: #202c33;
+  --wa-out: #005c4b;
+  --wa-tick: #53bdeb;
+  --ig-in: #262626;
+  --ig-out: #3797f0;
+
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glass {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 30px 64px; position: relative; z-index: 1; }
+
+/* Brilho atrás do palco: dá profundidade sem virar gradiente decorativo. */
+.glow {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(660px 420px at 32% 34%, rgba(91,141,239,0.13), transparent 70%),
+    radial-gradient(560px 380px at 76% 24%, rgba(52,211,153,0.07), transparent 72%);
+}
+
+/* ---------- cabeçalho ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px; justify-content: space-between; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-tertiary); margin: 0 0 10px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 4.2vw, 46px); line-height: 1.04; margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+.sub { color: var(--text-secondary); margin: 12px 0 0; max-width: 60ch; line-height: 1.6; font-size: 15px; }
+
+.views { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border-subtle); }
+.views button { font: inherit; font-size: 12.5px; font-weight: 500; padding: 7px 14px; border-radius: 10px; border: 0; cursor: pointer; background: transparent; color: var(--text-secondary); transition: background .16s, color .16s; }
+.views button[aria-selected="true"] { background: var(--ice); color: #0a0a0a; font-weight: 600; }
+.views button:not([aria-selected="true"]):hover { color: var(--text-primary); }
+
+/* ---------- barra de controle ---------- */
+.deck { margin-top: 24px; border-radius: 22px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.play {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 0;
+  border-radius: 12px; padding: 11px 20px; background: var(--accent-500); color: #fff;
+  display: inline-flex; align-items: center; gap: 8px; transition: background .16s;
+}
+.play:hover { background: var(--accent-400); }
+.play[disabled] { opacity: .55; cursor: default; }
+.progress { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.deck input {
+  flex: 1 1 300px; min-width: 0; font: inherit; color: var(--text-primary);
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 11px 14px; outline: none;
+}
+.deck input:focus { border-color: rgba(91,141,239,0.45); }
+.btn { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 12px; padding: 11px 16px; background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border-subtle); transition: color .16s; }
+.btn:hover { color: var(--text-primary); }
+
+.channel-switch { display: flex; gap: 5px; padding: 4px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--border-subtle); }
+.channel-switch button { font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 9px; border: 0; background: transparent; color: var(--text-secondary); transition: background .16s, color .16s; }
+.channel-switch button[aria-selected="true"] { background: var(--surface-3); color: var(--text-primary); }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.wa { background: #25d366; }
+.dot.ig { background: linear-gradient(135deg, #f9ce34, #ee2a7b 55%, #6228d7); }
+
+/* ---------- palco ---------- */
+.stage { margin-top: 18px; display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1040px) { .stage { grid-template-columns: 380px minmax(0,1fr); } }
+
+/* ---------- telefone ---------- */
+.phone { width: 100%; max-width: 380px; margin: 0 auto; border-radius: 38px; padding: 11px; background: linear-gradient(160deg, #1d1d1d, #050505 55%); border: 1px solid var(--border-default); box-shadow: 0 40px 90px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.07); }
+.screen { border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; height: min(600px, 70vh); min-height: 460px; }
+.screen.wa { background: var(--wa-bg); }
+.screen.ig { background: #000; }
+
+.bar { display: flex; align-items: center; gap: 10px; padding: 13px 14px; flex-shrink: 0; }
+.screen.wa .bar { background: var(--wa-header); }
+.screen.ig .bar { background: #000; border-bottom: 1px solid #1c1c1c; }
+.ava { width: 33px; height: 33px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+.screen.wa .ava { background: #6a7175; }
+.screen.ig .ava { background: linear-gradient(135deg, #f9ce34, #ee2a7b 55%, #6228d7); }
+.bar .who { font-size: 13.5px; font-weight: 600; line-height: 1.2; }
+.bar .st { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+.thread { flex: 1; overflow-y: auto; padding: 14px 12px 10px; display: flex; flex-direction: column; gap: 7px; }
+
+.row { display: flex; animation: rise .32s ease both; }
+.row.out { justify-content: flex-end; }
+@keyframes rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+
+.bubble { max-width: 82%; padding: 7px 10px 6px; font-size: 13.5px; line-height: 1.42; border-radius: 12px; cursor: pointer; border: 1.5px solid transparent; transition: border-color .14s; text-align: left; font-family: inherit; color: #e9edef; }
+.screen.wa .row.out .bubble { background: var(--wa-out); border-top-right-radius: 4px; }
+.screen.wa .row.in .bubble { background: var(--wa-in); border-top-left-radius: 4px; }
+.screen.ig .row.out .bubble { background: var(--ig-out); border-radius: 20px; color: #fff; }
+.screen.ig .row.in .bubble { background: var(--ig-in); border-radius: 20px; }
+.bubble[data-sel="1"] { border-color: var(--accent-400); }
+
+.meta { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 3px; font-size: 10px; color: rgba(255,255,255,0.45); }
+.screen.ig .meta { display: none; }
+.tick { color: var(--wa-tick); font-size: 11px; }
+
+.quick { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,0.10); }
+.quick span { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.10); }
+
+.action { align-self: center; display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: rgba(255,255,255,0.62); background: rgba(255,255,255,0.055); border: 1px dashed rgba(255,255,255,0.14); padding: 5px 11px; border-radius: 999px; cursor: pointer; font-family: inherit; animation: rise .32s ease both; transition: border-color .14s, color .14s; }
+.action:hover, .action[data-sel="1"] { border-color: var(--accent-400); color: #fff; }
+.action.warn { border-style: solid; border-color: rgba(251,191,36,0.35); color: var(--warn); cursor: default; }
+
+.typing { align-self: flex-start; display: inline-flex; gap: 3px; padding: 9px 13px; border-radius: 12px; background: var(--wa-in); }
+.screen.ig .typing { background: var(--ig-in); border-radius: 20px; }
+.typing i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.5); animation: blink 1.1s infinite; }
+.typing i:nth-child(2) { animation-delay: .18s; }
+.typing i:nth-child(3) { animation-delay: .36s; }
+@keyframes blink { 0%,60%,100% { opacity:.25 } 30% { opacity:1 } }
+
+.composer { flex-shrink: 0; padding: 10px 12px 14px; }
+.addstep { width: 100%; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 999px; padding: 11px 16px; text-align: left; background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.55); border: 1px dashed rgba(255,255,255,0.20); display: flex; align-items: center; gap: 9px; transition: background .16s, color .16s; }
+.addstep:hover { background: rgba(255,255,255,0.11); color: #fff; }
+
+/* ---------- coluna direita ---------- */
+.right { display: flex; flex-direction: column; gap: 16px; }
+
+.panel { border-radius: 22px; overflow: hidden; }
+.panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
+.panel-head h2 { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin: 0; }
+.panel-head .tagline { font-size: 11.5px; color: var(--text-tertiary); margin-left: auto; }
+
+/* ficha ao vivo */
+.crm-body { padding: 16px 18px 18px; display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 620px) { .crm-body { grid-template-columns: 1fr 168px; } }
+
+.ident { display: flex; gap: 12px; align-items: center; }
+.ident .big { width: 46px; height: 46px; border-radius: 14px; background: var(--surface-3); display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--text-secondary); flex-shrink: 0; }
+.ident .nm { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+.ident .co { font-size: 12.5px; color: var(--text-tertiary); margin-top: 2px; }
+.pending { color: var(--text-tertiary); font-style: normal; opacity: .55; }
+
+.kv { margin-top: 14px; display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; font-size: 12.5px; align-items: baseline; }
+.kv dt { color: var(--text-tertiary); }
+.kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.kv dd.new { color: var(--ok); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.chip { font-size: 11.5px; padding: 4px 10px; border-radius: 999px; background: var(--surface-3); color: var(--text-secondary); animation: rise .3s ease both; }
+.chip.hot { background: rgba(251,191,36,0.13); color: var(--warn); }
+
+/* placar */
+.score { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ring { position: relative; width: 108px; height: 108px; }
+.ring svg { transform: rotate(-90deg); }
+.ring .val { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums; }
+.ring .val small { display: block; font-family: var(--font-mono); font-size: 9.5px; font-weight: 400; letter-spacing: .1em; color: var(--text-tertiary); text-align: center; margin-top: 2px; }
+.score-legend { font-size: 11px; color: var(--text-tertiary); text-align: center; line-height: 1.4; }
+
+/* negócio */
+.deal { margin: 0 18px 18px; border-radius: 16px; border: 1px solid var(--border-subtle); background: var(--surface-2); padding: 14px; animation: rise .35s ease both; }
+.deal-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.deal-name { font-family: var(--font-display); font-size: 14px; font-weight: 600; }
+.deal-val { font-family: var(--font-display); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rail { display: flex; gap: 4px; margin-top: 12px; }
+.rail span { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); }
+.rail span.done { background: var(--accent-500); }
+.rail span.now { background: var(--ok); }
+.rail-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--text-tertiary); }
+
+/* linha do tempo */
+.log { padding: 4px 18px 18px; display: flex; flex-direction: column; gap: 0; }
+.log-item { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 9px 0; animation: rise .3s ease both; }
+.log-item + .log-item { border-top: 1px solid var(--border-subtle); }
+.log-ic { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 11px; }
+.log-t { font-size: 12.5px; line-height: 1.45; }
+.log-t b { font-weight: 600; }
+.log-w { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.log-empty { color: var(--text-tertiary); font-size: 12.5px; padding: 18px 0; text-align: center; }
+
+/* ---------- inspetor ---------- */
+.plain { margin: 14px 18px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); border: 1px solid rgba(91,141,239,0.22); font-size: 13px; line-height: 1.5; }
+.plain b { color: var(--accent-400); font-weight: 600; }
+.fields { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 13px; }
+label { display: block; font-size: 11.5px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+.fields input, .fields select, .fields textarea { width: 100%; font: inherit; font-size: 13px; color: var(--text-primary); background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 11px; padding: 9px 12px; outline: none; resize: vertical; }
+.fields input:focus, .fields select:focus, .fields textarea:focus { border-color: rgba(91,141,239,0.45); }
+.hint { font-size: 11px; color: var(--text-tertiary); margin: 5px 0 0; line-height: 1.45; }
+
+/* ---------- menu ---------- */
+.sheet { margin: 12px auto 0; border-radius: 20px; padding: 12px; max-width: 380px; }
+.sheet-group + .sheet-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.sheet-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); padding: 0 8px 6px; }
+.opt { width: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left; font: inherit; cursor: pointer; border: 0; background: transparent; padding: 8px; border-radius: 12px; transition: background .14s; }
+.opt:hover { background: var(--surface-2); }
+.opt .oic { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; font-size: 13px; }
+.opt .on { font-size: 13px; display: block; }
+.opt .oh { font-size: 11px; color: var(--text-tertiary); display: block; margin-top: 1px; }
+
+/* ---------- capacidades de IA ---------- */
+.caps { margin-top: 44px; }
+.caps h2 { font-family: var(--font-display); font-size: clamp(20px, 2.4vw, 26px); font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+.caps .lead { color: var(--text-secondary); margin: 0 0 20px; max-width: 64ch; line-height: 1.6; }
+.cap-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .cap-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) { .cap-grid { grid-template-columns: repeat(3, 1fr); } }
+.cap { border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 9px; }
+.cap-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-size: 14px; }
+.cap h3 { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; margin: 0; }
+.cap p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+.cap .crm { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; color: var(--ok); margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <p class="eyebrow">Eva Studio · proposta de interface</p>
+      <h1>Modo Conversa</h1>
+      <p class="sub">
+        O agente é montado dentro da conversa, no canal em que vai atender. Cada mensagem é um passo do fluxo,
+        e o CRM ao lado se preenche enquanto a conversa acontece.
+      </p>
+    </div>
+    <div class="views" role="tablist" aria-label="Alternar visão">
+      <button id="v-crm" role="tab" aria-selected="true">CRM ao vivo</button>
+      <button id="v-step" role="tab" aria-selected="false">Editar passo</button>
+    </div>
+  </div>
+
+  <div class="deck glass">
+    <button class="play" id="play"><span aria-hidden="true">▶</span> <span id="play-label">Começar</span></button>
+    <span class="progress" id="progress" hidden></span>
+    <div class="channel-switch" role="tablist" aria-label="Canal">
+      <button id="c-wa" role="tab" aria-selected="true"><span class="dot wa"></span> WhatsApp</button>
+      <button id="c-ig" role="tab" aria-selected="false"><span class="dot ig"></span> Instagram</button>
+    </div>
+    <input id="copilot-input" aria-label="Descreva o que o agente deve fazer"
+           value="qualifica o lead e, se passar de 5 mil, chama o Rafa">
+    <button class="btn" id="copilot-go">Montar com IA</button>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="phone">
+        <div class="screen wa" id="screen">
+          <div class="bar">
+            <span class="ava" id="ava">RE</span>
+            <div>
+              <div class="who" id="who">Renata Estefan</div>
+              <div class="st" id="st">online</div>
+            </div>
+          </div>
+          <div class="thread" id="thread"></div>
+          <div class="composer">
+            <button class="addstep" id="addstep"><span aria-hidden="true">＋</span> O que acontece depois</button>
+          </div>
+        </div>
+      </div>
+      <div class="sheet glass" id="sheet" hidden></div>
+    </div>
+
+    <div class="right">
+      <section class="panel glass" id="crmpanel">
+        <div class="panel-head">
+          <h2>Ficha no CRM</h2>
+          <span class="tagline" id="crm-status">preenchida pelo agente</span>
+        </div>
+
+        <div class="crm-body">
+          <div>
+            <div class="ident">
+              <span class="big" id="crm-ini">?</span>
+              <div>
+                <div class="nm" id="crm-name"><span class="pending">Sem nome ainda</span></div>
+                <div class="co" id="crm-co">contato novo pelo WhatsApp</div>
+              </div>
+            </div>
+            <dl class="kv" id="crm-kv"></dl>
+            <div class="chips" id="crm-chips"></div>
+          </div>
+
+          <div class="score">
+            <div class="ring">
+              <svg width="108" height="108" viewBox="0 0 108 108" aria-hidden="true">
+                <circle cx="54" cy="54" r="46" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="9"></circle>
+                <circle id="ring-fg" cx="54" cy="54" r="46" fill="none" stroke="#5b8def" stroke-width="9"
+                        stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"
+                        style="transition: stroke-dashoffset .7s ease, stroke .4s ease"></circle>
+              </svg>
+              <div class="val"><span id="score-val">0</span><small>placar</small></div>
+            </div>
+            <p class="score-legend" id="score-why">orçamento · autoridade<br>urgência · encaixe</p>
+          </div>
+        </div>
+
+        <div id="deal-slot"></div>
+
+        <div class="panel-head" style="border-top:1px solid var(--border-subtle)">
+          <h2>O que o agente fez</h2>
+        </div>
+        <div class="log" id="log"><p class="log-empty">Toque em “Começar” e avance no seu ritmo.</p></div>
+      </section>
+
+      <section class="panel glass" id="insppanel" hidden></section>
+    </div>
+  </div>
+
+  <section class="caps">
+    <h2>O que a IA faz aqui, além de responder</h2>
+    <p class="lead">
+      Um bot que só responde bem é commodity. O que não é commodity é o agente operar o CRM enquanto conversa,
+      com o que ele já sabe sobre a pessoa.
+    </p>
+    <div class="cap-grid" id="capgrid"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var ESTAGIOS = ["Novo", "Qualificado", "Proposta", "Negociação", "Ganho"];
+
+  /* Cada passo é um bloco do fluxo. "crm" é o efeito na ficha: é o que torna
+     visível que a conversa e o CRM são a mesma coisa, não duas telas. */
+  var BASE = [
+    { kind: "message", side: "out", text: "Oi! Aqui é a assistente da Renata. Posso te ajudar com o Drawing Club?" },
+    { kind: "ai-lookup", text: "Leu o CRM: contato novo, sem negócio aberto",
+      crm: { status: "reconhecendo contato" } },
+    { kind: "capture", side: "out", text: "Antes de começar, como posso te chamar?", varName: "nome" },
+    { kind: "reply", side: "in", text: "Matheus, da Beeno" },
+    { kind: "ai-extract", text: "Extraiu nome e empresa da mesma frase",
+      crm: { name: "Matheus Paes", co: "Beeno", kv: [["Telefone", "+55 11 98888-7777"], ["Origem", "WhatsApp"]], score: 15 } },
+    { kind: "capture", side: "out", text: "Prazer, {nome}. Qual seu orçamento pra esse projeto?",
+      varName: "orcamento", options: ["Até 2 mil", "2 a 5 mil", "Acima de 5 mil"] },
+    { kind: "reply", side: "in", text: "Acima de 5 mil, precisamos pra semana que vem" },
+    { kind: "ai-score", text: "Qualificou: orçamento alto e urgência declarada",
+      crm: { score: 82, why: "orçamento alto<br>prazo curto · decisor", chips: ["orçamento alto", "urgente"] } },
+    { kind: "crm-deal", text: "Criou negócio no funil Vendas", stage: "Qualificado", amount: "R$ 5.000+",
+      crm: { deal: { name: "Drawing Club · Beeno", value: "R$ 5.000", stage: 1 } } },
+    { kind: "condition", text: "Orçamento acima de 5 mil", expr: '{orcamento} == "Acima de 5 mil"' },
+    { kind: "human", text: "Transferiu para o Rafa", owner: "Rafa",
+      crm: { task: "Rafa: retornar hoje", stage: 2 } },
+    { kind: "ai-summary", text: "Gravou o resumo na linha do tempo",
+      crm: { note: "Lead da Beeno, orçamento acima de 5 mil, precisa para a semana que vem." } }
+  ];
+
+  var META = {
+    message:    { label: "Mensagem", kind: "Conversa", ic: "❝", bg: "rgba(91,141,239,0.12)", fg: "#7ba3f5" },
+    capture:    { label: "Perguntar", kind: "Conversa", ic: "?", bg: "rgba(91,141,239,0.12)", fg: "#7ba3f5" },
+    reply:      { label: "Resposta", kind: "Exemplo", ic: "·", bg: "rgba(255,255,255,0.07)", fg: "#9aa0a6" },
+    condition:  { label: "Condição", kind: "Decisão", ic: "⑂", bg: "rgba(52,211,153,0.12)", fg: "#34d399" },
+    "crm-deal": { label: "Criar negócio", kind: "CRM", ic: "◈", bg: "rgba(251,191,36,0.12)", fg: "#fbbf24" },
+    "crm-task": { label: "Criar tarefa", kind: "CRM", ic: "✓", bg: "rgba(251,191,36,0.12)", fg: "#fbbf24" },
+    "crm-tag":  { label: "Etiquetar", kind: "CRM", ic: "◆", bg: "rgba(251,191,36,0.12)", fg: "#fbbf24" },
+    human:      { label: "Falar com atendente", kind: "Conversa", ic: "⇄", bg: "rgba(242,85,90,0.12)", fg: "#f2555a" },
+    "ai-agent": { label: "Responder com IA", kind: "IA", ic: "✦", bg: "rgba(123,163,245,0.14)", fg: "#7ba3f5" },
+    "ai-lookup":{ label: "Consultou o CRM", kind: "IA", ic: "◎", bg: "rgba(123,163,245,0.14)", fg: "#7ba3f5" },
+    "ai-extract":{ label: "Extraiu dados", kind: "IA", ic: "⟐", bg: "rgba(123,163,245,0.14)", fg: "#7ba3f5" },
+    "ai-score": { label: "Qualificou o lead", kind: "IA", ic: "◉", bg: "rgba(52,211,153,0.14)", fg: "#34d399" },
+    "ai-summary":{ label: "Resumiu a conversa", kind: "IA", ic: "≡", bg: "rgba(123,163,245,0.14)", fg: "#7ba3f5" }
+  };
+
+  var steps = BASE.slice();
+  var canal = "wa", sel = -1, visiveis = steps.length, tocando = false, timer = null;
+
+  var thread = document.getElementById("thread");
+  var screenEl = document.getElementById("screen");
+  var sheet = document.getElementById("sheet");
+  var logEl = document.getElementById("log");
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  /* ---------- conversa ---------- */
+  function renderThread(comTyping) {
+    thread.innerHTML = "";
+    steps.slice(0, visiveis).forEach(function (st, i) {
+      var m = META[st.kind] || META.message;
+
+      if (!st.side) {
+        var b = document.createElement("button");
+        b.className = "action";
+        b.type = "button";
+        b.dataset.sel = i === sel ? "1" : "0";
+        b.innerHTML = '<span style="color:' + m.fg + '">' + m.ic + "</span>" + esc(st.text);
+        b.addEventListener("click", function () { select(i); });
+        thread.appendChild(b);
+        return;
+      }
+
+      var row = document.createElement("div");
+      row.className = "row " + st.side;
+      var bub = document.createElement("button");
+      bub.className = "bubble";
+      bub.type = "button";
+      bub.dataset.sel = i === sel ? "1" : "0";
+
+      var html = esc(st.text);
+      if (st.options && canal === "wa") {
+        html += '<div class="quick">' + st.options.map(function (o) { return "<span>" + esc(o) + "</span>"; }).join("") + "</div>";
+      }
+      if (st.side === "out") html += '<div class="meta">09:41 <span class="tick">✓✓</span></div>';
+      bub.innerHTML = html;
+      bub.addEventListener("click", function () { select(i); });
+      row.appendChild(bub);
+      thread.appendChild(row);
+
+      if (st.options && canal === "ig") {
+        var n = document.createElement("div");
+        n.className = "action warn";
+        n.textContent = "O Instagram não tem botão de resposta rápida: as opções vão no texto.";
+        thread.appendChild(n);
+      }
+    });
+
+    if (comTyping) {
+      var t = document.createElement("div");
+      t.className = "typing";
+      t.innerHTML = "<i></i><i></i><i></i>";
+      thread.appendChild(t);
+    }
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  /* ---------- CRM ao vivo ---------- */
+  var crm = {};
+  function resetCrm() {
+    crm = { name: null, co: null, kv: [], chips: [], score: 0, why: null, deal: null, task: null, note: null, status: "aguardando" };
+    paintCrm();
+    logEl.innerHTML = '<p class="log-empty">Toque em “Começar” e avance no seu ritmo.</p>';
+  }
+
+  function paintCrm() {
+    document.getElementById("crm-status").textContent = crm.status;
+    document.getElementById("crm-ini").textContent = crm.name ? crm.name.split(" ").map(function (p) { return p[0]; }).slice(0, 2).join("") : "?";
+    document.getElementById("crm-name").innerHTML = crm.name ? esc(crm.name) : '<span class="pending">Sem nome ainda</span>';
+    document.getElementById("crm-co").textContent = crm.co ? crm.co : "contato novo pelo " + (canal === "wa" ? "WhatsApp" : "Instagram");
+
+    document.getElementById("crm-kv").innerHTML = crm.kv.map(function (p) {
+      return "<dt>" + esc(p[0]) + "</dt><dd>" + esc(p[1]) + "</dd>";
+    }).join("");
+
+    document.getElementById("crm-chips").innerHTML = crm.chips.map(function (c) {
+      return '<span class="chip hot">' + esc(c) + "</span>";
+    }).join("");
+
+    var ring = document.getElementById("ring-fg");
+    ring.style.strokeDashoffset = String(289 - (289 * crm.score) / 100);
+    ring.setAttribute("stroke", crm.score >= 70 ? "#34d399" : crm.score > 0 ? "#5b8def" : "#5b8def");
+    document.getElementById("score-val").textContent = crm.score;
+    if (crm.why) document.getElementById("score-why").innerHTML = crm.why;
+
+    var slot = document.getElementById("deal-slot");
+    if (!crm.deal) { slot.innerHTML = ""; return; }
+    slot.innerHTML =
+      '<div class="deal">' +
+        '<div class="deal-top"><span class="deal-name">' + esc(crm.deal.name) + '</span>' +
+        '<span class="deal-val">' + esc(crm.deal.value) + "</span></div>" +
+        '<div class="rail">' + ESTAGIOS.map(function (_, i) {
+          return "<span class=\"" + (i < crm.deal.stage ? "done" : i === crm.deal.stage ? "now" : "") + '"></span>';
+        }).join("") + "</div>" +
+        '<div class="rail-labels"><span>' + ESTAGIOS[0] + "</span><span>" + ESTAGIOS[crm.deal.stage] + "</span><span>" + ESTAGIOS[4] + "</span></div>" +
+      "</div>";
+  }
+
+  function logar(st) {
+    var m = META[st.kind] || META.message;
+    if (logEl.querySelector(".log-empty")) logEl.innerHTML = "";
+    var extra = "";
+    if (st.crm && st.crm.task) extra = "Tarefa: " + st.crm.task;
+    if (st.crm && st.crm.note) extra = "“" + st.crm.note + "”";
+    var d = document.createElement("div");
+    d.className = "log-item";
+    d.innerHTML =
+      '<span class="log-ic" style="background:' + m.bg + ";color:" + m.fg + '">' + m.ic + "</span>" +
+      '<span><span class="log-t"><b>' + m.label + "</b> · " + esc(st.text) + "</span>" +
+      (extra ? '<span class="log-w">' + esc(extra) + "</span>" : "") + "</span>";
+    logEl.appendChild(d);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function aplicar(st) {
+    if (!st.crm) return;
+    var c = st.crm;
+    if (c.status) crm.status = c.status;
+    if (c.name) { crm.name = c.name; crm.status = "ficha criada"; }
+    if (c.co) crm.co = c.co;
+    if (c.kv) crm.kv = crm.kv.concat(c.kv);
+    if (c.chips) crm.chips = crm.chips.concat(c.chips);
+    if (typeof c.score === "number") crm.score = c.score;
+    if (c.why) crm.why = c.why;
+    if (c.deal) { crm.deal = c.deal; crm.status = "negócio aberto"; }
+    if (c.stage != null && crm.deal) crm.deal.stage = c.stage;
+    if (c.task) crm.task = c.task;
+    if (c.note) { crm.note = c.note; crm.status = "conversa resumida"; }
+    paintCrm();
+  }
+
+  /* ---------- reprodução passo a passo ---------- */
+  function rotulo() {
+    var lab = document.getElementById("play-label");
+    var prog = document.getElementById("progress");
+    if (!tocando) { lab.textContent = "Começar"; prog.hidden = true; return; }
+    prog.hidden = false;
+    prog.textContent = visiveis + " / " + steps.length;
+    if (visiveis >= steps.length) { lab.textContent = "Reiniciar"; return; }
+    var prox = steps[visiveis];
+    var m = META[prox.kind] || META.message;
+    lab.textContent = "Próximo: " + m.label;
+  }
+
+  function comecar() {
+    tocando = true;
+    sel = -1;
+    visiveis = 0;
+    resetCrm();
+    renderThread(false);
+    rotulo();
+  }
+
+  function avancar() {
+    if (!tocando) { comecar(); return; }
+    if (visiveis >= steps.length) { comecar(); return; }
+    var st = steps[visiveis];
+    visiveis += 1;
+    renderThread(false);
+    aplicar(st);
+    if (!st.side) logar(st);
+    rotulo();
+  }
+
+  /* ---------- inspetor ---------- */
+  function frase(st) {
+    switch (st.kind) {
+      case "message": return "O agente envia <b>“" + esc(st.text) + "”</b> e segue.";
+      case "capture": return "Pergunta e guarda em <b>{" + esc(st.varName) + "}</b>" + (st.options ? ", oferecendo " + st.options.length + " opções." : ".");
+      case "reply": return "Exemplo de resposta. Não é um passo do fluxo.";
+      case "condition": return "Segue por um caminho se <b>" + esc(st.expr) + "</b>.";
+      case "crm-deal": return "Abre negócio no funil <b>Vendas</b>, etapa <b>" + esc(st.stage) + "</b>, valor <b>" + esc(st.amount) + "</b>.";
+      case "human": return "Entrega a conversa para <b>" + esc(st.owner) + "</b> e para o bot.";
+      default: return "Passo de IA: acontece sem o contato ver, e aparece na ficha ao lado.";
+    }
+  }
+
+  function campos(st) {
+    if (st.kind === "message" || st.kind === "capture") {
+      var h = '<div><label for="f-text">Texto</label><textarea id="f-text" rows="3">' + esc(st.text) + "</textarea></div>";
+      if (st.kind === "capture") h += '<div><label for="f-var">Guardar em</label><input id="f-var" value="' + esc(st.varName) + '"></div>';
+      return h;
+    }
+    if (st.kind === "crm-deal") {
+      return '<div><label for="f-etapa">Etapa de entrada</label><select id="f-etapa">' +
+        ESTAGIOS.map(function (e) { return "<option" + (e === st.stage ? " selected" : "") + ">" + e + "</option>"; }).join("") +
+        '</select></div><p class="hint">A probabilidade vem da etapa, então a previsão ponderada sai sem digitar número.</p>';
+    }
+    if (st.kind === "ai-score") {
+      return '<div><label for="f-dim">Dimensões do placar</label><input id="f-dim" value="orçamento, autoridade, urgência, encaixe"></div>' +
+        '<div><label for="f-cut">Mover etapa a partir de</label><input id="f-cut" value="70"></div>' +
+        '<p class="hint">Acima do corte, o agente avança o negócio sozinho. Abaixo, deixa como está e cria tarefa.</p>';
+    }
+    return '<p class="hint">Sem configuração obrigatória neste passo.</p>';
+  }
+
+  function renderInspector() {
+    var p = document.getElementById("insppanel");
+    var st = steps[sel];
+    if (!st) { p.innerHTML = '<p class="log-empty" style="padding:34px 20px">Toque numa mensagem para editar o passo.</p>'; return; }
+    var m = META[st.kind] || META.message;
+    p.innerHTML =
+      '<div class="panel-head"><span class="log-ic" style="background:' + m.bg + ";color:" + m.fg + '">' + m.ic + "</span>" +
+      "<h2>" + m.label + '</h2><span class="tagline">' + m.kind + "</span></div>" +
+      '<div class="plain">' + frase(st) + "</div>" +
+      '<div class="fields">' + campos(st) + "</div>";
+  }
+
+  function select(i) { sel = i; setView("step"); renderThread(false); renderInspector(); }
+
+  /* ---------- menu ---------- */
+  var MENU = [
+    { g: "Conversa", itens: [
+      { k: "message", n: "Mensagem", h: "O agente fala alguma coisa." },
+      { k: "capture", n: "Perguntar", h: "Pergunta e guarda a resposta." },
+      { k: "human", n: "Falar com atendente", h: "Para o bot e chama uma pessoa." }
+    ]},
+    { g: "Decisão", itens: [{ k: "condition", n: "Condição", h: "Segue por um caminho ou outro." }] },
+    { g: "CRM", itens: [
+      { k: "crm-deal", n: "Criar negócio", h: "Abre um negócio no funil." },
+      { k: "crm-task", n: "Criar tarefa", h: "Gera um follow-up pra equipe." },
+      { k: "crm-tag", n: "Etiquetar", h: "Marca o contato. Pode iniciar uma régua." }
+    ]},
+    { g: "Inteligência artificial", itens: [
+      { k: "ai-agent", n: "Responder com IA", h: "O modelo responde livremente." },
+      { k: "ai-score", n: "Qualificar lead", h: "Dá um placar e move o funil." },
+      { k: "ai-extract", n: "Extrair dados", h: "Tira nome, empresa e valor da fala." },
+      { k: "ai-summary", n: "Resumir conversa", h: "Grava o resumo na linha do tempo." }
+    ]}
+  ];
+
+  var NOVO = {
+    message: { side: "out", text: "Escreva o que o agente vai dizer." },
+    capture: { side: "out", text: "Escreva a pergunta.", varName: "resposta" },
+    condition: { text: "Se a condição for verdadeira", expr: "{orcamento} > 5000" },
+    "crm-deal": { text: "Cria negócio no funil Vendas", stage: "Novo", amount: "{orcamento}" },
+    "crm-task": { text: "Cria tarefa para a equipe" },
+    "crm-tag": { text: "Aplica uma etiqueta no contato" },
+    human: { text: "Transfere para um atendente", owner: "Quem estiver livre" },
+    "ai-agent": { side: "out", text: "A IA responde pela base de conhecimento." },
+    "ai-score": { text: "Qualifica o lead e move o funil" },
+    "ai-extract": { text: "Extrai dados da fala para a ficha" },
+    "ai-summary": { text: "Resume a conversa na linha do tempo" }
+  };
+
+  function renderSheet() {
+    sheet.innerHTML = MENU.map(function (grupo) {
+      return '<div class="sheet-group"><p class="sheet-label">' + grupo.g + "</p>" +
+        grupo.itens.map(function (it) {
+          var m = META[it.k] || META.message;
+          return '<button class="opt" type="button" data-k="' + it.k + '">' +
+            '<span class="oic" style="background:' + m.bg + ";color:" + m.fg + '">' + m.ic + "</span>" +
+            '<span><span class="on">' + it.n + '</span><span class="oh">' + it.h + "</span></span></button>";
+        }).join("") + "</div>";
+    }).join("");
+    Array.prototype.forEach.call(sheet.querySelectorAll(".opt"), function (b) {
+      b.addEventListener("click", function () {
+        steps.push(Object.assign({ kind: b.dataset.k }, NOVO[b.dataset.k] || NOVO.message));
+        visiveis = steps.length;
+        tocando = true;
+        sel = steps.length - 1;
+        sheet.hidden = true;
+        renderThread(false);
+        renderInspector();
+        setView("step");
+      });
+    });
+  }
+
+  /* ---------- capacidades ---------- */
+  var CAPS = [
+    { ic: "◎", fg: "#7ba3f5", bg: "rgba(123,163,245,0.14)", t: "Abre a conversa já sabendo quem é",
+      d: "Antes da primeira palavra, o agente lê a ficha: empresa, negócio aberto, etapa, última conversa e tarefas pendentes. Ninguém pergunta de novo o que já foi respondido.",
+      crm: "lê Contact · Company · Deal" },
+    { ic: "⟐", fg: "#7ba3f5", bg: "rgba(123,163,245,0.14)", t: "Extrai dados de fala solta",
+      d: "“Matheus, da Beeno, preciso pra semana que vem” vira nome, empresa e prazo em campos separados, sem formulário e sem perguntar três vezes.",
+      crm: "escreve em Contact · customFields" },
+    { ic: "◉", fg: "#34d399", bg: "rgba(52,211,153,0.14)", t: "Qualifica e move o funil",
+      d: "Dá um placar nas dimensões que você definir (orçamento, autoridade, urgência, encaixe) e usa o corte para avançar a etapa sozinho, ou parar e criar tarefa.",
+      crm: "move Deal.stage · cria Task" },
+    { ic: "≡", fg: "#7ba3f5", bg: "rgba(123,163,245,0.14)", t: "Resume a conversa na ficha",
+      d: "Ao encerrar ou transferir, grava um resumo na linha do tempo do contato e do negócio. O vendedor entra sabendo o que aconteceu, sem ler 40 mensagens.",
+      crm: "cria Note em Contact · Deal" },
+    { ic: "⇄", fg: "#f2555a", bg: "rgba(242,85,90,0.12)", t: "Escolhe para quem transferir",
+      d: "O destino sai do CRM: dono da empresa, responsável pelo negócio, ou quem estiver com menos conversa aberta. Não é uma fila cega.",
+      crm: "lê Company.owner · Deal.owner" },
+    { ic: "◔", fg: "#fbbf24", bg: "rgba(251,191,36,0.12)", t: "Percebe quando o lead esfria",
+      d: "Negócio parado na etapa há dias, resposta curta demais, prazo que passou: o agente sinaliza, etiqueta e coloca de volta numa régua de recuperação.",
+      crm: "aplica Tag · inicia Sequence" },
+    { ic: "♪", fg: "#7ba3f5", bg: "rgba(123,163,245,0.14)", t: "Entende áudio",
+      d: "No WhatsApp brasileiro metade do lead manda áudio. O agente transcreve e trata igual a texto, inclusive para extrair dados e qualificar.",
+      crm: "mesma escrita de um texto" },
+    { ic: "✎", fg: "#7ba3f5", bg: "rgba(123,163,245,0.14)", t: "Sugere a resposta do vendedor",
+      d: "Quando o humano assume, a IA propõe a próxima mensagem com o contexto completo do CRM, e o vendedor edita em vez de escrever do zero.",
+      crm: "lê tudo · não escreve sozinho" },
+    { ic: "▷", fg: "#34d399", bg: "rgba(52,211,153,0.14)", t: "Ensaia antes de publicar",
+      d: "Roda conversas simuladas contra o fluxo e mostra onde trava, e principalmente o que teria criado no CRM. Erro de funil aparece no ensaio, não no cliente.",
+      crm: "simula sem gravar nada" }
+  ];
+
+  document.getElementById("capgrid").innerHTML = CAPS.map(function (c) {
+    return '<article class="cap glass">' +
+      '<span class="cap-ic" style="background:' + c.bg + ";color:" + c.fg + '">' + c.ic + "</span>" +
+      "<h3>" + c.t + "</h3><p>" + c.d + '</p><span class="crm">' + c.crm + "</span></article>";
+  }).join("");
+
+  /* ---------- controles ---------- */
+  function setView(v) {
+    var isCrm = v === "crm";
+    document.getElementById("v-crm").setAttribute("aria-selected", String(isCrm));
+    document.getElementById("v-step").setAttribute("aria-selected", String(!isCrm));
+    document.getElementById("crmpanel").hidden = !isCrm;
+    document.getElementById("insppanel").hidden = isCrm;
+    if (!isCrm) renderInspector();
+  }
+  document.getElementById("v-crm").addEventListener("click", function () { setView("crm"); });
+  document.getElementById("v-step").addEventListener("click", function () { setView("step"); });
+
+  document.getElementById("addstep").addEventListener("click", function () { sheet.hidden = !sheet.hidden; });
+  document.getElementById("play").addEventListener("click", avancar);
+
+  function setCanal(c) {
+    canal = c;
+    screenEl.className = "screen " + c;
+    document.getElementById("c-wa").setAttribute("aria-selected", String(c === "wa"));
+    document.getElementById("c-ig").setAttribute("aria-selected", String(c === "ig"));
+    document.getElementById("who").textContent = c === "wa" ? "Renata Estefan" : "renataestefan";
+    document.getElementById("st").textContent = c === "wa" ? "online" : "Instagram · Direct";
+    renderThread(false);
+    paintCrm();
+  }
+  document.getElementById("c-wa").addEventListener("click", function () { setCanal("wa"); });
+  document.getElementById("c-ig").addEventListener("click", function () { setCanal("ig"); });
+
+  document.getElementById("copilot-go").addEventListener("click", function () {
+    var b = this;
+    b.textContent = "Montando...";
+    b.disabled = true;
+    setTimeout(function () {
+      steps = BASE.slice();
+      visiveis = 0;
+      tocando = false;
+      sel = -1;
+      b.textContent = "Montar com IA";
+      b.disabled = false;
+      setView("crm");
+      renderThread(false);
+      resetCrm();
+      rotulo();
+    }, 700);
+  });
+
+  clearTimeout(timer);
+  visiveis = 0;
+  resetCrm();
+  renderSheet();
+  renderThread(false);
+  rotulo();
+  setView("crm");
+})();
+</script>
+
+</head>
+<body>
+</body>
+</html>
