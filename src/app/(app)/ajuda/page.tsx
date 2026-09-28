@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, X, ArrowRight, CornerDownRight, LifeBuoy } from "lucide-react";
+import { Search, X, ArrowRight, ArrowLeft, CornerDownRight } from "lucide-react";
+import { SeloAjuda } from "@/components/layout/marca-ajuda";
 import { Input } from "@/components/ui/input";
 import { PALETTE_GROUPS } from "@/components/agent-studio/builder/palette-groups";
 import { ICON_REGISTRY } from "@/components/agent-studio/builder/icon-registry";
@@ -34,12 +35,25 @@ function normalizar(v: string): string {
   return v.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+/** Como a pessoa chama o formato do cartão, para a busca achar por ele. */
+function nomeDoTipo(tipo: string): string {
+  if (tipo === "numero") return "numero indicador";
+  if (tipo === "serie") return "grafico linha barras";
+  if (tipo === "quebra") return "pizza barras rosca";
+  return "tabela lista";
+}
+
+function textoDaFonte(f: { rotulo: string; explicacao: string; tipo: string }): string {
+  return normalizar(`${f.rotulo} ${f.explicacao} ${nomeDoTipo(f.tipo)}`);
+}
+
 function textoDoItem(i: Item): string {
   return normalizar(`${i.titulo} ${i.resumo} ${i.onde ?? ""} ${i.nota ?? ""} ${i.caminho ?? ""} ${i.metodo ?? ""}`);
 }
 
 export default function AjudaPage() {
   const [busca, setBusca] = React.useState("");
+  const [secaoAtiva, setSecaoAtiva] = React.useState(SECOES[0].id);
   const termo = normalizar(busca.trim());
 
   // Blocos e fontes vêm das listas de verdade do produto, não de uma cópia:
@@ -52,6 +66,31 @@ export default function AjudaPage() {
     []
   );
 
+  /** Quantos itens de cada seção sobrevivem à busca. Alimenta o contador ao
+   *  lado de cada aba e decide para onde pular quando a aba atual fica vazia. */
+  const contagem = React.useMemo(() => {
+    const mapa = new Map<string, number>();
+    for (const s of SECOES) {
+      if (s.especial === "blocos") {
+        mapa.set(s.id, blocos.filter((b) => !termo || normalizar(b.label + " " + b.hint).includes(termo)).length);
+      } else if (s.especial === "fontes") {
+        mapa.set(s.id, FONTES.filter((f) => !termo || textoDaFonte(f).includes(termo)).length);
+      } else {
+        mapa.set(s.id, s.itens.filter((i) => !termo || textoDoItem(i).includes(termo)).length);
+      }
+    }
+    return mapa;
+  }, [termo, blocos]);
+
+  // Buscar e continuar numa aba sem resultado é um beco: a tela fica vazia e a
+  // pessoa conclui que não achou nada, quando achou na aba do lado.
+  React.useEffect(() => {
+    if (!termo) return;
+    if ((contagem.get(secaoAtiva) ?? 0) > 0) return;
+    const primeira = SECOES.find((s) => (contagem.get(s.id) ?? 0) > 0);
+    if (primeira) setSecaoAtiva(primeira.id);
+  }, [termo, contagem, secaoAtiva]);
+
   const secoes = React.useMemo(() => {
     if (!termo) return SECOES;
     return SECOES.map((s) => {
@@ -60,7 +99,7 @@ export default function AjudaPage() {
         return achou ? s : { ...s, itens: [], especial: undefined, oculta: true };
       }
       if (s.especial === "fontes") {
-        const achou = FONTES.some((f) => normalizar(`${f.rotulo} ${f.explicacao}`).includes(termo));
+        const achou = FONTES.some((f) => textoDaFonte(f).includes(termo));
         return achou ? s : { ...s, itens: [], especial: undefined, oculta: true };
       }
       return { ...s, itens: s.itens.filter((i) => textoDoItem(i).includes(termo)) };
@@ -74,7 +113,7 @@ export default function AjudaPage() {
       return n + blocos.filter((b) => !termo || normalizar(b.label + " " + b.hint).includes(termo)).length;
     }
     if (s.especial === "fontes") {
-      return n + FONTES.filter((f) => !termo || normalizar(f.rotulo + " " + f.explicacao).includes(termo)).length;
+      return n + FONTES.filter((f) => !termo || textoDaFonte(f).includes(termo)).length;
     }
     return n + s.itens.length;
   }, 0);
@@ -83,9 +122,7 @@ export default function AjudaPage() {
     <div className="flex-1 p-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-start gap-3.5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent-400">
-            <LifeBuoy size={22} />
-          </span>
+          <SeloAjuda />
           <div>
             <h1 className="font-display text-2xl font-semibold text-text-primary">Eva Help</h1>
             <p className="mt-1 max-w-2xl text-[14px] text-text-secondary">
@@ -122,51 +159,108 @@ export default function AjudaPage() {
         </p>
       )}
 
-      <div className="flex gap-8">
-        {/* Índice fixo. Some na busca: filtrando, a lista já é curta e o índice
-            passaria a apontar pra seção que não está mais na tela. */}
-        {!termo && (
-          <nav className="sticky top-8 hidden h-fit w-[210px] shrink-0 flex-col gap-0.5 xl:flex">
-            {SECOES.map((s) => (
-              <a
+      <div className="flex gap-6">
+        {/* Uma seção por vez. Tudo num scroll só transformava a tela num
+            documento longo — dá pra rolar até achar, mas não dá pra saber onde
+            você está nem quanto falta. */}
+        <nav className="sticky top-8 hidden h-fit w-[230px] shrink-0 flex-col gap-0.5 lg:flex">
+          {SECOES.map((s) => {
+            const n = contagem.get(s.id) ?? 0;
+            const ativa = s.id === secaoAtiva;
+            const apagada = !!termo && n === 0;
+            return (
+              <button
                 key={s.id}
-                href={`#${s.id}`}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-[12.5px] text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
+                type="button"
+                disabled={apagada}
+                onClick={() => setSecaoAtiva(s.id)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[12.5px] transition-colors",
+                  ativa
+                    ? "bg-surface-2 font-medium text-text-primary"
+                    : "text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+                  apagada && "opacity-35 hover:bg-transparent"
+                )}
               >
-                <s.icone size={14} className="shrink-0 text-text-tertiary" />
-                <span className="truncate">{s.titulo}</span>
-              </a>
-            ))}
-          </nav>
-        )}
+                <s.icone
+                  size={14}
+                  className={cn("shrink-0", ativa ? "text-accent-400" : "text-text-tertiary")}
+                />
+                <span className="min-w-0 flex-1 truncate">{s.titulo}</span>
+                {termo && n > 0 && (
+                  <span className="shrink-0 rounded-md bg-surface-3 px-1.5 text-[10.5px] tabular-nums text-text-tertiary">
+                    {n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-5">
-          {secoes.length === 0 ? (
+        <div className="min-w-0 flex-1">
+          {totalAchado === 0 ? (
             <p className="glass-card rounded-3xl px-6 py-14 text-center text-[13.5px] text-text-secondary">
               Nada com “{busca}”. Tente outra palavra — os termos aqui são os mesmos que aparecem nas telas.
             </p>
           ) : (
-            secoes.map((s) => (
-              <section key={s.id} id={s.id} className="glass-card scroll-mt-8 rounded-3xl p-6">
-                <div className="mb-1 flex items-center gap-2.5">
-                  <s.icone size={17} className="text-accent-400" />
-                  <h2 className="font-display text-[17px] font-semibold text-text-primary">{s.titulo}</h2>
-                </div>
-                <p className="mb-5 max-w-3xl text-[13px] leading-relaxed text-text-secondary">{s.intro}</p>
+            (() => {
+              const s = secoes.find((x) => x.id === secaoAtiva) ?? secoes[0];
+              if (!s) return null;
+              const i = SECOES.findIndex((x) => x.id === s.id);
+              const anterior = SECOES[i - 1];
+              const proxima = SECOES[i + 1];
 
-                {s.especial === "blocos" ? (
-                  <Blocos termo={termo} />
-                ) : s.especial === "fontes" ? (
-                  <Fontes termo={termo} />
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {s.itens.map((i) => (
-                      <LinhaDeItem key={i.titulo} item={i} />
-                    ))}
+              return (
+                <>
+                  <section className="glass-card rounded-3xl p-6">
+                    <div className="mb-1 flex items-center gap-2.5">
+                      <s.icone size={17} className="text-accent-400" />
+                      <h2 className="font-display text-[17px] font-semibold text-text-primary">{s.titulo}</h2>
+                    </div>
+                    <p className="mb-5 max-w-3xl text-[13px] leading-relaxed text-text-secondary">{s.intro}</p>
+
+                    {s.especial === "blocos" ? (
+                      <Blocos termo={termo} />
+                    ) : s.especial === "fontes" ? (
+                      <Fontes termo={termo} />
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {s.itens.map((it) => (
+                          <LinhaDeItem key={it.titulo} item={it} />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* Ir pra próxima sem voltar ao índice: quem está lendo tudo
+                      lê em ordem, e obrigar a subir a cada seção cansa. */}
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    {anterior ? (
+                      <button
+                        type="button"
+                        onClick={() => setSecaoAtiva(anterior.id)}
+                        className="group inline-flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
+                      >
+                        <ArrowLeft size={14} className="shrink-0" />
+                        <span className="truncate">{anterior.titulo}</span>
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    {proxima && (
+                      <button
+                        type="button"
+                        onClick={() => setSecaoAtiva(proxima.id)}
+                        className="group inline-flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-right text-[12.5px] text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
+                      >
+                        <span className="truncate">{proxima.titulo}</span>
+                        <ArrowRight size={14} className="shrink-0" />
+                      </button>
+                    )}
                   </div>
-                )}
-              </section>
-            ))
+                </>
+              );
+            })()
           )}
         </div>
       </div>
@@ -289,7 +383,7 @@ function Fontes({ termo }: { termo: string }) {
     <div className="flex flex-col gap-5">
       {grupos.map((g) => {
         const itens = FONTES.filter(
-          (f) => f.grupo === g && (!termo || normalizar(`${f.rotulo} ${f.explicacao}`).includes(termo))
+          (f) => f.grupo === g && (!termo || textoDaFonte(f).includes(termo))
         );
         if (itens.length === 0) return null;
 

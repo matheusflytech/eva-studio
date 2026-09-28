@@ -22,9 +22,9 @@ import {
   Building2,
   Handshake,
   CheckSquare,
-  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MarcaAjuda } from "./marca-ajuda";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 
@@ -139,7 +139,7 @@ export function Sidebar() {
             collapsed && "justify-center px-0"
           )}
         >
-          <LifeBuoy size={17} className="shrink-0" />
+          <MarcaAjuda size={17} className="shrink-0" />
           {!collapsed && <span>Eva Help</span>}
         </Link>
       </div>
