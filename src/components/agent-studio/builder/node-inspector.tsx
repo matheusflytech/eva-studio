@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, X, Plus } from "lucide-react";
+import { Trash2, X, Plus, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { Node } from "@xyflow/react";
@@ -15,6 +15,49 @@ import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
 
 import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
+import { ICON_REGISTRY } from "./icon-registry";
+import { BLOCK_STYLES } from "./block-styles";
+import { PALETTE_GROUPS } from "./palette-groups";
+import { validateNode } from "./block-validation";
+import { cn } from "@/lib/utils";
+
+/** Como o bloco se chama e o que ele faz, na linguagem da paleta. */
+const DICIONARIO = new Map(
+  PALETTE_GROUPS.flatMap((g) => g.items.map((i) => [i.key, { label: i.label, hint: i.hint }]))
+);
+
+/**
+ * O que o cliente vê.
+ *
+ * Um painel de configuração mostra campos; ele não mostra o resultado. Para
+ * bloco de conversa o resultado é uma bolha de mensagem, e ver a bolha ao lado
+ * do campo é a diferença entre escrever no escuro e escrever olhando.
+ */
+function PreviaDaBolha({ texto, opcoes }: { texto: string; opcoes?: { id: string; label: string }[] }) {
+  if (!texto.trim() && (opcoes ?? []).length === 0) return null;
+  return (
+    <div className="rounded-xl bg-[#0b141a] p-2.5">
+      <p className="mb-1.5 text-[10px] uppercase tracking-wide text-white/30">o cliente vê</p>
+      <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-[#202c33] px-3 py-2">
+        <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-white/90">
+          {texto.trim() || "..."}
+        </p>
+      </div>
+      {(opcoes ?? []).length > 0 && (
+        <div className="mt-1.5 flex max-w-[85%] flex-wrap gap-1">
+          {opcoes!.map((o) => (
+            <span
+              key={o.id}
+              className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/70"
+            >
+              {o.label || "opção"}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function TemplateSelect({
   agentId,
@@ -75,18 +118,73 @@ export function NodeInspector({
   const conditionRef = React.useRef<HTMLTextAreaElement>(null);
   const variableExpressionRef = React.useRef<HTMLTextAreaElement>(null);
 
+  const Icone = ICON_REGISTRY[iconKey];
+  const estilo = BLOCK_STYLES[iconKey];
+  const doDicionario = DICIONARIO.get(iconKey);
+  // O que impede este bloco de funcionar — a mesma regra do aviso no canvas,
+  // dita aqui dentro, onde tem o campo pra resolver.
+  const pendencia = validateNode(node.data);
+  const daConversa = iconKey === "message" || iconKey === "capture";
+
   return (
-    <div className="glass-card glass-card-solid w-[260px] rounded-2xl p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Bloco selecionado</p>
-        <button type="button" onClick={onClose} className="text-text-tertiary transition-colors hover:text-text-primary">
-          <X size={14} />
+    <div className="glass-card glass-card-solid flex max-h-[calc(100vh-190px)] w-[340px] flex-col overflow-hidden rounded-3xl">
+      {/* Cabeçalho: o tipo do bloco primeiro. "Bloco selecionado" não dizia
+          nada — a pessoa já sabe que selecionou; o que ela não sabe é o que
+          este bloco faz e se está pronto. */}
+      <header className="flex items-start gap-3 border-b border-border-subtle p-4">
+        <span
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+            estilo?.badgeBg,
+            estilo?.badgeText
+          )}
+        >
+          <Icone size={17} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-semibold text-text-primary">
+            {doDicionario?.label ?? iconKey}
+          </p>
+          <p className="truncate text-[11.5px] text-text-tertiary">{doDicionario?.hint ?? ""}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          className="shrink-0 text-text-tertiary transition-colors hover:text-text-primary"
+        >
+          <X size={15} />
         </button>
+      </header>
+
+      <div
+        className={cn(
+          "flex items-start gap-2 px-4 py-2.5 text-[12px]",
+          pendencia ? "bg-amber-400/10 text-amber-300" : "bg-emerald-500/8 text-emerald-300"
+        )}
+      >
+        {pendencia ? (
+          <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+        ) : (
+          <CheckCircle2 size={13} className="mt-0.5 shrink-0" />
+        )}
+        <span>{pendencia ?? "Pronto pra rodar."}</span>
       </div>
-      <div className="flex flex-col gap-3">
+
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {daConversa && (
+          <PreviaDaBolha
+            texto={node.data.detail ?? ""}
+            opcoes={iconKey === "capture" ? node.data.options : undefined}
+          />
+        )}
+
         <div>
-          <Label htmlFor="node-label">Nome</Label>
+          <Label htmlFor="node-label">Nome do bloco</Label>
           <Input id="node-label" value={node.data.label} onChange={(e) => onChange({ label: e.target.value })} />
+          <p className="mt-1 text-[11px] text-text-tertiary">
+            Só aparece no canvas, pra você achar o bloco. O cliente não vê.
+          </p>
         </div>
         <div>
           <div className="mb-2 flex items-center justify-between">
@@ -532,14 +630,19 @@ export function NodeInspector({
           </div>
         )}
 
+      </div>
+
+      {/* Apagar é a única ação destrutiva da tela; fica no rodapé, separada,
+          e discreta até o ponteiro chegar nela. */}
+      <footer className="border-t border-border-subtle px-4 py-3">
         <button
           type="button"
           onClick={onDelete}
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-danger/20 bg-danger/10 px-3 py-2 text-[12.5px] font-medium text-danger transition-colors hover:bg-danger/20"
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
         >
           <Trash2 size={13} /> Excluir bloco
         </button>
-      </div>
+      </footer>
     </div>
   );
 }

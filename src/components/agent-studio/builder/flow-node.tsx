@@ -171,7 +171,12 @@ function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: str
       placeholder="Digite o texto..."
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onCommit(draft)}
-      onClick={(e) => e.stopPropagation()}
+      // Sem stopPropagation no clique: o bloco precisa ficar selecionado
+      // quando alguem clica no proprio texto dele. Antes o clique morria aqui,
+      // o painel nao abria e parecia que o bloco nao respondia — o jeito mais
+      // rapido de alguem concluir que a ferramenta esta quebrada.
+      // No teclado ele continua: digitar espaco ou delete dentro do campo nao
+      // pode acionar atalho do canvas.
       onKeyDown={(e) => e.stopPropagation()}
       className="nodrag mt-2.5 w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-[12px] leading-relaxed text-text-secondary outline-none transition-colors hover:border-border-subtle focus:border-accent-500/50 focus:bg-surface-3"
     />

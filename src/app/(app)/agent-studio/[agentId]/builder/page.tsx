@@ -125,6 +125,12 @@ export default function AgentBuilderPage() {
     return Array.from(set).sort();
   }, [nodes]);
 
+  const aoMudarSelecao = React.useCallback(
+    ({ nodes: selecionados }: { nodes: Node<FlowNodeData>[] }) =>
+      setSelectedId((atual) => selecionados[0]?.id ?? (selecionados.length === 0 ? null : atual)),
+    []
+  );
+
   const onConnect = React.useCallback(
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
     [setEdges]
@@ -472,6 +478,11 @@ export default function AgentBuilderPage() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedId(node.id)}
+              // onNodeClick sozinho nao bastava: bloco de mensagem tem campo de
+              // texto editavel dentro, e clicar no texto selecionava o no no
+              // canvas sem abrir o painel — parecia que o clique nao funcionava.
+              // A selecao e a fonte da verdade, venha o clique de onde vier.
+              onSelectionChange={aoMudarSelecao}
               onPaneClick={() => setSelectedId(null)}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
