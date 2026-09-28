@@ -22,6 +22,7 @@ import {
   Building2,
   Handshake,
   CheckSquare,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarNavItem } from "./sidebar-nav-item";
@@ -61,7 +62,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Fontes",
     items: [
-      { href: "/memory-base", label: "Memory base", icon: LayoutGrid },
       { href: "/biblioteca", label: "Biblioteca", icon: BookOpen },
       { href: "/integracoes", label: "Integrações", icon: Plug },
     ],
@@ -128,6 +128,21 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+
+      <div className="mt-2 border-t border-border-subtle pt-2">
+        <Link
+          href="/ajuda"
+          title="Eva Help — tudo que dá pra fazer no app"
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-medium text-text-tertiary transition-colors",
+            "hover:bg-surface-2 hover:text-text-primary",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <LifeBuoy size={17} className="shrink-0" />
+          {!collapsed && <span>Eva Help</span>}
+        </Link>
+      </div>
     </aside>
   );
 }
