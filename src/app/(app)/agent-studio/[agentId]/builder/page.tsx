@@ -35,12 +35,13 @@ import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-temp
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
 import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
 import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
+import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 
 type SaveState = "idle" | "pending" | "saved" | "error";
-type BuilderTab = "editor" | "executions";
+type BuilderTab = "editor" | "conversa" | "executions";
 
 const edgeTypes = { plusEdge: FlowEdge };
 
@@ -131,6 +132,37 @@ export default function AgentBuilderPage() {
     setSelectedId(id);
   }
 
+  function handleAddAfter(afterNodeId: string | null, iconKey: IconKey) {
+    const id = generateId();
+    const defaults = getBlockDefault(iconKey)?.data ?? {};
+    const anterior = afterNodeId ? nodes.find((n) => n.id === afterNodeId) : null;
+    const novo: Node<FlowNodeData> = {
+      id,
+      type: "flowNode",
+      position: anterior
+        ? { x: anterior.position.x + 320, y: anterior.position.y }
+        : { x: 120, y: 120 },
+      data: { iconKey, label: iconKey, ...defaults },
+    };
+    setNodes((nds) => [...nds, novo]);
+
+    // Se o bloco âncora já continuava pra algum lugar, o novo entra no meio
+    // em vez de virar um segundo fio saindo do mesmo ponto — dois fios na
+    // mesma saída é fluxo ambíguo, e o motor segue só o primeiro.
+    const continuacao = afterNodeId
+      ? edges.find((e) => e.source === afterNodeId && !e.sourceHandle && e.targetHandle !== "tools")
+      : undefined;
+
+    if (afterNodeId) {
+      setEdges((eds) => [
+        ...eds.filter((e) => e.id !== continuacao?.id),
+        { id: generateId(), source: afterNodeId, target: id },
+        ...(continuacao ? [{ id: generateId(), source: id, target: continuacao.target }] : []),
+      ]);
+    }
+    setSelectedId(id);
+  }
+
   function handleNodeDataChangeById(id: string, partial: Partial<FlowNodeData>) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...partial } } : n)));
   }
@@ -142,8 +174,23 @@ export default function AgentBuilderPage() {
 
   function handleDeleteNode() {
     if (!selectedId) return;
+
+    // Apagar um bloco do meio costurava o fluxo ao contrário: sumia o bloco e
+    // sumia a continuação junto, deixando o resto do fluxo pendurado sem
+    // ninguém apontando pra ele. Se o bloco tinha uma entrada e uma saída
+    // simples, quem entrava nele passa a entrar em quem vinha depois.
+    const entrada = edges.find((e) => e.target === selectedId && e.targetHandle !== "tools");
+    const saidas = edges.filter((e) => e.source === selectedId && e.targetHandle !== "tools");
+    const remendo =
+      entrada && saidas.length === 1
+        ? [{ id: generateId(), source: entrada.source, sourceHandle: entrada.sourceHandle, target: saidas[0].target }]
+        : [];
+
     setNodes((nds) => nds.filter((n) => n.id !== selectedId));
-    setEdges((eds) => eds.filter((e) => e.source !== selectedId && e.target !== selectedId));
+    setEdges((eds) => [
+      ...eds.filter((e) => e.source !== selectedId && e.target !== selectedId),
+      ...remendo,
+    ]);
     setSelectedId(null);
   }
 
@@ -241,7 +288,9 @@ export default function AgentBuilderPage() {
             <Badge variant="neutral">Beta</Badge>
           </div>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Clique num bloco pra editar, arraste das bordas pra conectar, adicione blocos pela paleta.
+            {tab === "conversa"
+              ? "O fluxo visto como a conversa que o cliente vai ter. Clique numa bolha pra editar o bloco."
+              : "Clique num bloco pra editar, arraste das bordas pra conectar, adicione blocos pela paleta."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -288,6 +337,7 @@ export default function AgentBuilderPage() {
       <div className="mb-4 flex items-center gap-1 border-b border-border-subtle">
         {([
           { key: "editor", label: "Editor" },
+          { key: "conversa", label: "Modo Conversa" },
           { key: "executions", label: "Execuções" },
         ] as const).map((t) => (
           <button
@@ -355,6 +405,29 @@ export default function AgentBuilderPage() {
           </div>
 
           {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
+        </div>
+      ) : tab === "conversa" ? (
+        <div className="flex flex-1 gap-4 overflow-hidden">
+          <ConversationMode
+            nodes={nodes}
+            edges={edges}
+            selectedId={selectedId}
+            agentName={agent.name}
+            onSelect={setSelectedId}
+            onAddAfter={handleAddAfter}
+          />
+          {selectedNode && (
+            <div className="shrink-0 overflow-y-auto">
+              <NodeInspector
+                node={selectedNode}
+                agentId={agentId}
+                variables={availableVariables}
+                onChange={handleNodeDataChange}
+                onDelete={handleDeleteNode}
+                onClose={() => setSelectedId(null)}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <ExecutionsPanel agentId={agentId} />
