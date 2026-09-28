@@ -1,0 +1,215 @@
+import "server-only";
+import { prisma } from "@/lib/db/prisma";
+
+// ---------------------------------------------------------------------------
+// Catálogo de fontes do Dashboard.
+//
+// O painel é montado pela pessoa: ela escolhe um cartão, escolhe uma fonte e
+// dá um nome. Para isso funcionar sem virar um zoológico de rotas, existe UM
+// lugar que calcula tudo e devolve por chave. Cartão novo não pede rota nova;
+// fonte nova aparece sozinha na lista de escolha.
+//
+// A regra do que entra aqui: número que sai de tabela. Nada de estimativa,
+// nada de "simulado" — se não dá pra contar, não vira fonte.
+// ---------------------------------------------------------------------------
+
+const DIA = 24 * 60 * 60 * 1000;
+const CANAIS_INTERNOS = ["playground", "builder_preview"];
+
+export type TipoDeFonte = "numero" | "serie" | "quebra" | "tabela";
+
+export interface DefinicaoDeFonte {
+  chave: string;
+  rotulo: string;
+  /** Uma linha explicando de onde o número sai, mostrada na hora de escolher. */
+  explicacao: string;
+  tipo: TipoDeFonte;
+  /** Como formatar um `numero`. */
+  formato?: "dinheiro" | "inteiro" | "porcento";
+  grupo: "Vendas" | "Funil" | "Atendimento";
+}
+
+/**
+ * O que existe pra colocar num cartão. É esta lista que a tela mostra quando
+ * alguém clica em "Adicionar painel" — por isso cada item tem explicação: a
+ * pessoa está escolhendo um número, não um campo de banco.
+ */
+export const FONTES: DefinicaoDeFonte[] = [
+  { chave: "vendas", rotulo: "Vendas fechadas", explicacao: "Negócios que entraram numa etapa de ganho no período.", tipo: "numero", formato: "inteiro", grupo: "Vendas" },
+  { chave: "receita", rotulo: "Receita", explicacao: "Soma do valor dos negócios ganhos no período.", tipo: "numero", formato: "dinheiro", grupo: "Vendas" },
+  { chave: "ticket", rotulo: "Ticket médio", explicacao: "Receita dividida pelo número de vendas.", tipo: "numero", formato: "dinheiro", grupo: "Vendas" },
+  { chave: "vendasHoje", rotulo: "Vendas de hoje", explicacao: "Negócios ganhos desde a meia-noite.", tipo: "numero", formato: "inteiro", grupo: "Vendas" },
+  { chave: "receitaHoje", rotulo: "Receita de hoje", explicacao: "Valor fechado desde a meia-noite.", tipo: "numero", formato: "dinheiro", grupo: "Vendas" },
+  { chave: "conversao", rotulo: "Taxa de conversão", explicacao: "Dos negócios criados no período, quantos viraram venda.", tipo: "numero", formato: "porcento", grupo: "Vendas" },
+  { chave: "receitaPorDia", rotulo: "Receita por dia", explicacao: "Quanto fechou em cada dia do período.", tipo: "serie", grupo: "Vendas" },
+  { chave: "vendasRecentes", rotulo: "Últimas vendas", explicacao: "Lista dos negócios ganhos mais recentes.", tipo: "tabela", grupo: "Vendas" },
+
+  { chave: "emAberto", rotulo: "Em aberto", explicacao: "Valor somado dos negócios que ainda não fecharam.", tipo: "numero", formato: "dinheiro", grupo: "Funil" },
+  { chave: "emAbertoPonderado", rotulo: "Previsão ponderada", explicacao: "Em aberto, cada negócio multiplicado pela chance da etapa.", tipo: "numero", formato: "dinheiro", grupo: "Funil" },
+  { chave: "negociosAbertos", rotulo: "Negócios abertos", explicacao: "Quantos negócios estão em andamento agora.", tipo: "numero", formato: "inteiro", grupo: "Funil" },
+  { chave: "porEtapa", rotulo: "Onde o dinheiro está", explicacao: "Valor em aberto somado por etapa do funil.", tipo: "quebra", grupo: "Funil" },
+  { chave: "porCanalVendas", rotulo: "Vendas por canal", explicacao: "Por qual canal chegou quem comprou.", tipo: "quebra", grupo: "Funil" },
+
+  { chave: "conversas", rotulo: "Conversas", explicacao: "Atendimentos no período, sem contar testes.", tipo: "numero", formato: "inteiro", grupo: "Atendimento" },
+  { chave: "autonomia", rotulo: "Resolvido pelo agente", explicacao: "Conversas que não precisaram de atendente humano.", tipo: "numero", formato: "porcento", grupo: "Atendimento" },
+  { chave: "esperandoHumano", rotulo: "Esperando atendente", explicacao: "Conversas paradas aguardando uma pessoa agora.", tipo: "numero", formato: "inteiro", grupo: "Atendimento" },
+  { chave: "mensagens", rotulo: "Mensagens recebidas", explicacao: "Mensagens que os contatos enviaram no período.", tipo: "numero", formato: "inteiro", grupo: "Atendimento" },
+  { chave: "conversasPorHora", rotulo: "Horário de pico", explicacao: "Mensagens recebidas por hora, no fuso de São Paulo.", tipo: "serie", grupo: "Atendimento" },
+  { chave: "porCanalConversas", rotulo: "Conversas por canal", explicacao: "De onde vêm os atendimentos.", tipo: "quebra", grupo: "Atendimento" },
+];
+
+export const FONTE_POR_CHAVE = new Map(FONTES.map((f) => [f.chave, f]));
+
+export interface Ponto { label: string; value: number }
+export interface LinhaDeTabela {
+  id: string;
+  quando: string | null;
+  titulo: string;
+  contato: string;
+  responsavel: string;
+  valorCents: number;
+}
+
+export interface Fontes {
+  numeros: Record<string, number | null>;
+  series: Record<string, Ponto[]>;
+  quebras: Record<string, Ponto[]>;
+  tabelas: Record<string, LinhaDeTabela[]>;
+}
+
+export async function coletarFontes(orgId: string, dias: number): Promise<Fontes> {
+  const desde = new Date();
+  desde.setHours(0, 0, 0, 0);
+  desde.setTime(desde.getTime() - (dias - 1) * DIA);
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const [ganhos, criados, abertos, recentes, canalVendas, conversas, mensagens, porHora] =
+    await Promise.all([
+      prisma.deal.findMany({
+        where: { orgId, closedAt: { gte: desde }, stage: { type: "won" } },
+        select: { amountCents: true, closedAt: true },
+      }),
+      prisma.deal.count({ where: { orgId, createdAt: { gte: desde } } }),
+      prisma.deal.findMany({
+        where: { orgId, closedAt: null, archivedAt: null },
+        select: { amountCents: true, probability: true, stage: { select: { name: true, position: true } } },
+      }),
+      prisma.deal.findMany({
+        where: { orgId, closedAt: { gte: desde }, stage: { type: "won" } },
+        include: {
+          owner: { select: { name: true } },
+          contacts: { take: 1, include: { contact: { select: { name: true, phone: true } } } },
+        },
+        orderBy: { closedAt: "desc" },
+        take: 15,
+      }),
+      prisma.$queryRaw<{ canal: string; total: number }[]>`
+        SELECT COALESCE(ch.channel, 'sem canal') AS canal, COUNT(DISTINCT d.id)::int AS total
+          FROM eva_studio_deals d
+          JOIN eva_studio_pipeline_stages st ON st.id = d."stageId"
+          LEFT JOIN eva_studio_deal_contacts dc ON dc."dealId" = d.id
+          LEFT JOIN eva_studio_contact_channels ch ON ch."contactId" = dc."contactId"
+         WHERE d."orgId" = ${orgId} AND st.type = 'won' AND d."closedAt" >= ${desde}
+         GROUP BY 1 ORDER BY 2 DESC
+      `,
+      prisma.conversation.findMany({
+        where: { agent: { orgId }, updatedAt: { gte: desde }, channel: { notIn: CANAIS_INTERNOS } },
+        select: { channel: true, status: true },
+      }),
+      prisma.message.count({
+        where: {
+          role: "contact",
+          createdAt: { gte: desde },
+          conversation: { agent: { orgId }, channel: { notIn: CANAIS_INTERNOS } },
+        },
+      }),
+      prisma.$queryRaw<{ hora: number; total: number }[]>`
+        SELECT EXTRACT(HOUR FROM (m."createdAt" AT TIME ZONE 'America/Sao_Paulo'))::int AS hora,
+               COUNT(*)::int AS total
+          FROM eva_studio_messages m
+          JOIN eva_studio_conversations c ON c.id = m."conversationId"
+          JOIN eva_studio_agents a ON a.id = c."agentId"
+         WHERE a."orgId" = ${orgId} AND m.role = 'contact'
+           AND c.channel <> ALL(${CANAIS_INTERNOS})
+           AND m."createdAt" >= ${desde}
+         GROUP BY 1
+      `,
+    ]);
+
+  const receita = ganhos.reduce((s, d) => s + d.amountCents, 0);
+  const deHoje = ganhos.filter((d) => d.closedAt && d.closedAt >= hoje);
+  const escalaram = conversas.filter((c) => c.status === "waiting_human").length;
+
+  // Baldes fixos: dia sem venda tem que aparecer como zero, senão a linha
+  // "pula" o dia ruim e o gráfico mente pra quem olha rápido.
+  const porDia = new Map<string, number>();
+  for (let i = 0; i < dias; i += 1) {
+    porDia.set(new Date(desde.getTime() + i * DIA).toISOString().slice(0, 10), 0);
+  }
+  for (const d of ganhos) {
+    if (!d.closedAt) continue;
+    const k = d.closedAt.toISOString().slice(0, 10);
+    if (porDia.has(k)) porDia.set(k, (porDia.get(k) ?? 0) + d.amountCents);
+  }
+
+  const etapas = new Map<string, { valor: number; posicao: number }>();
+  for (const d of abertos) {
+    const atual = etapas.get(d.stage.name) ?? { valor: 0, posicao: d.stage.position };
+    atual.valor += d.amountCents;
+    etapas.set(d.stage.name, atual);
+  }
+
+  const canaisConversa = new Map<string, number>();
+  for (const c of conversas) canaisConversa.set(c.channel, (canaisConversa.get(c.channel) ?? 0) + 1);
+
+  return {
+    numeros: {
+      vendas: ganhos.length,
+      receita: receita,
+      ticket: ganhos.length ? Math.round(receita / ganhos.length) : 0,
+      vendasHoje: deHoje.length,
+      receitaHoje: deHoje.reduce((s, d) => s + d.amountCents, 0),
+      // null e não 0: "não houve negócio para converter" é diferente de
+      // "houve e nenhum converteu", e a tela sabe dizer os dois.
+      conversao: criados > 0 ? ganhos.length / criados : null,
+      emAberto: abertos.reduce((s, d) => s + d.amountCents, 0),
+      emAbertoPonderado: abertos.reduce((s, d) => s + Math.round((d.amountCents * d.probability) / 100), 0),
+      negociosAbertos: abertos.length,
+      conversas: conversas.length,
+      autonomia: conversas.length > 0 ? 1 - escalaram / conversas.length : null,
+      esperandoHumano: escalaram,
+      mensagens,
+    },
+    series: {
+      receitaPorDia: Array.from(porDia.entries()).map(([data, cents]) => ({
+        label: new Date(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        value: Math.round(cents / 100),
+      })),
+      conversasPorHora: Array.from({ length: 24 }, (_, h) => ({
+        label: `${String(h).padStart(2, "0")}h`,
+        value: Number(porHora.find((p) => Number(p.hora) === h)?.total ?? 0),
+      })),
+    },
+    quebras: {
+      porEtapa: Array.from(etapas.entries())
+        .sort((a, b) => a[1].posicao - b[1].posicao)
+        .map(([label, v]) => ({ label, value: Math.round(v.valor / 100) })),
+      porCanalVendas: canalVendas.map((c) => ({ label: c.canal, value: Number(c.total) })),
+      porCanalConversas: Array.from(canaisConversa.entries())
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value),
+    },
+    tabelas: {
+      vendasRecentes: recentes.map((d) => ({
+        id: d.id,
+        quando: d.closedAt?.toISOString() ?? null,
+        titulo: d.name,
+        contato: d.contacts[0]?.contact.name || d.contacts[0]?.contact.phone || "—",
+        responsavel: d.owner?.name ?? "—",
+        valorCents: d.amountCents,
+      })),
+    },
+  };
+}

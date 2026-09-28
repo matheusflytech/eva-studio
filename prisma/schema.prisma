@@ -36,6 +36,7 @@ model Organization {
   deals       Deal[]
   tasks       Task[]
   notes       Note[]
+  dashboard   DashboardLayout?
 
   @@map("eva_studio_organizations")
 }
@@ -1036,4 +1037,19 @@ model Note {
   @@index([contactId, createdAt])
   @@index([dealId, createdAt])
   @@map("eva_studio_notes")
+}
+
+// Painel montado pela propria pessoa: quais cartoes existem, em que ordem,
+// com que nome e ligados em qual numero. Um por organizacao — dashboard
+// pessoal por usuario viraria "cada um ve um numero diferente na reuniao".
+model DashboardLayout {
+  id        String   @id @default(uuid())
+  orgId     String   @unique
+  // [{ id, tipo, fonte, titulo, largura, periodo }]
+  widgets   Json
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_dashboard_layouts")
 }
