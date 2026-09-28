@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Compass, LayoutGrid, Blocks, Radio, ArrowDownToLine, ArrowUpFromLine,
-  Code2, Repeat, Database, ShieldAlert,
+  Code2, Repeat, Database, ShieldAlert, ShieldCheck,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -83,12 +83,27 @@ export const SECOES: Secao[] = [
     icone: LayoutGrid,
     intro: "O que dá para fazer em cada lugar do menu.",
     itens: [
-      { titulo: "Início", resumo: "Ponto de partida, com o estado geral da operação.", href: "/inicio" },
-      { titulo: "Dashboard", resumo: "Painel de números que você mesmo monta: escolhe o cartão, a fonte e o nome.", href: "/dashboard", nota: "Entre em “Editar painel” para adicionar, renomear, redimensionar e reordenar cartões. Salva sozinho." },
+      {
+        titulo: "Início",
+        resumo: "Responde uma pergunta só: o que precisa de você agora.",
+        href: "/inicio",
+        nota: "Lista gente esperando atendimento, tarefa atrasada ou vencendo hoje, negócio parado há mais de 7 dias na mesma etapa, bloco incompleto travando agente e relógio parado. Sem nada pendente, ela diz “tudo em dia” em vez de encher de cartão.",
+      },
+      {
+        titulo: "Dashboard",
+        resumo: "Painel de números que você mesmo monta: escolhe o cartão, a fonte e o nome.",
+        href: "/dashboard",
+        nota: "Em “Editar painel” dá pra adicionar, renomear, redimensionar (1/3, 2/3 ou cheia) e reordenar. Cinco formatos: número, linha, pizza, barras e tabela. Salva sozinho, e o painel é um por organização — não por pessoa.",
+      },
       { titulo: "Insights", resumo: "Quanto o agente resolve sozinho, onde a conversa para, horário de pico e o que mais falam.", href: "/insights", nota: "“Onde a conversa para” mostra o último bloco de cada execução — é o painel que aponta a pergunta específica que faz gente desistir." },
       { titulo: "Eva Studio", resumo: "Lista dos agentes, com o próximo passo de cada um e sete dias de conversa em barras.", href: "/agent-studio" },
       { titulo: "Builder de conversa", resumo: "Monta o fluxo em blocos. Tem Editor (canvas), Modo Conversa e Execuções.", nota: "O bloco novo já nasce conectado no bloco selecionado. A paleta diz onde ele vai cair antes de você clicar." },
-      { titulo: "Aprovações", resumo: "Fila do que precisa de um aval humano antes de sair.", href: "/aprovacoes" },
+      {
+        titulo: "Aprovações",
+        resumo: "O status real dos seus templates na Meta, lido ao vivo da conta de negócio.",
+        href: "/aprovacoes",
+        nota: "Mostra primeiro o que está quebrado: modelo configurado no Builder apontando para um template que a Meta rejeitou, pausou ou que nem existe mais. Fora da janela de 24h esses disparos não saem, e sem esta tela ninguém fica sabendo.",
+      },
       { titulo: "Disparos", resumo: "Envio em massa para uma lista, agora ou agendado.", href: "/disparos" },
       { titulo: "Sequências", resumo: "Régua de follow-up: uma fila de mensagens com espera entre elas.", href: "/sequencias", nota: "Entra por etiqueta, por segmento, por etapa do funil (inclusive “parado há N dias”) ou só manualmente." },
       { titulo: "Biblioteca", resumo: "Fluxos prontos para aplicar num agente sem montar do zero.", href: "/biblioteca" },
@@ -293,6 +308,42 @@ export const SECOES: Secao[] = [
   },
 
   {
+    id: "templates",
+    titulo: "Templates do WhatsApp oficial",
+    icone: ShieldCheck,
+    intro:
+      "A regra que mais confunde: dentro de 24 horas da última mensagem da pessoa, o agente manda o texto que quiser. Passou disso, a Meta só entrega por template aprovado por ela. Vale para WhatsApp oficial e Instagram.",
+    itens: [
+      {
+        titulo: "Criar um template",
+        resumo: "Templates nascem no Gerenciador da Meta, não aqui.",
+        nota: "O Eva Studio lê o que a Meta decidiu; criar e editar continua sendo lá, porque quem aprova é ela.",
+      },
+      {
+        titulo: "Apontar um modelo para o template",
+        resumo: "No Builder, o bloco de mensagem deixa escolher qual template usar fora da janela.",
+        onde: "Aba do agente → Modelos de mensagem",
+      },
+      {
+        titulo: "Ver o que foi aprovado",
+        resumo: "A tela de Aprovações lista tudo da sua conta de negócio, com status, categoria e motivo da recusa.",
+        href: "/aprovacoes",
+        onde: "Aprovações",
+      },
+      {
+        titulo: "Descobrir o que vai falhar antes de falhar",
+        resumo: "Aprovações cruza os dois lados e avisa quando um modelo daqui aponta para um template que não entrega.",
+        href: "/aprovacoes",
+        nota: "Esse é o caso que quebra campanha em silêncio: o disparo sai, a Meta recusa e ninguém percebe.",
+      },
+      {
+        titulo: "Modelo sem template",
+        resumo: "Funciona dentro das 24h, como texto livre. Fora delas, não sai.",
+      },
+    ],
+  },
+
+  {
     id: "dashboard",
     titulo: "Números disponíveis no Dashboard",
     icone: Database,
@@ -318,6 +369,11 @@ export const SECOES: Secao[] = [
         titulo: "Não manda mensagem fora da janela de 24h sem modelo",
         resumo: "É regra da Meta, não limitação do app.",
         nota: "Vale para WhatsApp oficial e Instagram. Cadastre modelos aprovados na aba do agente.",
+      },
+      {
+        titulo: "Template não se cria por aqui",
+        resumo: "O Eva Studio lê o status na Meta, mas criar e editar template é no Gerenciador dela.",
+        nota: "Quem aprova é a Meta; duplicar o formulário aqui só criaria duas verdades.",
       },
       {
         titulo: "A API pública cobre leads, não o CRM inteiro",
