@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
+import { DealDrawer } from "@/components/crm/deal-drawer";
 import { cn } from "@/lib/utils";
 
 interface DealCard {
@@ -96,13 +97,22 @@ function DealCardView({ deal, dragging }: { deal: DealCard; dragging?: boolean }
 
 function DraggableDeal({ deal, onOpen }: { deal: DealCard; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  // Onde o dedo desceu. Sem isso, arrastar um card para outra coluna também
+  // abriria o painel no fim do movimento: o dnd-kit deixa o clique passar.
+  const origem = React.useRef<{ x: number; y: number } | null>(null);
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }}
       {...listeners}
       {...attributes}
-      onClick={onOpen}
+      onPointerDownCapture={(e) => { origem.current = { x: e.clientX, y: e.clientY }; }}
+      onClick={(e) => {
+        const p = origem.current;
+        if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) return;
+        onOpen();
+      }}
       className="cursor-grab active:cursor-grabbing"
     >
       <DealCardView deal={deal} />
@@ -162,6 +172,7 @@ export default function NegociosPage() {
   const [stages, setStages] = React.useState<StageColumn[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [showNew, setShowNew] = React.useState(false);
+  const [openDealId, setOpenDealId] = React.useState<string | null>(null);
   const [dragging, setDragging] = React.useState<DealCard | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -269,11 +280,19 @@ export default function NegociosPage() {
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             {stages.map((stage) => (
-              <StageColumnView key={stage.id} stage={stage} onOpenDeal={() => {}} />
+              <StageColumnView key={stage.id} stage={stage} onOpenDeal={(d) => setOpenDealId(d.id)} />
             ))}
           </div>
           <DragOverlay>{dragging && <DealCardView deal={dragging} dragging />}</DragOverlay>
         </DndContext>
+      )}
+
+      {openDealId && (
+        <DealDrawer
+          dealId={openDealId}
+          onClose={() => setOpenDealId(null)}
+          onChanged={refresh}
+        />
       )}
 
       {showNew && (

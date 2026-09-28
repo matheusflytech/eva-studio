@@ -30,6 +30,8 @@ interface Sequence {
   trigger: string;
   triggerTag: { id: string; name: string } | null;
   triggerSegment: { id: string; name: string } | null;
+  triggerStage: { id: string; name: string; pipeline: string } | null;
+  triggerStageDays: number;
   allowReentry: boolean;
   stopOnReply: boolean;
   totalEnrollments: number;
@@ -39,6 +41,7 @@ interface Sequence {
 
 interface TagRow { id: string; name: string }
 interface SegmentRow { id: string; name: string }
+interface PipelineRow { id: string; name: string; stages: { id: string; name: string }[] }
 
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp_meta: "WhatsApp (oficial)",
@@ -50,10 +53,56 @@ const CHANNEL_LABEL: Record<string, string> = {
 const TRIGGER_LABEL: Record<string, string> = {
   tag: "Ao receber etiqueta",
   segment: "Ao entrar no segmento",
+  stage: "Por etapa do funil",
   manual: "Inscrição manual",
 };
 
 // Atraso é guardado em minutos, mas ninguém pensa em "2880 minutos".
+/**
+ * Gatilho por etapa: qual etapa e há quantos dias parado.
+ *
+ * Os dois campos juntos são o que separa duas réguas de naturezas diferentes:
+ * com 0 dias é acompanhamento (entrou em Proposta, começa a falar), com 7 é
+ * recuperação (esqueceram dele em Proposta faz uma semana).
+ */
+function StageTrigger({
+  idPrefix, pipelines, stageId, days, onStage, onDays,
+}: {
+  idPrefix: string;
+  pipelines: PipelineRow[];
+  stageId: string;
+  days: number;
+  onStage: (id: string) => void;
+  onDays: (n: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_140px] gap-4">
+      <div>
+        <Label htmlFor={`${idPrefix}-etapa`}>Etapa do funil</Label>
+        <Select id={`${idPrefix}-etapa`} value={stageId} onChange={(e) => onStage(e.target.value)}>
+          <option value="">Escolha...</option>
+          {pipelines.map((p) => (
+            <optgroup key={p.id} label={p.name}>
+              {p.stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+            </optgroup>
+          ))}
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor={`${idPrefix}-dias`}>Parado há</Label>
+        <Input
+          id={`${idPrefix}-dias`}
+          type="number"
+          min={0}
+          value={days}
+          onChange={(e) => onDays(Math.max(0, Number(e.target.value) || 0))}
+        />
+        <p className="mt-1 text-[11px] text-text-tertiary">dias. 0 = na hora</p>
+      </div>
+    </div>
+  );
+}
+
 function formatDelay(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
   if (minutes < 1440) {
@@ -80,6 +129,7 @@ export default function SequenciasPage() {
   const [sequences, setSequences] = React.useState<Sequence[]>([]);
   const [tags, setTags] = React.useState<TagRow[]>([]);
   const [segments, setSegments] = React.useState<SegmentRow[]>([]);
+  const [pipelines, setPipelines] = React.useState<PipelineRow[]>([]);
   const [templates, setTemplates] = React.useState<MessageTemplate[]>([]);
   const [editing, setEditing] = React.useState<Sequence | null>(null);
   const [showNew, setShowNew] = React.useState(false);
@@ -96,15 +146,17 @@ export default function SequenciasPage() {
 
   const refresh = React.useCallback(async () => {
     if (!agentId) return;
-    const [seqRes, tagRes, segRes, tpl] = await Promise.all([
+    const [seqRes, tagRes, segRes, pipeRes, tpl] = await Promise.all([
       fetch(`/api/agents/${agentId}/sequences`).then((r) => r.json()),
       fetch(`/api/tags`).then((r) => r.json()),
       fetch(`/api/segments`).then((r) => r.json()),
+      fetch(`/api/pipelines`).then((r) => r.json()),
       listTemplates(agentId).catch(() => []),
     ]);
     setSequences(seqRes.sequences ?? []);
     setTags(tagRes.tags ?? []);
     setSegments(segRes.segments ?? []);
+    setPipelines(pipeRes.pipelines ?? []);
     setTemplates(tpl);
   }, [agentId]);
 
@@ -184,6 +236,8 @@ export default function SequenciasPage() {
                     {CHANNEL_LABEL[s.channel] ?? s.channel} · {TRIGGER_LABEL[s.trigger]}
                     {s.trigger === "tag" && s.triggerTag && ` “${s.triggerTag.name}”`}
                     {s.trigger === "segment" && s.triggerSegment && ` “${s.triggerSegment.name}”`}
+                    {s.trigger === "stage" && s.triggerStage &&
+                      ` “${s.triggerStage.name}”${s.triggerStageDays > 0 ? ` parado há ${s.triggerStageDays}d` : ""}`}
                     {" · "}
                     {s.steps.length} passo{s.steps.length === 1 ? "" : "s"}
                   </p>
@@ -230,6 +284,7 @@ export default function SequenciasPage() {
           agentId={agentId}
           tags={tags}
           segments={segments}
+          pipelines={pipelines}
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); refresh(); }}
           onError={setError}
@@ -242,6 +297,7 @@ export default function SequenciasPage() {
           sequence={editing}
           tags={tags}
           segments={segments}
+          pipelines={pipelines}
           templates={templates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); refresh(); }}
@@ -253,11 +309,12 @@ export default function SequenciasPage() {
 }
 
 function NewSequenceModal({
-  agentId, tags, segments, onClose, onCreated, onError,
+  agentId, tags, segments, pipelines, onClose, onCreated, onError,
 }: {
   agentId: string;
   tags: TagRow[];
   segments: SegmentRow[];
+  pipelines: PipelineRow[];
   onClose: () => void;
   onCreated: () => void;
   onError: (e: string | null) => void;
@@ -267,6 +324,8 @@ function NewSequenceModal({
   const [trigger, setTrigger] = React.useState("tag");
   const [triggerTagId, setTriggerTagId] = React.useState("");
   const [triggerSegmentId, setTriggerSegmentId] = React.useState("");
+  const [triggerStageId, setTriggerStageId] = React.useState("");
+  const [triggerStageDays, setTriggerStageDays] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
 
   async function save() {
@@ -275,7 +334,9 @@ function NewSequenceModal({
     const res = await fetch(`/api/agents/${agentId}/sequences`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, channel, trigger, triggerTagId, triggerSegmentId }),
+      body: JSON.stringify({
+        name, channel, trigger, triggerTagId, triggerSegmentId, triggerStageId, triggerStageDays,
+      }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -308,6 +369,7 @@ function NewSequenceModal({
               <Select id="ns-gatilho" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
                 <option value="tag">Recebe uma etiqueta</option>
                 <option value="segment">Entra num segmento</option>
+                <option value="stage">Negócio entra numa etapa</option>
                 <option value="manual">Só inscrição manual</option>
               </Select>
             </div>
@@ -331,6 +393,16 @@ function NewSequenceModal({
               </Select>
             </div>
           )}
+          {trigger === "stage" && (
+            <StageTrigger
+              idPrefix="ns"
+              pipelines={pipelines}
+              stageId={triggerStageId}
+              days={triggerStageDays}
+              onStage={setTriggerStageId}
+              onDays={setTriggerStageDays}
+            />
+          )}
 
           {channel === "instagram" && (
             <p className="rounded-2xl bg-surface-2 px-4 py-3 text-[12px] text-text-secondary">
@@ -352,12 +424,13 @@ function NewSequenceModal({
 }
 
 function SequenceEditor({
-  agentId, sequence, tags, segments, templates, onClose, onSaved, onError,
+  agentId, sequence, tags, segments, pipelines, templates, onClose, onSaved, onError,
 }: {
   agentId: string;
   sequence: Sequence;
   tags: TagRow[];
   segments: SegmentRow[];
+  pipelines: PipelineRow[];
   templates: MessageTemplate[];
   onClose: () => void;
   onSaved: () => void;
@@ -368,6 +441,8 @@ function SequenceEditor({
   const [trigger, setTrigger] = React.useState(sequence.trigger);
   const [triggerTagId, setTriggerTagId] = React.useState(sequence.triggerTag?.id ?? "");
   const [triggerSegmentId, setTriggerSegmentId] = React.useState(sequence.triggerSegment?.id ?? "");
+  const [triggerStageId, setTriggerStageId] = React.useState(sequence.triggerStage?.id ?? "");
+  const [triggerStageDays, setTriggerStageDays] = React.useState(sequence.triggerStageDays ?? 0);
   const [stopOnReply, setStopOnReply] = React.useState(sequence.stopOnReply);
   const [allowReentry, setAllowReentry] = React.useState(sequence.allowReentry);
   const [steps, setSteps] = React.useState<SequenceStep[]>(sequence.steps);
@@ -384,7 +459,8 @@ function SequenceEditor({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name, channel, trigger, triggerTagId, triggerSegmentId, stopOnReply, allowReentry, steps,
+        name, channel, trigger, triggerTagId, triggerSegmentId, triggerStageId, triggerStageDays,
+        stopOnReply, allowReentry, steps,
       }),
     });
     setSaving(false);
@@ -421,6 +497,7 @@ function SequenceEditor({
               <Select id="es-gatilho" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
                 <option value="tag">Recebe uma etiqueta</option>
                 <option value="segment">Entra num segmento</option>
+                <option value="stage">Negócio entra numa etapa</option>
                 <option value="manual">Só inscrição manual</option>
               </Select>
             </div>
@@ -443,6 +520,17 @@ function SequenceEditor({
               </div>
             )}
           </div>
+
+          {trigger === "stage" && (
+            <StageTrigger
+              idPrefix="es"
+              pipelines={pipelines}
+              stageId={triggerStageId}
+              days={triggerStageDays}
+              onStage={setTriggerStageId}
+              onDays={setTriggerStageDays}
+            />
+          )}
 
           <div className="flex flex-col gap-2.5 rounded-2xl bg-surface-2 px-4 py-3">
             <label className="flex items-center justify-between gap-4">

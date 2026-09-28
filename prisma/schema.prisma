@@ -675,10 +675,17 @@ model Sequence {
   channel          String   @default("whatsapp_meta")
   active           Boolean  @default(false)
   // "tag" = quando a etiqueta triggerTagId e aplicada; "segment" = quando o
-  // contato passa a bater com triggerSegmentId; "manual" = so inscricao a mao.
-  trigger          String   @default("manual") // tag | segment | manual
+  // contato passa a bater com triggerSegmentId; "stage" = quando um negocio
+  // do contato entra na etapa triggerStageId; "manual" = so inscricao a mao.
+  trigger          String   @default("manual") // tag | segment | stage | manual
   triggerTagId     String?
   triggerSegmentId String?
+  triggerStageId   String?
+  // So para trigger "stage": exige que o negocio esteja parado na etapa ha
+  // pelo menos N dias. 0 = entra assim que chega na etapa. E o que separa
+  // "acabou de entrar em Proposta" de "esta esquecido em Proposta ha uma
+  // semana", que sao reguas completamente diferentes.
+  triggerStageDays Int      @default(0)
   // Nao reinscreve quem ja passou pela sequencia.
   allowReentry     Boolean  @default(false)
   // Sai da sequencia se o contato responder qualquer coisa — o padrao certo
@@ -692,6 +699,7 @@ model Sequence {
   enrollments    SequenceEnrollment[]
   triggerTag     Tag?                 @relation("SequenceTriggerTag", fields: [triggerTagId], references: [id], onDelete: SetNull)
   triggerSegment Segment?             @relation("SequenceTriggerSegment", fields: [triggerSegmentId], references: [id], onDelete: SetNull)
+  triggerStage   PipelineStage?       @relation("SequenceTriggerStage", fields: [triggerStageId], references: [id], onDelete: SetNull)
 
   @@index([agentId])
   @@map("eva_studio_sequences")
@@ -918,8 +926,9 @@ model PipelineStage {
   // significa ganho, e nao da pra calcular taxa de conversao.
   type       String @default("open")
 
-  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  deals    Deal[]
+  pipeline  Pipeline   @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals     Deal[]
+  sequences Sequence[] @relation("SequenceTriggerStage")
 
   @@index([pipelineId])
   @@map("eva_studio_pipeline_stages")
@@ -945,6 +954,9 @@ model Deal {
   archivedAt        DateTime?
   // Ordem do card dentro da coluna do kanban (o "index" do Atomic CRM).
   position          Int       @default(0)
+  // Quando entrou na etapa atual. updatedAt nao serve: qualquer edicao no
+  // negocio o move, e "parado ha 7 dias" viraria mentira.
+  stageSince        DateTime  @default(now())
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

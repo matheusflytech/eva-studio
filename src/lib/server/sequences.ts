@@ -135,6 +135,46 @@ export async function enrollBySegments(limitPerSequence = 200): Promise<number> 
   return enrolled;
 }
 
+/**
+ * Inscreve contatos cujo negócio entrou (ou está parado) na etapa gatilho.
+ *
+ * Mesma natureza do gatilho por segmento: não existe um evento para assinar,
+ * porque "parado há 7 dias" acontece pela passagem do tempo, não por uma ação.
+ * Por isso é varredura, junto do relógio.
+ *
+ * Com triggerStageDays = 0 a régua começa assim que o negócio chega na etapa;
+ * com 7, só quando ele está esquecido ali há uma semana. São duas réguas
+ * bem diferentes: a primeira é acompanhamento, a segunda é recuperação.
+ */
+export async function enrollByDealStage(limitPerSequence = 200): Promise<number> {
+  const sequences = await prisma.sequence.findMany({
+    where: { active: true, trigger: "stage", triggerStageId: { not: null } },
+  });
+
+  let enrolled = 0;
+  for (const sequence of sequences) {
+    const corte = new Date(Date.now() - sequence.triggerStageDays * 86_400_000);
+
+    const deals = await prisma.deal.findMany({
+      where: {
+        stageId: sequence.triggerStageId!,
+        closedAt: null,
+        archivedAt: null,
+        stageSince: { lte: corte },
+      },
+      select: { contacts: { select: { contactId: true } } },
+      take: limitPerSequence,
+    });
+
+    // Um negócio pode ter vários contatos; a régua vale para todos eles.
+    const contatos = [...new Set(deals.flatMap((d) => d.contacts.map((c) => c.contactId)))];
+    for (const contactId of contatos) {
+      if (await enrollContact(sequence.id, contactId)) enrolled += 1;
+    }
+  }
+  return enrolled;
+}
+
 export interface ProcessResult {
   processed: number;
   delivered: number;

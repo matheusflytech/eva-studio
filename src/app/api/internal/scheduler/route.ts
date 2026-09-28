@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
-import { processDueEnrollments, enrollBySegments } from "@/lib/server/sequences";
+import { processDueEnrollments, enrollBySegments, enrollByDealStage } from "@/lib/server/sequences";
 import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
 import { registrarBatida } from "@/lib/server/heartbeat";
 
@@ -46,7 +46,8 @@ export async function POST(request: Request) {
   // Primeiro inscreve quem passou a bater com um segmento, depois entrega os
   // passos vencidos — nessa ordem, quem acabou de entrar já começa a contar o
   // relógio a partir de agora em vez de esperar a próxima varredura.
-  const newlyEnrolled = await enrollBySegments();
+  const [porSegmento, porEtapa] = await Promise.all([enrollBySegments(), enrollByDealStage()]);
+  const newlyEnrolled = porSegmento + porEtapa;
   const [sequences, broadcasts] = await Promise.all([processDueEnrollments(50), runDueBroadcasts(10)]);
 
   return NextResponse.json({

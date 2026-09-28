@@ -107,6 +107,7 @@ export async function createDeal(input: CreateDealInput) {
       amountCents: Math.max(0, Math.round(input.amountCents ?? 0)),
       currency: input.currency ?? "BRL",
       probability: stage.probability,
+      stageSince: new Date(),
       companyId: input.companyId ?? null,
       ownerId: input.ownerId ?? null,
       expectedClosingAt: input.expectedClosingAt ?? null,
@@ -135,6 +136,10 @@ export async function moveDealStage(dealId: string, stageId: string, lostReason?
       stageId,
       pipelineId: stage.pipelineId,
       probability: stage.probability,
+      // Zera o relógio da etapa: é isto que faz "parado há 7 dias" significar
+      // alguma coisa. updatedAt não serve, porque qualquer edição no negócio
+      // o move e a régua de recuperação nunca dispararia.
+      stageSince: new Date(),
       closedAt: closing ? new Date() : null,
       lostReason: stage.type === "lost" ? lostReason ?? "" : "",
     },

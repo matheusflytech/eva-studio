@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ContactActivity } from "@/components/crm/contact-activity";
 import { formatRelativeDate } from "@/lib/utils";
 
 interface ContactTag {
@@ -621,6 +622,9 @@ function ContactDrawer({
     name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes,
   });
   const [saving, setSaving] = React.useState(false);
+  const [aba, setAba] = React.useState("ficha");
+  // Contador na aba: a pessoa precisa ver que há tarefa aberta sem trocar de aba.
+  const [tarefasAbertas, setTarefasAbertas] = React.useState(0);
 
   React.useEffect(() => {
     setForm({ name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes });
@@ -674,7 +678,19 @@ function ContactDrawer({
           </button>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <Tabs value={aba} onValueChange={setAba}>
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="ficha" className="flex-1">Ficha</TabsTrigger>
+            <TabsTrigger value="atividade" className="flex-1">
+              Atividade{tarefasAbertas > 0 ? ` (${tarefasAbertas})` : ""}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="atividade">
+            <ContactActivity contactId={contact.id} onCountsChange={setTarefasAbertas} />
+          </TabsContent>
+
+          <TabsContent value="ficha" className="flex flex-col gap-5">
           <section className="flex flex-col gap-3">
             <div>
               <Label htmlFor="d-nome">Nome</Label>
@@ -773,7 +789,8 @@ function ContactDrawer({
               <Trash2 size={15} /> Apagar
             </Button>
           </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </aside>
     </div>
   );

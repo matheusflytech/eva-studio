@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 
-const VALID_TRIGGERS = new Set(["tag", "segment", "manual"]);
+const VALID_TRIGGERS = new Set(["tag", "segment", "stage", "manual"]);
 const VALID_CHANNELS = new Set(["whatsapp_meta", "whatsapp_qr", "instagram", "telegram"]);
 
 export async function GET(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
@@ -19,6 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
       steps: { orderBy: { order: "asc" } },
       triggerTag: { select: { id: true, name: true } },
       triggerSegment: { select: { id: true, name: true } },
+      triggerStage: { select: { id: true, name: true, pipeline: { select: { name: true } } } },
       _count: { select: { enrollments: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -42,6 +43,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
       trigger: s.trigger,
       triggerTag: s.triggerTag,
       triggerSegment: s.triggerSegment,
+      triggerStage: s.triggerStage
+        ? { id: s.triggerStage.id, name: s.triggerStage.name, pipeline: s.triggerStage.pipeline.name }
+        : null,
+      triggerStageDays: s.triggerStageDays,
       allowReentry: s.allowReentry,
       stopOnReply: s.stopOnReply,
       totalEnrollments: s._count.enrollments,
@@ -82,6 +87,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       trigger,
       triggerTagId: trigger === "tag" ? body.triggerTagId ?? null : null,
       triggerSegmentId: trigger === "segment" ? body.triggerSegmentId ?? null : null,
+      triggerStageId: trigger === "stage" ? body.triggerStageId ?? null : null,
+      triggerStageDays: trigger === "stage" ? Math.max(0, Number(body.triggerStageDays ?? 0) || 0) : 0,
       allowReentry: body.allowReentry === true,
       stopOnReply: body.stopOnReply !== false,
       // Nasce desligada de propósito: uma régua sem passo nenhum que já sai

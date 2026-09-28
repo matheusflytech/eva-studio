@@ -55,6 +55,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
     data.probability = Math.min(100, Math.max(0, Number(body.probability) || 0));
   }
   if (body.position !== undefined) data.position = Number(body.position) || 0;
+  // Sem trocar de etapa: é o caso de quem perdeu o negócio agora e só volta
+  // depois para registrar por quê.
+  if (typeof body.lostReason === "string" && !body.stageId) data.lostReason = body.lostReason;
   if (body.expectedClosingAt !== undefined) {
     data.expectedClosingAt = body.expectedClosingAt ? new Date(body.expectedClosingAt) : null;
   }

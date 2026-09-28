@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Building2, Plus, Search, Loader2, Users, Handshake } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -88,14 +89,14 @@ export default function EmpresasPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {companies.map((c) => (
-            <Card key={c.id} className="flex flex-col gap-3">
-              <div className="min-w-0">
+            <Card key={c.id} className="flex flex-col gap-3 transition-colors hover:border-border-strong">
+              <Link href={`/empresas/${c.id}`} className="min-w-0 outline-none">
                 <div className="truncate font-medium text-text-primary">{c.name}</div>
                 <div className="truncate text-[12px] text-text-tertiary">
                   {[c.sector, c.city && c.uf ? `${c.city}/${c.uf}` : c.city].filter(Boolean).join(" · ") || "—"}
                 </div>
                 {c.cnpj && <div className="mt-0.5 font-mono text-[11.5px] text-text-tertiary">{formatCnpj(c.cnpj)}</div>}
-              </div>
+              </Link>
               <div className="flex items-center gap-4 border-t border-border-subtle pt-3 text-[12px] text-text-secondary">
                 <span className="inline-flex items-center gap-1.5">
                   <Users size={13} className="text-text-tertiary" /> {c.contactCount}
