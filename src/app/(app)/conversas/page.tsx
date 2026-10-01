@@ -119,6 +119,13 @@ export default function ConversasPage() {
     return () => clearInterval(interval);
   }, [load]);
 
+  // Sem seleção explícita, a primeira da lista é a selecionada de fato —
+  // não só visualmente.
+  React.useEffect(() => {
+    if (selectedId || !conversations || conversations.length === 0) return;
+    setSelectedId(conversations[0].id);
+  }, [selectedId, conversations]);
+
   React.useEffect(() => {
     if (!selectedId) return;
     setIsLoadingMessages(true);
