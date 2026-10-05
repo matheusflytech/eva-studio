@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { decryptSecret } from "@/lib/server/crypto";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
+import { guardarMidiaTelegram, orgDoAgente, textoDeAnexo, type MidiaGuardada } from "@/lib/server/media-inbound";
 
 // ---------------------------------------------------------------------------
 // Webhook do Telegram.
@@ -16,11 +17,29 @@ import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 // conseguiria injetar conversa falsa no fluxo.
 // ---------------------------------------------------------------------------
 
+interface TelegramArquivo {
+  file_id?: string;
+  mime_type?: string;
+  file_name?: string;
+}
+
 interface TelegramUpdate {
   message?: {
+    message_id?: number;
     chat?: { id?: number | string; first_name?: string; username?: string };
     from?: { first_name?: string; username?: string };
     text?: string;
+    caption?: string;
+    // O Telegram manda a mesma foto em vários tamanhos; o último é o maior.
+    photo?: { file_id?: string }[];
+    document?: TelegramArquivo;
+    voice?: TelegramArquivo;
+    audio?: TelegramArquivo;
+    video?: TelegramArquivo;
+    video_note?: TelegramArquivo;
+    sticker?: TelegramArquivo & { is_animated?: boolean; is_video?: boolean };
+    location?: { latitude?: number; longitude?: number };
+    contact?: { first_name?: string; phone_number?: string };
   };
   callback_query?: {
     id?: string;
@@ -55,14 +74,66 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   if (chatId === undefined || chatId === null) return NextResponse.json({ ok: true });
 
   const contactId = String(chatId);
-  const text = update.message?.text;
+  let text = update.message?.text;
+  let media: MidiaGuardada | undefined;
   // Botão tocado: o `data` do callback carrega o id da opção do bloco de
   // Captura, mesma semântica do optionId dos outros canais.
   const optionId = update.callback_query?.data;
 
-  if (text === undefined && optionId === undefined) return NextResponse.json({ ok: true });
+  // Anexos. Antes só texto passava e o resto sumia sem rastro.
+  const m = update.message;
+  if (m && text === undefined) {
+    const orgId = await orgDoAgente(agentId);
+    const legenda = m.caption;
 
-  const result = await advanceConversation({ agentId, channel: "telegram", contactId, text, optionId });
+    const arquivo: { id?: string; tipo: "image" | "audio" | "video" | "document" | "sticker"; dica?: string; nome?: string } | null =
+      m.photo?.length
+        ? { id: m.photo[m.photo.length - 1].file_id, tipo: "image", dica: "image/jpeg" }
+        : m.voice
+          ? { id: m.voice.file_id, tipo: "audio", dica: m.voice.mime_type ?? "audio/ogg" }
+          : m.audio
+            ? { id: m.audio.file_id, tipo: "audio", dica: m.audio.mime_type, nome: m.audio.file_name }
+            : m.video
+              ? { id: m.video.file_id, tipo: "video", dica: m.video.mime_type ?? "video/mp4" }
+              : m.video_note
+                ? { id: m.video_note.file_id, tipo: "video", dica: "video/mp4" }
+                : m.document
+                  ? { id: m.document.file_id, tipo: "document", dica: m.document.mime_type, nome: m.document.file_name }
+                  : m.sticker && !m.sticker.is_animated && !m.sticker.is_video
+                    ? { id: m.sticker.file_id, tipo: "sticker", dica: "image/webp" }
+                    : null;
+
+    if (arquivo) {
+      const guardada =
+        orgId && arquivo.id
+          ? await guardarMidiaTelegram(orgId, conn.botToken, arquivo.id, {
+              mimeDica: arquivo.dica,
+              name: arquivo.nome,
+              tipoForcado: arquivo.tipo === "sticker" ? "sticker" : undefined,
+            })
+          : null;
+      media = guardada ?? undefined;
+      text = textoDeAnexo(arquivo.tipo, legenda, !guardada);
+    } else if (m.location) {
+      text = `[Localização] https://maps.google.com/?q=${m.location.latitude},${m.location.longitude}`;
+    } else if (m.contact) {
+      text = `[Contato compartilhado] ${[m.contact.first_name, m.contact.phone_number].filter(Boolean).join(" ")}`;
+    } else if (m.sticker) {
+      text = "[Figurinha]";
+    }
+  }
+
+  if (text === undefined && optionId === undefined && !media) return NextResponse.json({ ok: true });
+
+  const result = await advanceConversation({
+    agentId,
+    channel: "telegram",
+    contactId,
+    text,
+    optionId,
+    media,
+    externalId: update.message?.message_id ? String(update.message.message_id) : undefined,
+  });
 
   const token = decryptSecret(conn.botToken);
 

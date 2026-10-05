@@ -86,7 +86,7 @@ export async function GET(request: Request) {
   // ── Quanto o agente resolve sozinho ──────────────────────────────────────
   // É O número de um produto de atendimento automático. Tudo o mais é detalhe
   // ao lado de "de cada dez conversas, quantas não precisaram de gente".
-  const escalaram = conversas.filter((c) => c.status === "waiting_human").length;
+  const escalaram = conversas.filter((c) => c.status === "waiting_human" || c.status === "human").length;
   const autonomia = conversas.length > 0 ? 1 - escalaram / conversas.length : null;
 
   // ── Por canal ────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export async function GET(request: Request) {
   for (const c of conversas) {
     const atual = canais.get(c.channel) ?? { total: 0, escalou: 0 };
     atual.total += 1;
-    if (c.status === "waiting_human") atual.escalou += 1;
+    if (c.status === "waiting_human" || c.status === "human") atual.escalou += 1;
     canais.set(c.channel, atual);
   }
 

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { registrarMensagens } from "@/lib/server/inbox";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 
 // Leads = conversas do canal "website" — tanto as que vieram do widget de
@@ -78,13 +79,9 @@ export async function POST(request: Request) {
     },
   });
 
-  await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      role: "bot",
-      text: viaSecret ? "Lead recebido via API." : "Lead adicionado manualmente.",
-    },
-  });
+  await registrarMensagens(conversation.id, [
+    { role: "bot", text: viaSecret ? "Lead recebido via API." : "Lead adicionado manualmente." },
+  ]);
 
   return NextResponse.json({ id: conversation.id });
 }

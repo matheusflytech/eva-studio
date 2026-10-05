@@ -1,36 +1,84 @@
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
+import { requirePermission } from "@/lib/server/permissions";
+import { CANAIS_DE_TESTE, INCLUDE_CONVERSA, montarItens } from "@/lib/server/conversas";
+import type { Prisma } from "@/generated/prisma/client";
 
-export async function GET() {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+// ---------------------------------------------------------------------------
+// Lista da caixa de entrada.
+//
+//   ?filtro=todas|esperando|minhas|agente|encerradas
+//   ?q=texto              nome, telefone, e-mail ou trecho da última mensagem
+//   ?canal=whatsapp_meta
+//   ?testes=1             inclui Playground e prévia do Builder
+//   ?limite=40&antes=ISO  paginação: as mais antigas que a data
+//   ?desde=ISO            só as que mudaram depois (é o que a tela usa pra
+//                         se manter atualizada sem baixar a lista toda)
+// ---------------------------------------------------------------------------
 
-  const rows = await prisma.conversation.findMany({
-    where: { agent: { orgId } },
-    include: {
-      agent: { select: { name: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
-      assignedTo: { select: { id: true, name: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 100,
+export async function GET(request: Request) {
+  const ctx = await requirePermission("read");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+
+  const params = new URL(request.url).searchParams;
+  const filtro = params.get("filtro") ?? "todas";
+  const q = params.get("q")?.trim() ?? "";
+  const canal = params.get("canal") ?? "";
+  const comTestes = params.get("testes") === "1";
+  const limite = Math.min(Math.max(Number(params.get("limite")) || 40, 1), 100);
+  const antes = params.get("antes");
+  const desde = params.get("desde");
+
+  const e: Prisma.ConversationWhereInput[] = [{ agent: { orgId: ctx.orgId } }];
+
+  if (!comTestes) e.push({ channel: { notIn: CANAIS_DE_TESTE } });
+  if (canal) e.push({ channel: canal });
+
+  if (filtro === "esperando") e.push({ status: "waiting_human" });
+  else if (filtro === "minhas") e.push({ assignedToId: ctx.userId, status: { in: ["human", "waiting_human"] } });
+  else if (filtro === "agente") e.push({ status: "active" });
+  else if (filtro === "encerradas") e.push({ status: "ended" });
+
+  if (q) {
+    e.push({
+      OR: [
+        { contactId: { contains: q, mode: "insensitive" } },
+        { lastMessageText: { contains: q, mode: "insensitive" } },
+        { contact: { name: { contains: q, mode: "insensitive" } } },
+        { contact: { phone: { contains: q } } },
+        { contact: { email: { contains: q, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const dData = (v: string | null) => {
+    const d = v ? new Date(v) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : null;
+  };
+
+  // Atualização incremental: tudo que mexeu depois do corte, de qualquer
+  // jeito (mensagem nova, assumida, encerrada). `updatedAt` cobre as mudanças
+  // de estado; `lastMessageAt` as mensagens.
+  const dDesde = dData(desde);
+  if (dDesde) e.push({ OR: [{ updatedAt: { gt: dDesde } }, { lastMessageAt: { gt: dDesde } }] });
+
+  const dAntes = dData(antes);
+  if (dAntes && !dDesde) e.push({ lastMessageAt: { lt: dAntes } });
+
+  const linhas = await prisma.conversation.findMany({
+    where: { AND: e },
+    include: INCLUDE_CONVERSA,
+    orderBy: { lastMessageAt: "desc" },
+    // Um a mais que o pedido: é como se sabe se tem outra página sem contar tudo.
+    take: limite + 1,
   });
 
+  const temMais = linhas.length > limite;
+  const pagina = temMais ? linhas.slice(0, limite) : linhas;
+
   return NextResponse.json({
-    conversations: rows.map((c) => ({
-      id: c.id,
-      agentId: c.agentId,
-      agentName: c.agent.name,
-      channel: c.channel,
-      contactId: c.contactId,
-      status: c.status,
-      assignedTo: c.assignedTo ? { id: c.assignedTo.id, name: c.assignedTo.name } : null,
-      updatedAt: c.updatedAt.toISOString(),
-      lastContactMessageAt: c.lastContactMessageAt ? c.lastContactMessageAt.toISOString() : null,
-      lastMessage: c.messages[0]
-        ? { text: c.messages[0].text, role: c.messages[0].role, createdAt: c.messages[0].createdAt.toISOString() }
-        : null,
-    })),
+    conversations: await montarItens(pagina),
+    temMais,
+    agora: new Date().toISOString(),
   });
 }

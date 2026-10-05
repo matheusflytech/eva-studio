@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import type { Edge } from "@xyflow/react";
-import { requireOrgId } from "@/lib/auth/require-org";
+import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { nextNodeId } from "@/lib/server/flow-engine";
 
-// "Retomar bot" — sai do waiting_human e continua o fluxo a partir do bloco
+// "Devolver ao agente" — sai de waiting_human ou human e continua o fluxo a partir do bloco
 // seguinte ao "Transferir p/ humano" onde a conversa estava parada. Sem
 // saída conectada dali, a próxima mensagem do contato recomeça o fluxo do
 // zero (mesmo comportamento de "conversa nova" que o motor já tem).
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("conversations:reply");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
-  const conversation = await prisma.conversation.findFirst({ where: { id, agent: { orgId } } });
+  const conversation = await prisma.conversation.findFirst({ where: { id, agent: { orgId: ctx.orgId } } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
 
   const flow = await prisma.agentFlow.findUnique({ where: { agentId: conversation.agentId } });
@@ -22,7 +22,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   await prisma.conversation.update({
     where: { id: conversation.id },
-    data: { status: "active", currentNodeId: next },
+    // Devolver solta a responsabilidade também: conversa com o agente não
+    // tem dono, e um nome ali faria parecer que alguém ainda cuida dela.
+    data: { status: "active", currentNodeId: next, assignedToId: null },
   });
 
   return NextResponse.json({ ok: true });

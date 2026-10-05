@@ -1,307 +1,312 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, UserCheck, PlayCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { EmptyState } from "@/components/ui/empty-state";
-import { cn, formatRelativeDate } from "@/lib/utils";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MessagesSquare, X } from "lucide-react";
+import { ListaDeConversas } from "@/components/inbox/lista-de-conversas";
+import { ConversaAberta } from "@/components/inbox/conversa-aberta";
+import { PainelDoCliente } from "@/components/inbox/painel-do-cliente";
+import { useSondagem } from "@/components/inbox/use-sondagem";
+import type { Conversa, IdDoFiltro, Membro, Resumo } from "@/components/inbox/tipos";
+import { cn } from "@/lib/utils";
 
-interface ConversationSummary {
-  id: string;
-  agentId: string;
-  agentName: string;
-  channel: string;
-  contactId: string;
-  status: string;
-  assignedTo: { id: string; name: string } | null;
-  updatedAt: string;
-  lastContactMessageAt: string | null;
-  lastMessage: { text: string; role: string; createdAt: string } | null;
+// ---------------------------------------------------------------------------
+// Atendimento.
+//
+// Três colunas, no formato que todo mundo já conhece de WhatsApp Web e
+// Intercom: quem escreveu, a conversa, e quem é essa pessoa. A terceira é a que
+// importa pro produto: o CRM não fica noutra tela. O atendente muda a etapa do
+// negócio, cria a tarefa e etiqueta o cliente sem sair da conversa.
+//
+// A tela se mantém atualizada sozinha, mas só com a aba à vista (ver
+// use-sondagem.ts), e escolhe o que pedir: a lista inteira a cada poucos
+// segundos, as últimas mensagens só da conversa aberta.
+// ---------------------------------------------------------------------------
+
+const TAMANHO_DA_PAGINA = 40;
+const CHAVE_DO_SOM = "eva-inbox-som";
+
+function tocarAviso() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const ganho = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
+    ganho.gain.setValueAtTime(0.0001, ctx.currentTime);
+    ganho.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+    ganho.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+    osc.connect(ganho).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.32);
+    osc.onended = () => void ctx.close();
+  } catch {
+    // Navegador sem áudio ou bloqueado até o primeiro clique: sem som, só isso.
+  }
 }
 
-interface Message {
-  id: string;
-  role: string;
-  text: string;
-  createdAt: string;
-}
+function Conversas() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const selecionada = params.get("c");
 
-interface Member {
-  id: string;
-  name: string;
-  isMe: boolean;
-}
+  const [filtro, setFiltro] = React.useState<IdDoFiltro>("todas");
+  const [busca, setBusca] = React.useState("");
+  const [buscaAplicada, setBuscaAplicada] = React.useState("");
+  const [canal, setCanal] = React.useState("");
+  const [testes, setTestes] = React.useState(false);
 
-const CHANNEL_LABEL: Record<string, string> = {
-  telegram: "Telegram",
-  messenger: "Messenger",
-  tiktok: "TikTok",
-  playground: "Playground",
-  whatsapp_qr: "WhatsApp (QR)",
-  whatsapp_meta: "WhatsApp (Meta)",
-  instagram: "Instagram",
-  website: "Site (widget)",
-};
+  const [itens, setItens] = React.useState<Conversa[]>([]);
+  const [extras, setExtras] = React.useState<Conversa[]>([]);
+  const [temMais, setTemMais] = React.useState(false);
+  const [carregando, setCarregando] = React.useState(true);
+  const [carregandoMais, setCarregandoMais] = React.useState(false);
+  const [avulsa, setAvulsa] = React.useState<Conversa | null>(null);
+  const [resumo, setResumo] = React.useState<Resumo | null>(null);
+  const [membros, setMembros] = React.useState<Membro[]>([]);
+  const [meuId, setMeuId] = React.useState("");
+  const [painelAberto, setPainelAberto] = React.useState(false);
+  const [som, setSom] = React.useState(false);
 
-const STATUS_VARIANT: Record<string, "success" | "danger" | "neutral"> = {
-  active: "success",
-  waiting_human: "danger",
-  ended: "neutral",
-};
+  const naoLidasAnterior = React.useRef<number | null>(null);
+  const somRef = React.useRef(som);
+  somRef.current = som;
+  const filtrosRef = React.useRef({ filtro, buscaAplicada, canal, testes });
+  filtrosRef.current = { filtro, buscaAplicada, canal, testes };
+  const geracao = React.useRef(0);
 
-// Só faz sentido pro WhatsApp oficial (Meta) — via QR (Baileys) e Playground
-// não têm essa regra de janela de 24h.
-function windowLabel(c: ConversationSummary): { text: string; variant: "success" | "danger" } | null {
-  if (c.channel !== "whatsapp_meta") return null;
-  if (!c.lastContactMessageAt) return { text: "Fora da janela", variant: "danger" };
-  const hoursLeft = 24 - (Date.now() - new Date(c.lastContactMessageAt).getTime()) / 3_600_000;
-  return hoursLeft > 0
-    ? { text: `Dentro da janela · ${Math.max(1, Math.floor(hoursLeft))}h restantes`, variant: "success" }
-    : { text: "Fora da janela — precisa de modelo", variant: "danger" };
-}
+  React.useEffect(() => {
+    try {
+      setSom(localStorage.getItem(CHAVE_DO_SOM) === "1");
+    } catch {
+      // armazenamento bloqueado: segue sem som
+    }
+  }, []);
 
-export default function ConversasPage() {
-  const [conversations, setConversations] = React.useState<ConversationSummary[] | null>(null);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [messages, setMessages] = React.useState<Message[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = React.useState(false);
-  const [draft, setDraft] = React.useState("");
-  const [isSending, setIsSending] = React.useState(false);
-  const [isResuming, setIsResuming] = React.useState(false);
-  // Quem pode assumir uma conversa = membros da organização. Carregado uma
-  // vez: a lista muda raramente e é a mesma pra todas as conversas.
-  const [members, setMembers] = React.useState<Member[]>([]);
-  const [isAssigning, setIsAssigning] = React.useState(false);
+  function mudarSom(v: boolean) {
+    setSom(v);
+    try {
+      localStorage.setItem(CHAVE_DO_SOM, v ? "1" : "0");
+    } catch {
+      // idem
+    }
+    if (v) tocarAviso(); // confirma que funciona, e libera o áudio do navegador
+  }
+
+  // A busca espera a pessoa parar de digitar. Uma consulta por tecla, numa
+  // tabela com pool de conexão pequeno, é jeito de derrubar o banco.
+  React.useEffect(() => {
+    const t = setTimeout(() => setBuscaAplicada(busca.trim()), 300);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  const montarUrl = React.useCallback((extra: Record<string, string> = {}) => {
+    const f = filtrosRef.current;
+    const p = new URLSearchParams({ filtro: f.filtro, limite: String(TAMANHO_DA_PAGINA), ...extra });
+    if (f.buscaAplicada) p.set("q", f.buscaAplicada);
+    if (f.canal) p.set("canal", f.canal);
+    if (f.testes) p.set("testes", "1");
+    return `/api/conversations?${p}`;
+  }, []);
+
+  const carregarResumo = React.useCallback(async () => {
+    const res = await fetch("/api/inbox/summary");
+    if (!res.ok) return;
+    const dados = (await res.json()) as Resumo;
+    setResumo(dados);
+
+    // Chegou conversa nova desde a última olhada: avisa. Só soa se a pessoa
+    // pediu, e só quando ela não está olhando a tela agora.
+    const antes = naoLidasAnterior.current;
+    if (antes !== null && dados.naoLidas > antes && somRef.current) tocarAviso();
+    naoLidasAnterior.current = dados.naoLidas;
+  }, []);
+
+  const carregarLista = React.useCallback(async () => {
+    const g = geracao.current;
+    const res = await fetch(montarUrl());
+    if (!res.ok || g !== geracao.current) return;
+    const dados = await res.json();
+    if (g !== geracao.current) return;
+    setItens(dados.conversations as Conversa[]);
+    setExtras((e) => {
+      if (e.length === 0) setTemMais(!!dados.temMais);
+      return e;
+    });
+    setCarregando(false);
+  }, [montarUrl]);
+
+  // Trocou o filtro ou a busca: recomeça do zero e não aceita resposta de um
+  // pedido antigo que chegue atrasado.
+  React.useEffect(() => {
+    geracao.current += 1;
+    setItens([]);
+    setExtras([]);
+    setTemMais(false);
+    setCarregando(true);
+    void carregarLista();
+  }, [filtro, buscaAplicada, canal, testes, carregarLista]);
+
+  const lista = React.useMemo(
+    () => [...itens, ...extras.filter((e) => !itens.some((i) => i.id === e.id))],
+    [itens, extras]
+  );
+
+  const atual = React.useMemo(
+    () => lista.find((c) => c.id === selecionada) ?? (avulsa?.id === selecionada ? avulsa : null),
+    [lista, selecionada, avulsa]
+  );
+
+  // Conversa aberta por link, ou que sumiu da lista por causa do filtro: busca
+  // ela à parte pra a tela não ficar vazia com um id na URL.
+  const carregarAvulsa = React.useCallback(async () => {
+    if (!selecionada || lista.some((c) => c.id === selecionada)) return;
+    const res = await fetch(`/api/conversations/${selecionada}`);
+    if (res.ok) setAvulsa((await res.json()).conversation as Conversa);
+  }, [selecionada, lista]);
+
+  useSondagem(async () => {
+    await Promise.all([carregarLista(), carregarResumo(), carregarAvulsa()]);
+  }, 5000);
 
   React.useEffect(() => {
     fetch("/api/members")
       .then((r) => r.json())
-      .then((d) => setMembers(d.members ?? []))
-      .catch(() => setMembers([]));
+      .then((d) => {
+        setMeuId(d.me?.userId ?? "");
+        setMembros(d.members ?? []);
+      })
+      .catch(() => {});
   }, []);
 
-  async function handleAssign(conversationId: string, assignedToId: string | null) {
-    setIsAssigning(true);
-    try {
-      const res = await fetch(`/api/conversations/${conversationId}/assign`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedToId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setConversations((prev) =>
-          (prev ?? []).map((c) => (c.id === conversationId ? { ...c, assignedTo: data.assignedTo } : c))
-        );
-      }
-    } finally {
-      setIsAssigning(false);
-    }
-  }
-
-  const load = React.useCallback(async () => {
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    setConversations(data.conversations ?? []);
-  }, []);
-
-  const loadMessages = React.useCallback(async (id: string) => {
-    const res = await fetch(`/api/conversations/${id}/messages`);
-    const data = await res.json();
-    setMessages(data.messages ?? []);
-  }, []);
-
+  // Contador no título da aba: o jeito mais barato de saber que chegou algo
+  // sem estar olhando a tela.
   React.useEffect(() => {
-    load();
-    const interval = setInterval(load, 8000);
-    return () => clearInterval(interval);
-  }, [load]);
+    const n = resumo?.naoLidas ?? 0;
+    const base = "Eva";
+    document.title = n > 0 ? `(${n}) ${base}` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [resumo?.naoLidas]);
 
-  // Sem seleção explícita, a primeira da lista é a selecionada de fato —
-  // não só visualmente.
-  React.useEffect(() => {
-    if (selectedId || !conversations || conversations.length === 0) return;
-    setSelectedId(conversations[0].id);
-  }, [selectedId, conversations]);
+  function selecionar(id: string) {
+    router.replace(`/conversas?c=${id}`, { scroll: false });
+  }
 
-  React.useEffect(() => {
-    if (!selectedId) return;
-    setIsLoadingMessages(true);
-    loadMessages(selectedId).finally(() => setIsLoadingMessages(false));
-  }, [selectedId, loadMessages]);
+  function voltar() {
+    router.replace("/conversas", { scroll: false });
+  }
 
-  async function handleSendReply(conversationId: string) {
-    const text = draft.trim();
-    if (!text || isSending) return;
-    setIsSending(true);
-    try {
-      await fetch(`/api/conversations/${conversationId}/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      setDraft("");
-      await Promise.all([loadMessages(conversationId), load()]);
-    } finally {
-      setIsSending(false);
+  const atualizarTudo = React.useCallback(() => {
+    void carregarLista();
+    void carregarResumo();
+    void carregarAvulsa();
+  }, [carregarLista, carregarResumo, carregarAvulsa]);
+
+  async function carregarMais() {
+    const ultima = lista[lista.length - 1];
+    if (!ultima) return;
+    setCarregandoMais(true);
+    const res = await fetch(montarUrl({ antes: ultima.lastMessageAt }));
+    if (res.ok) {
+      const dados = await res.json();
+      setExtras((e) => [...e, ...(dados.conversations as Conversa[])]);
+      setTemMais(!!dados.temMais);
     }
+    setCarregandoMais(false);
   }
-
-  async function handleResume(conversationId: string) {
-    setIsResuming(true);
-    try {
-      await fetch(`/api/conversations/${conversationId}/resume`, { method: "POST" });
-      await load();
-    } finally {
-      setIsResuming(false);
-    }
-  }
-
-  if (conversations === null) return <div className="flex-1 p-8" />;
-
-  if (conversations.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-10">
-        <EmptyState
-          className="max-w-lg"
-          icon={<MessageSquare size={30} className="text-text-secondary" />}
-          title="Conversas"
-          description="Quando alguém falar com um dos seus agentes (Playground ou WhatsApp), a conversa aparece aqui."
-        />
-      </div>
-    );
-  }
-
-  const selected = conversations.find((c) => c.id === selectedId) ?? conversations[0];
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <div className="mb-5">
-        <h1 className="font-display text-xl font-semibold text-text-primary">Conversas</h1>
-        <p className="mt-1 text-[13px] text-text-secondary">Histórico real de conversas dos seus agentes.</p>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_330px]">
+        <ListaDeConversas
+          className={cn(selecionada ? "hidden lg:flex" : "flex")}
+          itens={lista}
+          selecionada={selecionada}
+          onSelecionar={selecionar}
+          filtro={filtro}
+          onFiltro={setFiltro}
+          busca={busca}
+          onBusca={setBusca}
+          canal={canal}
+          onCanal={setCanal}
+          testes={testes}
+          onTestes={setTestes}
+          resumo={resumo}
+          carregando={carregando}
+          temMais={temMais}
+          carregandoMais={carregandoMais}
+          onMais={carregarMais}
+          som={som}
+          onSom={mudarSom}
+        />
 
-      <div className="flex flex-1 gap-5 overflow-hidden">
-        <div className="glass-card w-[300px] shrink-0 overflow-y-auto rounded-3xl p-2">
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setSelectedId(c.id)}
-              className={cn(
-                "flex w-full flex-col gap-1 rounded-2xl p-3 text-left transition-colors",
-                (selected?.id ?? conversations[0].id) === c.id ? "bg-surface-3" : "hover:bg-surface-2"
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[13px] font-medium text-text-primary">{c.agentName}</p>
-                <Badge variant={STATUS_VARIANT[c.status] ?? "neutral"}>{c.status}</Badge>
-              </div>
-              <p className="truncate text-[11.5px] text-text-tertiary">
-                {CHANNEL_LABEL[c.channel] ?? c.channel} · {c.contactId}
+        {atual ? (
+          <ConversaAberta
+            key={atual.id}
+            className={cn(selecionada ? "flex" : "hidden lg:flex")}
+            conversa={atual}
+            meuId={meuId}
+            membros={membros}
+            onMudou={atualizarTudo}
+            onVoltar={voltar}
+            onAbrirCliente={() => setPainelAberto(true)}
+          />
+        ) : (
+          <section className={cn("glass-card min-h-0 flex-col items-center justify-center rounded-3xl p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
+            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2 text-text-tertiary">
+              <MessagesSquare size={26} />
+            </span>
+            <h2 className="font-display text-[17px] font-semibold text-text-primary">
+              {selecionada ? "Carregando a conversa..." : "Escolha uma conversa"}
+            </h2>
+            {!selecionada && (
+              <p className="mt-2 max-w-sm text-[13px] text-text-secondary">
+                Você vê o histórico, responde, deixa notas para a equipe e mexe no negócio do cliente sem sair daqui.
               </p>
-              {windowLabel(c) && (
-                <Badge variant={windowLabel(c)!.variant} className="w-fit">
-                  {windowLabel(c)!.text}
-                </Badge>
-              )}
-              {c.lastMessage && (
-                <p className="truncate text-[12px] text-text-secondary">
-                  {c.lastMessage.role === "bot" ? "Bot: " : c.lastMessage.role === "human" ? "Atendente: " : ""}
-                  {c.lastMessage.text}
-                </p>
-              )}
-              <p className="text-[11px] text-text-tertiary">{formatRelativeDate(c.updatedAt)}</p>
-            </button>
-          ))}
-        </div>
-
-        <div className="glass-card flex flex-1 flex-col rounded-3xl">
-          <div className="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
-            <div>
-              <p className="text-[13.5px] font-medium text-text-primary">{selected.agentName}</p>
-              <p className="text-[11.5px] text-text-tertiary">
-                {CHANNEL_LABEL[selected.channel] ?? selected.channel} · {selected.contactId}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {windowLabel(selected) && <Badge variant={windowLabel(selected)!.variant}>{windowLabel(selected)!.text}</Badge>}
-              {/* Sem atribuição, dois atendentes respondem a mesma pessoa —
-                  é o primeiro problema de qualquer caixa compartilhada. */}
-              <Select
-                aria-label="Responsável pela conversa"
-                className="h-8 w-[160px] text-[12.5px]"
-                value={selected.assignedTo?.id ?? ""}
-                disabled={isAssigning}
-                onChange={(e) => handleAssign(selected.id, e.target.value || null)}
-              >
-                <option value="">Sem responsável</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.isMe ? `${m.name} (você)` : m.name}
-                  </option>
-                ))}
-              </Select>
-              {selected.status === "waiting_human" && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => handleResume(selected.id)} disabled={isResuming}>
-                  <PlayCircle size={13} /> {isResuming ? "Retomando..." : "Retomar bot"}
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-5">
-            {isLoadingMessages ? (
-              <p className="text-[13px] text-text-tertiary">Carregando...</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {messages.map((m) => (
-                  <div key={m.id} className={cn("flex flex-col", m.role === "contact" ? "items-end" : "items-start")}>
-                    {m.role === "human" && (
-                      <span className="mb-1 flex items-center gap-1 text-[10.5px] font-medium text-amber-400">
-                        <UserCheck size={11} /> Atendente
-                      </span>
-                    )}
-                    <div
-                      className={cn(
-                        "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
-                        m.role === "contact"
-                          ? "bg-accent-500 text-white"
-                          : m.role === "human"
-                            ? "border border-amber-500/30 bg-amber-500/10 text-text-primary"
-                            : "border border-border-subtle bg-surface-2 text-text-primary"
-                      )}
-                    >
-                      {m.text}
-                    </div>
-                  </div>
-                ))}
-              </div>
             )}
-          </div>
+          </section>
+        )}
 
-          {selected.status === "waiting_human" && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendReply(selected.id);
-              }}
-              className="flex items-center gap-2 border-t border-border-subtle p-3.5"
-            >
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Responder como atendente..."
-                className="h-10 flex-1 rounded-xl border border-border-default bg-surface-2 px-3.5 text-[13px] text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-strong"
-              />
-              <Button type="submit" size="sm" disabled={!draft.trim() || isSending}>
-                {isSending ? "Enviando..." : "Enviar"}
-              </Button>
-            </form>
-          )}
-        </div>
+        {atual && (
+          <PainelDoCliente
+            key={`painel-${atual.id}`}
+            className="hidden xl:flex"
+            conversa={atual}
+            onMudou={atualizarTudo}
+          />
+        )}
       </div>
+
+      {/* Abaixo de 1280px o painel do cliente não cabe como coluna: abre por cima. */}
+      {painelAberto && atual && (
+        <div className="fixed inset-0 z-40 flex justify-end xl:hidden" role="dialog" aria-label="Dados do cliente">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setPainelAberto(false)} />
+          <div className="relative z-10 h-full w-full max-w-[380px] p-3">
+            <button
+              type="button"
+              onClick={() => setPainelAberto(false)}
+              aria-label="Fechar"
+              className="absolute right-6 top-6 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3 text-text-secondary hover:text-text-primary"
+            >
+              <X size={16} />
+            </button>
+            <PainelDoCliente conversa={atual} onMudou={atualizarTudo} className="glass-card-solid h-full" />
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function ConversasPage() {
+  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página.
+  return (
+    <React.Suspense fallback={<div className="flex-1" />}>
+      <Conversas />
+    </React.Suspense>
   );
 }

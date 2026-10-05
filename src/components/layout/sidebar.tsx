@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarcaAjuda } from "./marca-ajuda";
+import { useSondagem } from "@/components/inbox/use-sondagem";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 
@@ -79,20 +80,31 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Acompanhamento",
     items: [
       { href: "/leads", label: "Leads", icon: Users },
-      { href: "/conversas", label: "Conversas", icon: MessageSquare, badge: "+99" },
+      { href: "/conversas", label: "Conversas", icon: MessageSquare },
       { href: "/playground", label: "Playground", icon: PlayCircle },
     ],
   },
 ];
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = React.useState(false);
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+  const [collapsedState, setCollapsed] = React.useState(false);
+  // Na gaveta do celular não existe "recolher": ela ou está aberta, ou não existe.
+  const collapsed = mobile ? false : collapsedState;
+  const [naoLidas, setNaoLidas] = React.useState(0);
+
+  // O menu tinha um "+99" escrito à mão, igual pra todo mundo, o tempo todo.
+  // Agora é quantas conversas estão esperando alguém olhar. A cada 20s e só com
+  // a aba à vista: é um número de relance, não precisa ser instantâneo.
+  useSondagem(async () => {
+    const res = await fetch("/api/inbox/summary");
+    if (res.ok) setNaoLidas((await res.json()).naoLidas ?? 0);
+  }, 20_000);
 
   return (
     <aside
       className={cn(
         "glass-card flex h-full shrink-0 flex-col rounded-3xl bg-surface-1/90 p-3 transition-[width] duration-200",
-        collapsed ? "w-[76px]" : "w-[248px]"
+        mobile ? "glass-card-solid w-full" : collapsed ? "w-[76px]" : "w-[248px]"
       )}
     >
       <div className="mb-3 flex items-center justify-between border-b border-border-subtle px-1 pb-3 pt-1">
@@ -123,7 +135,12 @@ export function Sidebar() {
               </p>
             )}
             {group.items.map((item) => (
-              <SidebarNavItem key={item.href} {...item} collapsed={collapsed} />
+              <SidebarNavItem
+                key={item.href}
+                {...item}
+                badge={item.href === "/conversas" && naoLidas > 0 ? (naoLidas > 99 ? "99+" : String(naoLidas)) : item.badge}
+                collapsed={collapsed}
+              />
             ))}
           </div>
         ))}

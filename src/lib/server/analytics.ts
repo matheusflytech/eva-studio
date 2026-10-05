@@ -99,7 +99,10 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
 
   const receita = ganhos.reduce((s, d) => s + d.amountCents, 0);
   const deHoje = ganhos.filter((d) => d.closedAt && d.closedAt >= hoje);
-  const escalaram = conversas.filter((c) => c.status === "waiting_human").length;
+  // Duas perguntas diferentes: "quantas precisaram de gente" (conta quem esta
+  // com um atendente tambem) e "quantas esperam gente agora" (so as paradas).
+  const escalaram = conversas.filter((c) => c.status === "waiting_human" || c.status === "human").length;
+  const esperandoAgora = conversas.filter((c) => c.status === "waiting_human").length;
 
   // Baldes fixos: dia sem venda tem que aparecer como zero, senão a linha
   // "pula" o dia ruim e o gráfico mente pra quem olha rápido.
@@ -138,7 +141,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
       negociosAbertos: abertos.length,
       conversas: conversas.length,
       autonomia: conversas.length > 0 ? 1 - escalaram / conversas.length : null,
-      esperandoHumano: escalaram,
+      esperandoHumano: esperandoAgora,
       mensagens,
     },
     series: {

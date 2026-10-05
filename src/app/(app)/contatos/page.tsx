@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Users, Search, Plus, Upload, Tag as TagIcon, Filter, X, Trash2,
   Mail, Phone, BellOff, BellRing, Loader2,
@@ -122,7 +123,7 @@ function initials(name: string, fallback: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function ContatosPage() {
+function ContatosConteudo() {
   const { agents, isLoaded, load } = useAgentsStore();
   const [agentId, setAgentId] = React.useState<string | null>(null);
 
@@ -137,6 +138,16 @@ export default function ContatosPage() {
   const [segmentFilter, setSegmentFilter] = React.useState("");
 
   const [selected, setSelected] = React.useState<Contact | null>(null);
+
+  // Link vindo de outra tela (a caixa de entrada abre a ficha completa daqui).
+  const abrir = useSearchParams().get("abrir");
+  React.useEffect(() => {
+    if (!abrir) return;
+    fetch(`/api/contacts/${abrir}`)
+      .then((r) => r.json())
+      .then((d) => d.contact && setSelected(d.contact as Contact))
+      .catch(() => {});
+  }, [abrir]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -1138,3 +1149,12 @@ function SegmentEditor({
   );
 }
 
+
+export default function ContatosPage() {
+  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página.
+  return (
+    <React.Suspense fallback={<div className="flex-1" />}>
+      <ContatosConteudo />
+    </React.Suspense>
+  );
+}

@@ -9,7 +9,11 @@ import http from "node:http";
 import pg from "pg";
 import QRCode from "qrcode";
 import pino from "pino";
-import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
+import makeWASocket, {
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  downloadMediaMessage,
+} from "@whiskeysockets/baileys";
 import { loadAuthState } from "./auth-store.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -55,6 +59,66 @@ function extractText(msg) {
   );
 }
 
+// Anexo que o cliente mandou. O WhatsApp entrega cada tipo numa chave
+// diferente da mensagem; aqui vira um formato só.
+const LIMITE_DE_MIDIA = 16 * 1024 * 1024;
+const ROTULO_DE_MIDIA = { image: "Foto", audio: "Áudio", video: "Vídeo", document: "Documento", sticker: "Figurinha" };
+
+function extractMedia(msg) {
+  const m = msg.message;
+  if (!m) return null;
+  if (m.imageMessage) return { tipo: "image", info: m.imageMessage };
+  if (m.audioMessage) return { tipo: "audio", info: m.audioMessage };
+  if (m.videoMessage) return { tipo: "video", info: m.videoMessage };
+  if (m.documentMessage) return { tipo: "document", info: m.documentMessage };
+  if (m.stickerMessage) return { tipo: "sticker", info: m.stickerMessage };
+  return null;
+}
+
+// Baixa o arquivo do WhatsApp e manda direto pro storage do app. O worker não
+// tem a chave do storage de propósito: pede uma URL de envio ao app.
+async function guardarMidia(agentId, sock, msg, midia) {
+  try {
+    const tamanho = Number(midia.info.fileLength ?? 0);
+    if (tamanho > LIMITE_DE_MIDIA) return null;
+
+    const buffer = await downloadMediaMessage(msg, "buffer", {}, {
+      logger,
+      reuploadRequest: sock.updateMediaMessage,
+    });
+    if (!buffer || buffer.length === 0 || buffer.length > LIMITE_DE_MIDIA) return null;
+
+    // "audio/ogg; codecs=opus" -> "audio/ogg"
+    const mime = String(midia.info.mimetype ?? "application/octet-stream").split(";")[0].trim().toLowerCase();
+    const nome = midia.info.fileName ?? undefined;
+
+    const pedido = await fetch(`${EVA_STUDIO_URL}/api/internal/media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
+      body: JSON.stringify({ agentId, mime, size: buffer.length, name: nome }),
+    });
+    if (!pedido.ok) return null;
+    const autorizacao = await pedido.json();
+
+    const form = new FormData();
+    form.append("cacheControl", "3600");
+    form.append("", new Blob([buffer], { type: mime }));
+    const envio = await fetch(autorizacao.uploadUrl, { method: "PUT", body: form });
+    if (!envio.ok) return null;
+
+    return {
+      path: autorizacao.path,
+      type: midia.tipo === "sticker" ? "sticker" : autorizacao.type,
+      mime,
+      name: nome,
+      size: buffer.length,
+    };
+  } catch (err) {
+    logger.error({ err, agentId }, "Falha ao guardar mídia recebida");
+    return null;
+  }
+}
+
 // Toque em botão/lista chega num formato especial, não como texto — extrai o
 // id da opção selecionada (o "gatilho") em vez do texto livre.
 function extractOptionId(msg) {
@@ -64,12 +128,12 @@ function extractOptionId(msg) {
 
 // Fala com o motor de fluxo no app principal (Next.js/Vercel) — o worker não
 // decide mais nada sozinho sobre o que responder, só repassa mensagens.
-async function advanceViaEngine(agentId, contactId, { text, optionId }) {
+async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId }) {
   try {
     const res = await fetch(`${EVA_STUDIO_URL}/api/conversations/message`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
-      body: JSON.stringify({ agentId, channel: "whatsapp_qr", contactId, text, optionId }),
+      body: JSON.stringify({ agentId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -167,11 +231,27 @@ async function startSession(agentId) {
     for (const msg of messages) {
       if (msg.key.fromMe || !msg.message) continue;
       const optionId = extractOptionId(msg);
-      const text = extractText(msg);
-      if (!optionId && !text) continue;
+      let text = extractText(msg);
+      const midia = extractMedia(msg);
+      if (!optionId && !text && !midia) continue;
+
+      // Foto, áudio, documento: antes o worker ignorava tudo que não fosse
+      // texto, e o que o cliente mandava de arquivo sumia sem rastro.
+      let anexo;
+      if (midia && !optionId) {
+        anexo = await guardarMidia(agentId, sock, msg, midia);
+        const rotulo = ROTULO_DE_MIDIA[midia.tipo] ?? "Anexo";
+        text = text || `[${rotulo}]`;
+        if (!anexo) text = `${text} (não foi possível baixar o arquivo)`;
+      }
 
       const remoteJid = msg.key.remoteJid;
-      const replies = await advanceViaEngine(agentId, remoteJid, { text, optionId });
+      const replies = await advanceViaEngine(agentId, remoteJid, {
+        text,
+        optionId,
+        media: anexo,
+        externalId: msg.key.id,
+      });
       for (const reply of replies) {
         await sendReply(sock, remoteJid, reply);
       }
@@ -258,7 +338,7 @@ async function bumpBroadcast(broadcastId, field) {
 async function drainOutboundQueue() {
   try {
     const { rows } = await pool.query(
-      `select id, "agentId", "contactId", text, "broadcastId" from eva_studio_outbound_queue where status = 'pending' order by "createdAt" asc limit 20`
+      `select id, "agentId", "contactId", text, "broadcastId", "mediaPath", "mediaType", "mediaMime", "mediaName" from eva_studio_outbound_queue where status = 'pending' order by "createdAt" asc limit 20`
     );
     for (const row of rows) {
       const session = sessions.get(row.agentId);
@@ -271,7 +351,31 @@ async function drainOutboundQueue() {
         continue;
       }
       try {
-        await session.sock.sendMessage(row.contactId, { text: row.text });
+        if (row.mediaPath) {
+          // O arquivo vive no storage do app; ele devolve um link temporário.
+          const r = await fetch(
+            `${EVA_STUDIO_URL}/api/internal/media?path=${encodeURIComponent(row.mediaPath)}`,
+            { headers: { "X-Internal-Secret": INTERNAL_API_SECRET } }
+          );
+          if (!r.ok) throw new Error("não consegui buscar o arquivo");
+          const { url } = await r.json();
+
+          const legenda = row.text || undefined;
+          let conteudo;
+          if (row.mediaType === "image") conteudo = { image: { url }, caption: legenda };
+          else if (row.mediaType === "video") conteudo = { video: { url }, caption: legenda };
+          else if (row.mediaType === "audio") conteudo = { audio: { url }, mimetype: row.mediaMime || "audio/mpeg" };
+          else if (row.mediaType === "sticker") conteudo = { sticker: { url } };
+          else conteudo = { document: { url }, mimetype: row.mediaMime || "application/octet-stream", fileName: row.mediaName || "arquivo", caption: legenda };
+
+          await session.sock.sendMessage(row.contactId, conteudo);
+          // Áudio e figurinha não levam legenda: o texto vai em mensagem à parte.
+          if (legenda && (row.mediaType === "audio" || row.mediaType === "sticker")) {
+            await session.sock.sendMessage(row.contactId, { text: legenda });
+          }
+        } else {
+          await session.sock.sendMessage(row.contactId, { text: row.text });
+        }
         await pool.query(`update eva_studio_outbound_queue set status = 'sent', "sentAt" = now() where id = $1`, [row.id]);
         if (row.broadcastId) await bumpBroadcast(row.broadcastId, "sentCount");
       } catch (err) {

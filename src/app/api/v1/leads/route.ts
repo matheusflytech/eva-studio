@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireApiKeyOrgId } from "@/lib/server/api-keys";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { prisma } from "@/lib/db/prisma";
+import { registrarMensagens } from "@/lib/server/inbox";
 
 // API pública de Leads — /api/v1/leads. Autenticada por "Authorization: Bearer
 // evs_live_...", uma chave por org (ver Integrações → API). Mesmo dado que a
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       leadStage: stage || "novo",
     },
   });
-  await prisma.message.create({ data: { conversationId: conversation.id, role: "bot", text: "Lead recebido via API pública." } });
+  await registrarMensagens(conversation.id, [{ role: "bot", text: "Lead recebido via API pública." }]);
 
   return NextResponse.json({ data: serializeLead(conversation) }, { status: 201 });
 }

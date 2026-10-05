@@ -27,7 +27,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const updated = await prisma.conversation.update({
     where: { id },
-    data: { assignedToId: assignedToId || null },
+    data: {
+      assignedToId: assignedToId || null,
+      // Atribuir a alguém quer dizer que uma pessoa cuida da conversa. Se o
+      // agente continuasse ativo, os dois responderiam o mesmo cliente.
+      ...(assignedToId && conversation.status !== "human" ? { status: "human" } : {}),
+    },
     include: { assignedTo: { select: { id: true, name: true } } },
   });
 

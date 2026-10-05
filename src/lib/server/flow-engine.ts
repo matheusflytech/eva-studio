@@ -21,6 +21,7 @@ import {
   parseRelativeDue,
 } from "@/lib/server/crm";
 import { safeFetch } from "@/lib/server/ssrf";
+import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/server/inbox";
 import { syncContactFromConversation } from "@/lib/server/contacts";
 import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
 import { registerBroadcastReply } from "@/lib/server/outbound";
@@ -48,11 +49,17 @@ export interface AdvanceInput {
   // pro webhook do agente pra ele responder no idioma certo. Opcional e sem
   // efeito nenhum no motor em si, só passa adiante.
   lang?: string;
+  // Anexo que veio junto (foto da conta de luz, áudio, PDF). O arquivo já foi
+  // guardado no storage antes de chegar aqui; o motor só registra o caminho.
+  media?: { path: string; type: string; mime: string; name?: string; size?: number };
+  // Id da mensagem do lado de fora (wamid), pra recibo de entrega e pra não
+  // gravar a mesma mensagem duas vezes se a Meta reentregar.
+  externalId?: string;
 }
 
 export interface AdvanceResult {
   messages: OutboundMessage[];
-  status: "active" | "waiting_human" | "ended";
+  status: "active" | "waiting_human" | "human" | "ended";
 }
 
 type Variables = Record<string, unknown>;
@@ -229,7 +236,10 @@ async function loadConversationHistory(
 ): Promise<{ role: "user" | "assistant"; content: string }[]> {
   if (windowSize <= 0) return [];
   const rows = await prisma.message.findMany({
-    where: { conversationId },
+    // Nota interna é recado da equipe. Se entrasse aqui, a IA leria "esse
+    // cliente é chato, não dê desconto" como se fosse algo que ela mesma
+    // disse, e podia repetir ao cliente.
+    where: { conversationId, role: { in: ["contact", "bot", "human"] } },
     orderBy: { createdAt: "desc" },
     take: windowSize,
   });
@@ -712,11 +722,27 @@ const MAX_HOPS = 25;
 
 // Grava a transcrição real (pra página Conversas) — a mensagem que chegou
 // (se teve) e cada mensagem que o bot mandou nessa rodada, na ordem.
-async function logMessages(conversationId: string, inboundText: string | undefined, outbound: OutboundMessage[]) {
-  const rows: { conversationId: string; role: string; text: string }[] = [];
-  if (inboundText) rows.push({ conversationId, role: "contact", text: inboundText });
-  for (const m of outbound) rows.push({ conversationId, role: "bot", text: m.text });
-  if (rows.length > 0) await prisma.message.createMany({ data: rows });
+async function logMessages(
+  conversationId: string,
+  inboundText: string | undefined,
+  outbound: OutboundMessage[],
+  inbound?: Pick<AdvanceInput, "media" | "externalId">
+) {
+  const rows: NovaMensagem[] = [];
+  if (inboundText || inbound?.media) {
+    rows.push({
+      role: "contact",
+      text: inboundText ?? "",
+      mediaPath: inbound?.media?.path,
+      mediaType: inbound?.media?.type,
+      mediaMime: inbound?.media?.mime,
+      mediaName: inbound?.media?.name,
+      mediaSize: inbound?.media?.size,
+      externalId: inbound?.externalId,
+    });
+  }
+  for (const m of outbound) rows.push({ role: "bot", text: m.text });
+  await registrarMensagens(conversationId, rows);
 }
 
 export async function advanceConversation(input: AdvanceInput): Promise<AdvanceResult> {
@@ -750,6 +776,31 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     }
   }
 
+  /**
+   * Registra o que o cliente escreveu sem rodar o fluxo. Usado quando um
+   * atendente está com a conversa: a mensagem entra na caixa de entrada, a
+   * janela de 24h renova e a ficha atualiza — só o agente não responde.
+   */
+  async function registrarSemResponder(conversationId: string, status: AdvanceResult["status"]): Promise<AdvanceResult> {
+    const veioAlgo = input.text !== undefined || input.optionId !== undefined || !!input.media;
+    if (veioAlgo) {
+      await registrarMensagens(conversationId, [
+        {
+          role: "contact",
+          text: input.text ?? (input.optionId ? `[opção: ${input.optionId}]` : ""),
+          mediaPath: input.media?.path,
+          mediaType: input.media?.type,
+          mediaMime: input.media?.mime,
+          mediaName: input.media?.name,
+          mediaSize: input.media?.size,
+          externalId: input.externalId,
+        },
+      ]);
+      await syncContact(conversationId, {}, true);
+    }
+    return { messages: [], status };
+  }
+
   const flow = await prisma.agentFlow.findUnique({ where: { agentId: input.agentId } });
 
   // Sem fluxo salvo: comportamento antigo, direto pro webhook do agente —
@@ -762,9 +813,12 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       create: { agentId: input.agentId, channel: input.channel, contactId: input.contactId, variables: {} },
       update: { updatedAt: new Date() },
     });
+    if (agentePausado(conversation.status)) {
+      return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
+    }
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
-    await logMessages(conversation.id, input.text, messages);
+    await logMessages(conversation.id, input.text, messages, input);
     const inboundNoFlow = input.text !== undefined || input.optionId !== undefined;
     if (inboundNoFlow) {
       await prisma.conversation.update({ where: { id: conversation.id }, data: { lastContactMessageAt: new Date() } });
@@ -782,8 +836,13 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     update: {},
   });
 
-  if (conversation.status === "waiting_human") {
-    return { messages: [], status: "waiting_human" };
+  // Conversa com humano: o agente fica mudo, mas a mensagem do cliente TEM que
+  // ser registrada. Antes isto retornava aqui sem gravar nada — então enquanto
+  // um atendente cuidava da conversa, tudo que o cliente escrevia sumia: não
+  // aparecia na caixa de entrada, não renovava a janela de 24h da Meta e não
+  // atualizava a ficha. O atendente respondia no escuro.
+  if (agentePausado(conversation.status)) {
+    return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
   }
 
   const variables: Variables = { ...(conversation.variables as Variables) };
@@ -852,7 +911,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         lastContactMessageAt: isGenuineInbound ? new Date() : conversation.lastContactMessageAt,
       },
     });
-    await logMessages(conversation.id, inboundText, messages);
+    await logMessages(conversation.id, inboundText, messages, input);
     await syncContact(conversation.id, variables, isGenuineInbound);
     if (steps.length > 0) {
       await prisma.flowExecution.create({

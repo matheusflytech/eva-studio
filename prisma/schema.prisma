@@ -102,6 +102,7 @@ model Profile {
   ownedDeals      Deal[]         @relation("DealOwner")
   assignedTasks   Task[]         @relation("TaskAssignee")
   authoredNotes   Note[]         @relation("NoteAuthor")
+  messages        Message[]      @relation("MessageAuthor")
 
   @@index([orgId])
   @@map("eva_studio_profiles")
@@ -302,7 +303,11 @@ model Conversation {
   contactId            String // telefone/jid, id de sessão do Playground, ou id gerado no navegador do visitante (website)
   currentNodeId        String?
   variables            Json      @default("{}")
-  status               String    @default("active") // active | waiting_human | ended
+  // active        = o agente responde
+  // waiting_human = o agente passou e ninguem assumiu ainda (precisa de gente)
+  // human         = um atendente assumiu; o agente fica mudo ate devolverem
+  // ended         = encerrada; a proxima mensagem do contato recomeca o fluxo
+  status               String    @default("active") // active | waiting_human | human | ended
   // Última vez que o CONTATO mandou algo (texto ou toque de botão) — é o que
   // abre/fecha a janela de 24h da Meta (regra oficial do WhatsApp Business:
   // fora dela só se pode mandar mensagem de modelo pré-aprovado). Ver
@@ -317,6 +322,17 @@ model Conversation {
   contactRecordId      String?
   // Atendente responsável (inbox humano). null = ninguém pegou ainda.
   assignedToId         String?
+  // Quando alguém da equipe abriu a conversa pela última vez. Não lida =
+  // existe mensagem do contato depois disso. É um marcador da conversa, não
+  // por pessoa: numa caixa compartilhada, "alguém já viu" é o que evita dois
+  // atendentes abrirem a mesma conversa achando que é nova.
+  readAt               DateTime?
+  // Última mensagem, copiada pra cá. Listar 50 conversas com a prévia de cada
+  // custava uma consulta de mensagens por linha; assim a lista sai de uma
+  // tabela só e ordena por quem escreveu por último, não por quem foi mexida.
+  lastMessageAt        DateTime  @default(now())
+  lastMessageText      String    @default("")
+  lastMessageRole      String    @default("")
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -328,6 +344,8 @@ model Conversation {
   @@unique([agentId, channel, contactId])
   @@index([contactRecordId])
   @@index([assignedToId])
+  @@index([agentId, lastMessageAt])
+  @@index([agentId, status])
   @@map("eva_studio_conversations")
 }
 
@@ -362,13 +380,31 @@ model MessageTemplate {
 model Message {
   id             String   @id @default(uuid())
   conversationId String
-  role           String // contact | bot | human
+  // contact = quem escreveu de fora | bot = o agente | human = atendente
+  // note    = nota interna da equipe. NUNCA sai pro cliente e NUNCA entra no
+  //           contexto da IA (ver loadConversationHistory).
+  role           String // contact | bot | human | note
   text           String   @db.Text
+  authorId       String?
+  // Anexo. O arquivo mora no storage, não no banco: aqui só o caminho.
+  mediaPath      String?
+  mediaType      String? // image | audio | video | document | sticker
+  mediaMime      String?
+  mediaName      String?
+  mediaSize      Int?
+  // Id do lado de fora: wamid da Meta, ou o id do item da fila do worker. É o
+  // que permite o recibo de entrega (enviado, entregue, lido) achar a mensagem.
+  externalId     String?
+  // sending | queued | sent | delivered | read | failed
+  deliveryStatus String   @default("sent")
+  deliveryError  String?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       Profile?     @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
 
-  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@index([externalId])
   @@map("eva_studio_messages")
 }
 
@@ -434,6 +470,12 @@ model OutboundQueueItem {
   // Preenchido quando o item veio de uma Sequencia (drip) — serve pra
   // contabilizar entrega por passo e pra nao reenviar o mesmo passo.
   enrollmentId   String?
+  // Anexo (resposta de atendente com arquivo). O worker pede a URL assinada ao
+  // app, porque quem tem a chave do storage é o app, não ele.
+  mediaPath      String?
+  mediaType      String?
+  mediaMime      String?
+  mediaName      String?
   status         String    @default("pending") // pending | sent | failed
   error          String?
   createdAt      DateTime  @default(now())

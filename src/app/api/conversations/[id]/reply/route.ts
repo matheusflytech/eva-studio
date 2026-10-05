@@ -1,55 +1,35 @@
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
-import { prisma } from "@/lib/db/prisma";
-import { decryptSecret } from "@/lib/server/crypto";
+import { requirePermission } from "@/lib/server/permissions";
+import { responderComoAtendente } from "@/lib/server/responder";
 
-// Resposta manual de um atendente numa conversa parada em waiting_human. Não
-// passa pelo motor de fluxo (advanceConversation) — é canal direto: grava na
-// transcrição (role "human", pra diferenciar de "bot") e manda de verdade
-// pro canal certo. Playground/prévia do Builder não têm destinatário real,
-// então só ficam registradas.
+// Resposta de um atendente. Toda a regra mora em lib/server/responder.ts, que
+// a rota de reenvio também usa.
+//
+// POST { text?, templateId?, attachment? }
+//
+// Responder numa conversa que o agente ainda atende ASSUME a conversa: não
+// existe "responder sem assumir", porque o agente e a pessoa falariam juntos.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("conversations:reply");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
-  const conversation = await prisma.conversation.findFirst({
-    where: { id, agent: { orgId } },
-    include: { agent: { include: { metaConnection: true } } },
+  const body = await request.json().catch(() => ({}));
+
+  const resultado = await responderComoAtendente({
+    conversationId: id,
+    orgId: ctx.orgId,
+    userId: ctx.userId,
+    text: typeof body.text === "string" ? body.text : undefined,
+    templateId: typeof body.templateId === "string" ? body.templateId : undefined,
+    attachment: body.attachment && typeof body.attachment === "object" ? body.attachment : undefined,
   });
-  if (!conversation) return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
 
-  const { text } = await request.json();
-  const trimmed = typeof text === "string" ? text.trim() : "";
-  if (!trimmed) return NextResponse.json({ error: "text é obrigatório." }, { status: 400 });
-
-  await prisma.message.create({ data: { conversationId: conversation.id, role: "human", text: trimmed } });
-  await prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
-
-  if (conversation.channel === "whatsapp_meta") {
-    const conn = conversation.agent.metaConnection;
-    if (!conn) return NextResponse.json({ error: "Agente sem conexão Meta configurada." }, { status: 400 });
-    try {
-      await fetch(`https://graph.facebook.com/v21.0/${conn.phoneNumberId}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${decryptSecret(conn.accessToken)}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: conversation.contactId,
-          type: "text",
-          text: { body: trimmed },
-        }),
-      });
-    } catch {
-      return NextResponse.json({ error: "Mensagem registrada, mas falhou ao enviar pra Meta." }, { status: 502 });
-    }
-  } else if (conversation.channel === "whatsapp_qr") {
-    // O app não segura o socket do Baileys (fica no worker) — grava na fila
-    // e o worker manda de verdade por polling. Ver worker/index.js.
-    await prisma.outboundQueueItem.create({
-      data: { agentId: conversation.agentId, contactId: conversation.contactId, text: trimmed },
-    });
+  if (!resultado.ok) {
+    return NextResponse.json(
+      { error: resultado.error, codigo: resultado.codigo, ...resultado.extra },
+      { status: resultado.status }
+    );
   }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, message: resultado.message });
 }
