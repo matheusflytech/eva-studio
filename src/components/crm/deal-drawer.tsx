@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
+import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 
 interface Stage { id: string; name: string; type: string; probability: number }
 
@@ -31,6 +33,7 @@ interface DealFull {
   contacts: { contact: { id: string; name: string; email: string; phone: string } }[];
   tasks: { id: string; type: string; text: string; dueAt: string | null; doneAt: string | null }[];
   notes: { id: string; text: string; createdAt: string }[];
+  customFields: Record<string, unknown>;
 }
 
 function money(cents: number): string {
@@ -58,12 +61,20 @@ export function DealDrawer({
   const [novaTarefa, setNovaTarefa] = React.useState("");
   const [novaNota, setNovaNota] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
+  const [rascunho, setRascunho] = React.useState<Rascunho>({});
+  const [sujo, setSujo] = React.useState(false);
+  const [erroCampos, setErroCampos] = React.useState<string | null>(null);
 
   const carregar = React.useCallback(async () => {
     const res = await fetch(`/api/deals/${dealId}`);
     if (!res.ok) return;
     const data = await res.json();
     setDeal(data.deal);
+    setDefs(data.fields ?? []);
+    setRascunho(rascunhoInicial(data.fields ?? [], data.deal.customFields));
+    setSujo(false);
+    setErroCampos(null);
     setForm({
       name: data.deal.name,
       amount: (data.deal.amountCents / 100).toFixed(2).replace(".", ","),
@@ -81,6 +92,23 @@ export function DealDrawer({
       body: JSON.stringify(body),
     });
     setBusy(false);
+    await carregar();
+    onChanged();
+  }
+
+  async function salvarCampos() {
+    setBusy(true);
+    setErroCampos(null);
+    const res = await fetch(`/api/deals/${dealId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customFields: rascunhoParaEnvio(defs, rascunho) }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setErroCampos((await res.json().catch(() => ({}))).error ?? "Não foi possível salvar os campos.");
+      return;
+    }
     await carregar();
     onChanged();
   }
@@ -234,6 +262,29 @@ export function DealDrawer({
                 </div>
               )}
             </section>
+
+            {defs.length > 0 && (
+              <section className="flex flex-col gap-4 border-b border-border-subtle px-6 py-5">
+                <Label className="mb-0">Dados do negócio</Label>
+                <CamposDoFormulario
+                  defs={defs}
+                  rascunho={rascunho}
+                  prefixo="d"
+                  onChange={(k, v) => { setRascunho((r) => ({ ...r, [k]: v })); setSujo(true); }}
+                />
+                {erroCampos && <p className="text-[12.5px] text-danger">{erroCampos}</p>}
+                {sujo && (
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => { setRascunho(rascunhoInicial(defs, deal.customFields)); setSujo(false); setErroCampos(null); }}>
+                      Descartar
+                    </Button>
+                    <Button onClick={salvarCampos} disabled={busy}>
+                      {busy && <Loader2 size={15} className="animate-spin" />} Salvar dados
+                    </Button>
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="border-b border-border-subtle px-6 py-5">
               <Label>Pessoas</Label>

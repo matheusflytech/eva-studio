@@ -164,6 +164,18 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     },
   },
   {
+    key: "crm-update",
+    paletteLabel: "CRM: Atualizar dados",
+    data: {
+      label: "Atualizar dados",
+      kind: "CRM",
+      detail: "Grava respostas do cliente nos campos do negócio ou do contato.",
+      crmUpdateTarget: "deal",
+      crmAutoFill: true,
+      crmFieldMap: [],
+    },
+  },
+  {
     key: "crm-note",
     paletteLabel: "CRM: Registrar nota",
     data: {
@@ -189,7 +201,7 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
       label: "Ferramentas de CRM",
       kind: "Conecta na porta de baixo de um Agente de IA",
       detail: "Deixa o agente criar negócio, mover etapa, criar tarefa e etiquetar sozinho.",
-      crmToolActions: ["buscar", "criar_negocio", "criar_tarefa", "etiquetar"],
+      crmToolActions: ["buscar", "criar_negocio", "atualizar_campos", "criar_tarefa", "etiquetar"],
       crmAllowedStageIds: [],
       crmMaxAmount: "",
       hasTarget: false,

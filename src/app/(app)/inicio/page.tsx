@@ -41,6 +41,7 @@ interface AgenteResumo {
 }
 
 interface Payload {
+  onboardingPendente?: boolean;
   pendencias: Pendencia[];
   resumo: { agentes: number; conversas7d: number; tudoEmDia: boolean };
   agentes: AgenteResumo[];
@@ -68,6 +69,7 @@ export default function InicioPage() {
   const primeiroNome = session?.name?.split(" ")[0] ?? "";
   const pendencias = dados?.pendencias ?? [];
   const semAgente = !!dados && dados.resumo.agentes === 0;
+  const comecar = !!dados?.onboardingPendente;
 
   return (
     <div className="flex-1 p-8">
@@ -88,7 +90,9 @@ export default function InicioPage() {
             <p className="mt-2 text-[14.5px] leading-relaxed text-text-secondary">
               {carregando
                 ? "Vendo o que precisa de você..."
-                : semAgente
+                : comecar
+                  ? "Escolha o seu tipo de negócio e, em um minuto, o funil, os campos e um atendimento de WhatsApp ficam prontos."
+                  : semAgente
                   ? "Nada por aqui ainda. O primeiro passo é criar um agente e dar um fluxo pra ele."
                   : pendencias.length === 0
                     ? "Nada pedindo atenção agora. Os agentes estão no ar, as tarefas em dia e nenhum negócio está parado."
@@ -97,13 +101,17 @@ export default function InicioPage() {
                       : `${pendencias.length} coisas precisam de você.`}
             </p>
 
-            {semAgente ? (
+            {comecar ? (
+              <Link href="/comecar" className={cn(buttonVariants({ variant: "solid", size: "md" }), "mt-5")}>
+                Montar o meu CRM <ArrowRight size={15} />
+              </Link>
+            ) : semAgente ? (
               <Link href="/agent-studio/new" className={cn(buttonVariants({ variant: "solid", size: "md" }), "mt-5")}>
                 <Plus size={15} /> Criar o primeiro agente
               </Link>
             ) : (
               <Link href="/agent-studio" className={cn(buttonVariants({ variant: "secondary", size: "md" }), "mt-5")}>
-                Ir para o Eva Studio <ArrowRight size={15} />
+                Ir para os agentes <ArrowRight size={15} />
               </Link>
             )}
           </div>

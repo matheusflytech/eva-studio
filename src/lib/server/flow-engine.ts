@@ -19,7 +19,10 @@ import {
   findOpenDealForContact,
   lookupCrmForContact,
   parseRelativeDue,
+  preencherCamposDoNegocio,
+  preencherCamposDoContato,
 } from "@/lib/server/crm";
+import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { safeFetch } from "@/lib/server/ssrf";
 import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/server/inbox";
 import { syncContactFromConversation } from "@/lib/server/contacts";
@@ -254,6 +257,73 @@ const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
 // ferramenta interna de coleta de variáveis (collectVars) — e devolve o texto
 // final já depois do loop de tool-calling (ver src/lib/server/groq.ts).
 /**
+ * Ferramenta "salvar dados do cliente" da IA, montada a partir dos campos que o
+ * cliente criou: cada campo vira um parâmetro, com o rótulo, o tipo e as
+ * opções na descrição. Assim o modelo sabe que "tipo_de_imovel" só aceita
+ * Casa ou Apartamento, e a resposta dele já chega no formato certo.
+ */
+async function montarFerramentaDeCampos(
+  orgId: string,
+  resolveContactId: () => Promise<string | null>
+): Promise<{ action: string; tool: LlmTool }[]> {
+  const contactId = await resolveContactId().catch(() => null);
+  const deal = contactId ? await findOpenDealForContact(contactId).catch(() => null) : null;
+  const defsNegocio = deal ? await carregarDefinicoes(orgId, "deal", deal.pipelineId) : [];
+  const defsContato = await carregarDefinicoes(orgId, "contact");
+  const todas = [...defsNegocio, ...defsContato];
+  if (todas.length === 0) return [];
+
+  const dica = (d: (typeof todas)[number]): string => {
+    const base = d.label;
+    if (d.options.length > 0) return `${base}. Escolha exatamente uma de: ${d.options.map((o) => o.label).join(", ")}.`;
+    if (d.type === "currency") return `${base}. Valor em reais, só números.`;
+    if (d.type === "number") return `${base}. Só o número.`;
+    if (d.type === "date") return `${base}. Data no formato AAAA-MM-DD.`;
+    if (d.type === "checkbox") return `${base}. "sim" ou "nao".`;
+    return base;
+  };
+
+  return [
+    {
+      action: "atualizar_campos",
+      tool: {
+        name: "crm_atualizar_campos",
+        description:
+          "Salva no CRM dados que o cliente informou na conversa. Preencha só o que o cliente disse de fato, nunca invente.",
+        params: todas.map((d) => ({ name: d.key, description: dica(d), required: false })),
+      },
+    },
+  ];
+}
+
+/**
+ * Monta os valores de campos personalizados que um bloco do fluxo vai gravar:
+ * primeiro as variáveis com o mesmo nome do campo (a pergunta "consumo_mensal_kwh"
+ * já preenche o campo de mesma chave, sem configurar nada), depois o mapa
+ * explícito do bloco, que manda. Valor vazio é ignorado: uma variável que o
+ * cliente ainda não respondeu não pode apagar o que já está no campo.
+ */
+function entradaDeCampos(
+  defs: { key: string }[],
+  node: Node<FlowNodeData>,
+  variables: Record<string, unknown>
+): Record<string, unknown> {
+  const entrada: Record<string, unknown> = {};
+  if (node.data.crmAutoFill !== false) {
+    for (const d of defs) {
+      const v = variables[d.key];
+      if (v !== undefined && v !== null && String(v).trim() !== "") entrada[d.key] = v;
+    }
+  }
+  for (const m of node.data.crmFieldMap ?? []) {
+    if (!m.key) continue;
+    const texto = interpolate(m.value ?? "", variables);
+    if (texto.trim() !== "") entrada[m.key] = texto;
+  }
+  return entrada;
+}
+
+/**
  * Executa uma ferramenta de CRM pedida pelo modelo, aplicando as travas
  * configuradas no bloco.
  *
@@ -329,6 +399,34 @@ async function runCrmTool(
 
     await moveDealStage(deal.id, stage.id);
     return `Negócio movido para ${stage.name}.`;
+  }
+
+  if (call.name === "crm_atualizar_campos") {
+    const deal = await findOpenDealForContact(contactId);
+    const defsNegocio = deal ? await carregarDefinicoes(orgId, "deal", deal.pipelineId) : [];
+    const defsContato = await carregarDefinicoes(orgId, "contact");
+    const noNegocio: Record<string, unknown> = {};
+    const noContato: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args)) {
+      if (defsNegocio.some((d) => d.key === k)) noNegocio[k] = v;
+      else if (defsContato.some((d) => d.key === k)) noContato[k] = v;
+    }
+    const partes: string[] = [];
+    const erros: string[] = [];
+    if (deal && Object.keys(noNegocio).length > 0) {
+      const r = await preencherCamposDoNegocio(orgId, deal.id, noNegocio);
+      if (r.aplicados > 0) partes.push(`${r.aplicados} no negócio`);
+      erros.push(...r.erros);
+    }
+    if (Object.keys(noContato).length > 0) {
+      const r = await preencherCamposDoContato(orgId, contactId, noContato);
+      if (r.aplicados > 0) partes.push(`${r.aplicados} no contato`);
+      erros.push(...r.erros);
+    }
+    if (!deal && Object.keys(noNegocio).length === 0 && Object.keys(noContato).length === 0) {
+      return "Essa pessoa não tem negócio aberto e nenhum campo de contato foi informado.";
+    }
+    return (partes.length > 0 ? `Campos salvos: ${partes.join(", ")}.` : "Nada foi salvo.") + (erros.length > 0 ? ` Problemas: ${erros.join(" ")}` : "");
   }
 
   if (call.name === "crm_criar_tarefa") {
@@ -476,6 +574,7 @@ async function runAiAgent(
             params: [{ name: "etapa", description: "Nome exato da etapa de destino." }],
           },
         },
+        ...(await montarFerramentaDeCampos(crmContext.orgId, crmContext.resolveContactId)),
         {
           action: "criar_tarefa",
           tool: {
@@ -1058,6 +1157,26 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
           if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
           output = `negócio ${deal.name}`;
+          const defsDoNegocio = await carregarDefinicoes(agent.orgId, "deal", deal.pipelineId);
+          const preenchido = await preencherCamposDoNegocio(agent.orgId, deal.id, entradaDeCampos(defsDoNegocio, node, variables));
+          if (preenchido.aplicados > 0) output += `, ${preenchido.aplicados} campo(s)`;
+          if (preenchido.erros.length > 0) stepError = preenchido.erros.join(" ");
+        }
+
+        if (kind === "crm-update") {
+          if (node.data.crmUpdateTarget === "contact") {
+            const defs = await carregarDefinicoes(agent.orgId, "contact");
+            const r = await preencherCamposDoContato(agent.orgId, contactId, entradaDeCampos(defs, node, variables));
+            output = `${r.aplicados} campo(s) do contato`;
+            if (r.erros.length > 0) stepError = r.erros.join(" ");
+          } else {
+            const deal = await findOpenDealForContact(contactId);
+            if (!deal) throw new Error("O contato não tem negócio aberto para atualizar.");
+            const defs = await carregarDefinicoes(agent.orgId, "deal", deal.pipelineId);
+            const r = await preencherCamposDoNegocio(agent.orgId, deal.id, entradaDeCampos(defs, node, variables));
+            output = `${r.aplicados} campo(s) do negócio`;
+            if (r.erros.length > 0) stepError = r.erros.join(" ");
+          }
         }
 
         if (kind === "crm-stage") {

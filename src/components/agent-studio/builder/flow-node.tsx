@@ -87,6 +87,12 @@ export interface FlowNodeData {
   crmTagAction?: "add" | "remove";
   crmNoteText?: string;
   crmLostReason?: string;
+  // Campos personalizados que o bloco grava: chave do campo -> valor ({variavel} ok).
+  crmFieldMap?: { key: string; value: string }[];
+  // Grava também as variáveis com o mesmo nome de um campo (padrão: ligado).
+  crmAutoFill?: boolean;
+  // Bloco "Atualizar dados": em qual registro grava.
+  crmUpdateTarget?: "deal" | "contact";
   // ── Ferramenta de CRM para o Agente de IA ─────────────────────────────
   // Sem essas três travas, IA com permissão de escrita no CRM vira geradora
   // de lixo: fecha negócio como Ganho porque a conversa foi simpática.

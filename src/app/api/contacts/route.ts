@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import { requirePermission } from "@/lib/server/permissions";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { serializeContact } from "@/lib/server/contact-dto";
@@ -106,6 +107,13 @@ export async function POST(request: Request) {
     );
   }
 
+  let customFields: Record<string, unknown> = {};
+  if (body.customFields && typeof body.customFields === "object") {
+    const r = await mesclarCamposDeContato(ctx.orgId, {}, body.customFields as Record<string, unknown>);
+    if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
+    customFields = r.valores;
+  }
+
   const contact = await prisma.contact.create({
     data: {
       orgId: ctx.orgId,
@@ -116,7 +124,7 @@ export async function POST(request: Request) {
       companyId: body.companyId || null,
       ownerId: body.ownerId || null,
       notes: String(body.notes ?? ""),
-      customFields: (body.customFields ?? {}) as Prisma.InputJsonValue,
+      customFields: customFields as Prisma.InputJsonValue,
       source: "manual",
       // Canal opcional no cadastro manual: dá pra criar a ficha antes de
       // saber por onde falar com a pessoa.

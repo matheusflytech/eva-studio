@@ -158,7 +158,16 @@ export async function GET() {
     });
   }
 
+  // Configuração inicial: some assim que a pessoa escolhe um pacote, pula, ou
+  // a conta já tem negócios (quem importou dados não precisa de assistente).
+  const [org, negociosTotal] = await Promise.all([
+    prisma.organization.findUnique({ where: { id: ctx.orgId }, select: { onboardedAt: true } }),
+    prisma.deal.count({ where: { orgId: ctx.orgId } }),
+  ]);
+  const onboardingPendente = !org?.onboardedAt && negociosTotal === 0 && agentes.length === 0;
+
   return NextResponse.json({
+    onboardingPendente,
     pendencias,
     resumo: {
       agentes: agentes.length,

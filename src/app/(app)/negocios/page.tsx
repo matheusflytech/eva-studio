@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Handshake, Plus, Loader2, X, CheckCircle2, XCircle, Clock } from "lucide-react";
+import Link from "next/link";
+import { Handshake, Plus, Loader2, X, CheckCircle2, XCircle, Clock, SlidersHorizontal } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -23,6 +24,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { DealDrawer } from "@/components/crm/deal-drawer";
 import { cn } from "@/lib/utils";
+import { ChipsDeCampos, CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
+import { corDaEtapa, type DefinicaoDeCampo } from "@/lib/custom-fields";
 
 interface DealCard {
   id: string;
@@ -35,12 +38,14 @@ interface DealCard {
   openTasks: number;
   expectedClosingAt: string | null;
   closedAt: string | null;
+  customFields: Record<string, unknown>;
 }
 
 interface StageColumn {
   id: string;
   name: string;
   type: string;
+  color: string;
   probability: number;
   totalCents: number;
   weightedCents: number;
@@ -57,15 +62,16 @@ function money(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
-// Só as etapas de fechamento ganham cor. O resto fica neutro: kanban com
-// uma cor por coluna vira arco-íris e para de comunicar qualquer coisa.
-function stageAccent(type: string): { dot: string; label?: React.ReactNode } {
-  if (type === "won") return { dot: "bg-emerald-400", label: <CheckCircle2 size={12} className="text-emerald-400" /> };
-  if (type === "lost") return { dot: "bg-danger", label: <XCircle size={12} className="text-danger" /> };
-  return { dot: "bg-text-tertiary" };
+// A cor da etapa é escolha do cliente. Sem escolha, só ganho e perdido ganham
+// cor e o resto fica neutro.
+function stageAccent(type: string, color: string): { dot: string; label?: React.ReactNode } {
+  const cor = corDaEtapa(color, type);
+  if (type === "won") return { dot: cor.ponto, label: <CheckCircle2 size={12} className={cor.texto} /> };
+  if (type === "lost") return { dot: cor.ponto, label: <XCircle size={12} className={cor.texto} /> };
+  return { dot: cor.ponto };
 }
 
-function DealCardView({ deal, dragging }: { deal: DealCard; dragging?: boolean }) {
+function DealCardView({ deal, defs, dragging }: { deal: DealCard; defs: DefinicaoDeCampo[]; dragging?: boolean }) {
   return (
     <div
       className={cn(
@@ -86,6 +92,7 @@ function DealCardView({ deal, dragging }: { deal: DealCard; dragging?: boolean }
           </span>
         )}
       </div>
+      <ChipsDeCampos defs={defs} valores={deal.customFields} />
       {deal.contacts.length > 0 && (
         <div className="mt-2 truncate text-[11.5px] text-text-tertiary">
           {deal.contacts.map((c) => c.name || "Sem nome").join(", ")}
@@ -95,7 +102,7 @@ function DealCardView({ deal, dragging }: { deal: DealCard; dragging?: boolean }
   );
 }
 
-function DraggableDeal({ deal, onOpen }: { deal: DealCard; onOpen: () => void }) {
+function DraggableDeal({ deal, defs, onOpen }: { deal: DealCard; defs: DefinicaoDeCampo[]; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   // Onde o dedo desceu. Sem isso, arrastar um card para outra coluna também
   // abriria o painel no fim do movimento: o dnd-kit deixa o clique passar.
@@ -115,20 +122,22 @@ function DraggableDeal({ deal, onOpen }: { deal: DealCard; onOpen: () => void })
       }}
       className="cursor-grab active:cursor-grabbing"
     >
-      <DealCardView deal={deal} />
+      <DealCardView deal={deal} defs={defs} />
     </div>
   );
 }
 
 function StageColumnView({
   stage,
+  defs,
   onOpenDeal,
 }: {
   stage: StageColumn;
+  defs: DefinicaoDeCampo[];
   onOpenDeal: (deal: DealCard) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
-  const accent = stageAccent(stage.type);
+  const accent = stageAccent(stage.type, stage.color);
 
   return (
     <div
@@ -156,7 +165,7 @@ function StageColumnView({
 
       <div className="flex flex-col gap-2 overflow-y-auto">
         {stage.deals.map((deal) => (
-          <DraggableDeal key={deal.id} deal={deal} onOpen={() => onOpenDeal(deal)} />
+          <DraggableDeal key={deal.id} deal={deal} defs={defs} onOpen={() => onOpenDeal(deal)} />
         ))}
         {stage.deals.length === 0 && (
           <p className="px-1 py-6 text-center text-[12px] text-text-tertiary">Nenhum negócio aqui.</p>
@@ -170,6 +179,7 @@ export default function NegociosPage() {
   const [pipelines, setPipelines] = React.useState<PipelineOption[]>([]);
   const [pipelineId, setPipelineId] = React.useState("");
   const [stages, setStages] = React.useState<StageColumn[]>([]);
+  const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [showNew, setShowNew] = React.useState(false);
   const [openDealId, setOpenDealId] = React.useState<string | null>(null);
@@ -193,6 +203,7 @@ export default function NegociosPage() {
     const res = await fetch(`/api/deals${pipelineId ? `?pipeline=${pipelineId}` : ""}`);
     const data = await res.json();
     setStages(data.stages ?? []);
+    setDefs(data.fields ?? []);
     setIsLoading(false);
   }, [pipelineId]);
 
@@ -260,6 +271,12 @@ export default function NegociosPage() {
               </Select>
             </div>
           )}
+          <Link
+            href="/negocios/configurar"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-border-default bg-surface-2 px-4 text-sm text-text-secondary transition-colors hover:text-text-primary"
+          >
+            <SlidersHorizontal size={15} /> Personalizar
+          </Link>
           <Button onClick={() => setShowNew(true)}>
             <Plus size={15} /> Novo negócio
           </Button>
@@ -280,10 +297,10 @@ export default function NegociosPage() {
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             {stages.map((stage) => (
-              <StageColumnView key={stage.id} stage={stage} onOpenDeal={(d) => setOpenDealId(d.id)} />
+              <StageColumnView key={stage.id} stage={stage} defs={defs} onOpenDeal={(d) => setOpenDealId(d.id)} />
             ))}
           </div>
-          <DragOverlay>{dragging && <DealCardView deal={dragging} dragging />}</DragOverlay>
+          <DragOverlay>{dragging && <DealCardView deal={dragging} defs={defs} dragging />}</DragOverlay>
         </DndContext>
       )}
 
@@ -324,8 +341,18 @@ function NewDealModal({
   const [contactId, setContactId] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [campos, setCampos] = React.useState<DefinicaoDeCampo[]>([]);
+  const [rascunho, setRascunho] = React.useState<Rascunho>({});
 
   const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0];
+
+  React.useEffect(() => {
+    if (!pipeline?.id) return;
+    fetch(`/api/custom-fields?entity=deal&pipelineId=${pipeline.id}`)
+      .then((r) => r.json())
+      .then((d) => setCampos(d.fields ?? []))
+      .catch(() => setCampos([]));
+  }, [pipeline?.id]);
 
   React.useEffect(() => {
     if (contactQuery.trim().length < 2) {
@@ -354,6 +381,7 @@ function NewDealModal({
         amount: Number(form.amount.replace(/\./g, "").replace(",", ".")) || 0,
         description: form.description,
         contactId: contactId || undefined,
+        customFields: rascunhoParaEnvio(campos, rascunho),
       }),
     });
     setBusy(false);
@@ -433,6 +461,14 @@ function NewDealModal({
               </p>
             )}
           </div>
+
+          <CamposDoFormulario
+            defs={campos}
+            rascunho={rascunho}
+            prefixo="novo"
+            colunas={2}
+            onChange={(k, v) => setRascunho((r) => ({ ...r, [k]: v }))}
+          />
 
           <div>
             <Label htmlFor="deal-desc">Observações</Label>

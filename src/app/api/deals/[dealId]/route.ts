@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { moveDealStage } from "@/lib/server/crm";
+import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
@@ -23,7 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
   });
   if (!deal) return NextResponse.json({ error: "Negócio não encontrado." }, { status: 404 });
 
-  return NextResponse.json({ deal });
+  const fields = await carregarDefinicoes(ctx.orgId, "deal", deal.pipelineId);
+  return NextResponse.json({ deal, fields });
 }
 
 // PATCH cobre três coisas: mover de etapa (passa por moveDealStage, que
@@ -48,6 +50,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
   }
 
   const data: Prisma.DealUpdateInput = {};
+
+  // Campos personalizados: mescla com o que já existe. Valor null apaga.
+  if (body.customFields && typeof body.customFields === "object") {
+    const atual = await prisma.deal.findUnique({ where: { id: deal.id }, select: { pipelineId: true, customFields: true } });
+    const defs = await carregarDefinicoes(ctx.orgId, "deal", atual?.pipelineId);
+    const r = aplicarValores(
+      defs,
+      (atual?.customFields ?? {}) as Record<string, unknown>,
+      body.customFields as Record<string, unknown>
+    );
+    // Obrigatório só vale pro que a pessoa mexeu agora: negócio antigo não pode
+    // ficar travado por um campo que passou a ser obrigatório depois.
+    if (r.ok) {
+      for (const d of defs) {
+        if (d.required && d.key in (body.customFields as object) && r.valores[d.key] === undefined) {
+          return NextResponse.json({ error: d.label + ": preenchimento obrigatório." }, { status: 400 });
+        }
+      }
+    }
+    if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
+    data.customFields = r.valores as Prisma.InputJsonValue;
+  }
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.description === "string") data.description = body.description;
   if (body.amount !== undefined) data.amountCents = Math.max(0, Math.round(Number(body.amount) * 100) || 0);

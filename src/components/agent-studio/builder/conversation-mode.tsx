@@ -33,6 +33,7 @@ const CRM_RESUMO: Partial<Record<IconKey, (d: FlowNodeData) => string>> = {
   "crm-stage": () => "Move o negócio de etapa",
   "crm-task": (d) => `Cria tarefa${d.crmTaskText ? ` “${d.crmTaskText}”` : ""}${d.crmTaskDue ? ` · vence ${d.crmTaskDue}` : ""}`,
   "crm-tag": (d) => (d.crmTagAction === "remove" ? "Tira uma etiqueta" : "Aplica uma etiqueta"),
+  "crm-update": (d) => (d.crmUpdateTarget === "contact" ? "Atualiza dados do contato" : "Atualiza dados do negócio"),
   "crm-note": (d) => `Registra nota${d.crmNoteText ? `: “${d.crmNoteText.slice(0, 60)}”` : ""}`,
   "crm-lookup": () => "Consulta o CRM antes de responder",
 };

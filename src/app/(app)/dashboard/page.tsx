@@ -11,6 +11,9 @@ import { Select } from "@/components/ui/select";
 import { AreaChart } from "@/components/charts/area-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
+import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
+import { descreverConsulta, tiposPermitidos as tiposPermitidos_, type Consulta } from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // Dashboard montado pela própria pessoa.
@@ -57,6 +60,13 @@ interface Widget {
   fonte: string;
   titulo: string;
   largura: number;
+  /** Só para fonte "custom": o cartão que a pessoa montou. */
+  consulta?: Consulta;
+}
+
+interface Rotulos {
+  campos: { key: string; label: string }[];
+  funis: { id: string; name: string }[];
 }
 
 interface Ponto { label: string; value: number }
@@ -109,6 +119,15 @@ export default function DashboardPage() {
   const [editando, setEditando] = React.useState(false);
   const [selecionado, setSelecionado] = React.useState<string | null>(null);
   const [adicionando, setAdicionando] = React.useState(false);
+  const [construtor, setConstrutor] = React.useState<{ editandoId: string | null } | null>(null);
+  const [rotulos, setRotulos] = React.useState<Rotulos>({ campos: [], funis: [] });
+
+  React.useEffect(() => {
+    Promise.all([
+      fetch("/api/custom-fields?entity=deal&todos=1").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/pipelines").then((r) => r.json()).catch(() => ({})),
+    ]).then(([c, pp]) => setRotulos({ campos: c.fields ?? [], funis: pp.pipelines ?? [] }));
+  }, []);
   const [carregando, setCarregando] = React.useState(true);
   const [estadoSalvar, setEstadoSalvar] = React.useState<"parado" | "salvando" | "salvo">("parado");
   const [atualizadoEm, setAtualizadoEm] = React.useState<string | null>(null);
@@ -195,6 +214,22 @@ export default function DashboardPage() {
     setAdicionando(false);
     setSelecionado(id);
     setEditando(true);
+  }
+
+  function salvarDoConstrutor(r: ResultadoDoConstrutor) {
+    const alvo = construtor?.editandoId;
+    if (alvo) {
+      alterar(alvo, { consulta: r.consulta, tipo: r.tipo, titulo: r.titulo });
+    } else {
+      const id = `w${Date.now().toString(36)}`;
+      setWidgets((ws) => [
+        ...(ws ?? []),
+        { id, tipo: r.tipo, fonte: "custom", titulo: r.titulo, largura: r.tipo === "numero" ? 1 : 2, consulta: r.consulta },
+      ]);
+      setSelecionado(id);
+      setEditando(true);
+    }
+    setConstrutor(null);
   }
 
   async function restaurarPadrao() {
@@ -293,6 +328,8 @@ export default function DashboardPage() {
               widget={w}
               fonte={fontePorChave.get(w.fonte)}
               dados={dados}
+              dias={dias}
+              rotulos={rotulos}
               editando={editando}
               selecionado={selecionado === w.id}
               primeiro={i === 0}
@@ -321,6 +358,8 @@ export default function DashboardPage() {
             fonte={fontePorChave.get(widgetSelecionado.fonte)}
             catalogo={catalogo}
             onChange={(m) => alterar(widgetSelecionado.id, m)}
+            rotulos={rotulos}
+            onEditarConsulta={() => setConstrutor({ editandoId: widgetSelecionado.id })}
             onRemover={() => remover(widgetSelecionado.id)}
             onFechar={() => setSelecionado(null)}
           />
@@ -341,7 +380,20 @@ export default function DashboardPage() {
         <EscolherFonte
           catalogo={catalogo}
           onEscolher={adicionar}
+          onMontar={() => { setAdicionando(false); setConstrutor({ editandoId: null }); }}
           onFechar={() => setAdicionando(false)}
+        />
+      )}
+
+      {construtor && (
+        <ConstrutorDeConsulta
+          dias={dias}
+          inicial={(() => {
+            const w = (widgets ?? []).find((x) => x.id === construtor.editandoId);
+            return w?.consulta ? { consulta: w.consulta, tipo: w.tipo, titulo: w.titulo } : undefined;
+          })()}
+          aoSalvar={salvarDoConstrutor}
+          aoFechar={() => setConstrutor(null)}
         />
       )}
     </div>
@@ -351,12 +403,14 @@ export default function DashboardPage() {
 // ── Cartão ─────────────────────────────────────────────────────────────────
 
 function Cartao({
-  widget, fonte, dados, editando, selecionado, primeiro, ultimo,
+  widget, fonte, dados, dias, rotulos, editando, selecionado, primeiro, ultimo,
   onSelecionar, onRemover, onMover,
 }: {
   widget: Widget;
   fonte: Fonte | undefined;
   dados: Dados | null;
+  dias: number;
+  rotulos: Rotulos;
   editando: boolean;
   selecionado: boolean;
   primeiro: boolean;
@@ -394,7 +448,11 @@ function Cartao({
 
       <h2 className="pr-16 text-[12.5px] text-text-tertiary">{widget.titulo}</h2>
 
-      {!fonte ? (
+      {widget.fonte === "custom" && widget.consulta ? (
+        <div className="mt-2 flex-1">
+          <ConteudoDeConsulta consulta={widget.consulta} tipo={widget.tipo} dias={dias} />
+        </div>
+      ) : !fonte ? (
         <p className="mt-3 text-[12.5px] text-text-tertiary">Fonte não encontrada.</p>
       ) : (
         <div className="mt-2 flex-1">
@@ -404,6 +462,9 @@ function Cartao({
 
       {fonte && !editando && (
         <p className="mt-2 text-[11px] text-text-tertiary">{fonte.explicacao}</p>
+      )}
+      {widget.fonte === "custom" && widget.consulta && !editando && (
+        <p className="mt-2 text-[11px] text-text-tertiary">{descreverConsulta(widget.consulta, rotulos.campos, rotulos.funis)}</p>
       )}
     </div>
   );
@@ -534,16 +595,21 @@ function Vazio() {
 // ── Propriedades ───────────────────────────────────────────────────────────
 
 function Propriedades({
-  widget, fonte, catalogo, onChange, onRemover, onFechar,
+  widget, fonte, catalogo, rotulos, onChange, onEditarConsulta, onRemover, onFechar,
 }: {
   widget: Widget;
+  rotulos: Rotulos;
   fonte: Fonte | undefined;
   catalogo: Fonte[];
   onChange: (m: Partial<Widget>) => void;
+  onEditarConsulta: () => void;
   onRemover: () => void;
   onFechar: () => void;
 }) {
-  const tiposPermitidos = fonte ? TIPOS_POR_FONTE[fonte.tipo] : (["numero"] as Widget["tipo"][]);
+  const ehCustom = widget.fonte === "custom" && !!widget.consulta;
+  const tiposPermitidos = ehCustom
+    ? tiposPermitidos_(widget.consulta!)
+    : fonte ? TIPOS_POR_FONTE[fonte.tipo] : (["numero"] as Widget["tipo"][]);
   const grupos = [...new Set(catalogo.map((f) => f.grupo))];
 
   return (
@@ -571,6 +637,19 @@ function Propriedades({
           />
         </div>
 
+        {ehCustom ? (
+          <div>
+            <Label>O que o cartão mostra</Label>
+            <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-secondary">{descreverConsulta(widget.consulta!, rotulos.campos, rotulos.funis)}</p>
+            <button
+              type="button"
+              onClick={onEditarConsulta}
+              className="mt-2 w-full rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Editar o que ele mede
+            </button>
+          </div>
+        ) : (
         <div>
           <Label htmlFor="w-fonte">De onde vem o número</Label>
           <Select
@@ -598,6 +677,7 @@ function Propriedades({
           </Select>
           {fonte && <p className="mt-1.5 text-[11.5px] text-text-tertiary">{fonte.explicacao}</p>}
         </div>
+        )}
 
         <div>
           <Label>Como mostrar</Label>
@@ -666,10 +746,11 @@ function Propriedades({
 // ── Escolher fonte ─────────────────────────────────────────────────────────
 
 function EscolherFonte({
-  catalogo, onEscolher, onFechar,
+  catalogo, onEscolher, onMontar, onFechar,
 }: {
   catalogo: Fonte[];
   onEscolher: (f: Fonte) => void;
+  onMontar: () => void;
   onFechar: () => void;
 }) {
   const [busca, setBusca] = React.useState("");
@@ -711,6 +792,21 @@ function EscolherFonte({
         </header>
 
         <div className="flex-1 overflow-y-auto p-3">
+          <button
+            type="button"
+            onClick={onMontar}
+            className="mb-2 flex w-full items-start gap-3 rounded-xl bg-accent-soft px-3 py-3 text-left ring-1 ring-accent-500/30 transition-colors hover:ring-accent-500/60"
+          >
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-500/20 text-accent-300">
+              <Plus size={14} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-medium text-text-primary">Montar do meu jeito</span>
+              <span className="block text-[11.5px] text-text-secondary">
+                Some, conte ou tire a média de qualquer valor ou campo seu, separe por etapa, responsável ou mês, e filtre.
+              </span>
+            </span>
+          </button>
           {grupos.length === 0 ? (
             <p className="px-3 py-8 text-center text-[12.5px] text-text-tertiary">
               Nada com “{busca}”.

@@ -37,6 +37,9 @@ model Organization {
   tasks       Task[]
   notes       Note[]
   dashboard   DashboardLayout?
+  customFieldDefs CustomField[]
+  // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
+  onboardedAt DateTime?
 
   @@map("eva_studio_organizations")
 }
@@ -952,6 +955,7 @@ model Pipeline {
   organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
   stages       PipelineStage[]
   deals        Deal[]
+  customFields CustomField[]
 
   @@index([orgId])
   @@map("eva_studio_pipelines")
@@ -968,6 +972,10 @@ model PipelineStage {
   // "open" | "won" | "lost". Sem isso o sistema nao sabe qual etapa
   // significa ganho, e nao da pra calcular taxa de conversao.
   type       String @default("open")
+  // Nome da cor na paleta do app (slate, blue, violet, amber, emerald, rose,
+  // cyan). Vazio = a cor padrao do tipo. Guardado o NOME e nao o hex: assim a
+  // etapa acompanha o tema em vez de ficar com um valor fixo.
+  color      String @default("")
 
   pipeline  Pipeline   @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals     Deal[]
@@ -1000,6 +1008,9 @@ model Deal {
   // Quando entrou na etapa atual. updatedAt nao serve: qualquer edicao no
   // negocio o move, e "parado ha 7 dias" viraria mentira.
   stageSince        DateTime  @default(now())
+  // Valores dos campos que o cliente criou, por chave: { consumo_kwh: 480 }.
+  // A definicao (rotulo, tipo, opcoes) mora em CustomField; aqui so o valor.
+  customFields      Json      @default("{}")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -1094,4 +1105,42 @@ model DashboardLayout {
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@map("eva_studio_dashboard_layouts")
+}
+
+// Campo que o cliente cria. Cada negocio tem os dados que fazem sentido pra ele:
+// solar quer "consumo mensal", imobiliaria quer "tipo de imovel". A definicao
+// mora aqui; o valor mora no JSON `customFields` do negocio ou do contato.
+//
+// A `key` e o que liga os dois e NUNCA muda depois de criada. O rotulo pode
+// ser renomeado a vontade sem perder nenhum dado, porque os valores sao
+// guardados pela chave, nao pelo nome que aparece na tela.
+model CustomField {
+  id         String   @id @default(uuid())
+  orgId      String
+  // "deal" | "contact"
+  entity     String
+  // So pra entity "deal". null = o campo vale em todos os funis.
+  pipelineId String?
+  key        String
+  label      String
+  // text | longtext | number | currency | date | select | multiselect |
+  // checkbox | url | phone | email. O tipo tambem nao muda: trocar texto por
+  // numero deixaria valores antigos que nao sao numero.
+  type       String
+  // Para select e multiselect: [{ value, label, color? }]
+  options    Json     @default("[]")
+  required   Boolean  @default(false)
+  helpText   String   @default("")
+  // Aparece como etiqueta no cartao do kanban.
+  showOnCard Boolean  @default(false)
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline?    @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, entity, key])
+  @@index([orgId, entity])
+  @@map("eva_studio_custom_fields")
 }

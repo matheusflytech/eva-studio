@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { createDeal, ensureDefaultPipeline } from "@/lib/server/crm";
+import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 
 // Negócios de um funil, agrupados por etapa (o kanban lê isso direto).
 //   ?pipeline=<id>  padrão: o funil padrão da org
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
       id: stage.id,
       name: stage.name,
       type: stage.type,
+      color: stage.color,
       probability: stage.probability,
       totalCents: stageDeals.reduce((sum, d) => sum + d.amountCents, 0),
       weightedCents: stageDeals.reduce((sum, d) => sum + Math.round((d.amountCents * d.probability) / 100), 0),
@@ -60,6 +62,7 @@ export async function GET(request: Request) {
         owner: d.owner,
         contacts: d.contacts.map((c) => c.contact),
         openTasks: d._count.tasks,
+        customFields: (d.customFields ?? {}) as Record<string, unknown>,
         expectedClosingAt: d.expectedClosingAt?.toISOString() ?? null,
         closedAt: d.closedAt?.toISOString() ?? null,
         createdAt: d.createdAt.toISOString(),
@@ -67,9 +70,13 @@ export async function GET(request: Request) {
     };
   });
 
+  // Definições dos campos: o kanban mostra como etiqueta os marcados "no cartão".
+  const fields = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);
+
   return NextResponse.json({
     pipeline: { id: pipeline.id, name: pipeline.name },
     stages,
+    fields,
   });
 }
 
@@ -80,6 +87,21 @@ export async function POST(request: Request) {
   const body = await request.json();
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Nome do negócio é obrigatório." }, { status: 400 });
+
+  // Campos personalizados: da tela, são validados de verdade (obrigatório,
+  // tipo). O motor do fluxo usa createDeal direto e é mais tolerante.
+  let customFields: Record<string, unknown> | undefined;
+  if (body.customFields && typeof body.customFields === "object") {
+    let pipelineId: string | undefined = body.pipelineId || undefined;
+    if (!pipelineId && body.stageId) {
+      pipelineId = (await prisma.pipelineStage.findFirst({ where: { id: String(body.stageId), pipeline: { orgId: ctx.orgId } }, select: { pipelineId: true } }))?.pipelineId;
+    }
+    if (!pipelineId) pipelineId = (await ensureDefaultPipeline(ctx.orgId)).id;
+    const defs = await carregarDefinicoes(ctx.orgId, "deal", pipelineId);
+    const r = aplicarValores(defs, {}, body.customFields as Record<string, unknown>, { exigirObrigatorios: true });
+    if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
+    customFields = r.valores;
+  }
 
   const deal = await createDeal({
     orgId: ctx.orgId,
@@ -92,6 +114,7 @@ export async function POST(request: Request) {
     amountCents: Math.round(Number(body.amount ?? 0) * 100),
     description: String(body.description ?? ""),
     expectedClosingAt: body.expectedClosingAt ? new Date(body.expectedClosingAt) : null,
+    customFields,
   });
 
   return NextResponse.json({ deal: { id: deal.id, name: deal.name } });

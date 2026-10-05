@@ -21,6 +21,7 @@ import {
   StickyNote,
   Search,
   Building2,
+  PencilLine,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -45,6 +46,7 @@ export const ICON_REGISTRY = {
   "crm-stage": MoveRight,
   "crm-task": CheckSquare,
   "crm-tag": Tag,
+  "crm-update": PencilLine,
   "crm-note": StickyNote,
   "crm-lookup": Search,
   "tool-crm": Building2,

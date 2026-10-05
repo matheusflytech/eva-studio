@@ -5,6 +5,8 @@ import { ExternalLink } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X } from "lucide-react";
+import { TIPO_POR_ID, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { FlowNodeData } from "./flow-node";
 
 // ---------------------------------------------------------------------------
@@ -104,6 +106,107 @@ function StagePicker({
   );
 }
 
+/**
+ * Liga o que o cliente responde aos campos que o negócio criou. O jeito mais
+ * simples: dar à pergunta o mesmo nome do campo e deixar o preenchimento
+ * automático ligado. O mapa abaixo serve para o resto: valor fixo, ou uma
+ * variável de nome diferente.
+ */
+function MapaDeCampos({
+  entidade,
+  pipelineId,
+  data,
+  onChange,
+}: {
+  entidade: "deal" | "contact";
+  pipelineId?: string;
+  data: FlowNodeData;
+  onChange: (patch: Partial<FlowNodeData>) => void;
+}) {
+  const [defs, setDefs] = React.useState<DefinicaoDeCampo[] | null>(null);
+
+  React.useEffect(() => {
+    const q = entidade === "deal" && pipelineId ? `&pipelineId=${pipelineId}` : "";
+    fetch(`/api/custom-fields?entity=${entidade}${q}`)
+      .then((r) => r.json())
+      .then((d) => setDefs(d.fields ?? []))
+      .catch(() => setDefs([]));
+  }, [entidade, pipelineId]);
+
+  const mapa = data.crmFieldMap ?? [];
+  const set = (novo: { key: string; value: string }[]) => onChange({ crmFieldMap: novo });
+
+  if (defs === null) return null;
+
+  if (defs.length === 0) {
+    return (
+      <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
+        Você ainda não criou campos {entidade === "deal" ? "do negócio" : "do contato"}.{" "}
+        <a href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</a> para o agente poder preenchê-los.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+        <Checkbox checked={data.crmAutoFill !== false} onCheckedChange={(v) => onChange({ crmAutoFill: v === true })} />
+        <span className="min-w-0">
+          <span className="block font-medium text-text-primary">Preencher pelo nome da variável</span>
+          <span className="block text-[11.5px] text-text-tertiary">
+            Se uma pergunta guarda a resposta numa variável com o mesmo nome de um campo, o valor vai direto para o campo.
+          </span>
+        </span>
+      </label>
+      <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
+        Nomes dos campos:{" "}
+        {defs.map((d) => (
+          <span key={d.id} className="mr-1.5 inline-block font-mono text-text-secondary" title={`${d.label} (${TIPO_POR_ID.get(d.type)?.rotulo})`}>
+            {d.key}
+          </span>
+        ))}
+      </div>
+      <div>
+        <Label>Valores definidos por você</Label>
+        <div className="mt-1.5 flex flex-col gap-2">
+          {mapa.map((m, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <Select
+                value={m.key}
+                aria-label="Campo"
+                className="h-9"
+                onChange={(e) => set(mapa.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))}
+              >
+                <option value="">Campo...</option>
+                {defs.map((d) => (
+                  <option key={d.id} value={d.key}>{d.label}</option>
+                ))}
+              </Select>
+              <Input
+                value={m.value}
+                aria-label="Valor"
+                className="h-9"
+                placeholder="{variavel} ou valor"
+                onChange={(e) => set(mapa.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
+              />
+              <button type="button" aria-label="Remover" onClick={() => set(mapa.filter((_, j) => j !== i))} className="rounded-lg p-1.5 text-text-tertiary hover:text-danger">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => set([...mapa, { key: "", value: "" }])}
+            className="inline-flex w-fit items-center gap-1.5 text-[12px] text-accent-400 hover:underline"
+          >
+            <Plus size={13} /> Adicionar valor
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CrmBlockFields({
   iconKey,
   data,
@@ -155,8 +258,36 @@ export function CrmBlockFields({
             placeholder="negocio_id"
           />
         </div>
+        <div>
+          <Label>Campos do negócio</Label>
+          <MapaDeCampos entidade="deal" pipelineId={data.crmPipelineId ?? pipelines[0]?.id} data={data} onChange={onChange} />
+        </div>
         <p className="text-[11.5px] text-text-tertiary">
           O contato da conversa é vinculado ao negócio automaticamente. A probabilidade vem da etapa escolhida.
+        </p>
+      </div>
+    );
+  }
+
+  if (iconKey === "crm-update") {
+    const alvo = data.crmUpdateTarget ?? "deal";
+    return (
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label htmlFor="node-update-target">Atualizar</Label>
+          <Select
+            id="node-update-target"
+            value={alvo}
+            onChange={(e) => onChange({ crmUpdateTarget: e.target.value as "deal" | "contact" })}
+          >
+            <option value="deal">O negócio aberto do contato</option>
+            <option value="contact">O contato</option>
+          </Select>
+        </div>
+        <MapaDeCampos entidade={alvo} data={data} onChange={onChange} />
+        <p className="text-[11.5px] text-text-tertiary">
+          Valor vazio é ignorado: se o cliente ainda não respondeu, o que já está no campo não é apagado. Resposta que
+          não combina com o tipo do campo (texto num campo de número) é descartada e aparece na aba Execuções.
         </p>
       </div>
     );
@@ -340,6 +471,7 @@ export function CrmBlockFields({
       { id: "buscar", label: "Consultar CRM", hint: "Só leitura. Seguro deixar sempre ligado." },
       { id: "criar_negocio", label: "Criar negócio", hint: "A IA decide quando há intenção de compra." },
       { id: "mover_etapa", label: "Mover etapa", hint: "Limitado às etapas liberadas abaixo." },
+      { id: "atualizar_campos", label: "Salvar dados do cliente", hint: "A IA preenche os campos que você criou (consumo, tipo de imóvel...)." },
       { id: "criar_tarefa", label: "Criar tarefa", hint: "Gera trabalho pra equipe, não altera o funil." },
       { id: "etiquetar", label: "Etiquetar", hint: "Pode iniciar uma sequência automaticamente." },
       { id: "nota", label: "Registrar nota", hint: "Só escreve na linha do tempo." },

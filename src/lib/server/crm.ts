@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 
 // ---------------------------------------------------------------------------
 // Ações de CRM (§24 do CHATBOT_ENGINE.md).
@@ -61,6 +62,8 @@ export interface CreateDealInput {
   currency?: string;
   description?: string;
   expectedClosingAt?: Date | null;
+  /** Valores dos campos personalizados, por chave. Chave desconhecida ou valor inválido é descartado. */
+  customFields?: Record<string, unknown>;
 }
 
 /**
@@ -91,6 +94,18 @@ export async function createDeal(input: CreateDealInput) {
   const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
   if (!stage) throw new Error("Etapa não encontrada.");
 
+  // Campos personalizados: o que não bate com a definição é descartado em vez
+  // de derrubar a criação. O motor do fluxo chama isto no meio de uma conversa
+  // e não pode falhar porque o cliente digitou texto num campo de número.
+  let customFields: Record<string, unknown> = {};
+  if (input.customFields && Object.keys(input.customFields).length > 0) {
+    const defs = await carregarDefinicoes(input.orgId, "deal", stage.pipelineId);
+    for (const [k, v] of Object.entries(input.customFields)) {
+      const r = aplicarValores(defs, customFields, { [k]: v });
+      if (r.ok) customFields = r.valores;
+    }
+  }
+
   // Novo card entra no topo da coluna.
   const top = await prisma.deal.aggregate({
     where: { stageId },
@@ -111,6 +126,8 @@ export async function createDeal(input: CreateDealInput) {
       companyId: input.companyId ?? null,
       ownerId: input.ownerId ?? null,
       expectedClosingAt: input.expectedClosingAt ?? null,
+      closedAt: stage.type === "open" ? null : new Date(),
+      customFields: customFields as object,
       position: (top._min.position ?? 0) - 1,
       contacts: input.contactId ? { create: { contactId: input.contactId } } : undefined,
     },
@@ -243,4 +260,50 @@ export async function lookupCrmForContact(contactId: string) {
     deal,
     openTasks,
   };
+}
+
+/**
+ * Preenche campos personalizados do negócio. Tolerante de propósito: valor que
+ * não bate com o tipo do campo é descartado e devolvido em `erros`, nunca
+ * lançado. É chamado no meio de uma conversa, e o cliente digitar "bastante"
+ * num campo de número não pode derrubar o atendimento.
+ */
+export async function preencherCamposDoNegocio(orgId: string, dealId: string, entrada: Record<string, unknown>) {
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { pipelineId: true, customFields: true } });
+  if (!deal) return { aplicados: 0, erros: ["Negócio não encontrado."] };
+  const defs = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
+  return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
+    prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } })
+  );
+}
+
+export async function preencherCamposDoContato(orgId: string, contactId: string, entrada: Record<string, unknown>) {
+  const contato = await prisma.contact.findFirst({ where: { id: contactId, orgId }, select: { customFields: true } });
+  if (!contato) return { aplicados: 0, erros: ["Contato não encontrado."] };
+  const defs = await carregarDefinicoes(orgId, "contact");
+  return gravarCampos(defs, (contato.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
+    prisma.contact.update({ where: { id: contactId }, data: { customFields: valores as object } })
+  );
+}
+
+async function gravarCampos(
+  defs: Awaited<ReturnType<typeof carregarDefinicoes>>,
+  atuais: Record<string, unknown>,
+  entrada: Record<string, unknown>,
+  gravar: (valores: Record<string, unknown>) => Promise<unknown>
+) {
+  let valores = atuais;
+  let aplicados = 0;
+  const erros: string[] = [];
+  const conhecidas = new Set(defs.map((d) => d.key));
+  for (const [chave, bruto] of Object.entries(entrada)) {
+    if (!conhecidas.has(chave)) continue;
+    const r = aplicarValores(defs, valores, { [chave]: bruto });
+    if (r.ok) {
+      valores = r.valores;
+      aplicados += 1;
+    } else erros.push(...r.erros);
+  }
+  if (aplicados > 0) await gravar(valores);
+  return { aplicados, erros };
 }

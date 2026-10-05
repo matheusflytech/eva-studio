@@ -64,6 +64,7 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
       { key: "crm-stage", label: "Mover etapa", hint: "Avança o negócio no funil." },
       { key: "crm-task", label: "Criar tarefa", hint: "Gera um follow-up para a equipe." },
       { key: "crm-tag", label: "Etiquetar", hint: "Marca o contato. Pode iniciar uma sequência." },
+      { key: "crm-update", label: "Atualizar dados", hint: "Grava o que o cliente respondeu nos campos do negócio." },
       { key: "crm-note", label: "Registrar nota", hint: "Escreve na linha do tempo do contato." },
       { key: "crm-lookup", label: "Buscar dados", hint: "Lê o CRM para a Condição decidir." },
     ],

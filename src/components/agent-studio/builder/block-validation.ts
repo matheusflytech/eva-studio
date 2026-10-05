@@ -72,6 +72,11 @@ export function validateNode(data: FlowNodeData): string | null {
     case "crm-task":
       return vazio(data.crmTaskText) ? "Descreva a tarefa." : null;
 
+    case "crm-update":
+      return (data.crmFieldMap ?? []).some((m) => m.key) || data.crmAutoFill !== false
+        ? null
+        : "Ligue o preenchimento pelo nome da variável ou adicione um valor.";
+
     case "crm-note":
       return vazio(data.crmNoteText) ? "Escreva o texto da nota." : null;
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { normalizarCapturados } from "@/lib/server/custom-fields";
 import type { Prisma } from "@/generated/prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,8 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
     const digits = externalId.replace(/\D/g, "");
     if (digits.length >= 10) fields.phone = digits;
   }
+
+  await normalizarCapturados(orgId, custom);
 
   const now = new Date();
 

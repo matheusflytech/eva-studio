@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { applyTag, removeTag, optOutContact } from "@/lib/server/contacts";
 import { serializeContact } from "@/lib/server/contact-dto";
+import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import type { Prisma } from "@/generated/prisma/client";
 
 const INCLUDE = {
@@ -123,7 +124,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
     data.owner = body.ownerId ? { connect: { id: String(body.ownerId) } } : { disconnect: true };
   }
   if (body.customFields && typeof body.customFields === "object") {
-    data.customFields = body.customFields as Prisma.InputJsonValue;
+    const r = await mesclarCamposDeContato(
+      ctx.orgId,
+      (contact.customFields ?? {}) as Record<string, unknown>,
+      body.customFields as Record<string, unknown>
+    );
+    if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
+    data.customFields = r.valores as Prisma.InputJsonValue;
   }
   if (body.optIn === true) data.optIn = true;
 

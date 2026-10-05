@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ContactActivity } from "@/components/crm/contact-activity";
+import { CamposDoContato } from "@/components/crm/campos-do-contato";
 import { formatRelativeDate } from "@/lib/utils";
 
 interface ContactTag {
@@ -661,7 +662,6 @@ function ContactDrawer({
   }
 
   const available = tags.filter((t) => !contact.tags.some((ct) => ct.id === t.id));
-  const custom = Object.entries(contact.customFields ?? {});
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-label="Detalhes do contato">
@@ -749,19 +749,7 @@ function ContactDrawer({
             </p>
           </section>
 
-          {custom.length > 0 && (
-            <section>
-              <Label>Capturado no fluxo</Label>
-              <dl className="mt-1.5 flex flex-col gap-1.5 rounded-2xl bg-surface-2 px-4 py-3">
-                {custom.map(([key, value]) => (
-                  <div key={key} className="flex items-start justify-between gap-4 text-[13px]">
-                    <dt className="text-text-tertiary">{key}</dt>
-                    <dd className="max-w-[60%] break-words text-right text-text-primary">{String(value)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
+          <CamposDoContato contactId={contact.id} valores={contact.customFields ?? {}} aoSalvar={(c) => onChanged(c as Contact)} />
 
           <section>
             <Label htmlFor="d-notas">Anotações</Label>

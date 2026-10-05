@@ -97,7 +97,7 @@ function proximoPasso(agent: AgentOverview): ProximoPasso {
   if (agent.canais.length === 0) {
     return {
       texto: "Conecte um canal: o fluxo está pronto e ninguém alcança ele",
-      href: `/agent-studio/${agent.id}`,
+      href: `/agent-studio/${agent.id}?aba=canais`,
       tom: "atencao",
       icone: <PlugZap size={13} />,
     };

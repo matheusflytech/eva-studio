@@ -3,6 +3,7 @@ import { requireOrgId } from "@/lib/auth/require-org";
 import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { FONTE_POR_CHAVE } from "@/lib/server/analytics";
+import { sanearConsulta, tiposPermitidos, type Consulta } from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // O painel que a pessoa montou.
@@ -21,6 +22,8 @@ export interface Widget {
   fonte: string;
   titulo: string;
   largura: number;
+  /** Só para fonte "custom": o que o cliente montou. */
+  consulta?: Consulta;
 }
 
 /** O painel de quem nunca mexeu. Mostra o essencial de venda sem pedir configuração. */
@@ -59,12 +62,25 @@ export async function PUT(request: Request) {
   const widgets: Widget[] = [];
   for (const w of bruto.slice(0, 40)) {
     const fonte = String(w?.fonte ?? "");
+    const largura = LARGURAS.has(Number(w?.largura)) ? Number(w.largura) : 1;
+    const id = String(w?.id ?? crypto.randomUUID()).slice(0, 40);
+
+    // Cartão montado pelo cliente: a consulta é saneada, e o tipo precisa
+    // caber nela (não existe pizza de "por mês").
+    if (fonte === "custom") {
+      const consulta = sanearConsulta(w?.consulta);
+      if (!consulta) continue;
+      const permitidos = tiposPermitidos(consulta);
+      const tipo = permitidos.find((t) => t === w?.tipo) ?? permitidos[0];
+      widgets.push({ id, tipo, fonte, titulo: String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão", largura, consulta });
+      continue;
+    }
+
     const definicao = FONTE_POR_CHAVE.get(fonte);
     if (!definicao) continue;
     const tipo = TIPOS.has(w?.tipo) ? String(w.tipo) : "numero";
-    const largura = LARGURAS.has(Number(w?.largura)) ? Number(w.largura) : 1;
     widgets.push({
-      id: String(w?.id ?? crypto.randomUUID()).slice(0, 40),
+      id,
       tipo,
       fonte,
       titulo: String(w?.titulo ?? definicao.rotulo).slice(0, 80) || definicao.rotulo,
