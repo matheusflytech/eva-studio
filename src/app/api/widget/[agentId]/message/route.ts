@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
-import { transcreverAudio } from "@/lib/server/transcribe";
+import { transcreverAudio, MAX_AUDIO_BYTES } from "@/lib/server/transcribe";
+import { safeFetch } from "@/lib/server/ssrf";
+
+const MAX_AUDIO_B64 = Math.ceil((MAX_AUDIO_BYTES * 4) / 3);
 
 // Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
 const MAX_TEXT = 4000;
@@ -57,6 +60,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   if (typeof body.audio_base64 === "string") {
     const mime = typeof body.audio_mime === "string" ? body.audio_mime.slice(0, 40) : "audio/webm";
     const r = await transcreverAudio(agent.orgId, body.audio_base64, mime, typeof lang === "string" ? lang : undefined);
+    // Sem chave Groq aqui, mas com um fluxo n8n ligado ao agente: ele já sabe
+    // transcrever e responder áudio (audio_base64 -> Whisper -> resposta).
+    if ("erro" in r && r.erro === "sem_chave" && agent.outboundUrl && body.audio_base64.length <= MAX_AUDIO_B64) {
+      try {
+        const res = await safeFetch(agent.outboundUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audio_base64: body.audio_base64,
+            audio_mime: mime,
+            conversation_id: `website:${String(contactId ?? "").slice(0, MAX_CONTACT_ID)}`,
+            lang: typeof lang === "string" ? lang.slice(0, 8) : undefined,
+          }),
+        });
+        const d = res.ok ? await res.json() : null;
+        if (typeof d?.reply === "string" && d.reply.trim()) {
+          return NextResponse.json({ messages: [{ text: d.reply }], status: "active" }, { headers: CORS_HEADERS });
+        }
+      } catch {
+        /* cai na mensagem abaixo */
+      }
+    }
     if ("erro" in r) {
       const msg =
         r.erro === "sem_chave"
