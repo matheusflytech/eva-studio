@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { transcreverAudio } from "@/lib/server/transcribe";
 
 // Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
 const MAX_TEXT = 4000;
@@ -45,7 +46,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Muitas mensagens. Aguarde um instante." }, { status: 429, headers: CORS_HEADERS });
   }
 
-  const { contactId, text, optionId, lang } = await request.json();
+  const body = await request.json();
+  const { optionId, lang } = body;
+  let { text } = body;
+  // O site antigo mandava `conversation_id`; aceita os dois nomes.
+  const contactId = body.contactId ?? body.conversation_id;
+
+  // Áudio: transcreve e segue como se o visitante tivesse digitado.
+  let transcricao: string | undefined;
+  if (typeof body.audio_base64 === "string") {
+    const mime = typeof body.audio_mime === "string" ? body.audio_mime.slice(0, 40) : "audio/webm";
+    const r = await transcreverAudio(agent.orgId, body.audio_base64, mime, typeof lang === "string" ? lang : undefined);
+    if ("erro" in r) {
+      const msg =
+        r.erro === "sem_chave"
+          ? "O atendimento por voz ainda não está configurado. Pode escrever sua mensagem?"
+          : r.erro === "vazio"
+            ? "Não consegui ouvir nada nesse áudio. Tente de novo ou escreva."
+            : "Não consegui entender o áudio agora. Pode escrever sua mensagem?";
+      return NextResponse.json({ messages: [{ text: msg }], status: "active" }, { headers: CORS_HEADERS });
+    }
+    text = r.texto.slice(0, MAX_TEXT);
+    transcricao = text;
+  }
+
   if (!contactId || typeof contactId !== "string" || contactId.length > MAX_CONTACT_ID) {
     return NextResponse.json({ error: "contactId inválido." }, { status: 400, headers: CORS_HEADERS });
   }
@@ -58,5 +82,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const safeLang = typeof lang === "string" ? lang.slice(0, 8) : undefined;
 
   const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId, lang: safeLang });
-  return NextResponse.json(result, { headers: CORS_HEADERS });
+  return NextResponse.json(transcricao ? { ...result, transcricao } : result, { headers: CORS_HEADERS });
 }
