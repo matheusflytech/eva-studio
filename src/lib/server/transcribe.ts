@@ -35,6 +35,8 @@ export async function transcreverAudio(
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(bytes)], { type: mime }), `audio.${ext}`);
   form.append("model", "whisper-large-v3-turbo");
+  // Dica de vocabulário: sem ela o Whisper escreve "Vunhats" para WhatsApp.
+  form.append("prompt", "Eva Holding, WhatsApp, Instagram, agentes de IA, automação, CRM, chatbot, atendimento, orçamento.");
   form.append("language", lang === "en" ? "en" : lang === "es" ? "es" : "pt");
 
   try {
