@@ -224,8 +224,9 @@ comentário via `entry[].changes[]` com `field: "comments"` (`value.id`, `value.
 `value.media.id`) — formato diferente de `entry[].messaging[]` (mensagens diretas), mesmo webhook. Ao bater:
 `POST /{comment-id}/replies` (resposta pública, se tiver) e `POST /{comment-id}/private_replies` (a DM — único
 endpoint que consegue iniciar uma conversa sem o contato ter mandado mensagem antes). Registra a transcrição
-(o texto do comentário como "contact", a DM como "bot") e incrementa `triggerCount`. **Não deduplicado**: a Meta
-pode reentregar o mesmo evento de webhook, o que teoricamente manda a mesma DM duas vezes num reenvio raro.
+(o texto do comentário como "contact", a DM como "bot") e incrementa `triggerCount` — só se a private reply
+voltou OK; se a Meta recusar, o erro vai pro log e nada é contado nem registrado. Reentrega do mesmo comentário
+é barrada por `isFirstDelivery(commentId)`.
 
 **Simulador** (`CommentSimulator` dentro de `comment-automations-editor.tsx`): sem conta Instagram conectada,
 digita um comentário fictício e vê qual automação bateria (via
@@ -533,6 +534,11 @@ não o código.
 | `src/app/api/instagram/oauth/callback/route.ts` | Callback do Instagram Login (OAuth) |
 | `src/app/api/agents/[agentId]/comment-automations/` | CRUD + simulador das automações de comentário — §11 |
 | `src/lib/server/comment-automation.ts` | `matchCommentAutomation` — lógica de casamento, compartilhada entre webhook e simulador |
+| `src/lib/server/triggers.ts` | `matchTrigger`, `podeAvaliarGatilho`, `parseTriggerInput` — gatilhos — §24 |
+| `src/lib/server/instagram-events.ts` | `classifyInstagramMessage` — DM, resposta/reação a story, menção — §24 |
+| `src/lib/server/instagram-subscribe.ts` | Assina os campos do webhook do Instagram (`subscribed_apps`) — §24 |
+| `src/app/api/agents/[agentId]/triggers/` | CRUD dos gatilhos — §24 |
+| `src/app/api/agents/[agentId]/instagram-stories/route.ts` | Stories ativos para escolher no gatilho — §24 |
 | `src/app/api/analytics/overview/route.ts` | Dados reais do Dashboard/Insights (mensagens por dia, taxa de resposta, horário de pico) |
 | `src/components/agent-studio/builder/flow-node.tsx` | Como cada bloco renderiza (inclui as saídas por opção) |
 | `src/components/agent-studio/builder/node-inspector.tsx` | Edição de cada tipo de bloco, incluindo os botões e o seletor de modelo |
@@ -560,3 +566,44 @@ não o código.
 | `src/app/api/webhooks/telegram/[agentId]/route.ts` | Adaptador do canal Telegram — §16 |
 | `src/app/(app)/contatos/page.tsx` | Tela de Contatos, Etiquetas e Segmentos — §13 |
 | `src/app/(app)/sequencias/page.tsx` | Tela de Sequências (régua e passos) — §14 |
+
+## 24. Gatilhos (palavra-chave na DM, resposta e menção em story)
+
+Recurso estilo ManyChat: uma mensagem que bate com um gatilho dispara uma resposta e/ou pula a conversa para
+um bloco do fluxo. Nada casou → fluxo padrão, como sempre.
+
+**Modelo** (`eva_studio_agent_triggers`, `AgentTrigger`): `kind` (`dm_keyword` | `story_reply` |
+`story_mention`), `channels` (vazio = todos; story é sempre `instagram`), `matchMode` (`exact` | `contains` |
+`any`), `keywords[]`, `storyId` (vazio = qualquer story), `includeReactions`, `replyText` (aceita
+`{variaveis}`), `targetNodeId`, `priority`, `active`, `triggerCount`, `lastTriggeredAt`.
+
+**Casamento** (`matchTrigger` em `src/lib/server/triggers.ts`, puro e testado):
+1. Texto e palavras sem acento, minúsculos e com espaço colapsado.
+2. `exact` = texto inteiro igual a uma palavra; `contains` = texto contém uma palavra; `any` = qualquer texto
+   (proibido em `dm_keyword` — "qualquer mensagem" já é o fluxo padrão).
+3. Canais de teste (`builder_preview`, `playground`) ignoram o filtro de canal — dá pra testar no Playground.
+4. `story_reply`: `storyId` vazio = qualquer story; reação (mensagem só com emoji) só casa com `includeReactions`.
+5. Resposta a story sem gatilho de story cai nos gatilhos de DM; reação, não.
+6. Desempate: story específico > `exact` > `contains`, depois `priority` maior, depois o mais antigo.
+
+**No motor** (`advanceConversation`): avaliado depois do "humano está atendendo" e ANTES de retomar o bloco
+parado. `podeAvaliarGatilho`: DM só é avaliada com a conversa sem bloco parado ou parada em `ai-agent`, `agent`
+ou `wait` — **nunca durante uma Captura** (a resposta do cliente ali é dado, não comando). Evento de story é
+sempre avaliado. Com `targetNodeId`, o motor executa aquele bloco (e limpa um `Esperar` pendente); só com
+`replyText`, responde e deixa a conversa onde estava. Menção em story sem gatilho só entra na caixa de entrada,
+não roda o fluxo nem chama o webhook do n8n (agente sem fluxo). Cada disparo incrementa `triggerCount` e
+aparece como passo `trigger` na aba Execuções.
+
+**Instagram** (`handleInstagramEntries`): o webhook manda tudo em `messages`. `classifyInstagramMessage` olha
+`message.reply_to.story` (resposta/reação, com `story.id`) e anexo `story_mention` (menção). A mídia do story
+mencionado é baixada na hora (a URL expira) e vira `[Menção no story]` na conversa. Resposta a story com
+GIF/sticker não gera webhook (limite da Meta). Formato real da reação: ver
+`docs/superpowers/plans/2026-10-18-spike-instagram.md`.
+
+**Assinatura de eventos**: a conexão pelo Instagram Login chama `POST graph.instagram.com/{v}/me/subscribed_apps`
+com `messages, messaging_postbacks, message_reactions, comments`. Conexões antigas:
+`POST /api/agents/[agentId]/instagram-connection/subscribe`. Conexão manual (token de Página) assina na Página,
+pelo painel do app Meta.
+
+**Tela**: card "Gatilhos" na aba Canais do agente (`triggers-editor.tsx`), com lista de stories ativos via
+`GET /api/agents/[agentId]/instagram-stories` (cai para ID manual se a Meta não devolver).

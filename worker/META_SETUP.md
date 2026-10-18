@@ -50,3 +50,7 @@ de fluxo. Ver `docs/CHATBOT_ENGINE.md` §11.
    `instagram_business_manage_messages`
 4. No painel do app: Webhooks → configurar a URL `https://<seu-dominio>/api/webhooks/meta` e o verify token
    (serve pros dois produtos, o mesmo endpoint distingue pelo formato do payload)
+   - Instagram: a conexão pelo **Instagram Login** assina sozinha os campos `messages`,
+     `messaging_postbacks`, `message_reactions` e `comments` (resposta/menção em story chegam em `messages`).
+     Conexões feitas antes disso: `POST /api/agents/{id}/instagram-connection/subscribe`. Conexão manual
+     com token de Página: assinar os campos na Página pelo painel do app.
