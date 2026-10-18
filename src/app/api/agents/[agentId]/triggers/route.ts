@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { parseTriggerInput } from "@/lib/server/triggers";
+import { erroDoBlocoDeDestino, erroDoTetoDeGatilhos } from "@/lib/server/trigger-guards";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const ctx = await requirePermission("read");
@@ -25,6 +26,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
 
   const parsed = parseTriggerInput(await request.json().catch(() => null));
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
+  const erro =
+    (await erroDoTetoDeGatilhos(agentId)) ?? (await erroDoBlocoDeDestino(agentId, parsed.data.targetNodeId));
+  if (erro) return NextResponse.json({ error: erro }, { status: 400 });
 
   const trigger = await prisma.agentTrigger.create({ data: { agentId, ...parsed.data } });
   return NextResponse.json({ trigger });

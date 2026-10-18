@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
   agent: { findFirst: vi.fn() },
-  agentTrigger: { findMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  agentTrigger: { findMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), update: vi.fn(), delete: vi.fn(), count: vi.fn() },
+  agentFlow: { findUnique: vi.fn() },
 }));
 const auth = vi.hoisted(() => ({ requirePermission: vi.fn() }));
 
@@ -26,6 +27,8 @@ beforeEach(() => {
   auth.requirePermission.mockResolvedValue({ userId: "u1", orgId: "o1", role: "owner" });
   db.agent.findFirst.mockResolvedValue({ id: "a1" });
   db.agentTrigger.findFirst.mockResolvedValue({ id: "t1" });
+  db.agentTrigger.count.mockResolvedValue(0);
+  db.agentFlow.findUnique.mockResolvedValue({ nodes: [{ id: "n1" }, { id: "n2" }] });
 });
 
 describe("API de gatilhos", () => {
@@ -90,5 +93,33 @@ describe("API de gatilhos", () => {
       where: { id: "t1" },
       data: expect.objectContaining({ active: false }),
     });
+  });
+});
+
+describe("API de gatilhos — integridade", () => {
+  it("bloco de destino que não existe no fluxo do agente: 400", async () => {
+    const res = await POST(req({ ...valido, targetNodeId: "outro-agente-node" }), { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "O bloco escolhido não existe mais no fluxo deste agente." });
+    expect(db.agentTrigger.create).not.toHaveBeenCalled();
+  });
+
+  it("bloco de destino do próprio fluxo: aceita", async () => {
+    db.agentTrigger.create.mockResolvedValue({ id: "t1" });
+    expect((await POST(req({ ...valido, targetNodeId: "n2" }), { params })).status).toBe(200);
+  });
+
+  it("editar também confere o bloco de destino", async () => {
+    const res = await PUT(req({ ...valido, targetNodeId: "sumiu" }, "PUT"), { params: paramsId });
+    expect(res.status).toBe(400);
+    expect(db.agentTrigger.update).not.toHaveBeenCalled();
+  });
+
+  it("teto de gatilhos por agente", async () => {
+    db.agentTrigger.count.mockResolvedValue(100);
+    const res = await POST(req(valido), { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Este agente já tem 100 gatilhos, o máximo permitido." });
+    expect(db.agentTrigger.create).not.toHaveBeenCalled();
   });
 });

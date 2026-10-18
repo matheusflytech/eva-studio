@@ -112,15 +112,59 @@ export interface TriggerInput {
   active: boolean;
 }
 
-function toList(value: unknown): string[] {
-  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
-  return raw.map((v) => String(v).trim()).filter(Boolean);
+// Limites do que um gatilho aceita. O texto da resposta segue o teto de uma
+// mensagem do Instagram (1000), o canal mais restrito entre os atendidos.
+export const TRIGGER_LIMITS = {
+  name: 80,
+  replyText: 1000,
+  keyword: 60,
+  keywords: 30,
+  perAgent: 100,
+} as const;
+
+// Ids que vêm da Meta (story) e do Builder (bloco): só caracteres de id, nada
+// que vire HTML, caminho ou consulta se um dia for parar noutro lugar.
+const ID_PATTERN = /^[\w-]{1,64}$/;
+
+/** Lê string sem aceitar objeto/array disfarçado (`{ $ne: 1 }` vira erro, não "[object Object]"). */
+function readString(value: unknown): string | null {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+function toList(value: unknown): string[] | null {
+  const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : value == null ? [] : null;
+  if (!raw) return null;
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== "string" && typeof v !== "number") return null;
+    const s = String(v).trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+/** Tira repetidas que o motor trataria como iguais (acento e caixa). Fica a primeira grafia. */
+function dedupeKeywords(keywords: string[]): string[] {
+  const seen = new Set<string>();
+  return keywords.filter((k) => {
+    const key = normalizeText(k);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function parseTriggerInput(body: unknown): { data: TriggerInput } | { error: string } {
-  const b = (body ?? {}) as Record<string, unknown>;
-  const name = String(b.name ?? "").trim();
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return { error: "Dados do gatilho inválidos." };
+  const b = body as Record<string, unknown>;
+
+  const name = readString(b.name);
+  if (name === null) return { error: "Nome inválido." };
   if (!name) return { error: "Dê um nome ao gatilho." };
+  if (name.length > TRIGGER_LIMITS.name) return { error: `Nome muito longo (máximo de ${TRIGGER_LIMITS.name} caracteres).` };
 
   const kind = String(b.kind ?? "") as TriggerKind;
   if (!TRIGGER_KINDS.includes(kind)) return { error: "Tipo de gatilho inválido." };
@@ -132,13 +176,36 @@ export function parseTriggerInput(body: unknown): { data: TriggerInput } | { err
     return { error: "Palavra-chave na DM precisa ser exata ou parcial — 'qualquer mensagem' já é o fluxo padrão." };
   }
 
-  const keywords = matchMode === "any" ? [] : toList(b.keywords);
-  if (matchMode !== "any" && keywords.length === 0) return { error: "Informe ao menos uma palavra-chave." };
+  let keywords: string[] = [];
+  if (matchMode !== "any") {
+    const lista = toList(b.keywords);
+    if (!lista) return { error: "Palavras-chave inválidas." };
+    keywords = dedupeKeywords(lista);
+    if (keywords.length === 0) return { error: "Informe ao menos uma palavra-chave." };
+    if (keywords.length > TRIGGER_LIMITS.keywords) {
+      return { error: `Use no máximo ${TRIGGER_LIMITS.keywords} palavras-chave por gatilho.` };
+    }
+    if (keywords.some((k) => k.length > TRIGGER_LIMITS.keyword)) {
+      return { error: `Cada palavra-chave pode ter até ${TRIGGER_LIMITS.keyword} caracteres.` };
+    }
+  }
 
-  const channels = isStory ? ["instagram"] : toList(b.channels).filter((c) => TRIGGER_CHANNELS.includes(c));
-  const replyText = String(b.replyText ?? "").trim();
-  const targetNodeId = String(b.targetNodeId ?? "").trim();
+  const canais = toList(b.channels);
+  if (!canais) return { error: "Canais inválidos." };
+  const channels = isStory ? ["instagram"] : [...new Set(canais.filter((c) => TRIGGER_CHANNELS.includes(c)))];
+
+  const replyText = readString(b.replyText);
+  if (replyText === null) return { error: "Resposta inválida." };
+  if (replyText.length > TRIGGER_LIMITS.replyText) {
+    return { error: `Resposta muito longa (máximo de ${TRIGGER_LIMITS.replyText} caracteres).` };
+  }
+
+  const targetNodeId = readString(b.targetNodeId);
+  if (targetNodeId === null || (targetNodeId && !ID_PATTERN.test(targetNodeId))) return { error: "Bloco de destino inválido." };
   if (!replyText && !targetNodeId) return { error: "Defina uma mensagem de resposta ou um bloco do fluxo para seguir." };
+
+  const storyId = kind === "story_reply" ? readString(b.storyId) : "";
+  if (storyId === null || (storyId && !ID_PATTERN.test(storyId))) return { error: "ID do story inválido." };
 
   const priority = Math.max(0, Math.min(100, Number.parseInt(String(b.priority ?? 0), 10) || 0));
 
@@ -149,7 +216,7 @@ export function parseTriggerInput(body: unknown): { data: TriggerInput } | { err
       channels,
       matchMode,
       keywords,
-      storyId: kind === "story_reply" ? String(b.storyId ?? "").trim() : "",
+      storyId,
       includeReactions: kind === "story_reply" ? b.includeReactions !== false : false,
       replyText,
       targetNodeId,

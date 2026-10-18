@@ -162,3 +162,42 @@ describe("parseTriggerInput", () => {
     expect("error" in parseTriggerInput({ ...base, kind: "xyz" })).toBe(true);
   });
 });
+
+describe("parseTriggerInput — limites e saneamento", () => {
+  const base = { name: "Promo", kind: "dm_keyword", matchMode: "exact", keywords: "promo", replyText: "Oi!" };
+
+  it("nome comprido demais", () => {
+    expect(parseTriggerInput({ ...base, name: "x".repeat(81) })).toEqual({ error: "Nome muito longo (máximo de 80 caracteres)." });
+  });
+  it("resposta comprida demais", () => {
+    expect(parseTriggerInput({ ...base, replyText: "x".repeat(1001) })).toEqual({
+      error: "Resposta muito longa (máximo de 1000 caracteres).",
+    });
+  });
+  it("palavra comprida demais", () => {
+    expect(parseTriggerInput({ ...base, keywords: ["x".repeat(61)] })).toEqual({
+      error: "Cada palavra-chave pode ter até 60 caracteres.",
+    });
+  });
+  it("palavras demais", () => {
+    const muitas = Array.from({ length: 31 }, (_, i) => `p${i}`);
+    expect(parseTriggerInput({ ...base, keywords: muitas })).toEqual({ error: "Use no máximo 30 palavras-chave por gatilho." });
+  });
+  it("remove palavras repetidas, mesmo com acento e caixa diferentes", () => {
+    const r = parseTriggerInput({ ...base, keywords: ["Promoção", "promocao", " PROMOÇÃO ", "cupom"] });
+    expect("data" in r && r.data.keywords).toEqual(["Promoção", "cupom"]);
+  });
+  it("id de story só com letras, números, _ e -", () => {
+    const r = parseTriggerInput({ name: "S", kind: "story_reply", matchMode: "any", replyText: "Oi", storyId: "<script>" });
+    expect(r).toEqual({ error: "ID do story inválido." });
+  });
+  it("id de bloco com formato estranho", () => {
+    expect(parseTriggerInput({ ...base, targetNodeId: "x".repeat(65) })).toEqual({ error: "Bloco de destino inválido." });
+  });
+  it("tipos errados não quebram nem passam", () => {
+    expect("error" in parseTriggerInput({ ...base, name: { $ne: 1 } })).toBe(true);
+    expect("error" in parseTriggerInput({ ...base, keywords: [{ a: 1 }] })).toBe(true);
+    expect("error" in parseTriggerInput(null)).toBe(true);
+    expect("error" in parseTriggerInput("texto")).toBe(true);
+  });
+});

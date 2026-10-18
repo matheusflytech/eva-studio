@@ -5,7 +5,8 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/permissions", () => ({
   requirePermission: vi.fn(async () => ({ userId: "u1", orgId: "o1", role: "owner" })),
 }));
-vi.mock("@/lib/server/crypto", () => ({ decryptSecret: (v: string) => v }));
+const cripto = vi.hoisted(() => ({ decryptSecret: vi.fn((v: string) => v) }));
+vi.mock("@/lib/server/crypto", () => cripto);
 
 import { GET } from "./route";
 
@@ -44,5 +45,39 @@ describe("GET instagram-stories", () => {
     const res = await GET(req(), { params });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ stories: [], reason: "A Meta respondeu 403." });
+  });
+});
+
+describe("GET instagram-stories — saneamento", () => {
+  it("token ilegível (chave diferente): lista vazia com motivo, sem 500", async () => {
+    cripto.decryptSecret.mockImplementationOnce(() => {
+      throw new Error("bad decrypt");
+    });
+    const res = await GET(req(), { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      stories: [],
+      reason: "Não foi possível ler a conexão do Instagram. Reconecte a conta.",
+    });
+  });
+
+  it("prévia só https; id estranho é descartado", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { id: "S1", media_url: "javascript:alert(1)" },
+            { id: "S2", thumbnail_url: "https://cdn/ok.jpg" },
+            { id: "../x", media_url: "https://cdn/x.jpg" },
+          ],
+        })
+      )
+    );
+    const body = await (await GET(req(), { params })).json();
+    expect(body.stories.map((s: { id: string; preview: string }) => [s.id, s.preview])).toEqual([
+      ["S1", ""],
+      ["S2", "https://cdn/ok.jpg"],
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { parseTriggerInput } from "@/lib/server/triggers";
+import { erroDoBlocoDeDestino } from "@/lib/server/trigger-guards";
 
 type Params = { params: Promise<{ agentId: string; id: string }> };
 
@@ -19,6 +20,9 @@ export async function PUT(request: Request, { params }: Params) {
   }
   const parsed = parseTriggerInput(await request.json().catch(() => null));
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
+  const erro = await erroDoBlocoDeDestino(agentId, parsed.data.targetNodeId);
+  if (erro) return NextResponse.json({ error: erro }, { status: 400 });
 
   const trigger = await prisma.agentTrigger.update({ where: { id }, data: parsed.data });
   return NextResponse.json({ trigger });
