@@ -28,6 +28,7 @@ import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/serv
 import { syncContactFromConversation } from "@/lib/server/contacts";
 import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
 import { registerBroadcastReply } from "@/lib/server/outbound";
+import { matchTrigger, podeAvaliarGatilho, type InboundKind } from "@/lib/server/triggers";
 
 export interface OutboundMessage {
   text: string;
@@ -58,6 +59,9 @@ export interface AdvanceInput {
   // Id da mensagem do lado de fora (wamid), pra recibo de entrega e pra não
   // gravar a mesma mensagem duas vezes se a Meta reentregar.
   externalId?: string;
+  // Que tipo de evento é (só o Instagram distingue hoje): DM comum, resposta
+  // ou reação a story, menção em story. Sem isso, é DM.
+  event?: { kind: InboundKind; storyId?: string; isReaction?: boolean };
 }
 
 export interface AdvanceResult {
@@ -844,6 +848,29 @@ async function logMessages(
   await registrarMensagens(conversationId, rows);
 }
 
+async function acharGatilho(input: AdvanceInput, kind: InboundKind) {
+  const triggers = await prisma.agentTrigger.findMany({ where: { agentId: input.agentId, active: true } });
+  if (triggers.length === 0) return null;
+  return matchTrigger(triggers, {
+    channel: input.channel,
+    kind,
+    text: input.text,
+    storyId: input.event?.storyId,
+    isReaction: input.event?.isReaction,
+  });
+}
+
+async function contarDisparo(triggerId: string): Promise<void> {
+  try {
+    await prisma.agentTrigger.update({
+      where: { id: triggerId },
+      data: { triggerCount: { increment: 1 }, lastTriggeredAt: new Date() },
+    });
+  } catch (error) {
+    console.error("[flow-engine] falha ao contar disparo do gatilho", error);
+  }
+}
+
 export async function advanceConversation(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
@@ -914,6 +941,12 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
     if (agentePausado(conversation.status)) {
       return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
+    }
+    // Menção em story não é pergunta: registra e não acorda o webhook do agente.
+    if (input.event?.kind === "story_mention") {
+      await logMessages(conversation.id, input.text, [], input);
+      await syncContact(conversation.id, {}, true);
+      return { messages: [], status: "active" };
     }
     const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
@@ -1029,7 +1062,24 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   // Esperar) usando a mensagem que acabou de chegar, antes de continuar
   // andando pelo fluxo.
   const parkedNode = findNode(nodes, currentId);
-  if (parkedNode?.data.iconKey === "capture") {
+  const inboundKind: InboundKind = input.event?.kind ?? "dm";
+  const gatilho =
+    isGenuineInbound && podeAvaliarGatilho(parkedNode?.data.iconKey ?? null, inboundKind)
+      ? await acharGatilho(input, inboundKind)
+      : null;
+
+  if (gatilho) {
+    await contarDisparo(gatilho.id);
+    steps.push({ nodeId: `trigger:${gatilho.id}`, kind: "trigger", label: gatilho.name, ms: 0 });
+    if (gatilho.replyText) messages.push({ text: interpolate(gatilho.replyText, variables) });
+    const alvo = gatilho.targetNodeId ? findNode(nodes, gatilho.targetNodeId) : null;
+    if (!alvo) return finish(); // só resposta: a conversa fica onde estava
+    delete variables.__wait_until;
+    currentId = alvo.id; // o laço abaixo executa o bloco de destino
+  } else if (inboundKind === "story_mention") {
+    // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
+    return finish();
+  } else if (parkedNode?.data.iconKey === "capture") {
     const options = parkedNode.data.options ?? [];
     let resolvedOptionId = input.optionId;
     // Se não veio um id de botão (ex: o cliente respondeu em texto livre em
