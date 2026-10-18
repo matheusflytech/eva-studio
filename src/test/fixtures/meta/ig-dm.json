@@ -1,0 +1,6 @@
+{
+  "sender": { "id": "IGSID_3" },
+  "recipient": { "id": "IG_1" },
+  "timestamp": 1760000000000,
+  "message": { "mid": "mid.dm1", "text": "PROMO" }
+}
