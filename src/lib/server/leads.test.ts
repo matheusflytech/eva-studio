@@ -1,0 +1,129 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const db = vi.hoisted(() => ({
+  contact: { updateMany: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+  agent: { findFirst: vi.fn() },
+  conversation: { findFirst: vi.fn() },
+}));
+vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/server/custom-fields", () => ({ normalizarCapturados: vi.fn(async () => undefined) }));
+
+import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead } from "./leads";
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("marcarComoLead", () => {
+  it("só marca quem ainda não é lead (não rebaixa etapa)", async () => {
+    await marcarComoLead("c1", { agentId: "a1", channel: "instagram" });
+    expect(db.contact.updateMany).toHaveBeenCalledWith({
+      where: { id: "c1", leadStage: null },
+      data: expect.objectContaining({ leadStage: "novo", leadAgentId: "a1", leadChannel: "instagram" }),
+    });
+  });
+});
+
+describe("serializarLead", () => {
+  it("monta nome/e-mail/telefone, campos e a última conversa", () => {
+    const lead = serializarLead({
+      id: "c1",
+      name: "Ana",
+      email: "ana@x.com",
+      phone: "+5511987654321",
+      customFields: { consumo: 300 },
+      leadStage: "qualificado",
+      leadAt: new Date("2026-10-19T10:00:00Z"),
+      leadAgentId: "a1",
+      leadChannel: "website",
+      updatedAt: new Date("2026-10-19T11:00:00Z"),
+      conversations: [
+        { id: "conv1", agentId: "a1", channel: "website", contactId: "site-123", agent: { name: "Vendedor" }, messages: [{ text: "oi", role: "contact" }] },
+      ],
+    });
+    expect(lead).toMatchObject({
+      id: "c1",
+      name: "Ana",
+      stage: "qualificado",
+      agentId: "a1",
+      agentName: "Vendedor",
+      channel: "website",
+      externalId: "site-123",
+      conversationId: "conv1",
+      fields: { nome: "Ana", email: "ana@x.com", telefone: "+5511987654321", consumo: 300 },
+      lastMessage: { text: "oi", role: "contact" },
+    });
+  });
+});
+
+describe("salvarLeadExterno", () => {
+  beforeEach(() => {
+    db.agent.findFirst.mockResolvedValue({ id: "a1" });
+    db.contact.findFirst.mockResolvedValue(null);
+    db.contact.create.mockImplementation(async ({ data }) => ({ id: "novo", ...data }));
+  });
+
+  it("recusa e-mail e telefone inválidos com erro por campo", async () => {
+    const r = await salvarLeadExterno("o1", { agentId: "a1", fields: { email: "ana@", telefone: "123" } }, "api");
+    expect(r).toEqual({ error: "Dados inválidos.", fieldErrors: { email: "E-mail inválido.", telefone: "Telefone inválido." } });
+    expect(db.contact.create).not.toHaveBeenCalled();
+  });
+
+  it("agente de outra org: erro", async () => {
+    db.agent.findFirst.mockResolvedValue(null);
+    expect(await salvarLeadExterno("o1", { agentId: "x", fields: {} }, "api")).toEqual({ error: "agentId não encontrado nessa organização." });
+  });
+
+  it("cria contato-lead normalizado; resto vira campo livre", async () => {
+    const r = await salvarLeadExterno(
+      "o1",
+      { agentId: "a1", fields: { nome: " Ana ", email: "ANA@X.COM", telefone: "(11) 98765-4321", origem: "feira" }, stage: "contatado" },
+      "api"
+    );
+    expect("contactId" in r && r.contactId).toBe("novo");
+    expect(db.contact.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orgId: "o1",
+        name: "Ana",
+        email: "ana@x.com",
+        phone: "+5511987654321",
+        customFields: { origem: "feira" },
+        source: "api",
+        leadStage: "contatado",
+        leadAgentId: "a1",
+      }),
+    });
+  });
+
+  it("mesmo e-mail na org: atualiza a ficha em vez de duplicar", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c9", name: "Ana", email: "ana@x.com", phone: "", customFields: {}, leadStage: null });
+    db.contact.update.mockResolvedValue({ id: "c9" });
+    const r = await salvarLeadExterno("o1", { agentId: "a1", fields: { email: "ana@x.com" } }, "api");
+    expect("contactId" in r && r.contactId).toBe("c9");
+    expect(db.contact.create).not.toHaveBeenCalled();
+  });
+
+  it("etapa inválida", async () => {
+    expect(await salvarLeadExterno("o1", { agentId: "a1", fields: {}, stage: "xyz" }, "api")).toEqual({
+      error: "stage precisa ser um de: novo, contatado, qualificado, ganho, perdido.",
+    });
+  });
+});
+
+describe("resolverIdDoLead", () => {
+  it("id de contato da org", async () => {
+    db.contact.findFirst.mockResolvedValueOnce({ id: "c1" });
+    expect(await resolverIdDoLead("o1", "c1")).toBe("c1");
+  });
+  it("id antigo (conversa) resolve para o contato", async () => {
+    db.contact.findFirst.mockResolvedValueOnce(null);
+    db.conversation.findFirst.mockResolvedValueOnce({ contactRecordId: "c7" });
+    expect(await resolverIdDoLead("o1", "conv-antiga")).toBe("c7");
+    expect(db.conversation.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "conv-antiga", agent: { orgId: "o1" } } })
+    );
+  });
+  it("nada encontrado", async () => {
+    db.contact.findFirst.mockResolvedValueOnce(null);
+    db.conversation.findFirst.mockResolvedValueOnce(null);
+    expect(await resolverIdDoLead("o1", "zzz")).toBeNull();
+  });
+});
