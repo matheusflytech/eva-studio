@@ -1,341 +1,403 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Zap } from "lucide-react";
-import { Input, Textarea, Label } from "@/components/ui/input";
+import { ArrowRight, ChevronDown, CornerDownRight, Pencil, Plus, Sparkles, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmarExclusao } from "@/components/crm/config/confirmar-exclusao";
+import { cn } from "@/lib/utils";
+import { TriggerModal } from "./triggers/trigger-modal";
+import {
+  CHANNELS,
+  IDEAS,
+  KINDS,
+  describeMatch,
+  emptyDraft,
+  timeAgo,
+  type Draft,
+  type FlowNodeOption,
+  type Kind,
+  type StoryOption,
+  type Trigger,
+} from "./triggers/trigger-kinds";
 
-type Kind = "dm_keyword" | "story_reply" | "story_mention";
-type Mode = "any" | "exact" | "contains";
-
-interface Trigger {
-  id: string;
-  name: string;
-  kind: Kind;
-  channels: string[];
-  matchMode: Mode;
-  keywords: string[];
-  storyId: string;
-  includeReactions: boolean;
-  replyText: string;
-  targetNodeId: string;
-  priority: number;
-  active: boolean;
-  triggerCount: number;
-  lastTriggeredAt: string | null;
+async function chamar(url: string, metodo: string, corpo?: unknown) {
+  try {
+    const res = await fetch(url, {
+      method: metodo,
+      headers: corpo ? { "Content-Type": "application/json" } : undefined,
+      body: corpo ? JSON.stringify(corpo) : undefined,
+    });
+    const dados = await res.json().catch(() => ({}));
+    return { ok: res.ok, erro: res.ok ? null : ((dados.error as string) ?? "Algo deu errado. Tente de novo."), dados };
+  } catch {
+    return { ok: false, erro: "Sem conexão com o servidor. Tente de novo.", dados: {} };
+  }
 }
 
-type Draft = Omit<Trigger, "id" | "triggerCount" | "lastTriggeredAt" | "keywords"> & { keywords: string };
-
-const KIND_LABEL: Record<Kind, string> = {
-  dm_keyword: "Palavra-chave na mensagem",
-  story_reply: "Resposta a story",
-  story_mention: "Menção em story",
-};
-
-const CHANNEL_LABEL: Record<string, string> = {
-  instagram: "Instagram",
-  whatsapp_meta: "WhatsApp oficial",
-  whatsapp_qr: "WhatsApp (QR)",
-  messenger: "Messenger",
-  telegram: "Telegram",
-  website: "Site",
-  tiktok: "TikTok",
-};
-
-function emptyDraft(kind: Kind): Draft {
+function paraRascunho(t: Trigger): Draft {
   return {
-    name: "",
-    kind,
-    channels: [],
-    matchMode: kind === "dm_keyword" ? "contains" : "any",
-    keywords: "",
-    storyId: "",
-    includeReactions: true,
-    replyText: "",
-    targetNodeId: "",
-    priority: 0,
-    active: true,
+    name: t.name,
+    kind: t.kind,
+    channels: t.channels,
+    matchMode: t.matchMode,
+    keywords: t.keywords,
+    storyId: t.storyId,
+    includeReactions: t.includeReactions,
+    replyText: t.replyText,
+    targetNodeId: t.targetNodeId,
+    priority: t.priority,
+    active: t.active,
   };
 }
 
-interface FlowNodeOption {
-  id: string;
-  label: string;
-}
-interface StoryOption {
-  id: string;
-  preview: string;
-  postedAt: string | null;
-}
+const ROTULO_CANAL = new Map(CHANNELS.map((c) => [c.id, c.label]));
 
 export function TriggersEditor({ agentId }: { agentId: string }) {
-  const [triggers, setTriggers] = React.useState<Trigger[]>([]);
+  const [triggers, setTriggers] = React.useState<Trigger[] | null>(null);
   const [nodes, setNodes] = React.useState<FlowNodeOption[]>([]);
   const [stories, setStories] = React.useState<StoryOption[]>([]);
   const [storiesReason, setStoriesReason] = React.useState<string | null>(null);
-  const [draft, setDraft] = React.useState<Draft | null>(null);
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [saving, setSaving] = React.useState(false);
+  const [storiesLoading, setStoriesLoading] = React.useState(false);
+  const [editando, setEditando] = React.useState<{ id: string | null; draft: Draft } | null>(null);
+  const [excluindo, setExcluindo] = React.useState<Trigger | null>(null);
+  const [erro, setErro] = React.useState<string | null>(null);
+  const storiesPedidos = React.useRef(false);
 
-  const fetchAll = React.useCallback(async () => {
+  const buscar = React.useCallback(async () => {
     const [t, f] = await Promise.all([
-      fetch(`/api/agents/${agentId}/triggers`).then((r) => r.json()),
-      fetch(`/api/flows/${agentId}`).then((r) => r.json()),
+      chamar(`/api/agents/${agentId}/triggers`, "GET"),
+      chamar(`/api/flows/${agentId}`, "GET"),
     ]);
-    const flowNodes = (f.flow?.nodes ?? []) as { id: string; data?: { label?: string; iconKey?: string } }[];
+    const flowNodes = ((f.dados as { flow?: { nodes?: unknown[] } }).flow?.nodes ?? []) as {
+      id: string;
+      data?: { label?: string; iconKey?: string };
+    }[];
     return {
-      triggers: (t.triggers ?? []) as Trigger[],
+      erro: t.erro,
+      triggers: ((t.dados as { triggers?: Trigger[] }).triggers ?? []) as Trigger[],
       nodes: flowNodes
         .filter((n) => n.data?.iconKey !== "start")
-        .map((n) => ({ id: n.id, label: n.data?.label || n.data?.iconKey || n.id })),
+        .map((n) => ({ id: n.id, label: n.data?.label || n.data?.iconKey || "Bloco sem nome" })),
     };
   }, [agentId]);
 
-  const load = React.useCallback(async () => {
-    const data = await fetchAll();
-    setTriggers(data.triggers);
-    setNodes(data.nodes);
-  }, [fetchAll]);
+  const recarregar = React.useCallback(async () => {
+    const r = await buscar();
+    setTriggers(r.triggers);
+    setNodes(r.nodes);
+    if (r.erro) setErro(r.erro);
+  }, [buscar]);
 
   React.useEffect(() => {
-    let ativo = true;
-    fetchAll().then((data) => {
-      if (!ativo) return;
-      setTriggers(data.triggers);
-      setNodes(data.nodes);
+    let vivo = true;
+    buscar().then((r) => {
+      if (!vivo) return;
+      setTriggers(r.triggers);
+      setNodes(r.nodes);
+      if (r.erro) setErro(r.erro);
     });
     return () => {
-      ativo = false;
+      vivo = false;
     };
-  }, [fetchAll]);
+  }, [buscar]);
 
-  async function loadStories() {
-    const r = await fetch(`/api/agents/${agentId}/instagram-stories`).then((res) => res.json());
-    setStories(r.stories ?? []);
-    setStoriesReason(r.reason ?? null);
+  async function carregarStories() {
+    if (storiesPedidos.current) return;
+    storiesPedidos.current = true;
+    setStoriesLoading(true);
+    const r = await chamar(`/api/agents/${agentId}/instagram-stories`, "GET");
+    const dados = r.dados as { stories?: StoryOption[]; reason?: string };
+    setStories(dados.stories ?? []);
+    setStoriesReason(dados.reason ?? r.erro ?? null);
+    setStoriesLoading(false);
   }
 
-  function startNew(kind: Kind) {
-    setEditingId(null);
-    setError(null);
-    setDraft(emptyDraft(kind));
-    if (kind === "story_reply") void loadStories();
+  function abrir(id: string | null, draft: Draft) {
+    setErro(null);
+    setEditando({ id, draft });
+    if (draft.kind === "story_reply") void carregarStories();
   }
 
-  function startEdit(t: Trigger) {
-    setEditingId(t.id);
-    setError(null);
-    setDraft({ ...t, keywords: t.keywords.join(", ") });
-    if (t.kind === "story_reply") void loadStories();
+  async function salvar(draft: Draft): Promise<string | null> {
+    const id = editando?.id;
+    const r = await chamar(id ? `/api/agents/${agentId}/triggers/${id}` : `/api/agents/${agentId}/triggers`, id ? "PUT" : "POST", draft);
+    if (!r.ok) return r.erro;
+    setEditando(null);
+    await recarregar();
+    return null;
   }
 
-  async function save() {
-    if (!draft) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const url = editingId ? `/api/agents/${agentId}/triggers/${editingId}` : `/api/agents/${agentId}/triggers`;
-      const res = await fetch(url, {
-        method: editingId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Não foi possível salvar.");
-        return;
-      }
-      setDraft(null);
-      setEditingId(null);
-      await load();
-    } finally {
-      setSaving(false);
+  // Ligar/desligar direto na lista: muda na hora e desfaz se o servidor recusar.
+  async function alternar(t: Trigger, active: boolean) {
+    setTriggers((lista) => lista?.map((x) => (x.id === t.id ? { ...x, active } : x)) ?? null);
+    const r = await chamar(`/api/agents/${agentId}/triggers/${t.id}`, "PUT", { ...paraRascunho(t), active });
+    if (!r.ok) {
+      setTriggers((lista) => lista?.map((x) => (x.id === t.id ? { ...x, active: t.active } : x)) ?? null);
+      setErro(`Não foi possível ${active ? "ativar" : "pausar"} "${t.name}": ${r.erro}`);
     }
   }
 
-  async function remove(id: string) {
-    await fetch(`/api/agents/${agentId}/triggers/${id}`, { method: "DELETE" });
-    await load();
-  }
+  const nomeDoBloco = (id: string) => nodes.find((n) => n.id === id)?.label;
 
-  function toggleChannel(c: string) {
-    if (!draft) return;
-    const has = draft.channels.includes(c);
-    setDraft({ ...draft, channels: has ? draft.channels.filter((x) => x !== c) : [...draft.channels, c] });
+  if (triggers === null) {
+    return (
+      <div className="flex flex-col gap-2.5 p-1" aria-busy="true" aria-label="Carregando gatilhos">
+        {[0, 1].map((i) => (
+          <div key={i} className="h-[76px] animate-pulse rounded-2xl bg-surface-2" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => startNew("dm_keyword")}>
-          <Plus className="mr-1 h-4 w-4" /> Palavra-chave
-        </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={() => startNew("story_reply")}>
-          <Plus className="mr-1 h-4 w-4" /> Resposta a story
-        </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={() => startNew("story_mention")}>
-          <Plus className="mr-1 h-4 w-4" /> Menção em story
-        </Button>
-      </div>
-
-      {triggers.length === 0 && !draft && (
-        <p className="text-sm text-text-secondary">
-          Nenhum gatilho. Sem gatilho, toda mensagem segue o fluxo padrão do agente.
-        </p>
-      )}
-
-      <ul className="space-y-2">
-        {triggers.map((t) => (
-          <li key={t.id} className="flex items-center justify-between rounded-lg border border-border-default p-3">
-            <button type="button" className="text-left" onClick={() => startEdit(t)}>
-              <div className="flex items-center gap-2 font-medium">
-                <Zap className="h-4 w-4" /> {t.name}
-                {!t.active && <Badge variant="neutral">pausado</Badge>}
-              </div>
-              <div className="text-xs text-text-secondary">
-                {KIND_LABEL[t.kind]}
-                {t.keywords.length > 0 && ` · ${t.matchMode === "exact" ? "exata" : "contém"}: ${t.keywords.join(", ")}`}
-                {t.storyId && " · story específico"}
-                {` · disparou ${t.triggerCount}x`}
-              </div>
-            </button>
-            <Button type="button" variant="ghost" size="icon" onClick={() => remove(t.id)} aria-label="Excluir gatilho">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </li>
-        ))}
-      </ul>
-
-      {draft && (
-        <div className="space-y-3 rounded-lg border border-border-default p-4">
-          <div className="text-sm font-medium">{KIND_LABEL[draft.kind]}</div>
-
-          <div>
-            <Label>Nome</Label>
-            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          </div>
-
-          {draft.kind !== "story_mention" && (
-            <div>
-              <Label>Quando</Label>
-              <select
-                className="w-full rounded-lg border border-border-default bg-surface-2 p-2 text-sm"
-                value={draft.matchMode}
-                onChange={(e) => setDraft({ ...draft, matchMode: e.target.value as Mode })}
-              >
-                {draft.kind === "story_reply" && <option value="any">Qualquer resposta</option>}
-                <option value="exact">A mensagem for exatamente</option>
-                <option value="contains">A mensagem contiver</option>
-              </select>
-            </div>
-          )}
-
-          {draft.matchMode !== "any" && (
-            <div>
-              <Label>Palavras (separadas por vírgula)</Label>
-              <Input
-                value={draft.keywords}
-                placeholder="promo, cupom, quero"
-                onChange={(e) => setDraft({ ...draft, keywords: e.target.value })}
-              />
-            </div>
-          )}
-
-          {draft.kind === "story_reply" && (
-            <>
-              <div>
-                <Label>Story</Label>
-                <select
-                  className="w-full rounded-lg border border-border-default bg-surface-2 p-2 text-sm"
-                  value={stories.some((s) => s.id === draft.storyId) || !draft.storyId ? draft.storyId : "__manual"}
-                  onChange={(e) => setDraft({ ...draft, storyId: e.target.value === "__manual" ? draft.storyId : e.target.value })}
-                >
-                  <option value="">Qualquer story</option>
-                  {stories.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      Story de {s.postedAt ? new Date(s.postedAt).toLocaleString("pt-BR") : s.id}
-                    </option>
-                  ))}
-                  <option value="__manual">Informar ID…</option>
-                </select>
-                {storiesReason && <p className="mt-1 text-xs text-text-secondary">{storiesReason}</p>}
-                <Input
-                  className="mt-2"
-                  value={draft.storyId}
-                  placeholder="ID do story (vazio = qualquer)"
-                  onChange={(e) => setDraft({ ...draft, storyId: e.target.value })}
-                />
-                <p className="mt-1 text-xs text-text-secondary">Story some em 24h — depois disso este gatilho não dispara mais.</p>
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.includeReactions}
-                  onChange={(e) => setDraft({ ...draft, includeReactions: e.target.checked })}
-                />
-                Também responder reações com emoji
-              </label>
-            </>
-          )}
-
-          {draft.kind === "dm_keyword" && (
-            <div>
-              <Label>Canais (nenhum marcado = todos)</Label>
-              <div className="flex flex-wrap gap-3 text-sm">
-                {Object.entries(CHANNEL_LABEL).map(([c, label]) => (
-                  <label key={c} className="flex items-center gap-1">
-                    <input type="checkbox" checked={draft.channels.includes(c)} onChange={() => toggleChannel(c)} />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <Label>Resposta (pode ter cupom, link e {"{variaveis}"})</Label>
-            <Textarea value={draft.replyText} onChange={(e) => setDraft({ ...draft, replyText: e.target.value })} />
-          </div>
-
-          <div>
-            <Label>Depois, seguir para o bloco</Label>
-            <select
-              className="w-full rounded-lg border border-border-default bg-surface-2 p-2 text-sm"
-              value={draft.targetNodeId}
-              onChange={(e) => setDraft({ ...draft, targetNodeId: e.target.value })}
-            >
-              <option value="">Não mudar a conversa</option>
-              {nodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.label}
-                </option>
-              ))}
-            </select>
-            {nodes.length === 0 && (
-              <p className="mt-1 text-xs text-text-secondary">Este agente não tem fluxo salvo: só a resposta será enviada.</p>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
-            Ativo
-          </label>
-
-          {error && <p className="text-sm text-danger">{error}</p>}
-
-          <div className="flex gap-2">
-            <Button type="button" onClick={save} disabled={saving}>
-              {saving ? "Salvando…" : "Salvar"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setDraft(null)}>
-              Cancelar
-            </Button>
-          </div>
+    <div className="flex flex-col gap-5">
+      {triggers.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[12.5px] text-text-tertiary">
+            {triggers.filter((t) => t.active).length} de {triggers.length} ativos · sem gatilho, a mensagem segue o fluxo padrão.
+          </p>
+          <NovoGatilho onEscolher={(k) => abrir(null, emptyDraft(k))} />
         </div>
       )}
+
+      {erro && (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+          <span>{erro}</span>
+          <button type="button" onClick={() => setErro(null)} className="shrink-0 text-[12px] underline-offset-2 hover:underline">
+            Fechar
+          </button>
+        </div>
+      )}
+
+      {triggers.length === 0 ? (
+        <EstadoVazio onEscolher={(k) => abrir(null, emptyDraft(k))} onIdeia={(d) => abrir(null, d)} />
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {triggers.map((t) => {
+            const meta = KINDS[t.kind];
+            const Icon = meta.icon;
+            const ultimo = timeAgo(t.lastTriggeredAt);
+            const bloco = t.targetNodeId ? nomeDoBloco(t.targetNodeId) : null;
+            return (
+              <li
+                key={t.id}
+                className={cn(
+                  "group flex flex-wrap items-start gap-3.5 rounded-2xl bg-surface-2 p-3.5 ring-1 ring-border-subtle transition-colors hover:ring-border-default sm:flex-nowrap",
+                  !t.active && "opacity-60"
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl",
+                    t.active ? "bg-accent-soft text-accent-400" : "bg-surface-3 text-text-tertiary"
+                  )}
+                >
+                  <Icon size={18} aria-hidden />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => abrir(t.id, paraRascunho(t))}
+                      className="truncate text-left text-[14px] font-medium text-text-primary outline-none hover:underline focus-visible:underline"
+                    >
+                      {t.name}
+                    </button>
+                    {!t.active && <Badge>Pausado</Badge>}
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-text-tertiary">
+                    {meta.short} · {describeMatch(t)}
+                    {t.kind === "dm_keyword" &&
+                      ` · ${t.channels.length === 0 ? "todos os canais" : t.channels.map((c) => ROTULO_CANAL.get(c) ?? c).join(", ")}`}
+                  </p>
+
+                  {t.keywords.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {t.keywords.slice(0, 5).map((k) => (
+                        <span key={k} className="rounded-md bg-surface-3 px-2 py-0.5 font-mono text-[11.5px] text-text-secondary">
+                          {k}
+                        </span>
+                      ))}
+                      {t.keywords.length > 5 && (
+                        <span className="rounded-md px-1.5 py-0.5 text-[11.5px] text-text-tertiary">+{t.keywords.length - 5}</span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-text-tertiary">
+                    {t.replyText && (
+                      <span className="flex min-w-0 max-w-full items-center gap-1.5">
+                        <CornerDownRight size={13} aria-hidden className="shrink-0" />
+                        <span className="truncate">{t.replyText}</span>
+                      </span>
+                    )}
+                    {t.targetNodeId && (
+                      <span className={cn("flex items-center gap-1.5", !bloco && "text-danger")}>
+                        <ArrowRight size={13} aria-hidden />
+                        {bloco ? `Segue para ${bloco}` : "Bloco de destino foi apagado"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* No celular vira uma faixa embaixo: contador à esquerda, ações à direita. */}
+                <div className="flex w-full items-center justify-between gap-2 border-t border-border-subtle pt-2.5 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:border-0 sm:pt-0">
+                  <div className="order-last flex items-center gap-1 sm:order-first">
+                    <Switch
+                      checked={t.active}
+                      onCheckedChange={(v) => alternar(t, v)}
+                      aria-label={t.active ? `Pausar ${t.name}` : `Ativar ${t.name}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => abrir(t.id, paraRascunho(t))}
+                      aria-label={`Editar ${t.name}`}
+                      className="ml-1 grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                    >
+                      <Pencil size={15} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExcluindo(t)}
+                      aria-label={`Excluir ${t.name}`}
+                      className="grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-danger/10 hover:text-danger focus-visible:ring-2 focus-visible:ring-danger/60"
+                    >
+                      <Trash2 size={15} aria-hidden />
+                    </button>
+                  </div>
+                  <p className="text-[11.5px] tabular-nums text-text-tertiary sm:text-right">
+                    <span className="font-medium text-text-secondary">{t.triggerCount.toLocaleString("pt-BR")}</span>{" "}
+                    {t.triggerCount === 1 ? "disparo" : "disparos"}
+                    {ultimo && <span className="sm:block"><span className="sm:hidden"> · </span>último {ultimo}</span>}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {editando && (
+        <TriggerModal
+          initial={editando.draft}
+          editing={!!editando.id}
+          nodes={nodes}
+          stories={stories}
+          storiesLoading={storiesLoading}
+          storiesReason={storiesReason}
+          onClose={() => setEditando(null)}
+          onSave={salvar}
+        />
+      )}
+
+      {excluindo && (
+        <ConfirmarExclusao
+          titulo={`Excluir "${excluindo.name}"?`}
+          descricao={`${
+            excluindo.triggerCount === 0
+              ? "Ele ainda não disparou nenhuma vez."
+              : `Ele já disparou ${excluindo.triggerCount.toLocaleString("pt-BR")} ${excluindo.triggerCount === 1 ? "vez" : "vezes"}.`
+          } Se só quer parar por um tempo, pause em vez de excluir.`}
+          onCancelar={() => setExcluindo(null)}
+          onConfirmar={async () => {
+            const r = await chamar(`/api/agents/${agentId}/triggers/${excluindo.id}`, "DELETE");
+            if (!r.ok) return r.erro;
+            setExcluindo(null);
+            await recarregar();
+            return null;
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NovoGatilho({ onEscolher }: { onEscolher: (k: Kind) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button>
+          <Plus size={15} aria-hidden /> Novo gatilho <ChevronDown size={14} aria-hidden className="opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      {/* O menu devolveria o foco ao botão por cima do modal que acabou de abrir. */}
+      <DropdownMenuContent align="end" className="w-[300px]" onCloseAutoFocus={(e) => e.preventDefault()}>
+        {(Object.keys(KINDS) as Kind[]).map((k) => {
+          const Icon = KINDS[k].icon;
+          return (
+            <DropdownMenuItem key={k} onSelect={() => onEscolher(k)} className="items-start">
+              <Icon size={16} aria-hidden className="mt-0.5 shrink-0 text-accent-400" />
+              <span>
+                <span className="block text-[13px] font-medium text-text-primary">{KINDS[k].label}</span>
+                <span className="block text-[11.5px] leading-snug text-text-tertiary">{KINDS[k].description}</span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function EstadoVazio({ onEscolher, onIdeia }: { onEscolher: (k: Kind) => void; onIdeia: (d: Draft) => void }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start gap-3 rounded-2xl bg-surface-2/60 p-4 ring-1 ring-border-subtle">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-400">
+          <Zap size={16} aria-hidden />
+        </span>
+        <p className="text-[13px] leading-relaxed text-text-secondary">
+          Nenhum gatilho ainda. Sem gatilho, toda mensagem segue o fluxo padrão do agente. Com eles, uma palavra, uma resposta a
+          story ou uma menção já leva a pessoa direto para a resposta certa.
+        </p>
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {(Object.keys(KINDS) as Kind[]).map((k) => {
+          const Icon = KINDS[k].icon;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onEscolher(k)}
+              className="group flex flex-col items-start gap-3 rounded-2xl bg-surface-2 p-4 text-left ring-1 ring-border-subtle outline-none transition hover:-translate-y-0.5 hover:ring-accent-500/40 focus-visible:ring-2 focus-visible:ring-accent-500/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent-400">
+                <Icon size={18} aria-hidden />
+              </span>
+              <span>
+                <span className="flex items-center gap-1.5 text-[13.5px] font-medium text-text-primary">
+                  {KINDS[k].short}
+                  <ArrowRight size={13} aria-hidden className="opacity-0 transition-opacity group-hover:opacity-100" />
+                </span>
+                <span className="mt-1 block text-[12px] leading-snug text-text-tertiary">{KINDS[k].description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        <p className="mb-2 flex items-center gap-1.5 text-[12.5px] text-text-tertiary">
+          <Sparkles size={13} aria-hidden /> Ideias para começar
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {IDEAS.map((i) => (
+            <button
+              key={i.label}
+              type="button"
+              onClick={() => onIdeia(i.draft)}
+              className="min-h-9 rounded-full bg-surface-2 px-3.5 text-[12.5px] text-text-secondary ring-1 ring-border-subtle outline-none hover:text-text-primary hover:ring-border-default focus-visible:ring-2 focus-visible:ring-accent-500/60"
+            >
+              + {i.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
