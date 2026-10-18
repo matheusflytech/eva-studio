@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
 import { encryptSecret } from "@/lib/server/crypto";
+import { assinarEventosInstagram } from "@/lib/server/instagram-subscribe";
 
 const STATE_COOKIE = "ig_oauth_state";
 
@@ -91,6 +92,12 @@ export async function GET(request: Request) {
       create: { agentId, igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
       update: { igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
     });
+
+    const assinatura = await assinarEventosInstagram(accessToken);
+    if (!assinatura.ok) {
+      console.error("[instagram/oauth] não assinou os eventos", assinatura.error);
+      redirectBack.searchParams.set("instagram_warning", "subscribe_failed");
+    }
 
     redirectBack.searchParams.set("instagram", "connected");
     return NextResponse.redirect(redirectBack);
