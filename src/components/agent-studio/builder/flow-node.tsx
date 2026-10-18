@@ -5,6 +5,7 @@ import { Handle, Position } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { BLOCK_STYLES } from "./block-styles";
+import { SAIDA_INVALIDA } from "@/lib/capture-validation";
 
 export interface MenuOption {
   id: string;
@@ -31,6 +32,13 @@ export interface FlowNodeData {
   waitDuration?: number;
   waitUnit?: "segundos" | "minutos" | "horas";
   variableName?: string;
+  // Bloco Captura: o que a resposta é. "text" (ou vazio) = comportamento
+  // antigo, guarda em variableName sem validar.
+  captureField?: "text" | "name" | "email" | "phone" | "custom";
+  captureCustomKey?: string; // chave do CustomField de contato quando captureField = "custom"
+  captureRequired?: boolean; // false = aceita "pular"
+  captureMaxRetries?: number; // novas tentativas antes de desistir (padrão 2)
+  captureErrorMessage?: string; // vazio = mensagem padrão do tipo
   variableExpression?: string;
   conditionExpression?: string;
   options?: MenuOption[];
@@ -231,6 +239,7 @@ export function FlowNode({
   const problema = validateNode(data);
   const options = data.iconKey === "capture" ? data.options ?? [] : [];
   const isMenu = options.length > 0;
+  const validaResposta = data.iconKey === "capture" && !isMenu && !!data.captureField && data.captureField !== "text";
   const editableDetail = onDetailChange && data.iconKey !== "condition" && data.iconKey !== "start";
 
   return (
@@ -325,6 +334,17 @@ export function FlowNode({
             className={cn(HANDLE_DOT, "!bg-accent-500")}
           />
         ))
+      ) : validaResposta ? (
+        // "Respondeu" fica sem id de propósito: arestas já existentes desse
+        // bloco continuam ligadas nela.
+        <>
+          <div className="pointer-events-none mt-3 flex flex-col gap-4 text-[10px] font-medium">
+            <span className="text-emerald-400">Respondeu</span>
+            <span className="text-amber-400">Não respondeu certo</span>
+          </div>
+          <Handle type="source" position={Position.Right} style={{ top: "30%" }} className={cn(HANDLE_DOT, "!bg-emerald-400")} />
+          <Handle id={SAIDA_INVALIDA} type="source" position={Position.Right} style={{ top: "70%" }} className={cn(HANDLE_DOT, "!bg-amber-400")} />
+        </>
       ) : (
         !isTool &&
         data.hasSource !== false && <Handle type="source" position={Position.Right} className={cn(HANDLE_DOT, "!right-0")} />
