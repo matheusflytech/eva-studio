@@ -29,6 +29,15 @@ import { syncContactFromConversation } from "@/lib/server/contacts";
 import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
 import { registerBroadcastReply } from "@/lib/server/outbound";
 import { matchTrigger, podeAvaliarGatilho, type InboundKind } from "@/lib/server/triggers";
+import {
+  validateCapture,
+  isSkip,
+  variavelDaCaptura,
+  MENSAGEM_DE_ERRO,
+  SAIDA_INVALIDA,
+  type CaptureField,
+} from "@/lib/capture-validation";
+import { marcarComoLead } from "@/lib/server/leads";
 
 export interface OutboundMessage {
   text: string;
@@ -821,6 +830,18 @@ export function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string 
   return edge?.target ?? null;
 }
 
+/** Saída "normal" de um bloco: a aresta sem nome; nunca a de resposta inválida. */
+function nextDefaultNodeId(edges: Edge[], fromId: string): string | null {
+  const semNome = edges.find((e) => e.source === fromId && e.sourceHandle == null);
+  const qualquer = edges.find((e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA);
+  return (semNome ?? qualquer)?.target ?? null;
+}
+
+/** Captura que valida a resposta (tem tipo e não é menu de botões). */
+function capturaValida(data: FlowNodeData): boolean {
+  return (data.options ?? []).length === 0 && !!data.captureField && data.captureField !== "text";
+}
+
 const MAX_HOPS = 25;
 
 // Grava a transcrição real (pra página Conversas) — a mensagem que chegou
@@ -883,7 +904,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     conversationId: string,
     variables: Record<string, unknown>,
     isInbound: boolean
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
       const contactId = await syncContactFromConversation({
         agentId: input.agentId,
@@ -897,8 +918,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         await stopEnrollmentsOnReply(contactId);
         await registerBroadcastReply(input.agentId, input.contactId);
       }
+      return contactId;
     } catch (error) {
       console.error("[flow-engine] falha ao sincronizar contato", error);
+      return null;
     }
   }
 
@@ -988,6 +1011,9 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   // disso — senão o negócio nasceria sem dono. Memoiza pra não sincronizar
   // duas vezes na mesma rodada.
   let resolvedContactId: string | null = null;
+  // Uma captura validada (nome/e-mail/telefone/campo) nesta rodada: o contato
+  // vira lead no finish(), depois que a ficha foi sincronizada.
+  let virouLead = false;
   async function ensureContactId(): Promise<string | null> {
     if (resolvedContactId) return resolvedContactId;
     if (conversation.contactRecordId) {
@@ -1044,7 +1070,15 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       },
     });
     await logMessages(conversation.id, inboundText, messages, input);
-    await syncContact(conversation.id, variables, isGenuineInbound);
+    const contatoId = await syncContact(conversation.id, variables, isGenuineInbound);
+    if (virouLead && contatoId) {
+      // Igual ao syncContact: falha no CRM nunca derruba a resposta da conversa.
+      try {
+        await marcarComoLead(contatoId, { agentId: input.agentId, channel: input.channel });
+      } catch (e) {
+        console.error("[flow-engine] falha ao marcar lead", e);
+      }
+    }
     if (steps.length > 0) {
       await prisma.flowExecution.create({
         data: {
@@ -1079,6 +1113,37 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   } else if (inboundKind === "story_mention") {
     // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
     return finish();
+  } else if (parkedNode?.data.iconKey === "capture" && capturaValida(parkedNode.data)) {
+    // Captura com tipo (nome/e-mail/telefone/campo do contato): valida, pede de
+    // novo até captureMaxRetries e, se não der, sai por "não respondeu certo".
+    const campo = parkedNode.data.captureField as CaptureField;
+    const tentativas = Number(variables.__capture_tries ?? 0);
+    if (parkedNode.data.captureRequired === false && isSkip(input.text)) {
+      delete variables.__capture_tries;
+      currentId = nextDefaultNodeId(edges, parkedNode.id);
+    } else {
+      const def =
+        campo === "custom"
+          ? (await carregarDefinicoes(agent.orgId, "contact")).find((d) => d.key === parkedNode.data.captureCustomKey)
+          : undefined;
+      const r = validateCapture(campo, input.text ?? "", def);
+      if (r.ok) {
+        setVar(variables, variavelDaCaptura(parkedNode.data), r.value);
+        delete variables.__capture_tries;
+        virouLead = true;
+        currentId = nextDefaultNodeId(edges, parkedNode.id);
+      } else if (tentativas < (parkedNode.data.captureMaxRetries ?? 2)) {
+        variables.__capture_tries = tentativas + 1;
+        messages.push({ text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables) });
+        pushStep(parkedNode, { error: "resposta inválida" });
+        currentId = parkedNode.id;
+        return finish();
+      } else {
+        delete variables.__capture_tries;
+        pushStep(parkedNode, { error: "desistiu depois das tentativas" });
+        currentId = nextNodeId(edges, parkedNode.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, parkedNode.id);
+      }
+    }
   } else if (parkedNode?.data.iconKey === "capture") {
     const options = parkedNode.data.options ?? [];
     let resolvedOptionId = input.optionId;
