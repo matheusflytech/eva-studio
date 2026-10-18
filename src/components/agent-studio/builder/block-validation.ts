@@ -22,10 +22,13 @@ export function validateNode(data: FlowNodeData): string | null {
     case "message":
       return vazio(data.detail) ? "Escreva a mensagem que o agente vai enviar." : null;
 
-    case "capture":
+    case "capture": {
       if (vazio(data.detail)) return "Escreva a pergunta.";
-      if (vazio(data.variableName)) return "Escolha em qual variável guardar a resposta.";
+      const campo = data.captureField ?? "text";
+      if (campo === "custom" && vazio(data.captureCustomKey)) return "Escolha qual campo do contato a resposta preenche.";
+      if (campo === "text" && vazio(data.variableName)) return "Escolha em qual variável guardar a resposta.";
       return null;
+    }
 
     case "condition":
       return vazio(data.conditionExpression)

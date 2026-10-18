@@ -1,18 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, X, Plus, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { Node } from "@xyflow/react";
-import type { FlowNodeData, MenuOption } from "./flow-node";
+import type { FlowNodeData } from "./flow-node";
 import { VariablePicker } from "./variable-picker";
-import { generateId } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
+import { CaptureConfig } from "./capture-config";
 
 import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
 import { ICON_REGISTRY } from "./icon-registry";
@@ -239,63 +239,7 @@ export function NodeInspector({
           </div>
         )}
 
-        {iconKey === "capture" && (
-          <div className="flex flex-col gap-3">
-            <div>
-              <Label htmlFor="node-capture-var">Guardar resposta na variável</Label>
-              <Input
-                id="node-capture-var"
-                placeholder="ex: opcao_escolhida"
-                value={node.data.variableName ?? ""}
-                onChange={(e) => onChange({ variableName: e.target.value })}
-              />
-            </div>
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <Label className="mb-0">Botões (opcional)</Label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange({
-                      options: [...(node.data.options ?? []), { id: generateId(), label: "" }],
-                    })
-                  }
-                  className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
-                >
-                  <Plus size={12} /> Adicionar
-                </button>
-              </div>
-              <p className="mb-2 text-[11.5px] text-text-tertiary">
-                Se tiver botões, o WhatsApp manda como toque (não texto livre) e cada um vira uma saída própria no canvas.
-              </p>
-              <div className="flex flex-col gap-1.5">
-                {(node.data.options ?? []).map((opt: MenuOption, i: number) => (
-                  <div key={opt.id} className="flex items-center gap-1.5">
-                    <Input
-                      value={opt.label}
-                      placeholder={`Opção ${i + 1}`}
-                      onChange={(e) => {
-                        const next = [...(node.data.options ?? [])];
-                        next[i] = { ...next[i], label: e.target.value };
-                        onChange({ options: next });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (node.data.options ?? []).filter((_: MenuOption, idx: number) => idx !== i);
-                        onChange({ options: next });
-                      }}
-                      className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {iconKey === "capture" && <CaptureConfig data={node.data} onChange={onChange} />}
 
         {iconKey === "variable" && (
           <div className="flex flex-col gap-3">
