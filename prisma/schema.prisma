@@ -148,6 +148,7 @@ model Agent {
   outboundQueue       OutboundQueueItem[]
   broadcasts          Broadcast[]
   commentAutomations  CommentAutomation[]
+  triggers            AgentTrigger[]
   executions          FlowExecution[]
   contactChannels     ContactChannel[]
   sequences           Sequence[]
@@ -455,6 +456,34 @@ model CommentAutomation {
 
   @@index([agentId])
   @@map("eva_studio_comment_automations")
+}
+
+// Gatilhos do agente: palavra-chave na DM (qualquer canal), resposta/reação a
+// story e menção em story (Instagram). Casamento em src/lib/server/triggers.ts.
+// Ação: replyText (opcional) e/ou pular para targetNodeId no fluxo.
+model AgentTrigger {
+  id               String    @id @default(uuid())
+  agentId          String
+  name             String
+  kind             String // dm_keyword | story_reply | story_mention
+  channels         String[]  @default([]) // vazio = todos
+  matchMode        String    @default("contains") // any | exact | contains
+  keywords         String[]  @default([])
+  storyId          String    @default("") // story_reply: vazio = qualquer story
+  includeReactions Boolean   @default(true)
+  replyText        String    @default("") @db.Text
+  targetNodeId     String    @default("")
+  priority         Int       @default(0)
+  active           Boolean   @default(true)
+  triggerCount     Int       @default(0)
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, active])
+  @@map("eva_studio_agent_triggers")
 }
 
 // Fila de envio pro WhatsApp via QR (Baileys) — o app principal (serverless)
