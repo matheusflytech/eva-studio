@@ -20,6 +20,7 @@ import { InstagramConnect } from "./instagram-connect";
 import { TelegramConnect } from "./telegram-connect";
 import { MessengerConnect, TikTokConnect } from "./channel-connect";
 import { CommentAutomationsEditor } from "./comment-automations-editor";
+import { TriggersEditor } from "./triggers-editor";
 import { WidgetConnect } from "./widget-connect";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
@@ -349,6 +350,20 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
               <CardDescription>Textos aprovados pela Meta, para falar com o cliente depois das 24 horas sem resposta.</CardDescription>
             </CardHeader>
             <MessageTemplatesEditor agentId={agentId} />
+          </Card>
+        </Secao>
+      )}
+
+      {isEdit && (
+        <Secao id="canais" aba={aba}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Gatilhos</CardTitle>
+              <CardDescription>
+                Palavra-chave na mensagem (todos os canais), resposta a story e menção em story (Instagram).
+              </CardDescription>
+            </CardHeader>
+            <TriggersEditor agentId={agentId} />
           </Card>
         </Secao>
       )}
