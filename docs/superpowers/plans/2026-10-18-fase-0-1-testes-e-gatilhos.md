@@ -12,7 +12,7 @@
 - Ler `docs/superpowers/plans/2026-10-18-roadmap-todos-eva.md` (decisões e limites da Meta).
 - `AGENTS.md`: Next 16 tem APIs diferentes — consultar `node_modules/next/dist/docs/` antes de criar rota.
 - Branch: `git checkout -b feat/gatilhos` a partir de `main` atualizado.
-- **Banco:** `npm run db:push` aplica no Supabase de **produção** (compartilhado com o Beeno). Neste plano a única mudança de schema é **aditiva** (tabela nova + relação). Não rodar `db:push` sem confirmar com o Alfredo qual banco está no `.env`.
+- **Banco:** `npm run db:push` aplica no Supabase de **produção** da Eva (o mesmo banco do Beeno Builder, outro produto — tabelas separadas pelo prefixo `eva_studio_`). Neste plano a única mudança de schema é **aditiva** (tabela nova + relação). Não rodar `db:push` sem confirmar com o Alfredo qual banco está no `.env`.
 
 ## Mapa de arquivos
 

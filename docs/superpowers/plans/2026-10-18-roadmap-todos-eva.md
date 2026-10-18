@@ -11,7 +11,7 @@
 
 | Tema | Decisão |
 |---|---|
-| CRM da prospecção | CRM da própria Eva Studio (Company/Contact/Deal), não o Beeno |
+| CRM da prospecção | CRM da própria Eva Studio (Company/Contact/Deal) |
 | Fonte de empresas | Dados abertos do CNPJ (Receita Federal), filtrados por CNAE |
 | Alcance da prospecção | Captar + enriquecer (site, stack, CRM) + pontuar. Abordagem continua **manual** |
 | LinkedIn | Sem raspagem (proibida pelos termos do LinkedIn, caso hiQ terminou com indenização e destruição dos dados). Só o campo `linkedinUrl`, preenchido à mão |
@@ -38,7 +38,7 @@ A ordem segue dependência técnica e valor: primeiro a rede de testes, depois o
 ### Fase 0 — Base de testes e ambiente (pré-requisito)
 - Vitest com stub de `server-only` e alias `@/`; script `npm test`.
 - Testes de caracterização do que já existe e será mexido (`matchCommentAutomation`).
-- **Decisão pendente:** banco de staging. Hoje `db:push` aplica direto no Supabase de produção (compartilhado com o Beeno). Recomendação: projeto Supabase separado de staging ou branch do Supabase para testar mudanças de schema antes. Até lá, toda mudança de schema da fase é **só aditiva** (tabela/coluna nova, nada removido nem renomeado).
+- **Decisão pendente:** banco de staging. Hoje `db:push` aplica direto no Supabase de produção da Eva (o mesmo banco do Beeno Builder, outro produto — tabelas separadas pelo prefixo `eva_studio_`). Recomendação: projeto Supabase separado de staging ou branch do Supabase para testar mudanças de schema antes. Até lá, toda mudança de schema da fase é **só aditiva** (tabela/coluna nova, nada removido nem renomeado).
 - Detalhado em `2026-10-18-fase-0-1-testes-e-gatilhos.md`.
 
 ### Fase 1 — Gatilhos (to-dos 1, 2 e 3)
