@@ -642,6 +642,13 @@ model Contact {
   optIn        Boolean   @default(true)
   optOutAt     DateTime?
   lastSeenAt   DateTime  @default(now())
+  // Lead = contato com etapa. null = ainda não é lead (só conversou).
+  // Vira lead na 1ª captura validada de nome/e-mail/telefone/campo, ou
+  // quando é criado pela tela/API de Leads. Ver src/lib/server/leads.ts.
+  leadStage    String?
+  leadAt       DateTime?
+  leadAgentId  String?
+  leadChannel  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -659,6 +666,7 @@ model Contact {
   @@index([orgId])
   @@index([orgId, email])
   @@index([orgId, phone])
+  @@index([orgId, leadStage])
   @@index([companyId])
   @@map("eva_studio_contacts")
 }
