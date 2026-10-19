@@ -114,7 +114,7 @@ describe("tokens: globals.css igual ao espelho em TS", () => {
 
   it("componentes do design system não têm hex solto", () => {
     const dir = path.resolve(__dirname, "../../components/ui");
-    const arquivos = ["button", "badge", "card", "input", "select", "checkbox", "switch", "tabs", "modal", "drawer", "dropdown-menu", "tooltip", "toast", "empty-state", "page-header", "toolbar", "filter-button", "view-tabs", "data-table", "pagination", "stat", "kanban-column", "skeleton", "avatar", "icon-button", "theme", "styles"];
+    const arquivos = ["button", "badge", "card", "input", "select", "checkbox", "switch", "tabs", "modal", "drawer", "dropdown-menu", "tooltip", "toast", "empty-state", "page-header", "toolbar", "filter-button", "view-tabs", "data-table", "pagination", "stat", "kanban-column", "skeleton", "avatar", "icon-button", "theme", "styles", "phone-number", "date-filter-button", "search-input", "segmented-control", "column-picker", "notice"];
     for (const a of arquivos) {
       const ext = a === "styles" ? "ts" : "tsx";
       const fonte = readFileSync(path.join(dir, `${a}.${ext}`), "utf8");

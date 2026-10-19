@@ -226,6 +226,26 @@ describe("árvore E/OU, contrato e escopo", () => {
     });
   });
 
+  it("filtros rápidos entram em E no banco, junto do OU dos avançados", async () => {
+    const w = await whereDeContatos(
+      ctx,
+      {
+        logica: "ou",
+        grupos: [
+          { logica: "e", condicoes: [{ campo: "email", op: "vazio" }] },
+          { logica: "e", condicoes: [{ campo: "telefone", op: "vazio" }] },
+        ],
+        rapidos: [{ campo: "empresa", op: "qualquer", valores: ["e1"] }],
+      },
+      { agora }
+    );
+    expect(w.avisos).toEqual([]);
+    expect(w.where).toEqual({
+      orgId: "o1",
+      AND: [{ companyId: { in: ["e1"] } }, { OR: [{ email: "" }, { phone: "" }] }],
+    });
+  });
+
   it("contrato sempre presente, mesmo sem filtro", async () => {
     expect((await whereDeContatos(ctx, undefined)).where).toEqual({ orgId: "o1" });
     expect((await whereDeNegocios(ctx, "")).where).toEqual({ orgId: "o1", AND: [{ archivedAt: null }] });

@@ -89,7 +89,26 @@ referência de função).
   - Testes: totais vêm do agregado; "carregar mais" não repete nem pula; filtro aplicado igual no agregado e nos cartões.
 - Índices novos se faltarem (ex. `(orgId, lastSeenAt)`, `(orgId, ownerId)`, `(orgId, createdAt)` em contatos; `(orgId, pipelineId, stageId, position)` em negócios), em SQL só aditivo.
 
-### Fase L2. Contatos: tabela completa
+### Fase L2. Contatos: tabela completa — FEITA (2026-10-19, branch feat/dashboards-funil)
+
+**O que foi entregue**
+- Tela `src/app/(app)/[contrato]/contatos/page.tsx` reescrita no design system (PageHeader + abas Contatos/Etiquetas/Segmentos); partes em `src/components/crm/contatos/` (`lista-de-contatos`, `ficha-do-contato` em Drawer, `modais` criar/importar, `etiquetas-e-segmentos`, `tipos`).
+- Visões fixas com contagem (Todos, Meus, Sem proprietário) via `POST /api/contacts/busca` com `apenasTotal` (novo: conta sem buscar linhas).
+- Barra: Proprietário, Equipes, Empresas, Etiquetas (FilterButton), Criado em e Última atividade (DateFilterButton: hoje, 7/30/90 dias, este mês, intervalo), Filtros avançados (gaveta com o editor do dashboard, agora com `catalogo`/`opcoesExtras`/`campoInicialId` — o dashboard segue igual), Limpar filtros, busca, Editar colunas, Importar, Exportar.
+- Filtros da barra vão no filtro como `rapidos` (novo em `FiltroCrm`; saneados com o catálogo, sem `cf:`; o motor soma como E no banco). Assim a barra não disputa o limite de grupos nem muda o sentido de um OU dos avançados.
+- Tabela: DataTable com ordenação no servidor (nome, e-mail, proprietário, celular, empresa, criado, última atividade), seleção, cabeçalho fixo, Pagination 25/50/100. Colunas: Nome (fixa), E-mail, Proprietário, Celular, Telefone, Empresa, Cargo, Etiquetas, Canais, Origem, Aceita mensagens, Última atividade, Criado em e campos personalizados.
+- Editar colunas (ColumnPicker): escolher/reordenar, salvo em localStorage por lista+contrato+usuário (`src/lib/listas/colunas.ts`).
+- Estado (visão, busca, barra, avançados, ordem, página, tamanho) na URL via `history.replaceState` (`src/lib/listas/estado-da-lista.ts` + `use-estado-da-lista.ts`); `?abrir=` continua abrindo a ficha.
+- Telefone com bandeira: `src/lib/telefone.ts` (DDI → país → `public/bandeiras/<iso>.svg`, 15 países; sem DDI e 10–11 dígitos = Brasil) + `PhoneNumber`.
+- Exportar: `GET /api/contacts/exportar` (mesmo filtro/ordem/escopo, até 10 mil, `contatos:exportar`, contrato na query) + `src/lib/exportar/contatos.ts`.
+- Design system: `PhoneNumber`, `DateFilterButton`, `SearchInput`, `SegmentedControl`, `ColumnPicker`, `Notice`; `FilterButton.onSearchChange`. Identidade da Eva nos tokens (commit à parte).
+- Testes: telefone/bandeira, períodos, montagem do filtro da barra, URL ida e volta, colunas salvas, `rapidos` no saneamento e no motor, planilha de contatos.
+
+**Ficou para depois**
+- Seleção marca linhas, mas as ações em massa são da L5 (a barra de seleção avisa).
+- Visões salvas ("+" nas abas) e colunas no banco: L4.
+- Filtro de segmento saiu da barra (está nos avançados como "Segmento").
+
 - Barra de filtros rápidos: Proprietário (inclui "sem proprietário"), Equipes*, Empresas, Etiquetas, Criado em, Última atividade (presets e intervalo), cada um com várias escolhas e busca.
 - "Filtros avançados": reaproveita o editor de grupos do dashboard (`src/components/dashboard/editor-de-filtros.tsx`) com o catálogo de campos de contato.
 - Tabela: colunas Nome, E-mail, Proprietário, Celular, Telefone, Empresa, Etiquetas, Última atividade, Criado em e campos personalizados. Ordenar clicando no cabeçalho, cabeçalho fixo, linhas com link para a ficha.

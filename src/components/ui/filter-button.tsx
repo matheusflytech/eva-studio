@@ -23,6 +23,7 @@ export function FilterButton({
   onChange,
   searchable,
   searchPlaceholder = "Buscar",
+  onSearchChange,
   className,
 }: {
   label: string;
@@ -32,14 +33,19 @@ export function FilterButton({
   /** Padrão: mostra a busca quando há mais de 7 opções. */
   searchable?: boolean;
   searchPlaceholder?: string;
+  /**
+   * Busca no servidor (lista grande, ex.: contatos): a tela recebe o texto e
+   * troca as opções; aqui não se filtra de novo.
+   */
+  onSearchChange?: (q: string) => void;
   className?: string;
 }) {
   const [aberto, setAberto] = React.useState(false);
   const [busca, setBusca] = React.useState("");
   const buscaRef = React.useRef<HTMLInputElement>(null);
   const listaRef = React.useRef<HTMLDivElement>(null);
-  const comBusca = searchable ?? options.length > 7;
-  const visiveis = filterOptions(options, busca);
+  const comBusca = searchable ?? (!!onSearchChange || options.length > 7);
+  const visiveis = onSearchChange ? options : filterOptions(options, busca);
   const marcados = new Set(selected);
   const n = selected.length;
 
@@ -59,7 +65,10 @@ export function FilterButton({
       open={aberto}
       onOpenChange={(v) => {
         setAberto(v);
-        if (!v) setBusca("");
+        if (!v) {
+          setBusca("");
+          onSearchChange?.("");
+        }
       }}
     >
       <DropdownMenuPrimitive.Trigger
@@ -96,7 +105,10 @@ export function FilterButton({
               <input
                 ref={buscaRef}
                 value={busca}
-                onChange={(e) => setBusca(e.target.value)}
+                onChange={(e) => {
+                  setBusca(e.target.value);
+                  onSearchChange?.(e.target.value);
+                }}
                 onKeyDown={(e) => {
                   // Seta para baixo entra na lista; Esc e Tab seguem para o menu.
                   if (e.key === "ArrowDown") {

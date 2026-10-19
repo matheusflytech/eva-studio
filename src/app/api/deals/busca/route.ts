@@ -5,7 +5,7 @@ import { comBusca, listarNegocios } from "@/lib/server/listas-crm";
 import type { FiltroDeConsulta } from "@/lib/consulta";
 
 // POST /api/deals/busca — lista paginada de negócios (a visão "lista").
-//   { filtro?, q?, pipeline?, arquivados?, sort?, dir?, page?, pageSize? }
+//   { filtro?, q?, pipeline?, arquivados?, sort?, dir?, page?, pageSize?, apenasTotal? }
 // `pipeline` é atalho para "Funil é X". sort: nome, valor, etapa, responsavel,
 // criadoEm, previsao, fechadoEm, diasNaEtapa. pageSize 25/50/100 (senão 25).
 // Resposta: { total, page, pageSize, deals, somaCents, avisos, truncado, ordenacao }.
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     dir: corpo.dir,
     page: corpo.page,
     pageSize: corpo.pageSize,
+    apenasTotal: corpo.apenasTotal === true,
     extras,
     incluirArquivados: corpo.arquivados === true,
   });

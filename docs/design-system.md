@@ -175,7 +175,13 @@ Números em tabela, Stat e totais: `tabular-nums`.
 | `Card` / `Panel` | Agrupar conteúdo. `Panel` tem cabeçalho com ações e `flush` para tabela. |
 | `PageHeader` | Topo da página: `eyebrow` opcional, título em Plus Jakarta 700, descrição de uma linha, ações (≤ 1 primário). |
 | `Toolbar` | Linha de filtros à esquerda e ações à direita, acima da tabela/quadro. |
-| `FilterButton` | Filtro em linha "Proprietário ▾"; contagem quando há seleção; menu de múltipla escolha com busca. |
+| `FilterButton` | Filtro em linha "Proprietário ▾"; contagem quando há seleção; menu de múltipla escolha com busca. Lista grande (contatos): `onSearchChange` busca no servidor. |
+| `DateFilterButton` | Filtro de data em linha ("Criado em ▾"): hoje, 7/30/90 dias, este mês ou intervalo; escolha única. Lógica em `src/lib/listas/estado-da-lista.ts`. |
+| `SearchInput` | Busca da barra da lista (lupa, limpar). Rótulo em `aria-label`. |
+| `SegmentedControl` | Alternar poucos modos da mesma tela (Quadro | Lista). Não é filtro nem visão. |
+| `ColumnPicker` | "Editar colunas": gaveta para escolher e ordenar colunas (fixas não saem). Lógica em `src/lib/listas/colunas.ts`. |
+| `PhoneNumber` | Telefone com bandeira (SVG local em `public/bandeiras`) e formatado "+55 21 98171-0669" (`src/lib/telefone.ts`). |
+| `Notice` | Aviso em linha acima da tabela/quadro (info, warning, danger): fundo sutil de status, sem borda colorida. |
 | `DataTable` | Lista de registros. Cabeçalho fixo (passe `max-h-*`), ordenação com `aria-sort`, seleção com "Selecionar página", números à direita, `loading` e `empty`. Ordem/paginação controladas por fora (servidor). |
 | `Pagination` | Abaixo da tabela: itens por página 25/50/100, "1–25 de 24.752", números com reticências. |
 | `Stat` | Número + rótulo + variação escrita com seta. `inverse` quando subir é ruim. |

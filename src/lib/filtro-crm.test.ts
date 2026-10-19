@@ -77,3 +77,44 @@ describe("paginação", () => {
     for (const x of [undefined, 0, -1, "x"]) expect(lerPagina(x)).toBe(1);
   });
 });
+
+describe("filtros rápidos da barra (rapidos)", () => {
+  it("saneia cada condição com o catálogo da entidade e mantém junto dos grupos", () => {
+    const r = sanearFiltroCrm(
+      {
+        logica: "ou",
+        grupos: [{ logica: "e", condicoes: [{ campo: "nome", op: "contem", valor: "ana" }] }],
+        rapidos: [
+          { campo: "responsavel", op: "qualquer", valores: ["u1"] },
+          { campo: "criadoEm", op: "ultimos", valor: "30" },
+        ],
+      },
+      "contatos"
+    );
+    expect(r.avisos).toEqual([]);
+    expect(r.filtro.logica).toBe("ou");
+    expect(r.filtro.rapidos).toEqual([
+      { campo: "responsavel", op: "qualquer", valores: ["u1"] },
+      { campo: "criadoEm", op: "ultimos", valor: "30" },
+    ]);
+  });
+
+  it("campo personalizado, campo de outra entidade e rascunho caem com aviso", () => {
+    const r = sanearFiltroCrm(
+      {
+        rapidos: [
+          { campo: "cf:plano", op: "qualquer", valores: ["a"] },
+          { campo: "tarefa", op: "qualquer", valores: ["atrasada"] },
+          { campo: "empresa", op: "qualquer", valores: [] },
+        ],
+      },
+      "contatos"
+    );
+    expect(r.filtro.rapidos).toBeUndefined();
+    expect(r.avisos).toHaveLength(3);
+  });
+
+  it("sem rapidos não acrescenta a chave", () => {
+    expect("rapidos" in sanearFiltroCrm({ rapidos: "x" }, "negocios").filtro).toBe(false);
+  });
+});

@@ -30,6 +30,8 @@ export interface EntradaDaLista {
   /** Atalhos somados (E) ao filtro. */
   extras?: FiltroDeConsulta[];
   incluirArquivados?: boolean;
+  /** Só a contagem (as abas de visão): não busca as linhas. */
+  apenasTotal?: boolean;
 }
 
 function lerPaginacao(e: EntradaDaLista) {
@@ -82,7 +84,7 @@ export async function listarContatos(ctx: Ctx, e: EntradaDaLista) {
   const r = await resolverConjunto(w, { orderBy });
   const [total, linhas] = await Promise.all([
     r.ids ? r.ids.length : prisma.contact.count({ where: r.where }),
-    prisma.contact.findMany({ where: r.where, include: INCLUDE_CONTATO, orderBy, skip, take: pageSize }),
+    e.apenasTotal ? [] : prisma.contact.findMany({ where: r.where, include: INCLUDE_CONTATO, orderBy, skip, take: pageSize }),
   ]);
   return {
     total,
@@ -110,7 +112,7 @@ export async function listarNegocios(ctx: Ctx, e: EntradaDaLista) {
   const [total, soma, linhas] = await Promise.all([
     r.ids ? r.ids.length : prisma.deal.count({ where: r.where }),
     prisma.deal.aggregate({ where: r.where, _sum: { amountCents: true } }),
-    prisma.deal.findMany({ where: r.where, include: INCLUDE_LINHA_DE_NEGOCIO, orderBy, skip, take: pageSize }),
+    e.apenasTotal ? [] : prisma.deal.findMany({ where: r.where, include: INCLUDE_LINHA_DE_NEGOCIO, orderBy, skip, take: pageSize }),
   ]);
   return {
     total,

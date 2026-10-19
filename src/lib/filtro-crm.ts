@@ -1,9 +1,11 @@
 import {
   CAMPOS_DE_FILTRO,
   FILTROS_VAZIOS,
+  sanearCondicao,
   sanearFiltros,
   type CampoDeFiltro,
   type CatalogoDeCampos,
+  type FiltroDeConsulta,
   type FiltrosDeConsulta,
   type FonteDeOpcoes,
 } from "@/lib/consulta";
@@ -72,10 +74,19 @@ export function campoCrm(entidade: EntidadeCrm, id: string): CampoCrm | undefine
   return camposDaEntidade(entidade).find((c) => c.id === id);
 }
 
-/** Filtro de uma lista: os grupos E/OU + a busca de texto da caixa. */
+/**
+ * Filtro de uma lista: os grupos E/OU (filtros avançados) + a busca de texto
+ * da caixa + os filtros rápidos da barra ("Proprietário ▾", "Criado em ▾"),
+ * que valem sempre em E com o resto. Os rápidos ficam fora dos grupos para
+ * não disputar o limite de grupos/condições nem mudar o sentido de um OU.
+ */
 export interface FiltroCrm extends FiltrosDeConsulta {
   busca?: string;
+  rapidos?: FiltroDeConsulta[];
 }
+
+/** Quantas condições rápidas a barra pode mandar (uma por filtro da barra). */
+export const LIMITE_DE_RAPIDOS = 16;
 
 export const FILTRO_CRM_VAZIO: FiltroCrm = FILTROS_VAZIOS;
 
@@ -98,7 +109,29 @@ export function sanearFiltroCrm(bruto: unknown, entidade: EntidadeCrm): { filtro
   const filtros = sanearFiltros(valor, { catalogo: CATALOGO[entidade], avisar: (a) => avisos.push(a) });
   const b = valor && typeof valor === "object" && !Array.isArray(valor) ? (valor as Record<string, unknown>) : {};
   const busca = typeof b.busca === "string" ? b.busca.trim().slice(0, 120) : "";
-  return { filtro: { ...filtros, ...(busca ? { busca } : {}) }, avisos };
+  const rapidos = sanearRapidos(b.rapidos, entidade, avisos);
+  return { filtro: { ...filtros, ...(busca ? { busca } : {}), ...(rapidos.length ? { rapidos } : {}) }, avisos };
+}
+
+/**
+ * Condições da barra de filtros rápidos. Só campos do catálogo (campo
+ * personalizado fica nos avançados, onde pode precisar de avaliação em
+ * memória); inválida ou rascunho cai com aviso.
+ */
+function sanearRapidos(bruto: unknown, entidade: EntidadeCrm, avisos: string[]): FiltroDeConsulta[] {
+  if (!Array.isArray(bruto)) return [];
+  const out: FiltroDeConsulta[] = [];
+  for (const item of bruto.slice(0, LIMITE_DE_RAPIDOS)) {
+    const campo = item && typeof item === "object" ? String((item as Record<string, unknown>).campo ?? "").slice(0, 44) : "";
+    if (campo.startsWith("cf:")) {
+      avisos.push(`Filtro rápido “${campo}” ignorado: campo personalizado vai nos filtros avançados.`);
+      continue;
+    }
+    const f = sanearCondicao(item, CATALOGO[entidade]);
+    if (f) out.push(f);
+    else avisos.push(`Filtro rápido ${campo ? `“${campo}” ` : ""}ignorado: inválido.`);
+  }
+  return out;
 }
 
 // ── Ordenação e paginação ──────────────────────────────────────────────────

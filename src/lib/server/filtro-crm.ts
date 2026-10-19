@@ -431,7 +431,8 @@ async function montar(
 ): Promise<WhereCrm<W>> {
   const agora = opcoes.agora ?? new Date();
   const { filtro, avisos } = sanearFiltroCrm(filtroBruto, entidade);
-  const extras = opcoes.extras ?? [];
+  // Atalhos da rota + filtros rápidos da barra: tudo em E, no banco.
+  const extras = [...(opcoes.extras ?? []), ...(filtro.rapidos ?? [])];
   const todas = [...filtro.grupos.flatMap((g) => g.condicoes), ...extras];
 
   // Só consulta definições e segmentos quando o filtro usa.

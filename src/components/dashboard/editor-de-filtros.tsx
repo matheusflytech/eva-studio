@@ -34,21 +34,37 @@ import { cn } from "@/lib/utils";
 // ainda está escolhendo.
 // ---------------------------------------------------------------------------
 
-const ICONE_DO_GRUPO: Record<GrupoDeCampo, React.ComponentType<{ size?: number; className?: string }>> = {
+const SEM_EXTRAS: OpcoesExtras = {};
+
+const ICONE_DO_GRUPO: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   "Negócio": Briefcase,
   "Datas": CalendarDays,
   "Contato": User,
   "Campos personalizados": SlidersHorizontal,
 };
 
-function camposDisponiveis(opcoes: OpcoesDoDashboard): CampoDeFiltro[] {
+/**
+ * Campo que o editor sabe mostrar: o do dashboard ou o das listas do CRM
+ * (src/lib/filtro-crm.ts), que tem grupos e fontes de opção a mais.
+ */
+export type CampoDoEditor = Omit<CampoDeFiltro, "grupo" | "opcoes"> & { grupo: GrupoDeCampo | string; opcoes?: string };
+
+/** Opções de fontes que o dashboard não conhece (equipes, segmentos, produtos...). */
+export type OpcoesExtras = Record<string, OpcaoDeSelecao[]>;
+
+function camposDisponiveis(opcoes: OpcoesDoDashboard, base: readonly CampoDoEditor[]): CampoDoEditor[] {
   const proprios = opcoes.campos
     .map((d) => campoDeFiltro(`cf:${d.key}`, opcoes.campos))
     .filter((c): c is CampoDeFiltro => !!c);
-  return [...CAMPOS_DE_FILTRO, ...proprios];
+  return [...base, ...proprios];
 }
 
-function condicaoNova(campo: CampoDeFiltro): FiltroDeConsulta {
+function opcoesDaCondicao(campo: CampoDoEditor, opcoes: OpcoesDoDashboard, funilIds: string[], extras: OpcoesExtras): OpcaoDeSelecao[] {
+  if (campo.opcoes && extras[campo.opcoes]) return extras[campo.opcoes];
+  return opcoesDoCampo(campo as CampoDeFiltro, opcoes, funilIds);
+}
+
+function condicaoNova(campo: CampoDoEditor): FiltroDeConsulta {
   const op = operadoresDoCampo(campo)[0].id;
   return campo.tipo === "sim_nao" ? { campo: campo.id, op, valor: "true" } : { campo: campo.id, op };
 }
@@ -70,15 +86,25 @@ export function EditorDeFiltros({
   aoMudar,
   opcoes,
   funilIds,
+  catalogo = CAMPOS_DE_FILTRO,
+  opcoesExtras = SEM_EXTRAS,
+  campoInicialId = "etapa",
+  textoVazio = "Sem filtros: entram todos os negócios acima.",
 }: {
   filtros: FiltrosDeConsulta;
   aoMudar: (f: FiltrosDeConsulta) => void;
+  /** Membros, etiquetas, empresas, canais e os campos personalizados (opcoes.campos). */
   opcoes: OpcoesDoDashboard;
   funilIds: string[];
+  /** Campos base (padrão: os do dashboard; as listas passam CAMPOS_DE_CONTATO/NEGOCIO). */
+  catalogo?: readonly CampoDoEditor[];
+  opcoesExtras?: OpcoesExtras;
+  /** Campo da condição nova (padrão: "Etapa", o filtro que mais se usa no dashboard). */
+  campoInicialId?: string;
+  textoVazio?: string;
 }) {
-  const campos = React.useMemo(() => camposDisponiveis(opcoes), [opcoes]);
-  // Condição nova começa em "Etapa": é o filtro que mais se usa.
-  const campoInicial = campos.find((c) => c.id === "etapa") ?? campos[0];
+  const campos = React.useMemo(() => camposDisponiveis(opcoes, catalogo), [opcoes, catalogo]);
+  const campoInicial = campos.find((c) => c.id === campoInicialId) ?? campos[0];
   const grupos = filtros.grupos;
 
   const mudarGrupo = (i: number, condicoes: FiltroDeConsulta[], logica?: Logica) => {
@@ -93,9 +119,9 @@ export function EditorDeFiltros({
 
   if (grupos.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border-default px-3 py-3">
-        <p className="text-[12px] text-text-tertiary">Sem filtros: entram todos os negócios acima.</p>
-        <button type="button" onClick={adicionarGrupo} className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-accent-400 hover:underline">
+      <div className="rounded-lg border border-dashed border-border-default px-3 py-3">
+        <p className="text-caption text-text-tertiary">{textoVazio}</p>
+        <button type="button" onClick={adicionarGrupo} className="mt-1.5 inline-flex items-center gap-1.5 text-caption font-medium text-accent-fg hover:underline">
           <Plus size={13} /> Adicionar condição
         </button>
       </div>
@@ -118,10 +144,10 @@ export function EditorDeFiltros({
               <span className="h-px flex-1 bg-border-subtle" />
             </div>
           )}
-          <div className="rounded-2xl bg-surface-2/70 p-2.5 ring-1 ring-border-subtle">
+          <div className="rounded-lg border border-border-subtle bg-raised p-2.5">
             <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
-              <div className="flex items-center gap-2 text-[11.5px] text-text-tertiary">
-                {grupos.length > 1 && <span className="font-semibold uppercase tracking-wide">Grupo {i + 1}</span>}
+              <div className="flex items-center gap-2 text-caption text-text-tertiary">
+                {grupos.length > 1 && <span className="font-medium">Grupo {i + 1}</span>}
                 {g.condicoes.length > 1 ? (
                   <AlternarLogica
                     valor={g.logica}
@@ -138,7 +164,7 @@ export function EditorDeFiltros({
                   type="button"
                   onClick={() => mudarGrupo(i, [])}
                   aria-label={`Remover grupo ${i + 1}`}
-                  className="rounded-lg p-1 text-text-tertiary transition-colors hover:text-danger"
+                  className="rounded-md p-1 text-text-tertiary transition-colors hover:text-danger"
                 >
                   <Trash2 size={13} />
                 </button>
@@ -147,12 +173,13 @@ export function EditorDeFiltros({
             <div className="flex flex-col gap-1.5">
               {g.condicoes.map((f, k) => (
                 <React.Fragment key={k}>
-                  {k > 0 && <span className="pl-1 text-[11px] font-medium text-text-tertiary">{g.logica === "ou" ? "ou" : "e"}</span>}
+                  {k > 0 && <span className="pl-1 text-caption font-medium text-text-tertiary">{g.logica === "ou" ? "ou" : "e"}</span>}
                   <LinhaDeCondicao
                     condicao={f}
                     campos={campos}
                     opcoes={opcoes}
                     funilIds={funilIds}
+                    extras={opcoesExtras}
                     aoMudar={(nova) => mudarGrupo(i, g.condicoes.map((x, j) => (j === k ? nova : x)))}
                     aoRemover={() => mudarGrupo(i, g.condicoes.filter((_, j) => j !== k))}
                   />
@@ -163,7 +190,7 @@ export function EditorDeFiltros({
               <button
                 type="button"
                 onClick={() => mudarGrupo(i, [...g.condicoes, condicaoNova(campoInicial)])}
-                className="mt-2 inline-flex items-center gap-1.5 px-0.5 text-[12px] text-accent-400 hover:underline"
+                className="mt-2 inline-flex items-center gap-1.5 px-0.5 text-caption text-accent-fg hover:underline"
               >
                 <Plus size={13} /> Condição
               </button>
@@ -172,7 +199,7 @@ export function EditorDeFiltros({
         </React.Fragment>
       ))}
       {grupos.length < LIMITE_DE_GRUPOS && (
-        <button type="button" onClick={adicionarGrupo} className="inline-flex w-fit items-center gap-1.5 text-[12px] font-medium text-text-secondary hover:text-text-primary">
+        <button type="button" onClick={adicionarGrupo} className="inline-flex w-fit items-center gap-1.5 text-caption font-medium text-text-secondary hover:text-text-primary">
           <Plus size={13} /> Adicionar grupo de condições
         </button>
       )}
@@ -192,7 +219,7 @@ function AlternarLogica({
   titulo: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={titulo} className="inline-flex rounded-lg bg-surface-3 p-0.5">
+    <div role="radiogroup" aria-label={titulo} className="inline-flex rounded-md bg-hover p-0.5">
       {(["e", "ou"] as const).map((l) => (
         <button
           key={l}
@@ -201,8 +228,8 @@ function AlternarLogica({
           aria-checked={valor === l}
           onClick={() => aoMudar(l)}
           className={cn(
-            "rounded-md px-2 py-0.5 text-[11.5px] font-medium transition-colors",
-            valor === l ? "bg-accent-soft text-accent-300" : "text-text-tertiary hover:text-text-primary"
+            "rounded-md px-2 py-0.5 text-caption font-medium transition-colors",
+            valor === l ? "bg-panel text-text-primary ring-1 ring-border-subtle" : "text-text-tertiary hover:text-text-primary"
           )}
         >
           {rotulos[l]}
@@ -217,13 +244,15 @@ function LinhaDeCondicao({
   campos,
   opcoes,
   funilIds,
+  extras,
   aoMudar,
   aoRemover,
 }: {
   condicao: FiltroDeConsulta;
-  campos: CampoDeFiltro[];
+  campos: CampoDoEditor[];
   opcoes: OpcoesDoDashboard;
   funilIds: string[];
+  extras: OpcoesExtras;
   aoMudar: (f: FiltroDeConsulta) => void;
   aoRemover: () => void;
 }) {
@@ -233,29 +262,29 @@ function LinhaDeCondicao({
   const ops = campo ? operadoresDoCampo(campo) : [];
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-surface-1/60 p-1.5">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-panel p-1.5">
       <SeletorDeCampo campos={campos} atual={campo} aoEscolher={(c) => aoMudar(condicaoNova(c))} />
       {campo ? (
         <>
           {ops.length > 1 ? (
             <div className="w-[150px]">
-              <Select value={f.op} aria-label="Operador" className="h-9 text-[13px]" onChange={(e) => aoMudar(trocarOperador(f, e.target.value as OperadorDeFiltro))}>
+              <Select value={f.op} aria-label="Operador" className="h-8 text-small" onChange={(e) => aoMudar(trocarOperador(f, e.target.value as OperadorDeFiltro))}>
                 {ops.map((o) => (
                   <option key={o.id} value={o.id}>{o.rotulo}</option>
                 ))}
               </Select>
             </div>
           ) : (
-            <span className="px-1 text-[13px] text-text-tertiary">{ops[0]?.rotulo}</span>
+            <span className="px-1 text-small text-text-tertiary">{ops[0]?.rotulo}</span>
           )}
           <div className="min-w-[160px] flex-1">
-            <ValorDaCondicao campo={campo} f={f} opcoes={opcoes} funilIds={funilIds} aoMudar={aoMudar} />
+            <ValorDaCondicao campo={campo} f={f} opcoes={opcoes} funilIds={funilIds} extras={extras} aoMudar={aoMudar} />
           </div>
         </>
       ) : (
-        <span className="flex-1 px-1 text-[12px] text-text-tertiary">Este campo foi removido; a condição é ignorada.</span>
+        <span className="flex-1 px-1 text-caption text-text-tertiary">Este campo foi removido; a condição é ignorada.</span>
       )}
-      <button type="button" aria-label="Remover condição" onClick={aoRemover} className="rounded-lg p-1.5 text-text-tertiary transition-colors hover:text-danger">
+      <button type="button" aria-label="Remover condição" onClick={aoRemover} className="rounded-md p-1.5 text-text-tertiary transition-colors hover:text-danger">
         <X size={14} />
       </button>
     </div>
@@ -268,15 +297,15 @@ function SeletorDeCampo({
   atual,
   aoEscolher,
 }: {
-  campos: CampoDeFiltro[];
-  atual: CampoDeFiltro | undefined;
-  aoEscolher: (c: CampoDeFiltro) => void;
+  campos: CampoDoEditor[];
+  atual: CampoDoEditor | undefined;
+  aoEscolher: (c: CampoDoEditor) => void;
 }) {
   const [aberto, setAberto] = React.useState(false);
   const ancora = React.useRef<HTMLButtonElement | null>(null);
   const fechar = React.useCallback(() => setAberto(false), []);
   const lista: OpcaoDeSelecao[] = campos.map((c) => ({ id: c.id, label: c.rotulo, grupo: c.grupo }));
-  const Icone = atual ? ICONE_DO_GRUPO[atual.grupo] : SlidersHorizontal;
+  const Icone = (atual && ICONE_DO_GRUPO[atual.grupo]) || SlidersHorizontal;
 
   return (
     <>
@@ -287,7 +316,7 @@ function SeletorDeCampo({
         aria-expanded={aberto}
         aria-label="Campo da condição"
         onClick={() => setAberto((v) => !v)}
-        className="inline-flex h-9 min-w-[150px] max-w-[220px] items-center gap-2 rounded-xl border border-border-default bg-surface-2 px-3 text-left text-[13px] text-text-primary transition-colors hover:border-border-strong"
+        className="inline-flex h-8 min-w-[150px] max-w-[220px] items-center gap-2 rounded-md border border-border-default bg-panel px-2.5 text-left text-small text-text-primary transition-colors hover:border-border-strong"
       >
         <Icone size={13} className="shrink-0 text-text-tertiary" />
         <span className="flex-1 truncate">{atual?.rotulo ?? "Campo removido"}</span>
@@ -314,12 +343,14 @@ function ValorDaCondicao({
   f,
   opcoes,
   funilIds,
+  extras,
   aoMudar,
 }: {
-  campo: CampoDeFiltro;
+  campo: CampoDoEditor;
   f: FiltroDeConsulta;
   opcoes: OpcoesDoDashboard;
   funilIds: string[];
+  extras: OpcoesExtras;
   aoMudar: (f: FiltroDeConsulta) => void;
 }) {
   const listaId = React.useId();
@@ -330,7 +361,7 @@ function ValorDaCondicao({
       <SeletorMultiplo
         compacto
         rotulo={`Valores de ${campo.rotulo}`}
-        opcoes={opcoesDoCampo(campo, opcoes, funilIds)}
+        opcoes={opcoesDaCondicao(campo, opcoes, funilIds, extras)}
         valores={f.valores ?? []}
         aoMudar={(valores) => aoMudar({ ...f, valores })}
         placeholder="Escolha um ou mais..."
@@ -340,7 +371,7 @@ function ValorDaCondicao({
 
   if (campo.tipo === "sim_nao") {
     return (
-      <Select value={f.valor ?? "true"} aria-label={`Valor de ${campo.rotulo}`} className="h-9 text-[13px]" onChange={(e) => aoMudar({ ...f, valor: e.target.value })}>
+      <Select value={f.valor ?? "true"} aria-label={`Valor de ${campo.rotulo}`} className="h-8 text-small" onChange={(e) => aoMudar({ ...f, valor: e.target.value })}>
         <option value="true">Sim</option>
         <option value="false">Não</option>
       </Select>
@@ -357,20 +388,20 @@ function ValorDaCondicao({
             max={3650}
             value={f.valor ?? ""}
             aria-label="Quantidade de dias"
-            className="h-9 w-[90px] text-[13px]"
+            className="h-8 w-[90px] text-small"
             onChange={(e) => aoMudar({ ...f, valor: e.target.value })}
           />
-          <span className="text-[12.5px] text-text-tertiary">dias</span>
+          <span className="text-caption text-text-tertiary">dias</span>
         </div>
       );
     }
     return (
       <div className="flex items-center gap-1.5">
-        <Input type="date" value={f.valor ?? ""} aria-label={f.op === "entre" ? "De" : "Data"} className="h-9 text-[13px]" onChange={(e) => aoMudar({ ...f, valor: e.target.value })} />
+        <Input type="date" value={f.valor ?? ""} aria-label={f.op === "entre" ? "De" : "Data"} className="h-8 text-small" onChange={(e) => aoMudar({ ...f, valor: e.target.value })} />
         {f.op === "entre" && (
           <>
-            <span className="text-[12px] text-text-tertiary">e</span>
-            <Input type="date" value={f.ate ?? ""} aria-label="Até" className="h-9 text-[13px]" onChange={(e) => aoMudar({ ...f, ate: e.target.value })} />
+            <span className="text-caption text-text-tertiary">e</span>
+            <Input type="date" value={f.ate ?? ""} aria-label="Até" className="h-8 text-small" onChange={(e) => aoMudar({ ...f, ate: e.target.value })} />
           </>
         )}
       </div>
@@ -382,9 +413,9 @@ function ValorDaCondicao({
     const sufixo = campo.formato === "porcento" ? "%" : campo.formato === "dias" ? "dias" : null;
     const caixa = (valor: string | undefined, rotulo: string, aoTrocar: (v: string) => void) => (
       <div className="flex min-w-0 flex-1 items-center gap-1">
-        {prefixo && <span className="text-[12px] text-text-tertiary">{prefixo}</span>}
-        <Input inputMode="decimal" value={valor ?? ""} aria-label={rotulo} placeholder="0" className="h-9 text-[13px]" onChange={(e) => aoTrocar(e.target.value)} />
-        {sufixo && <span className="text-[12px] text-text-tertiary">{sufixo}</span>}
+        {prefixo && <span className="text-caption text-text-tertiary">{prefixo}</span>}
+        <Input inputMode="decimal" value={valor ?? ""} aria-label={rotulo} placeholder="0" className="h-8 text-small" onChange={(e) => aoTrocar(e.target.value)} />
+        {sufixo && <span className="text-caption text-text-tertiary">{sufixo}</span>}
       </div>
     );
     return (
@@ -392,7 +423,7 @@ function ValorDaCondicao({
         {caixa(f.valor, f.op === "entre" ? "Valor mínimo" : "Valor", (valor) => aoMudar({ ...f, valor }))}
         {f.op === "entre" && (
           <>
-            <span className="text-[12px] text-text-tertiary">e</span>
+            <span className="text-caption text-text-tertiary">e</span>
             {caixa(f.ate, "Valor máximo", (ate) => aoMudar({ ...f, ate }))}
           </>
         )}
@@ -408,7 +439,7 @@ function ValorDaCondicao({
         value={f.valor ?? ""}
         aria-label={`Valor de ${campo.rotulo}`}
         placeholder="Digite..."
-        className="h-9 text-[13px]"
+        className="h-8 text-small"
         list={sugestoes.length ? listaId : undefined}
         onChange={(e) => aoMudar({ ...f, valor: e.target.value })}
       />
