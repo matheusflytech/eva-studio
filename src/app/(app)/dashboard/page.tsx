@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import {
   RefreshCw, Plus, X, Pencil, ArrowLeft, ArrowRight, Check, LayoutGrid,
-  Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw,
+  Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel,
 } from "lucide-react";
+import { FunnelChart, type EtapaDoFunil } from "@/components/charts/funnel-chart";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { AreaChart } from "@/components/charts/area-chart";
@@ -13,7 +14,7 @@ import { DonutChart } from "@/components/charts/donut-chart";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
-import { descreverConsulta, tiposPermitidos as tiposPermitidos_, type Consulta } from "@/lib/consulta";
+import { descreverConsulta, tiposPermitidos as tiposPermitidos_, type Consulta, type TipoDeCartao } from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // Dashboard montado pela própria pessoa.
@@ -49,14 +50,14 @@ interface Fonte {
   chave: string;
   rotulo: string;
   explicacao: string;
-  tipo: "numero" | "serie" | "quebra" | "tabela";
-  formato?: "dinheiro" | "inteiro" | "porcento";
+  tipo: "numero" | "serie" | "quebra" | "tabela" | "funil";
+  formato?: "dinheiro" | "inteiro" | "porcento" | "dias";
   grupo: string;
 }
 
 interface Widget {
   id: string;
-  tipo: "numero" | "linha" | "pizza" | "barras" | "tabela";
+  tipo: "numero" | "linha" | "pizza" | "barras" | "tabela" | "funil";
   fonte: string;
   titulo: string;
   largura: number;
@@ -73,6 +74,8 @@ interface Ponto { label: string; value: number }
 interface LinhaTabela {
   id: string; quando: string | null; titulo: string;
   contato: string; responsavel: string; valorCents: number;
+  /** Só nas tabelas de funil (negócios parados). */
+  etapa?: string;
 }
 
 interface Dados {
@@ -81,6 +84,8 @@ interface Dados {
   series: Record<string, Ponto[]>;
   quebras: Record<string, Ponto[]>;
   tabelas: Record<string, LinhaTabela[]>;
+  funis: Record<string, EtapaDoFunil[]>;
+  historicoDesde: string | null;
 }
 
 /** Que cartões cada tipo de fonte aceita. É isto que impede pizza de série. */
@@ -89,15 +94,33 @@ const TIPOS_POR_FONTE: Record<Fonte["tipo"], Widget["tipo"][]> = {
   serie: ["linha", "barras"],
   quebra: ["pizza", "barras"],
   tabela: ["tabela"],
+  funil: ["funil", "barras"],
 };
 
 const ICONE_DO_TIPO: Record<Widget["tipo"], React.ComponentType<{ size?: number; className?: string }>> = {
-  numero: Hash, linha: LineChart, pizza: PieChart, barras: BarChart3, tabela: Table2,
+  numero: Hash, linha: LineChart, pizza: PieChart, barras: BarChart3, tabela: Table2, funil: Funnel,
 };
 
 const NOME_DO_TIPO: Record<Widget["tipo"], string> = {
-  numero: "Número", linha: "Linha", pizza: "Pizza", barras: "Barras", tabela: "Tabela",
+  numero: "Número", linha: "Linha", pizza: "Pizza", barras: "Barras", tabela: "Tabela", funil: "Funil",
 };
+
+/** O "Painel do funil": monta de uma vez os cartões que respondem como o funil está. */
+const PAINEL_DO_FUNIL: { fonte: string; tipo: Widget["tipo"] }[] = [
+  { fonte: "taxaDeGanho", tipo: "numero" },
+  { fonte: "cicloDeVenda", tipo: "numero" },
+  { fonte: "negociosAbertos", tipo: "numero" },
+  { fonte: "emAbertoPonderado", tipo: "numero" },
+  { fonte: "funilConversao", tipo: "funil" },
+  { fonte: "tempoPorEtapa", tipo: "barras" },
+  { fonte: "negociosParados", tipo: "tabela" },
+  { fonte: "motivosDePerda", tipo: "pizza" },
+];
+
+/** Cartão montado pelo construtor nunca é funil; se vier, mostra como barras. */
+function tipoDeConsulta(t: Widget["tipo"]): TipoDeCartao {
+  return t === "funil" ? "barras" : t;
+}
 
 function formatar(valor: number | null, formato: Fonte["formato"]): string {
   if (valor === null || valor === undefined) return "—";
@@ -105,6 +128,7 @@ function formatar(valor: number | null, formato: Fonte["formato"]): string {
     return (valor / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
   if (formato === "porcento") return `${(valor * 100).toFixed(1)}%`;
+  if (formato === "dias") return `${valor.toLocaleString("pt-BR")} ${valor === 1 ? "dia" : "dias"}`;
   return valor.toLocaleString("pt-BR");
 }
 
@@ -131,6 +155,9 @@ export default function DashboardPage() {
   const [carregando, setCarregando] = React.useState(true);
   const [estadoSalvar, setEstadoSalvar] = React.useState<"parado" | "salvando" | "salvo">("parado");
   const [atualizadoEm, setAtualizadoEm] = React.useState<string | null>(null);
+  // Momento em que os números chegaram: referência do aviso de histórico (sem
+  // ler o relógio durante a renderização).
+  const [carregadoEm, setCarregadoEm] = React.useState<number | null>(null);
   const timerSalvar = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const jaCarregou = React.useRef(false);
 
@@ -142,6 +169,7 @@ export default function DashboardPage() {
       if (res.ok) {
         setDados(d);
         setAtualizadoEm(new Date().toLocaleTimeString("pt-BR"));
+        setCarregadoEm(Date.now());
       }
     } finally {
       setCarregando(false);
@@ -216,6 +244,30 @@ export default function DashboardPage() {
     setEditando(true);
   }
 
+  // Acrescenta o que falta do Painel do funil, sem duplicar cartão que já existe.
+  function montarPainelDoFunil() {
+    const base = Date.now().toString(36);
+    setWidgets((ws) => {
+      const atuais = ws ?? [];
+      const novos = PAINEL_DO_FUNIL.filter((p) => fontePorChave.has(p.fonte) && !atuais.some((w) => w.fonte === p.fonte)).map(
+        (p, i) => ({
+          id: `w${base}${i}`,
+          tipo: p.tipo,
+          fonte: p.fonte,
+          titulo: fontePorChave.get(p.fonte)?.rotulo ?? p.fonte,
+          largura: p.tipo === "numero" ? 1 : 2,
+        })
+      );
+      return [...atuais, ...novos];
+    });
+  }
+
+  const temCartaoDeFunil = (widgets ?? []).some((w) => PAINEL_DO_FUNIL.some((p) => p.fonte === w.fonte && p.tipo !== "numero"));
+  const historicoRecente =
+    temCartaoDeFunil &&
+    carregadoEm !== null &&
+    (!dados?.historicoDesde || new Date(dados.historicoDesde).getTime() > carregadoEm - dias * 86_400_000);
+
   function salvarDoConstrutor(r: ResultadoDoConstrutor) {
     const alvo = construtor?.editandoId;
     if (alvo) {
@@ -283,6 +335,14 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
+            onClick={montarPainelDoFunil}
+            title="Acrescenta os cartões de funil que ainda não estão no painel"
+            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+          >
+            <Funnel size={14} /> Painel do funil
+          </button>
+          <button
+            type="button"
             onClick={() => { setEditando((v) => !v); setSelecionado(null); }}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-colors",
@@ -319,6 +379,16 @@ export default function DashboardPage() {
           Vale para todos os cartões.
         </span>
       </div>
+
+      {historicoRecente && (
+        <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-text-secondary ring-1 ring-border-subtle">
+          {dados?.historicoDesde
+            ? `O histórico de etapas começou em ${new Date(dados.historicoDesde).toLocaleDateString("pt-BR")}. `
+            : "O histórico de etapas começa a ser gravado a partir de agora. "}
+          Antes disso, cada negócio conta a partir da etapa em que estava, então conversão e dias por etapa ficam mais
+          precisos com o tempo.
+        </p>
+      )}
 
       <div className={cn("flex gap-4", editando && widgetSelecionado && "items-start")}>
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -390,7 +460,7 @@ export default function DashboardPage() {
           dias={dias}
           inicial={(() => {
             const w = (widgets ?? []).find((x) => x.id === construtor.editandoId);
-            return w?.consulta ? { consulta: w.consulta, tipo: w.tipo, titulo: w.titulo } : undefined;
+            return w?.consulta ? { consulta: w.consulta, tipo: tipoDeConsulta(w.tipo), titulo: w.titulo } : undefined;
           })()}
           aoSalvar={salvarDoConstrutor}
           aoFechar={() => setConstrutor(null)}
@@ -450,7 +520,7 @@ function Cartao({
 
       {widget.fonte === "custom" && widget.consulta ? (
         <div className="mt-2 flex-1">
-          <ConteudoDeConsulta consulta={widget.consulta} tipo={widget.tipo} dias={dias} />
+          <ConteudoDeConsulta consulta={widget.consulta} tipo={tipoDeConsulta(widget.tipo)} dias={dias} />
         </div>
       ) : !fonte ? (
         <p className="mt-3 text-[12.5px] text-text-tertiary">Fonte não encontrada.</p>
@@ -520,8 +590,13 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
     return <DonutChart segments={quebra.map((p) => ({ ...p, label: rotular(p.label) }))} size={150} />;
   }
 
+  if (widget.tipo === "funil") {
+    return <FunnelChart etapas={dados.funis?.[fonte.chave] ?? []} />;
+  }
+
   if (widget.tipo === "barras") {
-    const itens = (dados.quebras[fonte.chave] ?? dados.series[fonte.chave] ?? []).filter((p) => p.value > 0);
+    const funil = dados.funis?.[fonte.chave]?.map((e) => ({ label: e.nome, value: e.quantidade }));
+    const itens = (funil ?? dados.quebras[fonte.chave] ?? dados.series[fonte.chave] ?? []).filter((p) => p.value > 0);
     if (itens.length === 0) return <Vazio />;
     const maior = Math.max(...itens.map((i) => i.value));
     return (
@@ -548,14 +623,16 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
 
   const linhas = dados.tabelas[fonte.chave] ?? [];
   if (linhas.length === 0) return <Vazio />;
+  // Tabela de funil (parados): a coluna do meio é a etapa, e "quando" é desde quando está nela.
+  const porEtapa = linhas.some((l) => l.etapa !== undefined);
   return (
     <div className="-mx-2 overflow-x-auto pt-1">
       <table className="w-full min-w-[440px] border-collapse">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wide text-text-tertiary">
-            <th className="px-2 pb-2 font-medium">Quando</th>
+            <th className="px-2 pb-2 font-medium">{porEtapa ? "Parado desde" : "Quando"}</th>
             <th className="px-2 pb-2 font-medium">Negócio</th>
-            <th className="px-2 pb-2 font-medium">Contato</th>
+            <th className="px-2 pb-2 font-medium">{porEtapa ? "Etapa" : "Contato"}</th>
             <th className="px-2 pb-2 text-right font-medium">Valor</th>
           </tr>
         </thead>
@@ -566,7 +643,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
                 {l.quando ? formatRelativeDate(l.quando) : "—"}
               </td>
               <td className="max-w-[170px] truncate px-2 py-2 text-text-primary">{l.titulo}</td>
-              <td className="max-w-[130px] truncate px-2 py-2 text-text-secondary">{l.contato}</td>
+              <td className="max-w-[130px] truncate px-2 py-2 text-text-secondary">{porEtapa ? l.etapa : l.contato}</td>
               <td className="whitespace-nowrap px-2 py-2 text-right font-semibold text-text-primary">
                 {(l.valorCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </td>
