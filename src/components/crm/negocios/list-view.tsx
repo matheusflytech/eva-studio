@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { corDaEtapa } from "@/lib/custom-fields";
@@ -72,7 +73,7 @@ function Cabecalho({
   );
 }
 
-/** Visão em lista: para quem prefere ordenar e comparar em vez de arrastar. */
+/** Visão em lista: para quem prefere ordenar e comparar em vez de arrastar. Clicar na linha abre a prévia. */
 export function ListView({ etapas, agora, onAbrir }: { etapas: EtapaKanban[]; agora: Date; onAbrir: (d: NegocioKanban) => void }) {
   const [ordem, setOrdem] = React.useState<{ coluna: Coluna; desc: boolean }>({ coluna: "valor", desc: true });
   const linhas = React.useMemo(() => {
@@ -119,6 +120,7 @@ export function ListView({ etapas, agora, onAbrir }: { etapas: EtapaKanban[]; ag
             return (
               <tr
                 key={deal.id}
+                data-deal-id={deal.id}
                 tabIndex={0}
                 onClick={() => onAbrir(deal)}
                 onKeyDown={(e) => {
@@ -130,7 +132,16 @@ export function ListView({ etapas, agora, onAbrir }: { etapas: EtapaKanban[]; ag
                 className="cursor-pointer border-b border-border-subtle outline-none transition-colors last:border-0 hover:bg-surface-2/70 focus-visible:bg-surface-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500/60"
               >
                 <td className="max-w-[280px] px-3 py-3">
-                  <p className="truncate font-medium text-text-primary">{deal.name}</p>
+                  {/* Nome abre a ficha; o resto da linha abre a prévia. */}
+                  <Link
+                    href={`/negocios/${deal.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    title="Abrir ficha completa"
+                    className="block truncate rounded-sm font-medium text-text-primary underline-offset-2 outline-none hover:text-accent-400 hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                  >
+                    {deal.name}
+                  </Link>
                   {deal.company && <p className="truncate text-[11.5px] text-text-tertiary">{deal.company.name}</p>}
                 </td>
                 <td className="px-3 py-3">

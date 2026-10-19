@@ -12,6 +12,7 @@ import {
   respostaDeErroDoPrisma,
   texto,
 } from "@/lib/server/api-validacao";
+import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
 
 // Negócios de um funil, agrupados por etapa (o kanban lê isso direto).
 //   ?pipeline=<id>  padrão: o funil padrão da org
@@ -48,6 +49,9 @@ export async function GET(request: Request) {
             select: {
               id: true,
               name: true,
+              // Telefone e e-mail: campos que o cartão e a prévia podem mostrar.
+              phone: true,
+              email: true,
               // Conversa de WhatsApp mais recente: o cartão mostra o atalho e
               // se há mensagem do cliente ainda não lida.
               conversations: {
@@ -89,7 +93,7 @@ export async function GET(request: Request) {
         probability: d.probability,
         company: d.company,
         owner: d.owner,
-        contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name })),
+        contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name, phone: c.contact.phone, email: c.contact.email })),
         whatsapp: (() => {
           const conversa = d.contacts.map((c) => c.contact.conversations[0]).find(Boolean);
           if (!conversa) return null;
@@ -112,11 +116,15 @@ export async function GET(request: Request) {
 
   // Definições dos campos: o kanban mostra como etiqueta os marcados "no cartão".
   const fields = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);
+  // Layout do cartão junto, para o quadro não esperar uma segunda chamada.
+  // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
+  const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
 
   return NextResponse.json({
     pipeline: { id: pipeline.id, name: pipeline.name },
     stages,
     fields,
+    layout,
   });
 }
 

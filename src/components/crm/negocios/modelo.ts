@@ -8,7 +8,8 @@ export interface NegocioKanban {
   probability: number;
   company: { id: string; name: string } | null;
   owner: { id: string; name: string } | null;
-  contacts: { id: string; name: string }[];
+  /** Contatos do negócio; o primeiro é o principal. phone/email vêm do GET /api/deals. */
+  contacts: { id: string; name: string; phone?: string; email?: string }[];
   openTasks: number;
   expectedClosingAt: string | null;
   closedAt: string | null;

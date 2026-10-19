@@ -18,7 +18,8 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
-import { DealDrawer } from "@/components/crm/deal-drawer";
+import { PreviaDoNegocio } from "@/components/crm/negocios/previa";
+import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { cn } from "@/lib/utils";
 import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
@@ -68,7 +69,9 @@ export default function NegociosPage() {
   const [meuId, setMeuId] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
-  const [openDealId, setOpenDealId] = React.useState<string | null>(null);
+  // Negócio aberto na prévia (clique no cartão ou na linha); o título leva à ficha.
+  const [previaId, setPreviaId] = React.useState<string | null>(null);
+  const [layout, setLayout] = React.useState<LayoutDoCartao>(LAYOUT_PADRAO);
   const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({ visao: "todos" });
@@ -114,7 +117,12 @@ export default function NegociosPage() {
     return () => window.removeEventListener("keydown", aoTeclar);
   }, []);
 
+  // Número da carga mais recente: trocar de funil rápido não pode deixar a
+  // resposta do funil anterior, que chegou atrasada, pintar o quadro.
+  const ultimaCarga = React.useRef(0);
+
   const refresh = React.useCallback(async () => {
+    const carga = ++ultimaCarga.current;
     setIsLoading(true);
     try {
       const q = pipelineId ? `?pipeline=${pipelineId}` : "";
@@ -124,18 +132,28 @@ export default function NegociosPage() {
       ]);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
-      setStages(data.stages ?? []);
-      setDefs(data.fields ?? []);
       const dadosDoFunil = funil?.ok ? await funil.json() : null;
+      if (carga !== ultimaCarga.current) return;
+      const campos: DefinicaoDeCampo[] = data.fields ?? [];
+      setStages(data.stages ?? []);
+      setDefs(campos);
+      // O layout vem junto (padrão quando o funil não tem um salvo).
+      setLayout(data.layout ? normalizarLayout(data.layout, campos.map((c) => c.key)) : LAYOUT_PADRAO);
       setConversao(dadosDoFunil?.conversao ?? []);
       setCiclo(typeof dadosDoFunil?.cicloDeVenda === "number" ? dadosDoFunil.cicloDeVenda : null);
       setAgora(new Date());
     } catch (e) {
+      if (carga !== ultimaCarga.current) return;
       setError(e instanceof Error ? e.message : "Não foi possível carregar os negócios.");
     } finally {
-      setIsLoading(false);
+      if (carga === ultimaCarga.current) setIsLoading(false);
     }
   }, [pipelineId]);
+
+  function trocarDeFunil(id: string) {
+    setPreviaId(null);
+    setPipelineId(id);
+  }
 
   React.useEffect(() => {
     refresh();
@@ -167,6 +185,10 @@ export default function NegociosPage() {
   const totalVisivel = visiveis.reduce((s, e) => s + e.deals.length, 0);
   const etapaGanha = stages.find((s) => s.type === "won");
   const etapaPerdida = stages.find((s) => s.type === "lost");
+  // Busca no funil inteiro (não só no filtrado): mover pela prévia não pode fechá-la.
+  const previa = previaId
+    ? stages.flatMap((etapa) => etapa.deals.filter((d) => d.id === previaId).map((deal) => ({ deal, etapa })))[0] ?? null
+    : null;
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
@@ -219,7 +241,7 @@ export default function NegociosPage() {
               <label htmlFor="pipeline" className="sr-only">
                 Funil
               </label>
-              <Select id="pipeline" value={pipelineId} onChange={(e) => setPipelineId(e.target.value)} className="h-9 text-[13px]">
+              <Select id="pipeline" value={pipelineId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-[13px]">
                 {pipelines.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -231,9 +253,9 @@ export default function NegociosPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/negocios/configurar"
-            aria-label="Personalizar funis e campos"
-            title="Personalizar funis e campos"
+            href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
+            aria-label="Personalizar o cartão, os funis e os campos"
+            title="Personalizar o cartão, os funis e os campos"
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
           >
             <SlidersHorizontal size={14} aria-hidden /> <span className="hidden sm:inline">Personalizar</span>
@@ -380,7 +402,7 @@ export default function NegociosPage() {
           description="Um funil padrão é criado sozinho na primeira vez que você abre esta tela."
         />
       ) : visao === "lista" ? (
-        <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setOpenDealId(d.id)} />
+        <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setPreviaId(d.id)} />
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
           <div className="relative">
@@ -390,10 +412,11 @@ export default function NegociosPage() {
                   key={stage.id}
                   etapa={stage}
                   defs={defs}
+                  layout={layout}
                   agora={agora}
                   maiorTotalAberto={maiorTotalAberto}
                   arrastandoAlgo={!!dragging}
-                  onAbrir={(d) => setOpenDealId(d.id)}
+                  onAbrir={(d) => setPreviaId(d.id)}
                   onNovo={(id) => setNovoNaEtapa(id)}
                 />
               ))}
@@ -405,12 +428,24 @@ export default function NegociosPage() {
             />
           </div>
           <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
-            {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} arrastando />}
+            {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} layout={layout} arrastando />}
           </DragOverlay>
         </DndContext>
       )}
 
-      {openDealId && <DealDrawer dealId={openDealId} onClose={() => setOpenDealId(null)} onChanged={refresh} />}
+      {previa && (
+        <PreviaDoNegocio
+          key={previa.deal.id}
+          deal={previa.deal}
+          etapa={previa.etapa}
+          etapas={stages}
+          layout={layout}
+          defs={defs}
+          agora={agora}
+          onFechar={() => setPreviaId(null)}
+          onMudou={refresh}
+        />
+      )}
 
       {novoNaEtapa !== null && (
         <NewDealModal

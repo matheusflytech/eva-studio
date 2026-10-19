@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -142,7 +143,7 @@ function MapaDeCampos({
     return (
       <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
         Você ainda não criou campos {entidade === "deal" ? "do negócio" : "do contato"}.{" "}
-        <a href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</a> para o agente poder preenchê-los.
+        <Link href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</Link> para o agente poder preenchê-los.
       </p>
     );
   }

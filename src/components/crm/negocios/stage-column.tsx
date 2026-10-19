@@ -6,6 +6,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import { AcoesRapidas, DealCard } from "./deal-card";
 import { valorCurto, type EtapaKanban, type NegocioKanban } from "./modelo";
 
@@ -32,17 +33,19 @@ function CartaoArrastavel({
   deal,
   tipoDaEtapa,
   defs,
+  layout,
   agora,
   onAbrir,
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
   defs: DefinicaoDeCampo[];
+  layout: LayoutDoCartao;
   agora: Date;
   onAbrir: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
-  // Onde o ponteiro desceu: soltar depois de arrastar não pode abrir o painel.
+  // Onde o ponteiro desceu: soltar depois de arrastar não pode abrir a prévia.
   const origem = React.useRef<{ x: number; y: number } | null>(null);
 
   return (
@@ -51,7 +54,8 @@ function CartaoArrastavel({
       style={{ transform: CSS.Translate.toString(transform) }}
       {...listeners}
       {...attributes}
-      aria-label={`${deal.name}. Enter abre, espaço pega para mover.`}
+      data-deal-id={deal.id}
+      aria-label={`${deal.name}. Enter abre a prévia, espaço pega para mover.`}
       onPointerDownCapture={(e) => {
         origem.current = { x: e.clientX, y: e.clientY };
       }}
@@ -73,8 +77,8 @@ function CartaoArrastavel({
         isDragging && "opacity-30"
       )}
     >
-      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} />
-      <AcoesRapidas deal={deal} onAbrir={onAbrir} />
+      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} layout={layout} comLink />
+      <AcoesRapidas deal={deal} />
     </div>
   );
 }
@@ -82,6 +86,7 @@ function CartaoArrastavel({
 export function StageColumn({
   etapa,
   defs,
+  layout,
   agora,
   maiorTotalAberto,
   arrastandoAlgo,
@@ -90,6 +95,7 @@ export function StageColumn({
 }: {
   etapa: EtapaKanban;
   defs: DefinicaoDeCampo[];
+  layout: LayoutDoCartao;
   agora: Date;
   /** Maior total entre as etapas abertas: base da barrinha de proporção. */
   maiorTotalAberto: number;
@@ -156,6 +162,7 @@ export function StageColumn({
             deal={deal}
             tipoDaEtapa={etapa.type}
             defs={defs}
+            layout={layout}
             agora={agora}
             onAbrir={() => onAbrir(deal)}
           />
