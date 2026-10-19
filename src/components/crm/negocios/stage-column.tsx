@@ -112,6 +112,7 @@ export function StageColumn({
     <section
       ref={setNodeRef}
       aria-label={`Etapa ${etapa.name}, ${etapa.deals.length} negócios`}
+      data-etapa={etapa.name}
       className={cn(
         "group/col flex max-h-full w-[288px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border bg-surface-1 transition-[border-color,box-shadow] duration-150",
         isOver ? "border-accent-500/60 shadow-[0_0_0_1px_rgba(91,141,239,0.35)]" : "border-border-subtle"

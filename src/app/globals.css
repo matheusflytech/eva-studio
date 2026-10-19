@@ -221,3 +221,105 @@ body {
     radial-gradient(ellipse 700px 500px at 100% 100%, rgba(91, 141, 239, 0.05), transparent 60%),
     var(--bg-base);
 }
+
+/* ---------------------------------------------------------------------------
+   Impressão (relatório do funil em PDF e dashboard).
+
+   A casca do app (barra lateral, barra do celular) some e a área de conteúdo
+   deixa de ser uma caixa de rolagem de 100dvh: sem isso o navegador imprime
+   só a primeira tela. A paleta escura vira clara, porque fundo preto em PDF
+   é ilegível e gasta toner. Os gráficos desenham com branco fixo (feitos para
+   o fundo escuro), então ganham as cores do acento aqui.
+   --------------------------------------------------------------------------- */
+/* Eva: o brilho do cabeçalho respira devagar e o recado entra de leve. */
+@keyframes eva-respira {
+  0%, 100% { opacity: 0.6; transform: translate3d(0, 0, 0); }
+  50% { opacity: 0.85; transform: translate3d(-8px, 4px, 0); }
+}
+@keyframes eva-entra {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes eva-comemora {
+  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
+  12% { opacity: 1; transform: none; }
+  88% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(6px); }
+}
+
+@media print {
+  :root {
+    --bg-base: #ffffff;
+    --bg-surface-1: #ffffff;
+    --bg-surface-2: #f4f4f5;
+    --bg-surface-3: #e4e4e7;
+    --border-subtle: rgba(0, 0, 0, 0.1);
+    --border-default: rgba(0, 0, 0, 0.16);
+    --border-strong: rgba(0, 0, 0, 0.24);
+    --text-primary: #18181b;
+    --text-secondary: #3f3f46;
+    --text-tertiary: #71717a;
+    --glass-card-bg: #ffffff;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    background: #ffffff !important;
+  }
+
+  .app-backdrop {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  .app-backdrop > :not(main) {
+    display: none !important;
+  }
+  .app-backdrop > main {
+    display: block !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+
+  .glass-card {
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 1px solid #d4d4d8 !important;
+    break-inside: avoid;
+  }
+
+  /* Gráficos (src/components/charts) */
+  svg [stroke="rgba(255,255,255,0.75)"] { stroke: #3f6fd1; }
+  svg circle[fill="white"] { fill: #3f6fd1; }
+  svg stop[stop-color="rgba(255,255,255,0.16)"] { stop-color: rgba(91, 141, 239, 0.35); }
+  svg circle[stroke="rgba(255,255,255,0.06)"] { stroke: #e4e4e7; }
+  svg circle[stroke="rgba(255,255,255,0.85)"] { stroke: #3f6fd1; }
+  svg circle[stroke="rgba(255,255,255,0.45)"] { stroke: #7ba3f5; }
+  svg circle[stroke="rgba(255,255,255,0.2)"] { stroke: #b4c8f4; }
+  svg circle[stroke="rgba(255,255,255,0.1)"] { stroke: #dde6fa; }
+  [style*="255,255,255,0.85"], [style*="255, 255, 255, 0.85"] { background: #3f6fd1 !important; }
+  [style*="255,255,255,0.45"], [style*="255, 255, 255, 0.45"] { background: #7ba3f5 !important; }
+  [style*="255,255,255,0.2)"], [style*="255, 255, 255, 0.2)"] { background: #b4c8f4 !important; }
+  [style*="255,255,255,0.1)"], [style*="255, 255, 255, 0.1)"] { background: #dde6fa !important; }
+  .bg-white\/15 { background: rgba(0, 0, 0, 0.18) !important; }
+
+  /* Dashboard: grade de duas colunas na folha em pé. */
+  @page { size: A4; margin: 12mm; }
+  .dash-grade {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .dash-grade > .dash-largo { grid-column: span 2 / span 2 !important; }
+  .dash-grade > .dash-estreito { grid-column: span 1 / span 1 !important; }
+}

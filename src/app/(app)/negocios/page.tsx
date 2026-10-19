@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Handshake, Plus, Loader2, X, SlidersHorizontal, Search, Columns3, Rows3 } from "lucide-react";
+import { Handshake, Plus, Loader2, X, SlidersHorizontal, Search, Columns3, Rows3, Download, FileSpreadsheet, FileText } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -16,6 +16,7 @@ import {
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { PreviaDoNegocio } from "@/components/crm/negocios/previa";
@@ -28,6 +29,8 @@ import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
 import { ListView } from "@/components/crm/negocios/list-view";
 import { ResumoDoFunilView, type EtapaDeConversao } from "@/components/crm/negocios/resumo";
+import { CabecalhoAssinatura, Momentos, RecadoDaEva, SeletorDeEstilo, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
+import { carimbo, gargaloDaConversao, momentos, montarRecado, type AcaoDoRecado } from "@/components/crm/negocios/eva-voz";
 import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
@@ -37,6 +40,7 @@ import {
   precisaAtencao,
   resumoDoFunil,
   serieDeGanhoDoMes,
+  valorCurto,
   type EtapaKanban,
   type FiltrosDeNegocio,
   type NegocioKanban,
@@ -67,6 +71,7 @@ export default function NegociosPage() {
   const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
   const [ciclo, setCiclo] = React.useState<number | null>(null);
   const [meuId, setMeuId] = React.useState("");
+  const [meuNome, setMeuNome] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
   // Negócio aberto na prévia (clique no cartão ou na linha); o título leva à ficha.
@@ -77,6 +82,7 @@ export default function NegociosPage() {
   const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({ visao: "todos" });
   const [visao, setVisao] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
   const [resumoAberto, setResumoAberto] = usePreferencia("eva:negocios:resumo", "aberto", ["aberto", "recolhido"] as const);
+  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v1", ["classico", "v1"]);
   // Relógio da tela: muda só quando os dados chegam (dias parados, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
@@ -97,7 +103,10 @@ export default function NegociosPage() {
       .catch(() => setPipelines([]));
     fetch("/api/me")
       .then((r) => r.json())
-      .then((d) => setMeuId(d.session?.userId ?? ""))
+      .then((d) => {
+        setMeuId(d.session?.userId ?? "");
+        setMeuNome(d.session?.name ?? "");
+      })
       .catch(() => setMeuId(""));
   }, []);
 
@@ -175,6 +184,41 @@ export default function NegociosPage() {
       atencao: precisaAtencao(stages, agora),
     };
   }, [stages, agora]);
+  // Voz da Eva (variação 1): recado do dia, frase do cabeçalho e momentos.
+  const hoje = agora.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const [recadoDispensado, setRecadoDispensado] = usePreferencia<string>("eva:negocios:recado", "", [hoje]);
+  const recado = React.useMemo(
+    () => (isLoading ? null : montarRecado(stages, agora, meuNome, gargaloDaConversao(conversao))),
+    [isLoading, stages, agora, meuNome, conversao]
+  );
+  const momentosDoFunil = React.useMemo(() => momentos(stages, agora), [stages, agora]);
+  const fraseDoTopo = (
+    <>
+      <strong className="font-semibold text-text-primary">{valorCurto(dadosDoResumo.ganhoMesCents)}</strong> ganhos neste mês
+      {dadosDoResumo.variacaoGanho !== null && (
+        <>
+          {", "}
+          <span className={dadosDoResumo.variacaoGanho >= 0 ? "text-emerald-400" : "text-[#f2a65a]"}>
+            {dadosDoResumo.variacaoGanho >= 0 ? "acima" : "abaixo"} do mesmo ponto do mês passado
+          </span>
+        </>
+      )}
+      . {dadosDoResumo.atencao > 0 ? `${dadosDoResumo.atencao} ${dadosDoResumo.atencao === 1 ? "negócio pede" : "negócios pedem"} atenção.` : "Nada pedindo atenção agora."}
+    </>
+  );
+  function aoAcaoDoRecado(id: AcaoDoRecado) {
+    if (id === "novo") return setNovoNaEtapa("");
+    if (id === "gargalo") {
+      const g = gargaloDaConversao(conversao);
+      const coluna = g && [...document.querySelectorAll<HTMLElement>("[data-etapa]")].find((el) => el.dataset.etapa === g.de);
+      coluna?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      return;
+    }
+    // Retornos, não lidas e parados caem todos em "Precisam de atenção".
+    setFiltros((f) => ({ ...f, visao: "atencao" }));
+    document.querySelector('[aria-label="Visões"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const donos = React.useMemo(() => {
     const m = new Map<string, string>();
     for (const s of stages) for (const d of s.deals) if (d.owner) m.set(d.owner.id, d.owner.name || "Sem nome");
@@ -228,43 +272,107 @@ export default function NegociosPage() {
     refresh();
   }
 
+  // Exportar leva o funil escolhido e os filtros da tela (busca, responsável, visão).
+  const consultaDeExportacao = React.useMemo(() => {
+    const p = new URLSearchParams();
+    if (pipelineId) p.set("pipeline", pipelineId);
+    if (filtros.busca?.trim()) p.set("busca", filtros.busca.trim());
+    if (filtros.dono) p.set("dono", filtros.dono);
+    if (filtros.visao && filtros.visao !== "todos") p.set("visao", filtros.visao);
+    return p.toString();
+  }, [pipelineId, filtros.busca, filtros.dono, filtros.visao]);
+
   const contagemDaVisao = (v: VisaoSalva) =>
     v === "todos" ? null : filtrarEtapas(stages, { visao: v, meuId }, agora).reduce((s, e) => s + e.deals.length, 0);
 
+  const seletorDeFunil = (
+    <>
+      {pipelines.length > 1 && (
+        <div className="w-[180px]">
+          <label htmlFor="pipeline" className="sr-only">
+            Funil
+          </label>
+          <Select id="pipeline" value={pipelineId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-[13px]">
+            {pipelines.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+    </>
+  );
+  const acoesDoTopo = (
+    <>
+      <Link
+        href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
+        aria-label="Personalizar o cartão, os funis e os campos"
+        title="Personalizar o cartão, os funis e os campos"
+        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+      >
+        <SlidersHorizontal size={14} aria-hidden /> <span className="hidden sm:inline">Personalizar</span>
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Exportar o funil"
+          title={filtrando ? "Exportar o funil com os filtros atuais" : "Exportar o funil"}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+        >
+          <Download size={14} aria-hidden /> <span className="hidden sm:inline">Exportar</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[230px]">
+          <DropdownMenuItem asChild>
+            <a href={`/api/deals/exportar?formato=csv${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`} download>
+              <FileSpreadsheet size={15} aria-hidden /> Planilha (CSV)
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={`/negocios/relatorio?imprimir=1${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`}>
+              <FileText size={15} aria-hidden /> Relatório (PDF)
+            </Link>
+          </DropdownMenuItem>
+          {filtrando && <p className="px-3 pb-1.5 pt-1 text-[11.5px] text-text-tertiary">Sai com os filtros aplicados na tela.</p>}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button onClick={() => setNovoNaEtapa("")} className="h-9 rounded-lg px-3.5 text-[13px]" title="Novo negócio (N)">
+        <Plus size={15} aria-hidden /> Novo negócio
+      </Button>
+    </>
+  );
+
   return (
     <div className="flex min-h-0 flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="font-display text-[22px] font-semibold tracking-[-0.01em] text-text-primary">Negócios</h1>
-          {pipelines.length > 1 && (
-            <div className="w-[180px]">
-              <label htmlFor="pipeline" className="sr-only">
-                Funil
-              </label>
-              <Select id="pipeline" value={pipelineId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-[13px]">
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+      {estilo === "v1" ? (
+        <>
+          <CabecalhoAssinatura
+            funil={pipelines.find((p) => p.id === pipelineId)?.name ?? "Funil"}
+            frase={fraseDoTopo}
+            seletor={seletorDeFunil}
+            acoes={
+              <>
+                <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
+                {acoesDoTopo}
+              </>
+            }
+          />
+          {recado && recadoDispensado !== hoje && (
+            <RecadoDaEva recado={recado} carimbo={carimbo(agora)} onAcao={aoAcaoDoRecado} onDispensar={() => setRecadoDispensado(hoje)} />
           )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
-            aria-label="Personalizar o cartão, os funis e os campos"
-            title="Personalizar o cartão, os funis e os campos"
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-          >
-            <SlidersHorizontal size={14} aria-hidden /> <span className="hidden sm:inline">Personalizar</span>
-          </Link>
-          <Button onClick={() => setNovoNaEtapa("")} className="h-9 rounded-lg px-3.5 text-[13px]" title="Novo negócio (N)">
-            <Plus size={15} aria-hidden /> Novo negócio
-          </Button>
-        </div>
-      </header>
+          <Momentos itens={momentosDoFunil} />
+        </>
+      ) : (
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <h1 className="font-display text-[22px] font-semibold tracking-[-0.01em] text-text-primary">Negócios</h1>
+            {seletorDeFunil}
+          </div>
+          <div className="flex items-center gap-2">
+            <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
+            {acoesDoTopo}
+          </div>
+        </header>
+      )}
 
       <ResumoDoFunilView
         dados={dadosDoResumo}

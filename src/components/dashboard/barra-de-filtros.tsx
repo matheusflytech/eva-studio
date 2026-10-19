@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { CalendarRange, FilterX } from "lucide-react";
+import { CalendarRange, FilterX, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SeletorMultiplo } from "@/components/dashboard/seletor-multiplo";
 import type { OpcoesDoDashboard } from "@/components/dashboard/opcoes";
+import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
+import type { ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { FILTROS_GLOBAIS_PADRAO, SEM_VALOR, diaLocal, janelaDoPainel, somarDias, type FiltrosGlobais } from "@/lib/consulta";
 import { cn } from "@/lib/utils";
 
@@ -51,13 +53,21 @@ export function BarraDeFiltros({
   globais,
   aoMudar,
   opcoes,
+  aoSalvarCartao,
 }: {
   globais: FiltrosGlobais;
   aoMudar: (g: FiltrosGlobais) => void;
   opcoes: OpcoesDoDashboard;
+  /**
+   * Opcional: recebe o cartão que a pessoa montou a partir do "Filtrar com IA"
+   * (quando o pedido tinha condições que só cabem num cartão). Sem ele, a
+   * barra só explica o que ficou de fora.
+   */
+  aoSalvarCartao?: (r: ResultadoDoConstrutor) => void;
 }) {
   const personalizado = !!(globais.de && globais.ate);
   const [mostrarIntervalo, setMostrarIntervalo] = React.useState(personalizado);
+  const [mostrarIa, setMostrarIa] = React.useState(false);
   const janela = janelaDoPainel(globais.dias, globais.de, globais.ate);
   const [rascunho, setRascunho] = React.useState(janela);
 
@@ -114,6 +124,17 @@ export function BarraDeFiltros({
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMostrarIa((v) => !v)}
+            aria-expanded={mostrarIa}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+              mostrarIa ? "bg-accent-soft text-accent-400 ring-1 ring-accent-500/40" : "bg-surface-2 text-text-secondary hover:text-text-primary"
+            )}
+          >
+            <Sparkles size={13} /> Filtrar com IA
+          </button>
           {opcoes.funis.length > 1 && (
             <SeletorMultiplo
               compacto
@@ -184,6 +205,21 @@ export function BarraDeFiltros({
             ))}
           </div>
         </div>
+      )}
+
+      {mostrarIa && (
+        <PainelFiltrarComIa
+          globais={globais}
+          opcoes={opcoes}
+          aoMudar={(g) => {
+            // Período que a IA mandou como intervalo abre a linha de datas, como no clique manual.
+            setMostrarIntervalo(!!(g.de && g.ate));
+            if (g.de && g.ate) setRascunho({ de: g.de, ate: g.ate });
+            aoMudar(g);
+          }}
+          aoFechar={() => setMostrarIa(false)}
+          aoSalvarCartao={aoSalvarCartao}
+        />
       )}
     </div>
   );

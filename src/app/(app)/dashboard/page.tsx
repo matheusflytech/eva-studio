@@ -6,7 +6,20 @@ import { useSearchParams } from "next/navigation";
 import {
   RefreshCw, Plus, X, Pencil, ArrowLeft, ArrowRight, Check, LayoutGrid,
   Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel, FilterX,
+  Download, FileSpreadsheet, FileText, MoreHorizontal,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/lib/auth/auth-context";
+import { dataHoraBR, hojeSP, slugDoArquivo, type Celula } from "@/lib/exportar/csv";
+import {
+  baixarArquivo,
+  csvDeTodosOsCartoes,
+  csvDoCartao,
+  tabelaDaFonte,
+  tabelaDoResultado,
+  type SecaoDoCartao,
+  type TabelaDoCartao,
+} from "@/lib/exportar/cartao";
 import { FunnelChart, type EtapaDoFunil } from "@/components/charts/funnel-chart";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -19,13 +32,16 @@ import { BarraDeFiltros } from "@/components/dashboard/barra-de-filtros";
 import { rotulosDasOpcoes, useOpcoesDoDashboard, type OpcoesDoDashboard } from "@/components/dashboard/opcoes";
 import {
   ROTULO_CANAL,
+  SEM_VALOR,
   descreverConsulta,
+  janelaDoPainel,
   diasEntre,
   filtrosGlobaisParaQuery,
   sanearFiltrosGlobais,
   tiposPermitidos as tiposPermitidos_,
   type Consulta,
   type FiltrosGlobais,
+  type ResultadoDeConsulta,
   type RotulosDaConsulta,
   type TipoDeCartao,
 } from "@/lib/consulta";
@@ -148,6 +164,71 @@ function seloDeFiltro(fonte: Fonte, globais: FiltrosGlobais, dados: Dados | null
     if (globais.funis.length === 0 && totalDeFunis > 1 && nome) return `Funil “${nome}”`;
   }
   return null;
+}
+
+// ── Exportação ─────────────────────────────────────────────────────────────
+
+const dataDoDia = (dia: string) => dia.split("-").reverse().join("/");
+
+/** "01/10/2026 a 30/10/2026 (últimos 30 dias)". */
+function descreverPeriodo(globais: FiltrosGlobais, dados: Dados | null): string {
+  const j = dados?.periodo ?? janelaDoPainel(globais.dias, globais.de, globais.ate);
+  const intervalo = `${dataDoDia(j.de)} a ${dataDoDia(j.ate)}`;
+  return globais.de && globais.ate ? intervalo : `${intervalo} (últimos ${globais.dias} dias)`;
+}
+
+/** Os filtros globais ativos, já com nomes; vazio quando não há nenhum. */
+function filtrosEmTexto(globais: FiltrosGlobais, opcoes: OpcoesDoDashboard): [string, string][] {
+  const out: [string, string][] = [];
+  if (globais.funis.length) {
+    out.push(["Funis", globais.funis.map((id) => opcoes.funis.find((f) => f.id === id)?.name ?? "funil removido").join(", ")]);
+  }
+  if (globais.donos.length) {
+    const nomes = globais.donos.map((id) =>
+      id === SEM_VALOR ? "sem responsável" : opcoes.membros.find((m) => m.id === id)?.name ?? "pessoa removida"
+    );
+    out.push(["Responsáveis", nomes.join(", ")]);
+  }
+  return out;
+}
+
+/**
+ * Os dados que o cartão desenha, como tabela. Fonte fixa já está em `dados`;
+ * cartão montado pede o resultado de novo (o mesmo cálculo que ele mostra).
+ */
+async function tabelaDoWidget(
+  widget: Widget,
+  fonte: Fonte | undefined,
+  dados: Dados | null,
+  globais: FiltrosGlobais
+): Promise<{ tabela: TabelaDoCartao | null; erro?: string }> {
+  if (widget.fonte === "custom" && widget.consulta) {
+    try {
+      const res = await fetch("/api/analytics/consulta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consulta: widget.consulta, ...globais, lista: widget.tipo === "tabela" }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.resultado) return { tabela: null, erro: d.error ?? "Não foi possível calcular." };
+      return { tabela: tabelaDoResultado(d.resultado as ResultadoDeConsulta) };
+    } catch {
+      return { tabela: null, erro: "Sem conexão." };
+    }
+  }
+  if (!fonte) return { tabela: null, erro: "Fonte não encontrada." };
+  if (!dados) return { tabela: null, erro: "Os números ainda não carregaram." };
+  return { tabela: tabelaDaFonte(fonte, dados, rotular) };
+}
+
+/** Linhas do topo do "Todos os cartões": de quando e com que filtros. */
+function linhasDoTopo(globais: FiltrosGlobais, dados: Dados | null, opcoes: OpcoesDoDashboard, organizacao: string): Celula[][] {
+  return [
+    [`Dashboard${organizacao ? ` · ${organizacao}` : ""}`],
+    ["Período", descreverPeriodo(globais, dados)],
+    ...filtrosEmTexto(globais, opcoes),
+    ["Gerado em", dataHoraBR(new Date())],
+  ];
 }
 
 // useSearchParams precisa de um Suspense em volta para a página poder ser
@@ -328,18 +409,62 @@ function Painel() {
 
   const widgetSelecionado = (widgets ?? []).find((w) => w.id === selecionado) ?? null;
 
+  const { session } = useAuth();
+  const organizacao = session?.orgName ?? "";
+  const [exportando, setExportando] = React.useState(false);
+  const filtrosAtivos = filtrosEmTexto(globais, opcoes);
+
+  // PDF = a própria página impressa. Sai do modo de edição antes e espera o
+  // menu fechar, para nada disso sair na folha.
+  function imprimir() {
+    setEditando(false);
+    setSelecionado(null);
+    setTimeout(() => window.print(), 300);
+  }
+
+  async function exportarTodos() {
+    setExportando(true);
+    try {
+      const secoes: SecaoDoCartao[] = [];
+      for (const w of widgets ?? []) {
+        const r = await tabelaDoWidget(w, fontePorChave.get(w.fonte), dados, globais);
+        secoes.push({ titulo: w.titulo || fontePorChave.get(w.fonte)?.rotulo || "Cartão", tabela: r.tabela, erro: r.erro });
+      }
+      baixarArquivo(csvDeTodosOsCartoes(linhasDoTopo(globais, dados, opcoes, organizacao), secoes), `dashboard-${hojeSP()}.csv`);
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function exportarCartao(w: Widget) {
+    const r = await tabelaDoWidget(w, fontePorChave.get(w.fonte), dados, globais);
+    if (!r.tabela) {
+      alert(r.erro ?? "Sem dados para exportar.");
+      return;
+    }
+    baixarArquivo(csvDoCartao(r.tabela), `${slugDoArquivo(w.titulo || "cartao")}-${hojeSP()}.csv`);
+  }
+
   return (
-    <div className="flex-1 p-8">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div className="flex-1 p-8 print:p-0">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 print:mb-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary">Dashboard</h1>
-          <p className="mt-1 text-[14px] text-text-secondary">
+          <h1 className="font-display text-2xl font-semibold text-text-primary">
+            Dashboard<span className="hidden print:inline">{organizacao ? ` · ${organizacao}` : ""}</span>
+          </h1>
+          {/* Na folha impressa: período e filtros no lugar da explicação da tela. */}
+          <div className="hidden text-[12px] text-text-secondary print:block">
+            <p>Período: {descreverPeriodo(globais, dados)}</p>
+            {filtrosAtivos.length > 0 && <p>{filtrosAtivos.map(([r, v]) => `${r}: ${v}`).join(" · ")}</p>}
+            {carregadoEm !== null && <p className="text-text-tertiary">Gerado em {dataHoraBR(new Date(carregadoEm))}</p>}
+          </div>
+          <p className="mt-1 text-[14px] text-text-secondary print:hidden">
             {editando
               ? "Clique num cartão pra editar, use o + pra adicionar. Salva sozinho."
               : "O painel da sua operação. Você monta os cartões que quiser."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           {estadoSalvar !== "parado" && (
             <span className="text-[12px] text-text-tertiary">
               {estadoSalvar === "salvando" ? "Salvando..." : "Salvo."}
@@ -374,6 +499,27 @@ function Painel() {
           >
             <Funnel size={14} /> Painel do funil
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={exportando}
+              title="Baixar o painel em PDF ou os dados dos cartões"
+              className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-2 text-[13px] font-medium text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-50"
+            >
+              <Download size={14} className={cn(exportando && "animate-pulse")} /> Exportar
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[240px]">
+              <DropdownMenuItem onSelect={imprimir}>
+                <FileText size={15} /> Relatório (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { void exportarTodos(); }} disabled={!widgets?.length}>
+                <FileSpreadsheet size={15} /> Todos os cartões (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <p className="px-3 pb-1.5 text-[11.5px] text-text-tertiary">
+                No PDF, escolha &ldquo;Salvar como PDF&rdquo; na janela de impressão.
+              </p>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             onClick={() => { setEditando((v) => !v); setSelecionado(null); }}
@@ -389,7 +535,9 @@ function Painel() {
         </div>
       </header>
 
-      <BarraDeFiltros globais={globais} aoMudar={mudarGlobais} opcoes={opcoes} />
+      <div className="print:hidden">
+        <BarraDeFiltros globais={globais} aoMudar={mudarGlobais} opcoes={opcoes} aoSalvarCartao={salvarDoConstrutor} />
+      </div>
 
       {historicoRecente && (
         <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-text-secondary ring-1 ring-border-subtle">
@@ -402,7 +550,7 @@ function Painel() {
       )}
 
       <div className={cn("flex gap-4", editando && widgetSelecionado && "items-start")}>
-        <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="dash-grade grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(widgets ?? []).map((w, i) => (
             <Cartao
               key={w.id}
@@ -419,6 +567,7 @@ function Painel() {
               onSelecionar={() => setSelecionado(w.id)}
               onRemover={() => remover(w.id)}
               onMover={(d) => mover(w.id, d)}
+              onBaixarCsv={() => exportarCartao(w)}
             />
           ))}
 
@@ -426,7 +575,7 @@ function Painel() {
             <button
               type="button"
               onClick={() => setAdicionando(true)}
-              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-border-default text-text-tertiary transition-colors hover:border-accent-500/50 hover:text-accent-400"
+              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-3xl border border-dashed print:hidden border-border-default text-text-tertiary transition-colors hover:border-accent-500/50 hover:text-accent-400"
             >
               <Plus size={22} />
               <span className="text-[13px] font-medium">Adicionar painel</span>
@@ -487,7 +636,7 @@ function Painel() {
 
 function Cartao({
   widget, fonte, dados, globais, opcoes, rotulos, editando, selecionado, primeiro, ultimo,
-  onSelecionar, onRemover, onMover,
+  onSelecionar, onRemover, onMover, onBaixarCsv,
 }: {
   widget: Widget;
   fonte: Fonte | undefined;
@@ -502,6 +651,7 @@ function Cartao({
   onSelecionar: () => void;
   onRemover: () => void;
   onMover: (d: -1 | 1) => void;
+  onBaixarCsv: () => void;
 }) {
   const span =
     widget.largura === 3 ? "md:col-span-2 xl:col-span-3" : widget.largura === 2 ? "md:col-span-2" : "";
@@ -512,12 +662,13 @@ function Cartao({
       className={cn(
         "glass-card relative flex flex-col rounded-3xl p-5",
         span,
+        widget.largura >= 2 ? "dash-largo" : "dash-estreito",
         editando && "cursor-pointer",
         selecionado && "ring-2 ring-accent-500/60"
       )}
     >
       {editando && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-lg bg-surface-3/90 p-0.5">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-lg bg-surface-3/90 p-0.5 print:hidden">
           <BotaoMini onClick={(e) => { e.stopPropagation(); onMover(-1); }} disabled={primeiro} titulo="Mover pra trás">
             <ArrowLeft size={12} />
           </BotaoMini>
@@ -530,7 +681,26 @@ function Cartao({
         </div>
       )}
 
-      <h2 className="pr-16 text-[12.5px] text-text-tertiary">{widget.titulo}</h2>
+      {!editando && (
+        <div className="absolute right-3 top-3 z-10 print:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label={`Opções do cartão ${widget.titulo}`}
+              title="Opções do cartão"
+              className="rounded-md p-1 text-text-tertiary outline-none transition-colors hover:bg-surface-2 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+            >
+              <MoreHorizontal size={15} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onBaixarCsv}>
+                <Download size={14} /> Baixar CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      <h2 className="pr-16 text-[12.5px] text-text-tertiary print:text-[13px] print:font-medium print:text-text-primary">{widget.titulo}</h2>
 
       {widget.fonte === "custom" && widget.consulta ? (
         <div className="mt-2 flex-1">
@@ -712,7 +882,7 @@ function Propriedades({
   const grupos = [...new Set(catalogo.map((f) => f.grupo))];
 
   return (
-    <aside className="glass-card glass-card-solid sticky top-8 hidden w-[300px] shrink-0 flex-col rounded-3xl lg:flex">
+    <aside className="glass-card glass-card-solid sticky top-8 hidden w-[300px] shrink-0 flex-col rounded-3xl lg:flex print:hidden">
       <header className="flex items-center justify-between border-b border-border-subtle p-4">
         <p className="text-[13px] font-semibold text-text-primary">Propriedades</p>
         <button

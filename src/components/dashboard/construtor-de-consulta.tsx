@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { VisaoDoResultado, useResultadoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
 import { EditorDeFiltros } from "@/components/dashboard/editor-de-filtros";
 import { SeletorMultiplo } from "@/components/dashboard/seletor-multiplo";
+import { PergunteAEva, type RespostaIaCartao, type SugestaoDaIa } from "@/components/dashboard/ia-pergunte-a-eva";
 import { rotulosDasOpcoes, type OpcoesDoDashboard } from "@/components/dashboard/opcoes";
 import {
   AGRUPAMENTOS_BASE,
@@ -52,17 +53,42 @@ export function ConstrutorDeConsulta({
   opcoes,
   aoSalvar,
   aoFechar,
+  sugestaoDaIa,
 }: {
   inicial?: { consulta: Consulta; tipo: TipoDeCartao; titulo: string };
   globais: FiltrosGlobais;
   opcoes: OpcoesDoDashboard;
   aoSalvar: (r: ResultadoDoConstrutor) => void;
   aoFechar: () => void;
+  /** Cartão novo já preenchido pela IA (ex.: "Montar um cartão com isso" na barra do painel). */
+  sugestaoDaIa?: SugestaoDaIa;
 }) {
-  const [consulta, setConsulta] = React.useState<Consulta>(inicial?.consulta ?? CONSULTA_PADRAO);
-  const [tipoEscolhido, setTipoEscolhido] = React.useState<TipoDeCartao>(inicial?.tipo ?? "barras");
-  const [titulo, setTitulo] = React.useState(inicial?.titulo ?? "");
-  const [tituloMexido, setTituloMexido] = React.useState(!!inicial?.titulo);
+  const comeco = inicial ?? sugestaoDaIa;
+  const [consulta, setConsulta] = React.useState<Consulta>(comeco?.consulta ?? CONSULTA_PADRAO);
+  const [tipoEscolhido, setTipoEscolhido] = React.useState<TipoDeCartao>(comeco?.tipo ?? "barras");
+  const [titulo, setTitulo] = React.useState(comeco?.titulo ?? "");
+  const [tituloMexido, setTituloMexido] = React.useState(!!comeco?.titulo);
+
+  // Pilha do "Desfazer" da IA: cada resposta aplicada guarda o montador de antes.
+  const [antesDaIa, setAntesDaIa] = React.useState<{ consulta: Consulta; tipo: TipoDeCartao; titulo: string; tituloMexido: boolean }[]>([]);
+
+  function aplicarDaIa(r: RespostaIaCartao) {
+    setAntesDaIa((p) => [...p, { consulta, tipo: tipoEscolhido, titulo, tituloMexido }].slice(-10));
+    setConsulta(r.consulta);
+    setTipoEscolhido(r.tipo);
+    setTitulo(r.titulo);
+    setTituloMexido(!!r.titulo);
+  }
+
+  function desfazerIa() {
+    const anterior = antesDaIa[antesDaIa.length - 1];
+    if (!anterior) return;
+    setAntesDaIa((p) => p.slice(0, -1));
+    setConsulta(anterior.consulta);
+    setTipoEscolhido(anterior.tipo);
+    setTitulo(anterior.titulo);
+    setTituloMexido(anterior.tituloMexido);
+  }
 
   const campos = opcoes.campos;
   const rotulos = rotulosDasOpcoes(opcoes);
@@ -109,6 +135,14 @@ export function ConstrutorDeConsulta({
 
         <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto md:grid-cols-[1fr_340px] md:overflow-hidden">
           <div className="flex flex-col gap-6 p-5 md:overflow-y-auto">
+            <PergunteAEva
+              consultaAtual={consulta}
+              aoAplicar={aplicarDaIa}
+              podeDesfazer={antesDaIa.length > 0}
+              aoDesfazer={desfazerIa}
+              inicial={sugestaoDaIa ? { explicacao: sugestaoDaIa.explicacao, avisos: sugestaoDaIa.avisos } : undefined}
+            />
+
             <section>
               <Label>1. O que medir</Label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
