@@ -9,6 +9,8 @@ import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import { AcoesRapidas, DealCard } from "./deal-card";
 import { valorCurto, type EtapaKanban, type NegocioKanban } from "./modelo";
+import { IlustracaoVazia, VozDoQuadro } from "./eva-topo";
+import { vazioDaEtapa } from "./eva-voz";
 
 // Cor da etapa em hex: o topo da coluna usa um degradê bem leve dela (classe
 // do Tailwind não serve dentro de linear-gradient).
@@ -92,8 +94,11 @@ export function StageColumn({
   arrastandoAlgo,
   onAbrir,
   onNovo,
+  etapaAnterior = null,
 }: {
   etapa: EtapaKanban;
+  /** Nome da etapa aberta antes desta, para o texto da coluna vazia. */
+  etapaAnterior?: string | null;
   defs: DefinicaoDeCampo[];
   layout: LayoutDoCartao;
   agora: Date;
@@ -107,6 +112,7 @@ export function StageColumn({
   const cor = corDaEtapaHex(etapa.color, etapa.type);
   const aberta = etapa.type === "open";
   const ganha = etapa.type === "won";
+  const humana = React.useContext(VozDoQuadro);
 
   return (
     <section
@@ -118,13 +124,14 @@ export function StageColumn({
         isOver ? "border-accent-500/60 shadow-[0_0_0_1px_rgba(91,141,239,0.35)]" : "border-border-subtle"
       )}
     >
+      {humana && <div aria-hidden className="h-1 shrink-0" style={{ background: cor }} />}
       <header
         className="px-3 pb-2.5 pt-3"
-        style={{ background: `linear-gradient(180deg, ${cor}1a, transparent 92%)` }}
+        style={humana ? undefined : { background: `linear-gradient(180deg, ${cor}1a, transparent 92%)` }}
       >
         <div className="flex items-center gap-2">
           <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
-          <h2 className="truncate font-display text-[13.5px] font-semibold text-text-primary">{etapa.name}</h2>
+          <h2 className={cn("truncate font-display text-text-primary", humana ? "text-[14.5px] font-bold" : "text-[13.5px] font-semibold")}>{etapa.name}</h2>
           <span className="text-[12px] tabular-nums text-text-tertiary">{etapa.deals.length}</span>
           {aberta && (
             <button
@@ -175,7 +182,21 @@ export function StageColumn({
               arrastandoAlgo ? "border-accent-500/50 text-accent-400" : "border-border-default text-text-tertiary"
             )}
           >
-            {arrastandoAlgo ? "Solte aqui" : ganha ? "Arraste para cá quando fechar" : aberta ? "Arraste um negócio ou use o +" : "Nada aqui"}
+            {arrastandoAlgo ? (
+              "Solte aqui"
+            ) : humana ? (
+              <span className="flex flex-col items-center gap-2">
+                <IlustracaoVazia cor={cor} />
+                <span className="text-[12.5px] text-text-secondary">{vazioDaEtapa(etapa.type, etapa.name, etapaAnterior).titulo}</span>
+                <span className="text-[11.5px] text-text-tertiary">{vazioDaEtapa(etapa.type, etapa.name, etapaAnterior).dica}</span>
+              </span>
+            ) : ganha ? (
+              "Arraste para cá quando fechar"
+            ) : aberta ? (
+              "Arraste um negócio ou use o +"
+            ) : (
+              "Nada aqui"
+            )}
           </div>
         )}
       </div>

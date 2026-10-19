@@ -38,6 +38,7 @@ import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templa
 import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
 import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
+import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
@@ -410,6 +411,16 @@ export default function AgentBuilderPage() {
           )}
           {tab === "editor" && (
             <>
+              <MontarComIa
+                agentId={agentId}
+                nodes={nodes}
+                edges={edges}
+                onAplicar={(novosNos, novasLigacoes) => {
+                  setNodes(novosNos);
+                  setEdges(novasLigacoes);
+                  setSelectedId(null);
+                }}
+              />
               <button
                 type="button"
                 onClick={() => setShowTemplateGallery(true)}

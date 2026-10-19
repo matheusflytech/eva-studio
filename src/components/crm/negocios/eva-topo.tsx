@@ -161,13 +161,20 @@ export function Momentos({ itens }: { itens: string[] }) {
   );
 }
 
-export type EstiloDaTela = "classico" | "v1";
+export type EstiloDaTela = "classico" | "v1" | "v2";
+
+/**
+ * Liga a voz humana do quadro (variação 2) sem passar prop por cartão:
+ * cartão, coluna e chip leem daqui.
+ */
+export const VozDoQuadro = React.createContext(false);
 
 /** Troca de estilo enquanto comparamos as variações. Sai quando uma for escolhida. */
 export function SeletorDeEstilo({ estilo, onMudar }: { estilo: EstiloDaTela; onMudar: (e: EstiloDaTela) => void }) {
   const opcoes: [EstiloDaTela, string][] = [
     ["classico", "Atual"],
     ["v1", "Eva · 1"],
+    ["v2", "Eva · 2"],
   ];
   return (
     <div role="radiogroup" aria-label="Estilo da tela" className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface-1 p-0.5 text-[12px]">
@@ -188,5 +195,52 @@ export function SeletorDeEstilo({ estilo, onMudar }: { estilo: EstiloDaTela; onM
         </button>
       ))}
     </div>
+  );
+}
+
+/** Aviso curto quando um negócio fecha: some sozinho e não rouba o foco. */
+export function Comemoracao({ titulo, detalhe, onFim }: { titulo: string; detalhe: string; onFim: () => void }) {
+  React.useEffect(() => {
+    const t = window.setTimeout(onFim, 5200);
+    return () => window.clearTimeout(t);
+  }, [onFim]);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-6 right-6 z-50 flex max-w-[420px] items-center gap-3 rounded-2xl border border-emerald-400/35 bg-[#10201a] px-4 py-3 shadow-[0_16px_40px_rgba(0,0,0,0.5)] motion-safe:animate-[eva-comemora_5.2s_ease-in-out_forwards]"
+    >
+      <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden className="shrink-0 motion-safe:animate-[spin_2.4s_linear_1]">
+        <path
+          d="M14 3v4M14 21v4M3 14h4M21 14h4M6.5 6.5l2.8 2.8M18.7 18.7l2.8 2.8M21.5 6.5l-2.8 2.8M9.3 18.7l-2.8 2.8"
+          stroke="#57d6a0"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="min-w-0">
+        <p className="truncate text-[14px] font-semibold text-text-primary">{titulo}</p>
+        <p className="text-[12.5px] text-text-secondary">{detalhe}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onFim}
+        aria-label="Fechar aviso"
+        className="ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+      >
+        <X size={14} aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+/** Desenho em linha para coluna vazia: discreto, com o tom da etapa. */
+export function IlustracaoVazia({ cor }: { cor: string }) {
+  return (
+    <svg width="88" height="56" viewBox="0 0 96 64" aria-hidden>
+      <path d="M10 54c14-22 30-30 46-24s22 2 30-12" fill="none" stroke="#3a3a44" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="86" cy="18" r="5" fill="none" stroke={cor} strokeWidth="1.6" />
+      <path d="M20 54h56" stroke="#2a2a32" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }

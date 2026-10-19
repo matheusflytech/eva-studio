@@ -170,3 +170,41 @@ export function gargaloDaConversao(
   }
   return pior;
 }
+
+/**
+ * O chip do próximo passo dito como gente (variação 2). Recebe o texto curto
+ * de sinalDoNegocio e devolve a frase longa; o que não reconhece passa igual.
+ */
+export function sinalHumano(texto: string, tom: string): string {
+  let m = texto.match(/^Parado (\d+) dias$/);
+  if (m) return Number(m[1]) >= 14 ? `Quieto há ${m[1]} dias. Que tal ligar?` : `Parado há ${m[1]} dias`;
+  m = texto.match(/^Retorno atrasado (\d+)d$/);
+  if (m) return m[1] === "1" ? "Retorno era ontem" : `Retorno atrasado há ${m[1]} dias`;
+  m = texto.match(/^Fechamento passou (.+)$/);
+  if (m) return `Previsão era ${m[1]}. Remarcar?`;
+  m = texto.match(/^Ganho (.+)$/);
+  if (m && tom === "ok") return `Fechou em ${m[1]}`;
+  m = texto.match(/^Fecha (.+)$/);
+  if (m) return `Deve fechar ${m[1]}`;
+  return texto;
+}
+
+/** O que dizer numa coluna vazia, conforme o tipo e a posição da etapa. */
+export function vazioDaEtapa(tipo: string, nome: string, anterior: string | null): { titulo: string; dica: string } {
+  if (tipo === "won") return { titulo: "A próxima venda aparece aqui.", dica: "Arraste o negócio para cá quando fechar." };
+  if (tipo === "lost") return { titulo: "Nenhum negócio perdido.", dica: "Que continue assim." };
+  if (!anterior) return { titulo: `Ninguém em ${nome} agora.`, dica: "Use o + para cadastrar um negócio novo." };
+  return { titulo: `Caminho livre em ${nome}.`, dica: `Puxe um de ${anterior} quando ele estiver pronto.` };
+}
+
+/** Frase da comemoração quando um negócio vira ganho. */
+export function comemoracao(
+  nome: string,
+  valorCents: number,
+  vendasNoMes: number
+): { titulo: string; detalhe: string } {
+  const valor = valorCents > 0 ? `, ${valorCurto(valorCents)}` : "";
+  const detalhe =
+    vendasNoMes <= 1 ? "Primeira venda do mês. Bom começo." : vendasNoMes === 2 ? "Segunda venda do mês." : `Já são ${vendasNoMes} vendas este mês.`;
+  return { titulo: `Fechou! ${nome}${valor}.`, detalhe };
+}

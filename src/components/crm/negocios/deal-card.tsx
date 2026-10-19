@@ -21,6 +21,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { LAYOUT_PADRAO, type CampoDoCartao, type LayoutDoCartao } from "@/lib/cartao-layout";
+import { VozDoQuadro } from "./eva-topo";
+import { sinalHumano } from "./eva-voz";
 import { dinheiro, iniciais, pedeAtencao, sinalDoNegocio, type IconeDoSinal, type NegocioKanban } from "./modelo";
 import { blocosDoCartao, ehPersonalizado, textoDoCampo, tituloDoCartao, type ContextoDoCampo } from "./cartao";
 
@@ -76,13 +78,15 @@ export const TOM_DO_SINAL = {
 
 /** Chip do próximo passo (um sinal só, do mais urgente para o menos). */
 export function SinalDoProximoPasso({ deal, tipoDaEtapa, agora }: { deal: NegocioKanban; tipoDaEtapa: string; agora: Date }) {
+  const humana = React.useContext(VozDoQuadro);
   const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora);
   if (!sinal) return null;
   const Icone = ICONE[sinal.icone];
+  const texto = humana ? sinalHumano(sinal.texto, sinal.tom) : sinal.texto;
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1 rounded-md px-[7px] py-0.5", TOM_DO_SINAL[sinal.tom])}>
+    <span className={cn("inline-flex min-w-0 items-center gap-1 rounded-md px-[7px] py-0.5", TOM_DO_SINAL[sinal.tom])} title={texto}>
       <Icone size={12} aria-hidden className="shrink-0" />
-      <span className="truncate">{sinal.texto}</span>
+      <span className="truncate">{texto}</span>
     </span>
   );
 }

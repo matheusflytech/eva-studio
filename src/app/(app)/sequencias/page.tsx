@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Repeat, Plus, Trash2, Clock, X, Loader2, GripVertical, ArrowRight } from "lucide-react";
+import { Repeat, Plus, Trash2, Clock, X, Loader2, GripVertical, ArrowRight, Sparkles } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
+import { AssistenteIaSequencia, type RascunhoSequencia } from "./assistente-ia";
 
 interface SequenceStep {
   id?: string;
@@ -113,6 +114,38 @@ function formatDelay(minutes: number): string {
   return `${Number.isInteger(d) ? d : d.toFixed(1)} dia${d === 1 ? "" : "s"}`;
 }
 
+/**
+ * Rascunho da IA no formato que o editor entende. id vazio = régua ainda não
+ * criada: o Salvar do editor cria (POST) e depois grava os passos (PATCH).
+ */
+function sequenciaDoRascunho(
+  r: RascunhoSequencia,
+  pipelines: PipelineRow[],
+  tags: TagRow[],
+  segments: SegmentRow[],
+): Sequence {
+  const pipe = pipelines.find((p) => p.stages.some((s) => s.id === r.triggerStageId));
+  const stage = pipe?.stages.find((s) => s.id === r.triggerStageId);
+  const tag = tags.find((t) => t.id === r.triggerTagId);
+  const seg = segments.find((s) => s.id === r.triggerSegmentId);
+  return {
+    id: "",
+    name: r.name,
+    channel: r.channel,
+    active: false,
+    trigger: r.trigger,
+    triggerTag: tag ? { id: tag.id, name: tag.name } : null,
+    triggerSegment: seg ? { id: seg.id, name: seg.name } : null,
+    triggerStage: stage && pipe ? { id: stage.id, name: stage.name, pipeline: pipe.name } : null,
+    triggerStageDays: r.triggerStageDays,
+    allowReentry: r.allowReentry,
+    stopOnReply: r.stopOnReply,
+    totalEnrollments: 0,
+    activeEnrollments: 0,
+    steps: r.steps.map((s, i) => ({ ...s, order: i + 1 })),
+  };
+}
+
 const DELAY_PRESETS = [
   { label: "Imediato", value: 0 },
   { label: "15 minutos", value: 15 },
@@ -133,6 +166,7 @@ export default function SequenciasPage() {
   const [templates, setTemplates] = React.useState<MessageTemplate[]>([]);
   const [editing, setEditing] = React.useState<Sequence | null>(null);
   const [showNew, setShowNew] = React.useState(false);
+  const [showIa, setShowIa] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -207,6 +241,9 @@ export default function SequenciasPage() {
               {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </Select>
           </div>
+          <Button variant="secondary" onClick={() => setShowIa(true)} disabled={!agentId}>
+            <Sparkles size={15} className="text-accent-500" /> Criar com IA
+          </Button>
           <Button onClick={() => setShowNew(true)}>
             <Plus size={15} /> Nova sequência
           </Button>
@@ -220,7 +257,14 @@ export default function SequenciasPage() {
           icon={<Repeat size={36} className="text-text-tertiary" />}
           title="Nenhuma sequência ainda"
           description="Ex: quem pediu orçamento e não respondeu recebe uma lembrança em 1 dia e outra em 3."
-          action={<Button onClick={() => setShowNew(true)}><Plus size={15} /> Nova sequência</Button>}
+          action={
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setShowIa(true)}>
+                <Sparkles size={15} className="text-accent-500" /> Criar com IA
+              </Button>
+              <Button onClick={() => setShowNew(true)}><Plus size={15} /> Nova sequência</Button>
+            </div>
+          }
         />
       ) : (
         <div className="flex flex-col gap-3">
@@ -277,6 +321,19 @@ export default function SequenciasPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {showIa && agentId && (
+        <AssistenteIaSequencia
+          agentId={agentId}
+          catalogo={{ tags, segments, pipelines, templates }}
+          onClose={() => setShowIa(false)}
+          onUsar={(r) => {
+            // Abre o editor com o rascunho; nada é gravado até "Salvar".
+            setShowIa(false);
+            setEditing(sequenciaDoRascunho(r, pipelines, tags, segments));
+          }}
+        />
       )}
 
       {showNew && agentId && (
@@ -452,10 +509,62 @@ function SequenceEditor({
     setSteps(steps.map((s, i) => (i === index ? { ...s, ...patch } : s)));
   }
 
+  const [showIa, setShowIa] = React.useState(false);
+  // Régua vinda de um rascunho da IA que ainda não existe no banco.
+  const nova = sequence.id === "";
+  // Se a criação deu certo e o PATCH dos passos falhou, o próximo Salvar
+  // reaproveita a régua criada em vez de criar outra igual.
+  const idCriado = React.useRef<string | null>(null);
+
+  /** Estado atual do editor no formato do rascunho (para a IA ajustar). */
+  function rascunhoAtual(): RascunhoSequencia {
+    return {
+      name, channel, trigger,
+      triggerTagId: triggerTagId || null,
+      triggerSegmentId: triggerSegmentId || null,
+      triggerStageId: triggerStageId || null,
+      triggerStageDays, stopOnReply, allowReentry,
+      steps: steps.map((s, i) => ({ order: i + 1, delayMinutes: s.delayMinutes, text: s.text, templateId: s.templateId, applyTagId: s.applyTagId })),
+    };
+  }
+
+  function usarRascunho(r: RascunhoSequencia) {
+    setName(r.name);
+    setChannel(r.channel);
+    setTrigger(r.trigger);
+    setTriggerTagId(r.triggerTagId ?? "");
+    setTriggerSegmentId(r.triggerSegmentId ?? "");
+    setTriggerStageId(r.triggerStageId ?? "");
+    setTriggerStageDays(r.triggerStageDays);
+    setStopOnReply(r.stopOnReply);
+    setAllowReentry(r.allowReentry);
+    setSteps(r.steps.map((s, i) => ({ ...s, order: i + 1 })));
+    setShowIa(false);
+  }
+
   async function save() {
     setSaving(true);
     onError(null);
-    const res = await fetch(`/api/agents/${agentId}/sequences/${sequence.id}`, {
+    let id = idCriado.current ?? sequence.id;
+    if (nova && !idCriado.current) {
+      // Mesmo caminho do "Nova sequência": cria desligada e depois grava os passos.
+      const criada = await fetch(`/api/agents/${agentId}/sequences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name, channel, trigger, triggerTagId, triggerSegmentId, triggerStageId, triggerStageDays, stopOnReply, allowReentry,
+        }),
+      });
+      const data = await criada.json().catch(() => ({}));
+      if (!criada.ok || !data.sequence?.id) {
+        setSaving(false);
+        onError(data.error ?? "Não foi possível criar a sequência.");
+        return;
+      }
+      id = data.sequence.id;
+      idCriado.current = id;
+    }
+    const res = await fetch(`/api/agents/${agentId}/sequences/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -473,8 +582,26 @@ function SequenceEditor({
 
   return (
     <Modal open onOpenChange={(open) => !open && onClose()}>
-      <ModalContent className="max-w-3xl" title={`Editar “${sequence.name}”`}>
+      <ModalContent
+        className="max-w-3xl"
+        title={nova ? "Revisar rascunho da IA" : `Editar “${sequence.name}”`}
+        description={nova ? "Confira os passos. A régua só é criada quando você clicar em Salvar, e nasce desligada." : undefined}
+      >
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto pr-1">
+          <div className="flex justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setShowIa(true)}>
+              <Sparkles size={14} className="text-accent-500" /> {steps.length > 0 ? "Ajustar com IA" : "Criar com IA"}
+            </Button>
+          </div>
+          {showIa && (
+            <AssistenteIaSequencia
+              agentId={agentId}
+              catalogo={{ tags, segments, pipelines, templates }}
+              atual={steps.length > 0 ? rascunhoAtual() : null}
+              onClose={() => setShowIa(false)}
+              onUsar={usarRascunho}
+            />
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="es-nome">Nome</Label>

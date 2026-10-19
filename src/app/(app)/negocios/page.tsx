@@ -29,8 +29,16 @@ import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
 import { ListView } from "@/components/crm/negocios/list-view";
 import { ResumoDoFunilView, type EtapaDeConversao } from "@/components/crm/negocios/resumo";
-import { CabecalhoAssinatura, Momentos, RecadoDaEva, SeletorDeEstilo, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
-import { carimbo, gargaloDaConversao, momentos, montarRecado, type AcaoDoRecado } from "@/components/crm/negocios/eva-voz";
+import {
+  CabecalhoAssinatura,
+  Comemoracao,
+  Momentos,
+  RecadoDaEva,
+  SeletorDeEstilo,
+  VozDoQuadro,
+  type EstiloDaTela,
+} from "@/components/crm/negocios/eva-topo";
+import { carimbo, comemoracao, gargaloDaConversao, momentos, montarRecado, type AcaoDoRecado } from "@/components/crm/negocios/eva-voz";
 import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
@@ -77,12 +85,17 @@ export default function NegociosPage() {
   // Negócio aberto na prévia (clique no cartão ou na linha); o título leva à ficha.
   const [previaId, setPreviaId] = React.useState<string | null>(null);
   const [layout, setLayout] = React.useState<LayoutDoCartao>(LAYOUT_PADRAO);
-  const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string } | null>(null);
+  const [dragging, setDragging] = React.useState<{
+    deal: NegocioKanban;
+    tipo: string;
+  } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({ visao: "todos" });
+  const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({
+    visao: "todos",
+  });
   const [visao, setVisao] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
   const [resumoAberto, setResumoAberto] = usePreferencia("eva:negocios:resumo", "aberto", ["aberto", "recolhido"] as const);
-  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v1", ["classico", "v1"]);
+  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v2", ["classico", "v1", "v2"]);
   // Relógio da tela: muda só quando os dados chegam (dias parados, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
@@ -90,7 +103,9 @@ export default function NegociosPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     // Teclado: espaço pega, setas movem, espaço solta (Enter fica para abrir).
-    useSensor(KeyboardSensor, { keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } })
+    useSensor(KeyboardSensor, {
+      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
+    }),
   );
 
   React.useEffect(() => {
@@ -135,10 +150,7 @@ export default function NegociosPage() {
     setIsLoading(true);
     try {
       const q = pipelineId ? `?pipeline=${pipelineId}` : "";
-      const [res, funil] = await Promise.all([
-        fetch(`/api/deals${q}`),
-        fetch(`/api/deals/funil${q}`).catch(() => null),
-      ]);
+      const [res, funil] = await Promise.all([fetch(`/api/deals${q}`), fetch(`/api/deals/funil${q}`).catch(() => null)]);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
       const dadosDoFunil = funil?.ok ? await funil.json() : null;
@@ -147,7 +159,14 @@ export default function NegociosPage() {
       setStages(data.stages ?? []);
       setDefs(campos);
       // O layout vem junto (padrão quando o funil não tem um salvo).
-      setLayout(data.layout ? normalizarLayout(data.layout, campos.map((c) => c.key)) : LAYOUT_PADRAO);
+      setLayout(
+        data.layout
+          ? normalizarLayout(
+              data.layout,
+              campos.map((c) => c.key),
+            )
+          : LAYOUT_PADRAO,
+      );
       setConversao(dadosDoFunil?.conversao ?? []);
       setCiclo(typeof dadosDoFunil?.cicloDeVenda === "number" ? dadosDoFunil.cicloDeVenda : null);
       setAgora(new Date());
@@ -185,11 +204,13 @@ export default function NegociosPage() {
     };
   }, [stages, agora]);
   // Voz da Eva (variação 1): recado do dia, frase do cabeçalho e momentos.
-  const hoje = agora.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const hoje = agora.toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
   const [recadoDispensado, setRecadoDispensado] = usePreferencia<string>("eva:negocios:recado", "", [hoje]);
   const recado = React.useMemo(
     () => (isLoading ? null : montarRecado(stages, agora, meuNome, gargaloDaConversao(conversao))),
-    [isLoading, stages, agora, meuNome, conversao]
+    [isLoading, stages, agora, meuNome, conversao],
   );
   const momentosDoFunil = React.useMemo(() => momentos(stages, agora), [stages, agora]);
   const fraseDoTopo = (
@@ -203,7 +224,10 @@ export default function NegociosPage() {
           </span>
         </>
       )}
-      . {dadosDoResumo.atencao > 0 ? `${dadosDoResumo.atencao} ${dadosDoResumo.atencao === 1 ? "negócio pede" : "negócios pedem"} atenção.` : "Nada pedindo atenção agora."}
+      .{" "}
+      {dadosDoResumo.atencao > 0
+        ? `${dadosDoResumo.atencao} ${dadosDoResumo.atencao === 1 ? "negócio pede" : "negócios pedem"} atenção.`
+        : "Nada pedindo atenção agora."}
     </>
   );
   function aoAcaoDoRecado(id: AcaoDoRecado) {
@@ -211,13 +235,47 @@ export default function NegociosPage() {
     if (id === "gargalo") {
       const g = gargaloDaConversao(conversao);
       const coluna = g && [...document.querySelectorAll<HTMLElement>("[data-etapa]")].find((el) => el.dataset.etapa === g.de);
-      coluna?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      coluna?.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
       return;
     }
     // Retornos, não lidas e parados caem todos em "Precisam de atenção".
     setFiltros((f) => ({ ...f, visao: "atencao" }));
     document.querySelector('[aria-label="Visões"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  // Comemoração (variação 2): negócio que apareceu na etapa ganha desde a
+  // última carga, venha do arraste, da prévia ou de outra pessoa. A primeira
+  // carga só registra quem já estava lá.
+  const [festa, setFesta] = React.useState<{
+    titulo: string;
+    detalhe: string;
+  } | null>(null);
+  const ganhosVistos = React.useRef<{
+    quadro: string;
+    ids: Set<string>;
+  } | null>(null);
+  React.useEffect(() => {
+    if (isLoading) return;
+    // O quadro é identificado pelas próprias etapas carregadas: trocar de funil
+    // muda as etapas e só registra os ganhos dele, sem comemorar nada.
+    const quadro = stages.map((e) => e.id).join(",");
+    const ganhos = stages.filter((e) => e.type === "won").flatMap((e) => e.deals);
+    const ids = new Set(ganhos.map((d) => d.id));
+    const antes = ganhosVistos.current;
+    ganhosVistos.current = { quadro, ids };
+    if (!antes || antes.quadro !== quadro || estilo !== "v2") return;
+    const novo = ganhos.find((d) => !antes.ids.has(d.id));
+    if (!novo) return;
+    const titulo = novo.company?.name || novo.contacts[0]?.name || novo.name;
+    // Evento externo (a carga do quadro) dispara o aviso: não é estado derivado.
+    // No arraste o cartão chega antes do servidor carimbar o fechamento: conta ele também.
+    setFesta(comemoracao(titulo, novo.amountCents, dadosDoResumo.ganhosNoMes + (novo.closedAt ? 0 : 1)));
+  }, [isLoading, stages, estilo, dadosDoResumo.ganhosNoMes]);
+  const fecharFesta = React.useCallback(() => setFesta(null), []);
 
   const donos = React.useMemo(() => {
     const m = new Map<string, string>();
@@ -231,7 +289,7 @@ export default function NegociosPage() {
   const etapaPerdida = stages.find((s) => s.type === "lost");
   // Busca no funil inteiro (não só no filtrado): mover pela prévia não pode fechá-la.
   const previa = previaId
-    ? stages.flatMap((etapa) => etapa.deals.filter((d) => d.id === previaId).map((deal) => ({ deal, etapa })))[0] ?? null
+    ? (stages.flatMap((etapa) => etapa.deals.filter((d) => d.id === previaId).map((deal) => ({ deal, etapa })))[0] ?? null)
     : null;
 
   function handleDragStart(event: DragStartEvent) {
@@ -257,9 +315,13 @@ export default function NegociosPage() {
     setStages((prev) =>
       prev.map((s) => {
         if (s.id === from.id) return { ...s, deals: s.deals.filter((d) => d.id !== dealId) };
-        if (s.id === stageId) return { ...s, deals: [{ ...deal, stageSince: new Date().toISOString() }, ...s.deals] };
+        if (s.id === stageId)
+          return {
+            ...s,
+            deals: [{ ...deal, stageSince: new Date().toISOString() }, ...s.deals],
+          };
         return s;
-      })
+      }),
     );
 
     const res = await fetch(`/api/deals/${dealId}`, {
@@ -343,7 +405,7 @@ export default function NegociosPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-5">
-      {estilo === "v1" ? (
+      {estilo !== "classico" ? (
         <>
           <CabecalhoAssinatura
             funil={pipelines.find((p) => p.id === pipelineId)?.name ?? "Funil"}
@@ -381,7 +443,12 @@ export default function NegociosPage() {
         recolhido={resumoAberto === "recolhido"}
         onAlternar={() => setResumoAberto(resumoAberto === "recolhido" ? "aberto" : "recolhido")}
         verAtencao={filtros.visao === "atencao"}
-        onVerAtencao={() => setFiltros((f) => ({ ...f, visao: f.visao === "atencao" ? "todos" : "atencao" }))}
+        onVerAtencao={() =>
+          setFiltros((f) => ({
+            ...f,
+            visao: f.visao === "atencao" ? "todos" : "atencao",
+          }))
+        }
       />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border-subtle pb-2.5">
@@ -397,12 +464,14 @@ export default function NegociosPage() {
                 onClick={() => setFiltros((f) => ({ ...f, visao: v.id }))}
                 className={cn(
                   "relative inline-flex h-9 items-center gap-1.5 rounded-t-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
-                  ativa ? "text-text-primary" : "text-text-tertiary hover:text-text-primary"
+                  ativa ? "text-text-primary" : "text-text-tertiary hover:text-text-primary",
                 )}
               >
                 {v.rotulo}
                 {n !== null && n > 0 && (
-                  <span className={cn("tabular-nums text-[11.5px]", v.id === "atencao" ? "text-amber-300" : "text-text-tertiary")}>{n}</span>
+                  <span className={cn("tabular-nums text-[11.5px]", v.id === "atencao" ? "text-amber-300" : "text-text-tertiary")}>
+                    {n}
+                  </span>
                 )}
                 {ativa && <span aria-hidden className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-accent-500" />}
               </button>
@@ -447,7 +516,11 @@ export default function NegociosPage() {
               <option value="__sem">Sem responsável</option>
             </Select>
           </div>
-          <div role="radiogroup" aria-label="Visualização" className="inline-flex shrink-0 rounded-lg border border-border-subtle bg-surface-1 p-0.5">
+          <div
+            role="radiogroup"
+            aria-label="Visualização"
+            className="inline-flex shrink-0 rounded-lg border border-border-subtle bg-surface-1 p-0.5"
+          >
             {(
               [
                 ["kanban", "Quadro", Columns3],
@@ -462,7 +535,7 @@ export default function NegociosPage() {
                 onClick={() => setVisao(v)}
                 className={cn(
                   "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
-                  visao === v ? "bg-surface-3 text-text-primary" : "text-text-tertiary hover:text-text-primary"
+                  visao === v ? "bg-surface-3 text-text-primary" : "text-text-tertiary hover:text-text-primary",
                 )}
               >
                 <Icone size={13} aria-hidden /> {rotulo}
@@ -491,7 +564,12 @@ export default function NegociosPage() {
       {error && (
         <div role="alert" className="flex items-start justify-between gap-3 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Fechar aviso" className="shrink-0 rounded p-0.5 hover:bg-danger/15">
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="Fechar aviso"
+            className="shrink-0 rounded p-0.5 hover:bg-danger/15"
+          >
             <X size={14} aria-hidden />
           </button>
         </div>
@@ -512,47 +590,62 @@ export default function NegociosPage() {
       ) : visao === "lista" ? (
         <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setPreviaId(d.id)} />
       ) : (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
-          <div className="relative">
-            <div className="flex min-h-[440px] snap-x gap-2.5 overflow-x-auto pb-4 [max-height:calc(100dvh-300px)]">
-              {visiveis.map((stage) => (
-                <StageColumn
-                  key={stage.id}
-                  etapa={stage}
-                  defs={defs}
-                  layout={layout}
-                  agora={agora}
-                  maiorTotalAberto={maiorTotalAberto}
-                  arrastandoAlgo={!!dragging}
-                  onAbrir={(d) => setPreviaId(d.id)}
-                  onNovo={(id) => setNovoNaEtapa(id)}
-                />
-              ))}
+        <VozDoQuadro.Provider value={estilo === "v2"}>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
+            <div className="relative">
+              <div className="flex min-h-[440px] snap-x gap-2.5 overflow-x-auto pb-4 [max-height:calc(100dvh-300px)]">
+                {visiveis.map((stage, i) => (
+                  <StageColumn
+                    key={stage.id}
+                    etapa={stage}
+                    etapaAnterior={
+                      visiveis
+                        .slice(0, i)
+                        .filter((e) => e.type === "open")
+                        .at(-1)?.name ?? null
+                    }
+                    defs={defs}
+                    layout={layout}
+                    agora={agora}
+                    maiorTotalAberto={maiorTotalAberto}
+                    arrastandoAlgo={!!dragging}
+                    onAbrir={(d) => setPreviaId(d.id)}
+                    onNovo={(id) => setNovoNaEtapa(id)}
+                  />
+                ))}
+              </div>
+              <ZonasDeFechamento visivel={!!dragging && dragging.tipo === "open"} temGanho={!!etapaGanha} temPerdido={!!etapaPerdida} />
             </div>
-            <ZonasDeFechamento
-              visivel={!!dragging && dragging.tipo === "open"}
-              temGanho={!!etapaGanha}
-              temPerdido={!!etapaPerdida}
-            />
-          </div>
-          <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
-            {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} layout={layout} arrastando />}
-          </DragOverlay>
-        </DndContext>
+            <DragOverlay
+              dropAnimation={{
+                duration: 180,
+                easing: "cubic-bezier(0.2, 0, 0, 1)",
+              }}
+            >
+              {dragging && (
+                <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} layout={layout} arrastando />
+              )}
+            </DragOverlay>
+          </DndContext>
+        </VozDoQuadro.Provider>
       )}
 
+      {festa && <Comemoracao titulo={festa.titulo} detalhe={festa.detalhe} onFim={fecharFesta} />}
+
       {previa && (
-        <PreviaDoNegocio
-          key={previa.deal.id}
-          deal={previa.deal}
-          etapa={previa.etapa}
-          etapas={stages}
-          layout={layout}
-          defs={defs}
-          agora={agora}
-          onFechar={() => setPreviaId(null)}
-          onMudou={refresh}
-        />
+        <VozDoQuadro.Provider value={estilo === "v2"}>
+          <PreviaDoNegocio
+            key={previa.deal.id}
+            deal={previa.deal}
+            etapa={previa.etapa}
+            etapas={stages}
+            layout={layout}
+            defs={defs}
+            agora={agora}
+            onFechar={() => setPreviaId(null)}
+            onMudou={refresh}
+          />
+        </VozDoQuadro.Provider>
       )}
 
       {novoNaEtapa !== null && (
@@ -585,7 +678,12 @@ function NewDealModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [form, setForm] = React.useState({ name: "", amount: "", stageId: etapaInicial, description: "" });
+  const [form, setForm] = React.useState({
+    name: "",
+    amount: "",
+    stageId: etapaInicial,
+    description: "",
+  });
   const [contactQuery, setContactQuery] = React.useState("");
   const [contacts, setContacts] = React.useState<{ id: string; name: string; email: string }[]>([]);
   const [contactId, setContactId] = React.useState("");
@@ -672,14 +770,12 @@ function NewDealModal({
             </div>
             <div>
               <Label htmlFor="deal-stage">Etapa</Label>
-              <Select
-                id="deal-stage"
-                value={form.stageId}
-                onChange={(e) => setForm({ ...form, stageId: e.target.value })}
-              >
+              <Select id="deal-stage" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
                 <option value="">Primeira etapa</option>
                 {(pipeline?.stages ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
               </Select>
             </div>
@@ -690,7 +786,10 @@ function NewDealModal({
             <Input
               id="deal-contact"
               value={contactQuery}
-              onChange={(e) => { setContactQuery(e.target.value); setContactId(""); }}
+              onChange={(e) => {
+                setContactQuery(e.target.value);
+                setContactId("");
+              }}
               placeholder="Buscar por nome, e-mail ou telefone"
             />
             {contacts.length > 0 && !contactId && (
@@ -699,7 +798,11 @@ function NewDealModal({
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => { setContactId(c.id); setContactQuery(c.name || c.email); setContacts([]); }}
+                    onClick={() => {
+                      setContactId(c.id);
+                      setContactQuery(c.name || c.email);
+                      setContacts([]);
+                    }}
                     className="rounded-lg px-2.5 py-1.5 text-left text-[13px] text-text-secondary hover:bg-surface-3 hover:text-text-primary"
                   >
                     {c.name || "Sem nome"} <span className="text-text-tertiary">{c.email}</span>
@@ -710,7 +813,13 @@ function NewDealModal({
             {contactId && (
               <p className="mt-1.5 inline-flex items-center gap-1.5 text-[12px] text-emerald-400">
                 Contato vinculado
-                <button type="button" onClick={() => { setContactId(""); setContactQuery(""); }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContactId("");
+                    setContactQuery("");
+                  }}
+                >
                   <X size={12} />
                 </button>
               </p>
@@ -738,7 +847,9 @@ function NewDealModal({
           {error && <p className="text-[13px] text-danger">{error}</p>}
 
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
             <Button onClick={save} disabled={busy || !form.name.trim()}>
               {busy && <Loader2 size={15} className="animate-spin" />} Criar
             </Button>

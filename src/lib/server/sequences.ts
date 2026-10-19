@@ -333,3 +333,50 @@ function contactValues(contact: {
     phone: contact.phone,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Regras de validação da régua, extraídas para serem as mesmas em todo lugar
+// (rotas de sequência e o rascunho montado pela IA em src/lib/server/ia/).
+// Os valores espelham exatamente o que as rotas aceitam hoje.
+// ---------------------------------------------------------------------------
+
+export const CANAIS_DE_SEQUENCIA = ["whatsapp_meta", "whatsapp_qr", "instagram", "telegram"] as const;
+export type CanalDeSequencia = (typeof CANAIS_DE_SEQUENCIA)[number];
+
+export const GATILHOS_DE_SEQUENCIA = ["tag", "segment", "stage", "manual"] as const;
+export type GatilhoDeSequencia = (typeof GATILHOS_DE_SEQUENCIA)[number];
+
+export function ehCanalDeSequencia(v: unknown): v is CanalDeSequencia {
+  return typeof v === "string" && (CANAIS_DE_SEQUENCIA as readonly string[]).includes(v);
+}
+
+export function ehGatilhoDeSequencia(v: unknown): v is GatilhoDeSequencia {
+  return typeof v === "string" && (GATILHOS_DE_SEQUENCIA as readonly string[]).includes(v);
+}
+
+export interface PassoLimpo {
+  order: number;
+  delayMinutes: number;
+  text: string;
+  templateId: string | null;
+  applyTagId: string | null;
+}
+
+/**
+ * Mesma limpeza que o PATCH de sequência faz nos passos (espera nunca
+ * negativa, texto aparado, passo sem texto descartado), com a ordem
+ * recalculada depois do filtro para não sobrar buraco.
+ */
+export function limparPassosDeSequencia(
+  steps: { delayMinutes?: unknown; text?: unknown; templateId?: unknown; applyTagId?: unknown }[]
+): PassoLimpo[] {
+  return steps
+    .map((s) => ({
+      delayMinutes: Math.max(0, Number(s.delayMinutes ?? 60) || 0),
+      text: String(s.text ?? "").trim(),
+      templateId: typeof s.templateId === "string" && s.templateId ? s.templateId : null,
+      applyTagId: typeof s.applyTagId === "string" && s.applyTagId ? s.applyTagId : null,
+    }))
+    .filter((s) => s.text.length > 0)
+    .map((s, i) => ({ order: i + 1, ...s }));
+}

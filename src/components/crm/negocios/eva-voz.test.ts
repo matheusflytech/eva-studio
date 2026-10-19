@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gargaloDaConversao, listaHumana, momentos, montarRecado, saudacao } from "./eva-voz";
+import { comemoracao, gargaloDaConversao, listaHumana, momentos, montarRecado, saudacao, sinalHumano, vazioDaEtapa } from "./eva-voz";
 import type { EtapaKanban, NegocioKanban } from "./modelo";
 
 // 20/out/2026 9h em São Paulo (12h UTC).
@@ -77,5 +77,21 @@ describe("momentos e gargalo", () => {
   it("maior queda entre etapas vizinhas", () => {
     expect(gargaloDaConversao([{ nome: "A", quantidade: 10 }, { nome: "B", quantidade: 9 }, { nome: "C", quantidade: 3 }])).toEqual({ de: "B", para: "C", taxa: 3 / 9 });
     expect(gargaloDaConversao([{ nome: "A", quantidade: 4 }, { nome: "B", quantidade: 4 }])).toBeNull();
+  });
+});
+
+describe("variação 2: textos do quadro", () => {
+  it("sinal dito como gente", () => {
+    expect(sinalHumano("Parado 20 dias", "warn")).toBe("Quieto há 20 dias. Que tal ligar?");
+    expect(sinalHumano("Parado 8 dias", "warn")).toBe("Parado há 8 dias");
+    expect(sinalHumano("Retorno atrasado 1d", "bad")).toBe("Retorno era ontem");
+    expect(sinalHumano("Fechamento passou 28 out", "bad")).toBe("Previsão era 28 out. Remarcar?");
+    expect(sinalHumano("Ganho 18 out", "ok")).toBe("Fechou em 18 out");
+    expect(sinalHumano("Ligar amanhã 10h", "neu")).toBe("Ligar amanhã 10h");
+  });
+  it("coluna vazia e comemoração", () => {
+    expect(vazioDaEtapa("open", "Diagnóstico", "Qualificação").dica).toBe("Puxe um de Qualificação quando ele estiver pronto.");
+    expect(vazioDaEtapa("won", "Ganho", "Negociação").titulo).toBe("A próxima venda aparece aqui.");
+    expect(comemoracao("Clínica", 1_740_000, 3)).toEqual({ titulo: "Fechou! Clínica, R$ 17,4 mil.", detalhe: "Já são 3 vendas este mês." });
   });
 });
