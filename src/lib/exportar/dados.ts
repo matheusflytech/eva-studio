@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
+import { itensPorNegocio } from "@/lib/server/produtos";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { filtrarEtapas, type EtapaKanban, type FiltrosDeNegocio, type VisaoSalva } from "@/components/crm/negocios/modelo";
@@ -44,7 +45,9 @@ export async function carregarExportacao(
   ctx: { orgId: string; userId: string },
   pipelineId: string | undefined,
   filtros: FiltrosDaExportacao,
-  agora = new Date()
+  agora = new Date(),
+  /** Traz os itens (produtos) de cada negócio — a planilha usa, o relatório não. */
+  opcoes: { itens?: boolean } = {}
 ): Promise<DadosDaExportacao | null> {
   // Sem funil pedido: o padrão (ou o primeiro). Só leitura; exportar não cria funil.
   const pipeline = await prisma.pipeline.findFirst({
@@ -110,6 +113,12 @@ export async function carregarExportacao(
 
   if (filtros.busca || filtros.dono || filtros.visao) {
     negocios = aplicarFiltrosDaTela(etapas, negocios, { ...filtros, meuId: ctx.userId }, agora);
+  }
+
+  if (opcoes.itens) {
+    // Sem a tabela no banco, itensPorNegocio devolve vazio: a planilha sai sem produtos.
+    const itens = await itensPorNegocio(ctx.orgId, negocios.map((n) => n.id));
+    negocios = negocios.map((n) => (itens.has(n.id) ? { ...n, itens: itens.get(n.id) } : n));
   }
 
   const defs = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);

@@ -8,6 +8,7 @@
 
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import { dataBR, dataHoraBR, diaSemFusoBR, montarCsv, reais, reaisCsv, type Celula } from "@/lib/exportar/csv";
+import { rotuloDaRecorrencia, textoDaQuantidade, textoDoDesconto } from "@/lib/produtos";
 
 /** Tetos da exportação: acima disso a planilha sai cortada e avisa. */
 export const LIMITE_DE_EXPORTACAO = 20_000;
@@ -46,6 +47,25 @@ export interface NegocioParaExportar {
   nextTask: { type: string; text: string; dueAt: Data | null } | null;
   openTasks: number;
   customFields: Record<string, unknown>;
+  /** Itens (produtos) do negócio, na ordem. Ausente = sem itens. */
+  itens?: ItemParaExportar[];
+}
+
+export interface ItemParaExportar {
+  name: string;
+  sku: string;
+  unit: string;
+  recurrence: string;
+  unitPriceCents: number;
+  quantity: number;
+  discountType: string;
+  discountValue: number;
+  totalCents: number;
+}
+
+/** "2 × Plano Pro; 1,5 × Implantação". */
+export function resumoDosItensParaPlanilha(itens: ItemParaExportar[] | undefined): string {
+  return (itens ?? []).map((i) => `${textoDaQuantidade(i.quantity)} × ${i.name}`).join("; ");
 }
 
 const SITUACAO: Record<string, string> = { open: "Em andamento", won: "Ganho", lost: "Perdido" };
@@ -119,6 +139,7 @@ const COLUNAS_FIXAS = [
   "Prazo da próxima tarefa",
   "Tarefas abertas",
   "Descrição",
+  "Produtos",
 ] as const;
 
 export interface OpcoesDaPlanilha {
@@ -180,6 +201,7 @@ export function linhasDaPlanilha(o: OpcoesDaPlanilha): Celula[][] {
       dataHoraBR(n.nextTask?.dueAt ?? null),
       n.openTasks,
       n.description,
+      resumoDosItensParaPlanilha(n.itens),
       ...(o.comArquivados ? [dataBR(n.archivedAt)] : []),
       ...o.defs.map((d) => formatarValor(d, n.customFields?.[d.key])),
     ]);
@@ -190,6 +212,61 @@ export function linhasDaPlanilha(o: OpcoesDaPlanilha): Celula[][] {
 
 export function csvDosNegocios(o: OpcoesDaPlanilha): string {
   return montarCsv(linhasDaPlanilha(o));
+}
+
+const COLUNAS_DOS_ITENS = [
+  "Funil",
+  "Etapa",
+  "Situação",
+  "Negócio",
+  "Empresa",
+  "Responsável",
+  "Produto",
+  "Código",
+  "Quantidade",
+  "Unidade",
+  "Preço unitário",
+  "Desconto",
+  "Total",
+  "Total (número)",
+  "Recorrência",
+] as const;
+
+/**
+ * Planilha de itens: uma linha por item, com os dados do negócio repetidos
+ * (é o formato que tabela dinâmica entende). Negócio sem itens não entra.
+ */
+export function linhasDosItens(o: OpcoesDaPlanilha): Celula[][] {
+  const etapaPorId = new Map(o.etapas.map((e) => [e.id, e]));
+  const linhas: Celula[][] = [[...COLUNAS_DOS_ITENS]];
+  for (const n of ordenarPorEtapa(o.etapas, o.negocios)) {
+    const etapa = etapaPorId.get(n.stageId);
+    for (const i of n.itens ?? []) {
+      linhas.push([
+        o.funil,
+        etapa?.name ?? "",
+        situacaoDaEtapa(etapa?.type ?? "open"),
+        n.name,
+        n.company?.name ?? "",
+        n.owner?.name ?? "",
+        i.name,
+        i.sku,
+        textoDaQuantidade(i.quantity),
+        i.unit,
+        reais(i.unitPriceCents),
+        textoDoDesconto(i.discountType, i.discountValue),
+        reais(i.totalCents),
+        reaisCsv(i.totalCents),
+        rotuloDaRecorrencia(i.recurrence),
+      ]);
+    }
+  }
+  if (o.aviso) linhas.push([], [o.aviso]);
+  return linhas;
+}
+
+export function csvDosItens(o: OpcoesDaPlanilha): string {
+  return montarCsv(linhasDosItens(o));
 }
 
 // ── Números do relatório ───────────────────────────────────────────────────

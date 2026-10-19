@@ -454,6 +454,52 @@ describe("rodarConsulta", () => {
     expect(r).toMatchObject({ tipo: "pontos", formato: "porcento", pontos: [{ label: "Ana", value: 0.5 }] });
   });
 
+  it("por produto: soma do valor usa o total de cada item, não o negócio inteiro", async () => {
+    db.deal.findMany.mockResolvedValue([
+      linha({
+        amountCents: 150_000,
+        items: [
+          { productId: "pro", name: "Plano Pro", totalCents: 100_000 },
+          { productId: "imp", name: "Implantação", totalCents: 50_000 },
+        ],
+      }),
+      linha({ amountCents: 30_000, items: [{ productId: "pro", name: "Plano Pro", totalCents: 30_000 }] }),
+      linha({ amountCents: 20_000, items: [] }),
+    ]);
+    const c: Consulta = { ...CONSULTA_PADRAO, medida: "soma", campo: "valor", agrupar: "produto", status: "todos" };
+    const r = await rodarConsulta("o", c, { agora: AGORA });
+    expect(r.tipo === "pontos" && r.pontos).toEqual([
+      { label: "Plano Pro", value: 1300 },
+      { label: "Implantação", value: 500 },
+      { label: "Sem produtos", value: 200 },
+    ]);
+    expect(db.deal.findMany.mock.calls[0][0].include.items).toEqual({ select: { productId: true, name: true, totalCents: true } });
+  });
+
+  it("por produto: quantidade conta o negócio uma vez em cada produto", async () => {
+    db.deal.findMany.mockResolvedValue([
+      linha({
+        items: [
+          { productId: "pro", name: "Plano Pro", totalCents: 1 },
+          { productId: "pro", name: "Plano Pro", totalCents: 1 },
+          { productId: null, name: "Frete", totalCents: 1 },
+        ],
+      }),
+      linha({ items: [{ productId: "pro", name: "Plano Pro", totalCents: 1 }] }),
+    ]);
+    const r = await rodarConsulta("o", { ...CONSULTA_PADRAO, agrupar: "produto", status: "todos" }, { agora: AGORA });
+    expect(r.tipo === "pontos" && r.pontos).toEqual([
+      { label: "Plano Pro", value: 2 },
+      { label: "Frete", value: 1 },
+    ]);
+  });
+
+  it("sem agrupar por produto, não busca itens", async () => {
+    db.deal.findMany.mockResolvedValue([]);
+    await rodarConsulta("o", { ...CONSULTA_PADRAO }, { agora: AGORA });
+    expect(db.deal.findMany.mock.calls[0][0].include.items).toBeUndefined();
+  });
+
   it("busca contatos só quando precisa (etiqueta, canal)", async () => {
     db.deal.findMany.mockResolvedValue([]);
     await rodarConsulta("o", { ...CONSULTA_PADRAO }, { agora: AGORA });

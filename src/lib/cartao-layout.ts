@@ -24,6 +24,7 @@ export const CAMPOS_PADRAO = {
   contato: "Contato principal",
   telefone: "Telefone do contato",
   email: "E-mail do contato",
+  produtos: "Produtos",
 } as const;
 
 export type CampoPadrao = keyof typeof CAMPOS_PADRAO;

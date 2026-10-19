@@ -20,6 +20,8 @@ export interface NegocioKanban {
   whatsapp: { conversationId: string; naoLida: boolean } | null;
   /** Próxima tarefa em aberto (a de prazo mais próximo). */
   nextTask: { type: string; text: string; dueAt: string | null } | null;
+  /** Nomes dos itens (produtos), na ordem. Só vem quando o layout do funil mostra produtos. */
+  produtos?: string[];
 }
 
 export interface EtapaKanban {

@@ -407,6 +407,11 @@ export default function NegociosPage() {
             </a>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
+            <a href={`/api/deals/exportar?formato=csv&itens=1${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`} download>
+              <FileSpreadsheet size={15} aria-hidden /> Planilha de produtos (CSV)
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
             <Link href={`/negocios/relatorio?imprimir=1${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`}>
               <FileText size={15} aria-hidden /> Relatório (PDF)
             </Link>

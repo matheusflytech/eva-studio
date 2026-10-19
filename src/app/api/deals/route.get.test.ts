@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   deal: { findMany: vi.fn() },
   customField: { findMany: vi.fn(async () => []) },
   pipelineCardLayout: { findUnique: vi.fn() },
+  dealItem: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/permissions", () => ({
@@ -61,5 +62,29 @@ describe("GET /api/deals", () => {
     const d = await (await get()).json();
     expect(d.layout).toEqual({ campos: ["valor"], previa: [], densidade: "compacto" });
     expect(db.pipelineCardLayout.findUnique).toHaveBeenCalledWith({ where: { pipelineId: "p1" }, select: { layout: true } });
+  });
+
+  it("layout sem produtos: nem consulta os itens", async () => {
+    db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor"], previa: [], densidade: "compacto" } });
+    const d = await (await get()).json();
+    expect(db.dealItem.findMany).not.toHaveBeenCalled();
+    expect(d.stages[0].deals[0].produtos).toBeUndefined();
+  });
+
+  it("layout com produtos: traz os nomes dos itens de cada negócio", async () => {
+    db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor", "produtos"], previa: [], densidade: "compacto" } });
+    db.dealItem.findMany.mockResolvedValue([{ dealId: "d1", name: "Plano Pro" }]);
+    const d = await (await get()).json();
+    expect(d.stages[0].deals[0].produtos).toEqual(["Plano Pro"]);
+    expect(db.dealItem.findMany.mock.calls[0][0].where).toEqual({ orgId: "org", dealId: { in: ["d1"] } });
+  });
+
+  it("tabela de itens ausente não quebra o quadro", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["produtos"], previa: [], densidade: "compacto" } });
+    db.dealItem.findMany.mockRejectedValue(new Error('relation "eva_studio_deal_items" does not exist'));
+    const res = await get();
+    expect(res.status).toBe(200);
+    expect((await res.json()).stages[0].deals[0].produtos).toEqual([]);
   });
 });
