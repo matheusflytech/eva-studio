@@ -33,7 +33,26 @@ export async function GET(request: Request) {
     include: {
       company: { select: { id: true, name: true } },
       owner: { select: { id: true, name: true } },
-      contacts: { include: { contact: { select: { id: true, name: true } } } },
+      contacts: {
+        include: {
+          contact: {
+            select: {
+              id: true,
+              name: true,
+              // Conversa de WhatsApp mais recente: o cartão mostra o atalho e
+              // se há mensagem do cliente ainda não lida.
+              conversations: {
+                where: { channel: { in: ["whatsapp_meta", "whatsapp_qr"] } },
+                orderBy: { lastContactMessageAt: "desc" },
+                take: 1,
+                select: { id: true, readAt: true, lastContactMessageAt: true },
+              },
+            },
+          },
+        },
+      },
+      // Próxima tarefa em aberto (a de prazo mais próximo; sem prazo fica por último).
+      tasks: { where: { doneAt: null }, orderBy: { dueAt: "asc" }, take: 1, select: { type: true, text: true, dueAt: true } },
       // Só tarefas em aberto: o número no cartão é "o que falta fazer".
       _count: { select: { tasks: { where: { doneAt: null } } } },
     },
@@ -61,7 +80,17 @@ export async function GET(request: Request) {
         probability: d.probability,
         company: d.company,
         owner: d.owner,
-        contacts: d.contacts.map((c) => c.contact),
+        contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name })),
+        whatsapp: (() => {
+          const conversa = d.contacts.map((c) => c.contact.conversations[0]).find(Boolean);
+          if (!conversa) return null;
+          const naoLida =
+            !!conversa.lastContactMessageAt && (!conversa.readAt || conversa.lastContactMessageAt > conversa.readAt);
+          return { conversationId: conversa.id, naoLida };
+        })(),
+        nextTask: d.tasks[0]
+          ? { type: d.tasks[0].type, text: d.tasks[0].text, dueAt: d.tasks[0].dueAt?.toISOString() ?? null }
+          : null,
         openTasks: d._count.tasks,
         customFields: (d.customFields ?? {}) as Record<string, unknown>,
         expectedClosingAt: d.expectedClosingAt?.toISOString() ?? null,

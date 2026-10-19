@@ -5,9 +5,28 @@ import { Plus } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { corDaEtapa, type DefinicaoDeCampo } from "@/lib/custom-fields";
-import { DealCard } from "./deal-card";
+import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { AcoesRapidas, DealCard } from "./deal-card";
 import { valorCurto, type EtapaKanban, type NegocioKanban } from "./modelo";
+
+// Cor da etapa em hex: o topo da coluna usa um degradê bem leve dela (classe
+// do Tailwind não serve dentro de linear-gradient).
+const HEX: Record<string, string> = {
+  slate: "#94a3b8",
+  blue: "#7aa2f7",
+  violet: "#a48bf0",
+  amber: "#e3b341",
+  emerald: "#3fc58a",
+  rose: "#f2555a",
+  cyan: "#22d3ee",
+};
+
+export function corDaEtapaHex(cor: string, tipo: string): string {
+  if (cor && HEX[cor]) return HEX[cor];
+  if (tipo === "won") return HEX.emerald;
+  if (tipo === "lost") return HEX.rose;
+  return HEX.slate;
+}
 
 function CartaoArrastavel({
   deal,
@@ -50,11 +69,12 @@ function CartaoArrastavel({
         listeners?.onKeyDown?.(e);
       }}
       className={cn(
-        "cursor-grab rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent-500/70 active:cursor-grabbing",
+        "group/card relative cursor-grab rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-accent-500/70 active:cursor-grabbing",
         isDragging && "opacity-30"
       )}
     >
       <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} />
+      <AcoesRapidas deal={deal} onAbrir={onAbrir} />
     </div>
   );
 }
@@ -78,56 +98,58 @@ export function StageColumn({
   onNovo: (stageId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
-  const cor = corDaEtapa(etapa.color, etapa.type);
+  const cor = corDaEtapaHex(etapa.color, etapa.type);
   const aberta = etapa.type === "open";
+  const ganha = etapa.type === "won";
 
   return (
     <section
       ref={setNodeRef}
       aria-label={`Etapa ${etapa.name}, ${etapa.deals.length} negócios`}
       className={cn(
-        "flex max-h-full w-[292px] shrink-0 snap-start flex-col rounded-2xl bg-surface-1/70 ring-1 transition-[box-shadow,background-color] duration-150",
-        isOver ? "bg-accent-soft/40 ring-2 ring-accent-500/60" : "ring-border-subtle"
+        "group/col flex max-h-full w-[288px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border bg-surface-1 transition-[border-color,box-shadow] duration-150",
+        isOver ? "border-accent-500/60 shadow-[0_0_0_1px_rgba(91,141,239,0.35)]" : "border-border-subtle"
       )}
     >
-      <header className="relative px-3.5 pb-3 pt-3.5">
-        <span aria-hidden className={cn("absolute inset-x-3.5 top-0 h-[3px] rounded-b-full", cor.ponto)} />
+      <header
+        className="px-3 pb-2.5 pt-3"
+        style={{ background: `linear-gradient(180deg, ${cor}1a, transparent 92%)` }}
+      >
         <div className="flex items-center gap-2">
-          <h2 className="truncate text-[13.5px] font-semibold text-text-primary">{etapa.name}</h2>
-          <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium tabular-nums text-text-secondary">
-            {etapa.deals.length}
-          </span>
+          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
+          <h2 className="truncate font-display text-[13.5px] font-semibold text-text-primary">{etapa.name}</h2>
+          <span className="text-[12px] tabular-nums text-text-tertiary">{etapa.deals.length}</span>
           {aberta && (
             <button
               type="button"
               onClick={() => onNovo(etapa.id)}
               aria-label={`Novo negócio em ${etapa.name}`}
               title={`Novo negócio em ${etapa.name}`}
-              className="ml-auto grid h-7 w-7 place-items-center rounded-lg text-text-tertiary outline-none transition-colors hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              className="ml-auto grid h-6 w-6 place-items-center rounded-md text-text-tertiary opacity-0 outline-none transition-opacity hover:bg-surface-3 hover:text-text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-500/60 group-hover/col:opacity-100"
             >
-              <Plus size={15} aria-hidden />
+              <Plus size={14} aria-hidden />
             </button>
           )}
         </div>
-        <div className="mt-2 flex items-baseline justify-between gap-2">
-          <span className="font-display text-[15px] font-semibold tabular-nums text-text-primary">{valorCurto(etapa.totalCents)}</span>
+        <p className={cn("mt-1.5 font-display text-[18px] font-semibold tracking-[-0.01em] tabular-nums", ganha ? "text-emerald-400" : "text-text-primary")}>
+          {valorCurto(etapa.totalCents)}
           {aberta && etapa.totalCents > 0 && (
-            <span className="text-[11px] tabular-nums text-text-tertiary" title="Valor × chance de fechar">
+            <span className="ml-1.5 font-sans text-[11.5px] font-normal tracking-normal text-text-tertiary" title="Valor × chance de fechar">
               {valorCurto(etapa.weightedCents)} previsto
             </span>
           )}
-        </div>
-        {aberta && maiorTotalAberto > 0 && (
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+        </p>
+        {aberta && (
+          <div className="mt-2 h-[2px] overflow-hidden rounded-full bg-border-subtle" aria-hidden>
             <div
-              className={cn("h-full rounded-full opacity-80", cor.ponto)}
-              style={{ width: `${Math.max(2, (etapa.totalCents / maiorTotalAberto) * 100)}%` }}
+              className="h-full rounded-full"
+              style={{ width: `${maiorTotalAberto > 0 ? Math.max(2, (etapa.totalCents / maiorTotalAberto) * 100) : 0}%`, background: cor }}
             />
           </div>
         )}
       </header>
 
-      <div className="flex min-h-[120px] flex-1 flex-col gap-2 overflow-y-auto px-2.5 pb-2.5">
+      <div className="flex min-h-[110px] flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-2 pt-1">
         {etapa.deals.map((deal) => (
           <CartaoArrastavel
             key={deal.id}
@@ -141,11 +163,11 @@ export function StageColumn({
         {etapa.deals.length === 0 && (
           <div
             className={cn(
-              "grid flex-1 place-items-center rounded-xl border border-dashed px-3 py-8 text-center text-[12px] transition-colors",
+              "grid flex-1 place-items-center rounded-[10px] border border-dashed px-3 py-6 text-center text-[12px] transition-colors",
               arrastandoAlgo ? "border-accent-500/50 text-accent-400" : "border-border-default text-text-tertiary"
             )}
           >
-            {arrastandoAlgo ? "Solte aqui" : aberta ? "Nenhum negócio nesta etapa" : "Nada aqui ainda"}
+            {arrastandoAlgo ? "Solte aqui" : ganha ? "Arraste para cá quando fechar" : aberta ? "Arraste um negócio ou use o +" : "Nada aqui"}
           </div>
         )}
       </div>

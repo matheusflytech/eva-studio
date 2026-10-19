@@ -1,93 +1,194 @@
 "use client";
 
 import * as React from "react";
-import { CircleDollarSign, Hourglass, Target, Trophy } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { valorCurto, type ResumoDoFunil } from "./modelo";
+import { valorCurto } from "./modelo";
+
+export interface EtapaDeConversao {
+  etapaId: string;
+  nome: string;
+  quantidade: number;
+  taxaDoInicio: number;
+}
+
+/** Linha fina com ponto final destacado. Pontos já normalizados (0 a 1). */
+function Sparkline({ pontos, cor }: { pontos: number[]; cor: string }) {
+  if (pontos.length < 2) return null;
+  const w = 84;
+  const h = 28;
+  const xy = pontos.map((p, i) => [(i / (pontos.length - 1)) * w, h - 3 - p * (h - 6)] as const);
+  const d = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const [ux, uy] = xy[xy.length - 1];
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="pointer-events-none absolute bottom-3.5 right-3.5 h-7 w-[84px]" aria-hidden>
+      <path d={d} fill="none" stroke={cor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={ux} cy={uy} r="2" fill={cor} />
+    </svg>
+  );
+}
 
 function Indicador({
-  icone: Icone,
   rotulo,
   valor,
   detalhe,
-  tom = "accent",
+  alerta,
   ativo,
   onClick,
+  children,
 }: {
-  icone: React.ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
   rotulo: string;
   valor: string;
-  detalhe: string;
-  tom?: "accent" | "emerald" | "amber";
+  detalhe: React.ReactNode;
+  alerta?: boolean;
   ativo?: boolean;
   onClick?: () => void;
+  children?: React.ReactNode;
 }) {
-  const cores = {
-    accent: "bg-accent-soft text-accent-400",
-    emerald: "bg-emerald-400/12 text-emerald-400",
-    amber: "bg-amber-400/12 text-amber-300",
-  }[tom];
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
       {...(onClick ? { type: "button" as const, onClick, "aria-pressed": !!ativo } : {})}
       className={cn(
-        "flex min-w-0 items-start gap-3 rounded-2xl bg-surface-1/70 p-3 text-left ring-1 transition-colors sm:p-4",
-        ativo ? "ring-amber-400/50" : "ring-border-subtle",
-        onClick && "outline-none hover:ring-border-strong focus-visible:ring-2 focus-visible:ring-accent-500/60"
+        "relative flex min-w-0 flex-col gap-0.5 overflow-hidden rounded-xl border bg-surface-1 px-4 py-3.5 text-left transition-colors",
+        alerta ? "border-amber-400/35" : "border-border-subtle",
+        ativo && "border-amber-400/60 bg-amber-400/[0.06]",
+        onClick && "outline-none hover:border-border-default focus-visible:ring-2 focus-visible:ring-accent-500/60"
       )}
     >
-      <span className={cn("hidden h-9 w-9 shrink-0 place-items-center rounded-xl min-[420px]:grid", cores)}>
-        <Icone size={17} aria-hidden />
+      <span className="text-[12px] font-medium text-text-tertiary">{rotulo}</span>
+      <span className={cn("font-display text-[24px] font-semibold leading-tight tracking-[-0.02em] tabular-nums", alerta ? "text-amber-300" : "text-text-primary")}>
+        {valor}
       </span>
-      <span className="min-w-0">
-        <span className="block text-[12px] font-medium text-text-tertiary">{rotulo}</span>
-        <span className="mt-0.5 block font-display text-[20px] font-semibold leading-tight tabular-nums text-text-primary">{valor}</span>
-        <span className="mt-0.5 block truncate text-[11.5px] text-text-tertiary">{detalhe}</span>
-      </span>
+      <span className={cn("truncate text-[11.5px] text-text-tertiary", children && "pr-24")}>{detalhe}</span>
+      {children}
     </Tag>
   );
 }
 
+export interface DadosDoResumo {
+  abertoCents: number;
+  abertos: number;
+  ponderadoCents: number;
+  ganhoMesCents: number;
+  ganhosNoMes: number;
+  variacaoGanho: number | null;
+  /** Ganho acumulado dia a dia no mês, para a linha do cartão. */
+  serieGanho: number[];
+  atencao: number;
+}
+
 export function ResumoDoFunilView({
-  resumo,
-  soParados,
-  onAlternarParados,
+  dados,
+  conversao,
+  recolhido,
+  onAlternar,
+  verAtencao,
+  onVerAtencao,
 }: {
-  resumo: ResumoDoFunil;
-  soParados: boolean;
-  onAlternarParados: () => void;
+  dados: DadosDoResumo;
+  conversao: EtapaDeConversao[];
+  recolhido: boolean;
+  onAlternar: () => void;
+  verAtencao: boolean;
+  onVerAtencao: () => void;
 }) {
+  const maxSerie = Math.max(1, ...dados.serieGanho);
+  const nomeDoMes = new Date().toLocaleDateString("pt-BR", { month: "long", timeZone: "America/Sao_Paulo" });
+  const temConversao = conversao.length > 1 && conversao[0].quantidade > 0;
+
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 2xl:grid-cols-4">
-      <Indicador
-        icone={CircleDollarSign}
-        rotulo="Em aberto"
-        valor={valorCurto(resumo.abertoCents)}
-        detalhe={`${resumo.abertos} ${resumo.abertos === 1 ? "negócio" : "negócios"} em andamento`}
-      />
-      <Indicador
-        icone={Target}
-        rotulo="Previsão ponderada"
-        valor={valorCurto(resumo.ponderadoCents)}
-        detalhe="Valor × chance de cada etapa"
-      />
-      <Indicador
-        icone={Trophy}
-        tom="emerald"
-        rotulo="Ganho no mês"
-        valor={valorCurto(resumo.ganhoNoMesCents)}
-        detalhe={resumo.ganhosNoMes === 0 ? "Nenhuma venda ainda este mês" : `${resumo.ganhosNoMes} ${resumo.ganhosNoMes === 1 ? "venda" : "vendas"} fechadas`}
-      />
-      <Indicador
-        icone={Hourglass}
-        tom="amber"
-        rotulo="Precisam de atenção"
-        valor={String(resumo.parados)}
-        detalhe={soParados ? "Mostrando só os parados · clique para ver todos" : "Parados há mais de 7 dias · clique para ver"}
-        ativo={soParados}
-        onClick={onAlternarParados}
-      />
-    </div>
+    <section aria-label="Resumo do funil" className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[12px] font-medium uppercase tracking-[0.06em] text-text-tertiary">Resumo</h2>
+        <button
+          type="button"
+          onClick={onAlternar}
+          aria-expanded={!recolhido}
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+        >
+          {recolhido ? (
+            <>
+              Mostrar <ChevronDown size={13} aria-hidden />
+            </>
+          ) : (
+            <>
+              Recolher <ChevronUp size={13} aria-hidden />
+            </>
+          )}
+        </button>
+      </div>
+
+      {!recolhido && (
+        <>
+          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+            <Indicador
+              rotulo="Em aberto"
+              valor={valorCurto(dados.abertoCents)}
+              detalhe={`${dados.abertos} ${dados.abertos === 1 ? "negócio" : "negócios"}`}
+            />
+            <Indicador rotulo="Previsão ponderada" valor={valorCurto(dados.ponderadoCents)} detalhe="valor × chance da etapa" />
+            <Indicador
+              rotulo={`Ganho em ${nomeDoMes}`}
+              valor={valorCurto(dados.ganhoMesCents)}
+              detalhe={
+                <>
+                  {dados.variacaoGanho !== null && (
+                    <span className={dados.variacaoGanho >= 0 ? "text-emerald-400" : "text-danger"}>
+                      {dados.variacaoGanho >= 0 ? "+" : ""}
+                      {Math.round(dados.variacaoGanho * 100)}%
+                    </span>
+                  )}
+                  {dados.variacaoGanho !== null && " vs mês anterior · "}
+                  {dados.ganhosNoMes} {dados.ganhosNoMes === 1 ? "venda" : "vendas"}
+                </>
+              }
+            >
+              <Sparkline pontos={dados.serieGanho.map((v) => v / maxSerie)} cor="#3fc58a" />
+            </Indicador>
+            <Indicador
+              rotulo="Precisam de atenção"
+              valor={String(dados.atencao)}
+              detalhe={verAtencao ? "mostrando só esses · clique para ver todos" : "parados ou com retorno atrasado"}
+              alerta={dados.atencao > 0}
+              ativo={verAtencao}
+              onClick={onVerAtencao}
+            />
+          </div>
+
+          {temConversao && (
+            <div>
+              <div
+                className="flex h-1.5 gap-[3px] overflow-hidden rounded"
+                role="img"
+                aria-label={`Conversão nos últimos 90 dias: ${conversao.map((c) => `${c.nome} ${Math.round(c.taxaDoInicio * 100)}%`).join(", ")}`}
+              >
+                {conversao.map((c, i) => {
+                  const ultima = i === conversao.length - 1;
+                  return (
+                    <i
+                      key={c.etapaId}
+                      className="block"
+                      style={{
+                        flex: Math.max(c.taxaDoInicio * 100, 2),
+                        background: ultima ? "#3fc58a" : "#5b8def",
+                        opacity: ultima ? 1 : 0.35 + (i / Math.max(conversao.length - 1, 1)) * 0.5,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="mt-1.5 flex justify-between gap-2 overflow-hidden text-[11px] text-text-tertiary">
+                {conversao.map((c) => (
+                  <span key={c.etapaId} className="truncate">
+                    {c.nome} <span className="tabular-nums">{Math.round(c.taxaDoInicio * 100)}%</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }

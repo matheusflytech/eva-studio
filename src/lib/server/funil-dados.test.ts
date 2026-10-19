@@ -54,6 +54,11 @@ describe("coletarFunil", () => {
     );
   });
 
+  it("funil escolhido: busca esse, sempre dentro da organização", async () => {
+    await coletarFunil("o1", D("01"), D("15"), "p9");
+    expect(db.pipeline.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", id: "p9" } }));
+  });
+
   it("organização sem funil: tudo vazio, sem erro", async () => {
     db.pipeline.findFirst.mockResolvedValue(null);
     const r = await coletarFunil("o1", D("01"), D("15"));

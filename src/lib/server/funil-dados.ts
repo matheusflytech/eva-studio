@@ -47,10 +47,16 @@ const VAZIO: DadosDoFunil = {
   historicoDesde: null,
 };
 
-export async function coletarFunil(orgId: string, desde: Date, agora = new Date()): Promise<DadosDoFunil> {
-  // O funil do painel é o padrão; sem padrão, o primeiro da lista.
+export async function coletarFunil(
+  orgId: string,
+  desde: Date,
+  agora = new Date(),
+  pipelineId?: string
+): Promise<DadosDoFunil> {
+  // Funil pedido (sempre da organização) ou, sem pedido, o padrão; sem
+  // padrão, o primeiro da lista.
   const funil = await prisma.pipeline.findFirst({
-    where: { orgId },
+    where: pipelineId ? { orgId, id: pipelineId } : { orgId },
     orderBy: [{ isDefault: "desc" }, { position: "asc" }],
     select: { id: true },
   });
