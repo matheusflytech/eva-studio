@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { ErroDeCrm } from "@/lib/server/crm";
+import { ErroDeFunil } from "@/lib/server/funis-acoes";
 
 // ---------------------------------------------------------------------------
 // Resposta e erro padrão da API pública v1.
@@ -68,6 +69,9 @@ export function respostaDeErro(e: ErroApi, requestId: string): NextResponse {
 export function paraErroApi(e: unknown): ErroApi {
   if (e instanceof ErroApi) return e;
   if (e instanceof ErroDeCrm) return new ErroApi(e.status, e.status === 404 ? "not_found" : "invalid_request", e.message);
+  if (e instanceof ErroDeFunil) {
+    return new ErroApi(e.status, e.code, e.message, e.extra.deals !== undefined ? { details: { deals: e.extra.deals } } : {});
+  }
   if (e instanceof Prisma.PrismaClientKnownRequestError) {
     if (e.code === "P2002") return new ErroApi(409, "conflict", "Já existe um registro com esses dados.");
     if (e.code === "P2025") return new ErroApi(404, "not_found", "Registro não encontrado.");
