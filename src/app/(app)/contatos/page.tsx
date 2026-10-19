@@ -244,17 +244,16 @@ function ContatosConteudo() {
         </TabsContent>
 
         <TabsContent value="etiquetas" className="mt-6">
-          <TagsTab agentId={agentId} tags={tags} onChanged={refreshTags} onError={setError} />
+          <TagsTab tags={tags} onChanged={refreshTags} onError={setError} />
         </TabsContent>
 
         <TabsContent value="segmentos" className="mt-6">
-          <SegmentsTab agentId={agentId} segments={segments} tags={tags} onChanged={refreshSegments} onError={setError} />
+          <SegmentsTab segments={segments} tags={tags} onChanged={refreshSegments} onError={setError} />
         </TabsContent>
       </Tabs>
 
-      {selected && agentId && (
+      {selected && (
         <ContactDrawer
-          agentId={agentId}
           contact={selected}
           tags={tags}
           onClose={() => setSelected(null)}
@@ -430,7 +429,7 @@ function ContactsTab({
         )}
       </Card>
 
-      {showNew && agentId && (
+      {showNew && (
         <NewContactModal
           agentId={agentId}
           onClose={() => setShowNew(false)}
@@ -438,7 +437,7 @@ function ContactsTab({
           onError={onError}
         />
       )}
-      {showImport && agentId && (
+      {showImport && (
         <ImportModal
           agentId={agentId}
           tags={tags}
@@ -452,17 +451,25 @@ function ContactsTab({
 
 function NewContactModal({
   agentId, onClose, onCreated, onError,
-}: { agentId: string; onClose: () => void; onCreated: () => void; onError: (e: string | null) => void }) {
+}: { agentId: string | null; onClose: () => void; onCreated: () => void; onError: (e: string | null) => void }) {
   const [form, setForm] = React.useState({ name: "", email: "", phone: "", channel: "whatsapp_meta" });
   const [saving, setSaving] = React.useState(false);
 
   async function save() {
     setSaving(true);
     onError(null);
+    // O canal só nasce com agente e telefone: o telefone é o id de envio
+    // (a rota normaliza para 55 + DDD + número).
+    const comCanal = !!agentId && !!form.channel && !!form.phone.trim();
     const res = await fetch(`/api/contacts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        ...(comCanal ? { agentId, channel: form.channel, externalId: form.phone } : {}),
+      }),
     });
     setSaving(false);
     if (!res.ok) {
@@ -492,12 +499,12 @@ function NewContactModal({
           </div>
           <div>
             <Label htmlFor="c-canal">Canal</Label>
+            {/* Só canais em que o telefone identifica a pessoa: no Instagram e
+                no site o id externo não é telefone. */}
             <Select id="c-canal" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
               <option value="whatsapp_meta">WhatsApp (oficial)</option>
               <option value="whatsapp_qr">WhatsApp (QR)</option>
-              <option value="telegram">Telegram</option>
-              <option value="instagram">Instagram</option>
-              <option value="website">Site</option>
+              <option value="">Nenhum</option>
             </Select>
             <p className="mt-1.5 text-[12px] text-text-tertiary">
               O telefone vira o identificador de envio nesse canal. Sem ele o contato existe, mas não recebe disparo.
@@ -517,7 +524,7 @@ function NewContactModal({
 
 function ImportModal({
   agentId, tags, onClose, onDone,
-}: { agentId: string; tags: TagRow[]; onClose: () => void; onDone: () => void }) {
+}: { agentId: string | null; tags: TagRow[]; onClose: () => void; onDone: () => void }) {
   const [csv, setCsv] = React.useState("");
   const [channel, setChannel] = React.useState("whatsapp_meta");
   const [tagId, setTagId] = React.useState("");
@@ -533,9 +540,15 @@ function ImportModal({
     const res = await fetch(`/api/contacts/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ csv, channel, tagId: tagId || undefined }),
+      // Sem agentId a rota não cria o canal: o contato entraria sem como
+      // receber disparo.
+      body: JSON.stringify({
+        csv,
+        tagId: tagId || undefined,
+        ...(agentId && channel ? { agentId, channel } : {}),
+      }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     setBusy(false);
     setResult(res.ok ? data : { created: 0, updated: 0, skipped: 0, errors: [data.error ?? "Falhou."] });
   }
@@ -544,7 +557,7 @@ function ImportModal({
     <Modal open onOpenChange={(open) => !open && onClose()}>
       <ModalContent
         title="Importar contatos"
-        description="CSV com cabeçalho. Colunas nome, e-mail e telefone são reconhecidas sozinhas; o resto vira campo livre."
+        description="CSV com cabeçalho (vírgula ou ponto e vírgula). Colunas nome, e-mail e telefone são reconhecidas sozinhas; coluna com o nome de um campo do contato é validada; o resto vira campo livre."
       >
         {result ? (
           <div className="flex flex-col gap-4">
@@ -621,9 +634,8 @@ function ImportModal({
 // ---------------------------------------------------------------------------
 
 function ContactDrawer({
-  agentId, contact, tags, onClose, onChanged, onDeleted,
+  contact, tags, onClose, onChanged, onDeleted,
 }: {
-  agentId: string;
   contact: Contact;
   tags: TagRow[];
   onClose: () => void;
@@ -634,6 +646,7 @@ function ContactDrawer({
     name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes,
   });
   const [saving, setSaving] = React.useState(false);
+  const [erro, setErro] = React.useState<string | null>(null);
   const [aba, setAba] = React.useState("ficha");
   // Contador na aba: a pessoa precisa ver que há tarefa aberta sem trocar de aba.
   const [tarefasAbertas, setTarefasAbertas] = React.useState(0);
@@ -644,20 +657,36 @@ function ContactDrawer({
 
   async function patch(body: Record<string, unknown>) {
     setSaving(true);
+    setErro(null);
     const res = await fetch(`/api/contacts/${contact.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     setSaving(false);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.contact) onChanged(data.contact);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setErro(data.error ?? "Não foi possível salvar.");
+      return;
     }
+    if (data.contact) onChanged(data.contact);
+  }
+
+  // Sair do campo sem mudar nada não dispara PATCH.
+  function salvarSeMudou(campo: "name" | "email" | "phone" | "notes") {
+    if (form[campo] === contact[campo]) return;
+    patch({ [campo]: form[campo] });
   }
 
   async function remove() {
-    await fetch(`/api/contacts/${contact.id}`, { method: "DELETE" });
+    if (!window.confirm(`Apagar o contato ${contact.name || contact.email || contact.phone || ""}? Isso não pode ser desfeito.`)) return;
+    setErro(null);
+    const res = await fetch(`/api/contacts/${contact.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setErro(data.error ?? "Não foi possível apagar o contato.");
+      return;
+    }
     onDeleted();
   }
 
@@ -702,18 +731,19 @@ function ContactDrawer({
           </TabsContent>
 
           <TabsContent value="ficha" className="flex flex-col gap-5">
+          {erro && <div className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{erro}</div>}
           <section className="flex flex-col gap-3">
             <div>
               <Label htmlFor="d-nome">Nome</Label>
-              <Input id="d-nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} onBlur={() => patch({ name: form.name })} />
+              <Input id="d-nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} onBlur={() => salvarSeMudou("name")} />
             </div>
             <div>
               <Label htmlFor="d-email">E-mail</Label>
-              <Input id="d-email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} onBlur={() => patch({ email: form.email })} />
+              <Input id="d-email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} onBlur={() => salvarSeMudou("email")} />
             </div>
             <div>
               <Label htmlFor="d-fone">Telefone</Label>
-              <Input id="d-fone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} onBlur={() => patch({ phone: form.phone })} />
+              <Input id="d-fone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} onBlur={() => salvarSeMudou("phone")} />
             </div>
           </section>
 
@@ -758,7 +788,7 @@ function ContactDrawer({
               rows={3}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              onBlur={() => patch({ notes: form.notes })}
+              onBlur={() => salvarSeMudou("notes")}
             />
           </section>
 
@@ -800,13 +830,13 @@ function ContactDrawer({
 // ---------------------------------------------------------------------------
 
 function TagsTab({
-  agentId, tags, onChanged, onError,
-}: { agentId: string | null; tags: TagRow[]; onChanged: () => void; onError: (e: string | null) => void }) {
+  tags, onChanged, onError,
+}: { tags: TagRow[]; onChanged: () => void; onError: (e: string | null) => void }) {
   const [name, setName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
 
   async function create() {
-    if (!agentId || !name.trim()) return;
+    if (!name.trim()) return;
     setBusy(true);
     onError(null);
     const res = await fetch(`/api/tags`, {
@@ -823,9 +853,15 @@ function TagsTab({
     onChanged();
   }
 
-  async function remove(id: string) {
-    if (!agentId) return;
-    await fetch(`/api/tags/${id}`, { method: "DELETE" });
+  async function remove(tag: TagRow) {
+    const aviso = tag.contactCount > 0 ? ` Ela sai de ${tag.contactCount} contato(s).` : "";
+    if (!window.confirm(`Apagar a etiqueta "${tag.name}"?${aviso}`)) return;
+    onError(null);
+    const res = await fetch(`/api/tags/${tag.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      onError((await res.json().catch(() => ({}))).error ?? "Não foi possível apagar a etiqueta.");
+      return;
+    }
     onChanged();
   }
 
@@ -868,7 +904,7 @@ function TagsTab({
                 </div>
               </div>
               <button
-                onClick={() => remove(t.id)}
+                onClick={() => remove(t)}
                 className="shrink-0 rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
                 aria-label={`Apagar etiqueta ${t.name}`}
               >
@@ -887,9 +923,8 @@ function TagsTab({
 // ---------------------------------------------------------------------------
 
 function SegmentsTab({
-  agentId, segments, tags, onChanged, onError,
+  segments, tags, onChanged, onError,
 }: {
-  agentId: string | null;
   segments: SegmentRow[];
   tags: TagRow[];
   onChanged: () => void;
@@ -897,9 +932,14 @@ function SegmentsTab({
 }) {
   const [editing, setEditing] = React.useState<SegmentRow | "new" | null>(null);
 
-  async function remove(id: string) {
-    if (!agentId) return;
-    await fetch(`/api/segments/${id}`, { method: "DELETE" });
+  async function remove(segment: SegmentRow) {
+    if (!window.confirm(`Apagar o segmento "${segment.name}"?`)) return;
+    onError(null);
+    const res = await fetch(`/api/segments/${segment.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      onError((await res.json().catch(() => ({}))).error ?? "Não foi possível apagar o segmento.");
+      return;
+    }
     onChanged();
   }
 
@@ -936,7 +976,7 @@ function SegmentsTab({
                 <div className="flex shrink-0 gap-1">
                   <Button variant="ghost" onClick={() => setEditing(s)}>Editar</Button>
                   <button
-                    onClick={() => remove(s.id)}
+                    onClick={() => remove(s)}
                     className="rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
                     aria-label={`Apagar segmento ${s.name}`}
                   >
@@ -958,9 +998,8 @@ function SegmentsTab({
         </div>
       )}
 
-      {editing && agentId && (
+      {editing && (
         <SegmentEditor
-          agentId={agentId}
           segment={editing === "new" ? null : editing}
           tags={tags}
           onClose={() => setEditing(null)}
@@ -985,9 +1024,8 @@ function describeRule(rule: SegmentRule, tags: TagRow[]): string {
 }
 
 function SegmentEditor({
-  agentId, segment, tags, onClose, onSaved, onError,
+  segment, tags, onClose, onSaved, onError,
 }: {
-  agentId: string;
   segment: SegmentRow | null;
   tags: TagRow[];
   onClose: () => void;

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { normalizarCapturados } from "@/lib/server/custom-fields";
+import { normalizarTelefoneBR } from "@/lib/capture-validation";
 import type { Prisma } from "@/generated/prisma/client";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,53 @@ export function normalizePhone(raw: string): string {
   const digits = (raw ?? "").replace(/\D/g, "");
   if (digits.length > 11 && digits.startsWith("55")) return digits.slice(2);
   return digits;
+}
+
+/**
+ * Telefone como a ficha grava: só dígitos, com DDI (55 no Brasil) — o mesmo
+ * formato do externalId do WhatsApp. "" se veio vazio; null se não é telefone.
+ * "(11) 99999-8888", "+55 11 99999-8888" e "5511999998888" viram o mesmo valor.
+ */
+export function telefoneParaGravar(raw: unknown): string | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return "";
+  const n = normalizarTelefoneBR(t);
+  return n ? n.replace(/\D/g, "") : null;
+}
+
+/**
+ * Condição de deduplicação por telefone. Compara pelo número sem DDI no fim
+ * da coluna, o que pega o formato novo (5511...), o "+5511..." da captura e o
+ * legado só com dígitos. Telefone legado gravado com máscara ("(11) 9...")
+ * não casa até rodar o backfill.
+ */
+export function filtroDeTelefone(phone: string): Prisma.ContactWhereInput | null {
+  const nacional = normalizePhone(phone);
+  return nacional.length >= 10 ? { phone: { endsWith: nacional } } : null;
+}
+
+/** Canais que dá pra pendurar numa ficha pela tela/API. */
+export const CANAIS_DE_CONTATO = new Set([
+  "whatsapp_qr", "whatsapp_meta", "instagram", "telegram", "messenger", "tiktok", "website", "playground",
+]);
+
+/**
+ * Id externo de um canal cadastrado à mão. No WhatsApp é o telefone,
+ * normalizado como a ficha grava (5511...); nos outros, o texto como veio.
+ * null = inválido.
+ */
+export function externalIdDoCanal(channel: string, raw: unknown): string | null {
+  // O QR identifica o contato pelo JID inteiro (5511...@s.whatsapp.net): é o
+  // que chega na conversa de entrada. Gravar só os dígitos faria a resposta do
+  // cliente não achar este canal e abrir uma ficha duplicada.
+  if (channel === "whatsapp_qr" && String(raw ?? "").includes("@")) return String(raw).trim().slice(0, 200);
+  if (channel === "whatsapp_qr") {
+    const digitos = telefoneParaGravar(raw);
+    return digitos ? `${digitos}@s.whatsapp.net` : null;
+  }
+  if (PHONE_CHANNELS.has(channel)) return telefoneParaGravar(raw) || null;
+  const t = String(raw ?? "").trim().slice(0, 200);
+  return t || null;
 }
 
 export interface SyncContactInput {

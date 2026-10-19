@@ -31,3 +31,20 @@ export async function registrarMudancaDeEtapa(e: {
     console.error("[stage-events] falha ao registrar mudança de etapa", error);
   }
 }
+
+/**
+ * Mesmo histórico, para vários negócios movidos de uma vez (apagar etapa ou
+ * funil). Chamado depois da transação: falha aqui não desfaz a mudança.
+ */
+export async function registrarMudancasEmLote(
+  eventos: Array<{ orgId: string; dealId: string; pipelineId: string; fromStageId: string | null; toStageId: string }>,
+  origem: OrigemDoMovimento = "usuario"
+): Promise<void> {
+  const reais = eventos.filter((e) => e.fromStageId !== e.toStageId);
+  if (reais.length === 0) return;
+  try {
+    await prisma.dealStageEvent.createMany({ data: reais.map((e) => ({ ...e, origem })) });
+  } catch (error) {
+    console.error("[stage-events] falha ao registrar mudanças de etapa em lote", error);
+  }
+}

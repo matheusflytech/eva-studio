@@ -5,7 +5,15 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { corDaEtapa } from "@/lib/custom-fields";
 import { Avatar } from "./deal-card";
-import { dinheiro, diasParado, estaParado, type EtapaKanban, type NegocioKanban } from "./modelo";
+import {
+  diaDaPrevisao,
+  dinheiro,
+  diasParado,
+  estaParado,
+  fechamentoPassou,
+  type EtapaKanban,
+  type NegocioKanban,
+} from "./modelo";
 
 type Coluna = "nome" | "valor" | "chance" | "parado" | "fechamento";
 
@@ -106,7 +114,8 @@ export function ListView({ etapas, agora, onAbrir }: { etapas: EtapaKanban[]; ag
           {linhas.map(({ deal, etapa }) => {
             const cor = corDaEtapa(etapa.color, etapa.type);
             const parado = estaParado(deal, etapa.type, agora);
-            const atrasado = etapa.type === "open" && deal.expectedClosingAt && new Date(deal.expectedClosingAt) < agora;
+            // Mesma regra do cartão: o dia previsto ainda não é atraso.
+            const atrasado = etapa.type === "open" && fechamentoPassou(deal, agora);
             return (
               <tr
                 key={deal.id}
@@ -148,7 +157,7 @@ export function ListView({ etapas, agora, onAbrir }: { etapas: EtapaKanban[]; ag
                   {etapa.type === "open" ? `${diasParado(deal, agora)}d` : "—"}
                 </td>
                 <td className={cn("px-3 py-3 tabular-nums", atrasado ? "font-medium text-danger" : "text-text-secondary")}>
-                  {deal.expectedClosingAt ? new Date(deal.expectedClosingAt).toLocaleDateString("pt-BR") : "—"}
+                  {deal.expectedClosingAt ? diaDaPrevisao(deal.expectedClosingAt).split("-").reverse().join("/") : "—"}
                 </td>
               </tr>
             );

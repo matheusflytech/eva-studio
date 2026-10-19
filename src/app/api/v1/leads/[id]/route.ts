@@ -1,79 +1,55 @@
 import { NextResponse } from "next/server";
-import { requireApiKeyOrgId } from "@/lib/server/api-keys";
-import { checkRateLimit } from "@/lib/server/rate-limit";
-import { prisma } from "@/lib/db/prisma";
+import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
+import { atualizarLead, buscarLead, removerDosLeads, resolverIdDoLead, serializarLeadPublico } from "@/lib/server/leads";
+import { autenticarApiV1, respostaDeErroDoLead } from "../auth";
 
-const VALID_STAGES = ["novo", "contatado", "qualificado", "ganho", "perdido"];
+// `id` é o id do contato. O id antigo (de conversa, devolvido pela API antes
+// da Fase 2) continua funcionando: resolve para o contato ligado a ela.
+type Params = { params: Promise<{ id: string }> };
 
-function serializeLead(c: {
-  id: string; agentId: string; contactId: string; variables: unknown; leadStage: string | null; createdAt: Date; updatedAt: Date;
-}) {
-  return {
-    id: c.id,
-    agentId: c.agentId,
-    contactId: c.contactId,
-    stage: c.leadStage ?? "novo",
-    fields: c.variables,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-  };
-}
-
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireApiKeyOrgId(request);
-  if (!orgId) return NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 });
-
-  const rate = await checkRateLimit(`apikey:${orgId}`, 120, 60);
-  if (!rate.allowed) return NextResponse.json({ error: "Limite de requisições excedido. Tente de novo em instantes." }, { status: 429 });
+export async function GET(request: Request, { params }: Params) {
+  const auth = await autenticarApiV1(request);
+  if ("resposta" in auth) return auth.resposta;
 
   const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({ where: { id, channel: "website", agent: { orgId } } });
-  if (!conversation) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
-
-  return NextResponse.json({ data: serializeLead(conversation) });
+  const contactId = await resolverIdDoLead(auth.orgId, id);
+  const lead = contactId ? await buscarLead(auth.orgId, contactId) : null;
+  if (!lead) return erro("Lead não encontrado.", 404);
+  return NextResponse.json({ data: serializarLeadPublico(lead) });
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireApiKeyOrgId(request);
-  if (!orgId) return NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 });
-
-  const rate = await checkRateLimit(`apikey:${orgId}`, 120, 60);
-  if (!rate.allowed) return NextResponse.json({ error: "Limite de requisições excedido. Tente de novo em instantes." }, { status: 429 });
+// Corpo: { stage?, fields? } (`leadStage`/`variables` como apelido). `fields`
+// é mesclado: nome/e-mail/telefone vão para a ficha, o resto vira campo livre.
+export async function PATCH(request: Request, { params }: Params) {
+  const auth = await autenticarApiV1(request);
+  if ("resposta" in auth) return auth.resposta;
 
   const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({ where: { id, channel: "website", agent: { orgId } } });
-  if (!conversation) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
 
-  const { stage, fields } = await request.json();
-  if (stage && !VALID_STAGES.includes(stage)) {
-    return NextResponse.json({ error: `stage precisa ser um de: ${VALID_STAGES.join(", ")}.` }, { status: 400 });
-  }
-  if (fields !== undefined && typeof fields !== "object") {
-    return NextResponse.json({ error: "fields precisa ser um objeto." }, { status: 400 });
-  }
+  const contactId = await resolverIdDoLead(auth.orgId, id);
+  if (!contactId) return erro("Lead não encontrado.", 404);
 
-  const updated = await prisma.conversation.update({
-    where: { id },
-    data: {
-      ...(stage ? { leadStage: stage } : {}),
-      ...(fields !== undefined ? { variables: { ...(conversation.variables as object), ...fields } } : {}),
-    },
+  const r = await atualizarLead(auth.orgId, contactId, {
+    stage: body.stage ?? body.leadStage,
+    fields: body.fields ?? body.variables,
   });
+  if ("error" in r) return respostaDeErroDoLead(r);
 
-  return NextResponse.json({ data: serializeLead(updated) });
+  const lead = await buscarLead(auth.orgId, r.contactId);
+  if (!lead) return erro("Lead não encontrado.", 404);
+  return NextResponse.json({ data: serializarLeadPublico(lead) });
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireApiKeyOrgId(request);
-  if (!orgId) return NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 });
-
-  const rate = await checkRateLimit(`apikey:${orgId}`, 120, 60);
-  if (!rate.allowed) return NextResponse.json({ error: "Limite de requisições excedido. Tente de novo em instantes." }, { status: 429 });
+// Tira da lista de leads; o contato e as conversas continuam. `deleted` fica
+// por compatibilidade com quem já tratava a resposta antiga.
+export async function DELETE(request: Request, { params }: Params) {
+  const auth = await autenticarApiV1(request);
+  if ("resposta" in auth) return auth.resposta;
 
   const { id } = await params;
-  const conversation = await prisma.conversation.findFirst({ where: { id, channel: "website", agent: { orgId } } });
-  if (!conversation) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
-
-  await prisma.conversation.delete({ where: { id } });
-  return NextResponse.json({ data: { deleted: true } });
+  const contactId = await resolverIdDoLead(auth.orgId, id);
+  if (!contactId || !(await removerDosLeads(auth.orgId, contactId))) return erro("Lead não encontrado.", 404);
+  return NextResponse.json({ data: { deleted: true, removed: true } });
 }

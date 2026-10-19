@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/custom-fields", () => ({ normalizarCapturados: vi.fn(async () => undefined) }));
 
-import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead } from "./leads";
+import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead, atualizarLead, removerDosLeads } from "./leads";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -58,18 +58,19 @@ describe("salvarLeadExterno", () => {
   beforeEach(() => {
     db.agent.findFirst.mockResolvedValue({ id: "a1" });
     db.contact.findFirst.mockResolvedValue(null);
+    db.contact.findMany.mockResolvedValue([]);
     db.contact.create.mockImplementation(async ({ data }) => ({ id: "novo", ...data }));
   });
 
   it("recusa e-mail e telefone inválidos com erro por campo", async () => {
     const r = await salvarLeadExterno("o1", { agentId: "a1", fields: { email: "ana@", telefone: "123" } }, "api");
-    expect(r).toEqual({ error: "Dados inválidos.", fieldErrors: { email: "E-mail inválido.", telefone: "Telefone inválido." } });
+    expect(r).toEqual({ error: "Dados inválidos.", status: 400, fieldErrors: { email: "E-mail inválido.", telefone: "Telefone inválido." } });
     expect(db.contact.create).not.toHaveBeenCalled();
   });
 
   it("agente de outra org: erro", async () => {
     db.agent.findFirst.mockResolvedValue(null);
-    expect(await salvarLeadExterno("o1", { agentId: "x", fields: {} }, "api")).toEqual({ error: "agentId não encontrado nessa organização." });
+    expect(await salvarLeadExterno("o1", { agentId: "x", fields: {} }, "api")).toEqual({ error: "agentId não encontrado nessa organização.", status: 404 });
   });
 
   it("cria contato-lead normalizado; resto vira campo livre", async () => {
@@ -104,7 +105,88 @@ describe("salvarLeadExterno", () => {
   it("etapa inválida", async () => {
     expect(await salvarLeadExterno("o1", { agentId: "a1", fields: {}, stage: "xyz" }, "api")).toEqual({
       error: "stage precisa ser um de: novo, contatado, qualificado, ganho, perdido.",
+      status: 400,
     });
+  });
+
+  it("agentId ou fields com tipo errado: 400 sem tocar no banco", async () => {
+    expect(await salvarLeadExterno("o1", { agentId: 123, fields: {} }, "api")).toMatchObject({ status: 400 });
+    expect(await salvarLeadExterno("o1", { agentId: "a1", fields: ["x"] }, "api")).toMatchObject({ status: 400 });
+    expect(db.agent.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("dedupe por telefone compara o número inteiro: DDD diferente vira outro contato", async () => {
+    // Contato já existente com 21977776666, gravado em formatos variados.
+    db.contact.findMany.mockResolvedValue([
+      { id: "rj", phone: "+5521977776666", name: "", email: "", customFields: {}, leadStage: null },
+      { id: "rj2", phone: "21 97777-6666", name: "", email: "", customFields: {}, leadStage: null },
+    ]);
+    const r = await salvarLeadExterno("o1", { agentId: "a1", fields: { telefone: "11977776666" } }, "api");
+    expect("contactId" in r && r.contactId).toBe("novo");
+    expect(db.contact.update).not.toHaveBeenCalled();
+    expect(db.contact.create).toHaveBeenCalledWith({ data: expect.objectContaining({ phone: "+5511977776666" }) });
+  });
+
+  it("dedupe por telefone acha o mesmo número em outro formato", async () => {
+    db.contact.findMany.mockResolvedValue([
+      { id: "rj", phone: "+5521977776666", name: "", email: "", customFields: {}, leadStage: null },
+      { id: "sp", phone: "5511977776666", name: "Ana", email: "", customFields: {}, leadStage: null },
+    ]);
+    db.contact.update.mockResolvedValue({ id: "sp" });
+    const r = await salvarLeadExterno("o1", { agentId: "a1", fields: { telefone: "(11) 97777-6666" } }, "api");
+    expect("contactId" in r && r.contactId).toBe("sp");
+    expect(db.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", phone: { contains: "6666" } } }));
+    expect(db.contact.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("atualizarLead", () => {
+  it("muda a etapa", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", customFields: {}, leadStage: "novo" });
+    const r = await atualizarLead("o1", "c1", { stage: "ganho" });
+    expect(r).toEqual({ contactId: "c1" });
+    expect(db.contact.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { leadStage: "ganho" } });
+  });
+
+  it("etapa inválida ou nada para mudar: 400", async () => {
+    expect(await atualizarLead("o1", "c1", { stage: "xyz" })).toMatchObject({ status: 400 });
+    expect(await atualizarLead("o1", "c1", {})).toMatchObject({ status: 400 });
+    expect(db.contact.update).not.toHaveBeenCalled();
+  });
+
+  it("mescla fields validados (e-mail na coluna, resto em customFields)", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", customFields: { a: 1 }, leadStage: "novo" });
+    await atualizarLead("o1", "c1", { fields: { email: "ANA@X.COM", b: 2 } });
+    expect(db.contact.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { email: "ana@x.com", customFields: { a: 1, b: 2 } } });
+  });
+
+  it("e-mail inválido: 400 com fieldErrors", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", customFields: {}, leadStage: "novo" });
+    expect(await atualizarLead("o1", "c1", { fields: { email: "ana@" } })).toEqual({
+      error: "Dados inválidos.",
+      status: 400,
+      fieldErrors: { email: "E-mail inválido." },
+    });
+  });
+
+  it("não é lead da org: 404", async () => {
+    db.contact.findFirst.mockResolvedValue(null);
+    expect(await atualizarLead("o1", "c1", { stage: "ganho" })).toMatchObject({ status: 404 });
+  });
+});
+
+describe("removerDosLeads", () => {
+  it("só limpa leadStage (não apaga o contato)", async () => {
+    db.contact.updateMany.mockResolvedValue({ count: 1 });
+    expect(await removerDosLeads("o1", "c1")).toBe(true);
+    expect(db.contact.updateMany).toHaveBeenCalledWith({
+      where: { id: "c1", orgId: "o1", leadStage: { not: null } },
+      data: { leadStage: null },
+    });
+  });
+  it("não achou: false", async () => {
+    db.contact.updateMany.mockResolvedValue({ count: 0 });
+    expect(await removerDosLeads("o1", "c1")).toBe(false);
   });
 });
 

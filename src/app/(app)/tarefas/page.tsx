@@ -164,15 +164,24 @@ export default function TarefasPage() {
 function NewTaskModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = React.useState({ text: "", type: "ligar", dueAt: "" });
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function save() {
     setBusy(true);
-    await fetch("/api/tasks", {
+    setError(null);
+    // datetime-local vem sem fuso ("2026-10-20T14:00"): converte aqui, no
+    // fuso de quem digitou, em vez de deixar o servidor adivinhar.
+    const dueAt = form.dueAt ? new Date(form.dueAt).toISOString() : null;
+    const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, dueAt }),
     });
     setBusy(false);
+    if (!res.ok) {
+      setError((await res.json().catch(() => ({}))).error ?? "Não foi possível criar a tarefa.");
+      return;
+    }
     onCreated();
   }
 
@@ -204,6 +213,7 @@ function NewTaskModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
               />
             </div>
           </div>
+          {error && <p className="text-[12.5px] text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={save} disabled={busy || !form.text.trim()}>

@@ -50,6 +50,8 @@ export interface LeadDto {
   agentName: string | null;
   channel: string | null;
   externalId: string | null;
+  /** Canal da última conversa (pode diferir de `channel`, que é a origem do lead). */
+  conversationChannel: string | null;
   conversationId: string | null;
   fields: Record<string, unknown>;
   createdAt: string;
@@ -78,6 +80,7 @@ export function serializarLead(c: ContatoComConversa): LeadDto {
     agentName: conv?.agent.name ?? null,
     channel: c.leadChannel ?? conv?.channel ?? null,
     externalId: conv?.contactId ?? null,
+    conversationChannel: conv?.channel ?? null,
     conversationId: conv?.id ?? null,
     fields: {
       ...(c.name ? { nome: c.name } : {}),
@@ -117,29 +120,28 @@ export async function resolverIdDoLead(orgId: string, id: string): Promise<strin
   return conversa?.contactRecordId ?? null;
 }
 
-export type ResultadoLead = { contactId: string } | { error: string; fieldErrors?: Record<string, string> };
+export type ErroLead = { error: string; status: 400 | 404; fieldErrors?: Record<string, string> };
+export type ResultadoLead = { contactId: string } | ErroLead;
+
+const ERRO_STAGE = `stage precisa ser um de: ${LEAD_STAGES.join(", ")}.`;
+
+/** Objeto simples (não array, não null). */
+export function ehObjeto(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+type CamposValidados = { base: { name?: string; email?: string; phone?: string }; custom: Record<string, unknown> };
 
 /**
- * Lead que chega de fora do fluxo (tela, API pública, n8n): valida, deduplica
- * por e-mail/telefone na org e marca como lead. `fields` aceita nome/email/
- * telefone (e sinônimos) e qualquer outro campo, que vira campo livre.
+ * Separa nome/e-mail/telefone (validados e normalizados) do resto, que vira
+ * campo livre. Chave "__x", null, undefined e "" são ignorados.
  */
-export async function salvarLeadExterno(
-  orgId: string,
-  input: { agentId: string; fields: Record<string, unknown>; stage?: unknown },
-  source: "api" | "manual"
-): Promise<ResultadoLead> {
-  if (input.stage !== undefined && !isLeadStage(input.stage)) {
-    return { error: `stage precisa ser um de: ${LEAD_STAGES.join(", ")}.` };
-  }
-  const agent = await prisma.agent.findFirst({ where: { id: input.agentId, orgId }, select: { id: true } });
-  if (!agent) return { error: "agentId não encontrado nessa organização." };
-
-  const base: { name?: string; email?: string; phone?: string } = {};
+export function validarCamposDeLead(fields: Record<string, unknown>): CamposValidados | ErroLead {
+  const base: CamposValidados["base"] = {};
   const custom: Record<string, unknown> = {};
   const fieldErrors: Record<string, string> = {};
 
-  for (const [key, bruto] of Object.entries(input.fields ?? {})) {
+  for (const [key, bruto] of Object.entries(fields ?? {})) {
     if (key.startsWith("__") || bruto === undefined || bruto === null || bruto === "") continue;
     const alvo = mapCaptureField(key);
     const texto = String(bruto);
@@ -159,24 +161,56 @@ export async function salvarLeadExterno(
       custom[key] = bruto;
     }
   }
-  if (Object.keys(fieldErrors).length > 0) return { error: "Dados inválidos.", fieldErrors };
+  if (Object.keys(fieldErrors).length > 0) return { error: "Dados inválidos.", status: 400, fieldErrors };
+  return { base, custom };
+}
+
+/**
+ * Contato da org com o mesmo e-mail ou o mesmo telefone. O telefone é
+ * comparado inteiro (DDD + número, sem o 55) — antes era `contains` dos 10
+ * últimos dígitos, que juntava "11977776666" com "21977776666". Como o banco
+ * guarda telefone em formatos diferentes ("+5511…", "5511…", "(11) 9…"), a
+ * consulta só pré-filtra pelos 4 últimos dígitos e a comparação exata é aqui.
+ */
+async function acharContatoDuplicado(orgId: string, email: string | undefined, telefone: string) {
+  if (email) {
+    const porEmail = await prisma.contact.findFirst({ where: { orgId, email: { equals: email, mode: "insensitive" } } });
+    if (porEmail) return porEmail;
+  }
+  if (telefone.length < 10) return null;
+  const candidatos = await prisma.contact.findMany({
+    where: { orgId, phone: { contains: telefone.slice(-4) } },
+    orderBy: { createdAt: "asc" },
+    take: 500,
+  });
+  return (candidatos ?? []).find((c) => normalizePhone(c.phone) === telefone) ?? null;
+}
+
+/**
+ * Lead que chega de fora do fluxo (tela, API pública, n8n): valida, deduplica
+ * por e-mail/telefone na org e marca como lead. `fields` aceita nome/email/
+ * telefone (e sinônimos) e qualquer outro campo, que vira campo livre.
+ */
+export async function salvarLeadExterno(
+  orgId: string,
+  input: { agentId: unknown; fields: unknown; stage?: unknown },
+  source: "api" | "manual"
+): Promise<ResultadoLead> {
+  if (typeof input.agentId !== "string" || !input.agentId.trim()) return { error: "agentId é obrigatório.", status: 400 };
+  if (!ehObjeto(input.fields)) return { error: "fields precisa ser um objeto.", status: 400 };
+  if (input.stage !== undefined && !isLeadStage(input.stage)) return { error: ERRO_STAGE, status: 400 };
+  const agentId = input.agentId;
+  const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId }, select: { id: true } });
+  if (!agent) return { error: "agentId não encontrado nessa organização.", status: 404 };
+
+  const validados = validarCamposDeLead(input.fields);
+  if ("error" in validados) return validados;
+  const { base, custom } = validados;
 
   await normalizarCapturados(orgId, custom);
-  const stage = (input.stage as string | undefined) ?? "novo";
+  const stage: LeadStage = isLeadStage(input.stage) ? input.stage : "novo";
   const telefone = normalizePhone(base.phone ?? "");
-
-  const existente =
-    base.email || telefone.length >= 10
-      ? await prisma.contact.findFirst({
-          where: {
-            orgId,
-            OR: [
-              ...(base.email ? [{ email: { equals: base.email, mode: "insensitive" as const } }] : []),
-              ...(telefone.length >= 10 ? [{ phone: { contains: telefone.slice(-10) } }] : []),
-            ],
-          },
-        })
-      : null;
+  const existente = await acharContatoDuplicado(orgId, base.email, telefone);
 
   if (existente) {
     await prisma.contact.update({
@@ -190,7 +224,7 @@ export async function salvarLeadExterno(
           ? input.stage !== undefined
             ? { leadStage: stage }
             : {}
-          : { leadStage: stage, leadAt: new Date(), leadAgentId: input.agentId, leadChannel: source }),
+          : { leadStage: stage, leadAt: new Date(), leadAgentId: agentId, leadChannel: source }),
       },
     });
     return { contactId: existente.id };
@@ -206,9 +240,80 @@ export async function salvarLeadExterno(
       source,
       leadStage: stage,
       leadAt: new Date(),
-      leadAgentId: input.agentId,
+      leadAgentId: agentId,
       leadChannel: source,
     },
   });
   return { contactId: criado.id };
+}
+
+/**
+ * Muda etapa e/ou mescla campos de um lead que já existe. `fields` passa pela
+ * mesma validação da criação (nome/e-mail/telefone vão para as colunas, o
+ * resto para customFields).
+ */
+export async function atualizarLead(
+  orgId: string,
+  contactId: string,
+  input: { fields?: unknown; stage?: unknown }
+): Promise<ResultadoLead> {
+  if (input.stage === undefined && input.fields === undefined) {
+    return { error: "Envie stage e/ou fields para atualizar.", status: 400 };
+  }
+  if (input.stage !== undefined && !isLeadStage(input.stage)) return { error: ERRO_STAGE, status: 400 };
+  if (input.fields !== undefined && !ehObjeto(input.fields)) return { error: "fields precisa ser um objeto.", status: 400 };
+
+  const atual = await prisma.contact.findFirst({ where: { id: contactId, orgId, leadStage: { not: null } } });
+  if (!atual) return { error: "Lead não encontrado.", status: 404 };
+
+  const data: Prisma.ContactUpdateInput = {};
+  if (isLeadStage(input.stage)) data.leadStage = input.stage;
+  if (ehObjeto(input.fields)) {
+    const validados = validarCamposDeLead(input.fields);
+    if ("error" in validados) return validados;
+    const { base, custom } = validados;
+    if (base.name) data.name = base.name;
+    if (base.email) data.email = base.email;
+    if (base.phone) data.phone = base.phone;
+    if (Object.keys(custom).length > 0) {
+      await normalizarCapturados(orgId, custom);
+      data.customFields = { ...((atual.customFields ?? {}) as Record<string, unknown>), ...custom } as Prisma.InputJsonValue;
+    }
+  }
+
+  await prisma.contact.update({ where: { id: atual.id }, data });
+  return { contactId: atual.id };
+}
+
+/** Tira o contato da lista de leads. Contato, conversas e negócios continuam. */
+export async function removerDosLeads(orgId: string, contactId: string): Promise<boolean> {
+  const r = await prisma.contact.updateMany({
+    where: { id: contactId, orgId, leadStage: { not: null } },
+    data: { leadStage: null },
+  });
+  return r.count > 0;
+}
+
+/**
+ * Formato da API pública /api/v1/leads. Mantém as chaves de antes da Fase 2
+ * (id, agentId, contactId, stage, fields, createdAt, updatedAt) — `id` agora
+ * é o id do contato e `contactId` é o identificador externo da última
+ * conversa (ex. "site-123", número do WhatsApp; null se não houver) — e
+ * acrescenta name/email/phone/channel/conversationId.
+ */
+export function serializarLeadPublico(l: LeadDto) {
+  return {
+    id: l.id,
+    agentId: l.agentId,
+    contactId: l.externalId,
+    stage: l.stage,
+    fields: l.fields,
+    name: l.name,
+    email: l.email,
+    phone: l.phone,
+    channel: l.channel,
+    conversationId: l.conversationId,
+    createdAt: l.createdAt,
+    updatedAt: l.updatedAt,
+  };
 }

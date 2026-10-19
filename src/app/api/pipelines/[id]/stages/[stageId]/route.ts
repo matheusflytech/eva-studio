@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { corValida, probabilidade, tipoValido } from "@/lib/server/funis";
+import { PROBABILIDADE_ABERTA_PADRAO, corValida, moverNegociosDaEtapa, probabilidade, tipoValido } from "@/lib/server/funis";
+import { registrarMudancasEmLote } from "@/lib/server/stage-events";
 
 function carregar(id: string, stageId: string, orgId: string) {
   return prisma.pipelineStage.findFirst({ where: { id: stageId, pipelineId: id, pipeline: { orgId } } });
@@ -26,7 +27,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const tipo = body.type !== undefined ? tipoValido(body.type) : etapa.type;
   if (body.type !== undefined) data.type = tipo;
   if (body.probability !== undefined || body.type !== undefined) {
-    data.probability = probabilidade(body.probability ?? etapa.probability, tipo);
+    // Ganho (100) ou perdido (0) virando aberta não pode herdar o número do
+    // fechamento: sem probabilidade nova, volta ao padrão de etapa aberta.
+    const virouAberta = tipo === "open" && etapa.type !== "open";
+    const base = body.probability ?? (virouAberta ? PROBABILIDADE_ABERTA_PADRAO : etapa.probability);
+    data.probability = probabilidade(base, tipo);
   }
 
   await prisma.$transaction(async (tx) => {
@@ -63,26 +68,30 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const irmas = await prisma.pipelineStage.findMany({ where: { pipelineId: id }, orderBy: { position: "asc" } });
   if (irmas.length <= 1) return NextResponse.json({ error: "O funil precisa de pelo menos uma etapa." }, { status: 400 });
 
-  const qtd = await prisma.deal.count({ where: { stageId } });
   const moverPara = new URL(request.url).searchParams.get("moverPara");
-  let destino: (typeof irmas)[number] | null = null;
-  if (qtd > 0) {
-    destino = irmas.find((s) => s.id === moverPara && s.id !== stageId) ?? null;
-    if (!destino) return NextResponse.json({ error: `Esta etapa tem ${qtd} negócio(s). Escolha para qual etapa eles vão.`, deals: qtd }, { status: 409 });
-  }
+  const destino = irmas.find((s) => s.id === moverPara && s.id !== stageId) ?? null;
 
-  await prisma.$transaction(async (tx) => {
-    if (destino) {
-      await tx.deal.updateMany({
-        where: { stageId },
-        data: { stageId: destino.id, probability: destino.probability, stageSince: new Date(), closedAt: destino.type === "open" ? null : new Date() },
-      });
-    }
+  // Contar, mover e apagar na mesma transação: negócio criado na etapa entre
+  // a contagem e o delete não pode sumir junto com ela.
+  const r = await prisma.$transaction(async (tx) => {
+    const qtd = await tx.deal.count({ where: { stageId } });
+    if (qtd > 0 && !destino) return { qtd, movidos: [] as string[], faltaDestino: true };
+    const movidos = destino ? await moverNegociosDaEtapa(tx, stageId, destino) : [];
     await tx.pipelineStage.delete({ where: { id: stageId } });
     const restantes = irmas.filter((s) => s.id !== stageId);
     for (let i = 0; i < restantes.length; i++) {
       await tx.pipelineStage.update({ where: { id: restantes[i].id }, data: { position: i } });
     }
+    return { qtd, movidos, faltaDestino: false };
   });
-  return NextResponse.json({ ok: true, movidos: qtd });
+  if (r.faltaDestino) {
+    return NextResponse.json({ error: `Esta etapa tem ${r.qtd} negócio(s). Escolha para qual etapa eles vão.`, deals: r.qtd }, { status: 409 });
+  }
+
+  if (destino) {
+    await registrarMudancasEmLote(
+      r.movidos.map((dealId) => ({ orgId: ctx.orgId, dealId, pipelineId: id, fromStageId: stageId, toStageId: destino.id }))
+    );
+  }
+  return NextResponse.json({ ok: true, movidos: r.movidos.length });
 }

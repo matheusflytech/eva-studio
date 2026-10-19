@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 
@@ -84,16 +85,46 @@ export function DealDrawer({
 
   React.useEffect(() => { carregar(); }, [carregar]);
 
+  // Erro da última ação (salvar campo, mover etapa, apagar). Sem isso a tela
+  // recarregava com o valor antigo e parecia que o clique não tinha pegado.
+  const [erro, setErro] = React.useState<string | null>(null);
+
+  async function falhou(res: Response, padrao: string): Promise<boolean> {
+    if (res.ok) return false;
+    setErro((await res.json().catch(() => ({}))).error ?? padrao);
+    return true;
+  }
+
   async function patch(body: Record<string, unknown>) {
     setBusy(true);
-    await fetch(`/api/deals/${dealId}`, {
+    setErro(null);
+    const res = await fetch(`/api/deals/${dealId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     setBusy(false);
+    await falhou(res, "Não foi possível salvar.");
     await carregar();
     onChanged();
+  }
+
+  function salvarValor() {
+    const reais = reaisDigitados(form.amount);
+    if (reais === null) {
+      setErro("Valor inválido (máximo R$ 21 milhões).");
+      return;
+    }
+    if (Math.round(reais * 100) !== deal?.amountCents) patch({ amount: reais });
+  }
+
+  async function apagar() {
+    if (!window.confirm("Apagar este negócio? Tarefas e notas dele também somem.")) return;
+    setErro(null);
+    const res = await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
+    if (await falhou(res, "Não foi possível apagar o negócio.")) return;
+    onChanged();
+    onClose();
   }
 
   async function salvarCampos() {
@@ -115,32 +146,38 @@ export function DealDrawer({
 
   async function criarTarefa() {
     if (!novaTarefa.trim()) return;
-    await fetch("/api/tasks", {
+    setErro(null);
+    const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: novaTarefa.trim(), dealId, due: "+2 dias" }),
     });
+    if (await falhou(res, "Não foi possível criar a tarefa.")) return;
     setNovaTarefa("");
     carregar();
   }
 
   async function criarNota() {
     if (!novaNota.trim()) return;
-    await fetch("/api/notes", {
+    setErro(null);
+    const res = await fetch("/api/notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: novaNota.trim(), dealId }),
     });
+    if (await falhou(res, "Não foi possível registrar a nota.")) return;
     setNovaNota("");
     carregar();
   }
 
   async function alternarTarefa(id: string, feita: boolean) {
-    await fetch(`/api/tasks/${id}`, {
+    setErro(null);
+    const res = await fetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done: !feita }),
     });
+    await falhou(res, "Não foi possível atualizar a tarefa.");
     carregar();
   }
 
@@ -193,6 +230,12 @@ export function DealDrawer({
               </button>
             </header>
 
+            {erro && (
+              <p role="alert" className="border-b border-border-subtle bg-danger/10 px-6 py-2.5 text-[12.5px] text-danger">
+                {erro}
+              </p>
+            )}
+
             {/* Trilha de etapas. É a ação mais frequente, então vem primeiro. */}
             <section className="border-b border-border-subtle px-6 py-5">
               <Label>Etapa no funil {deal.pipeline.name}</Label>
@@ -232,7 +275,7 @@ export function DealDrawer({
                     id="d-valor"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    onBlur={() => patch({ amount: Number(form.amount.replace(/\./g, "").replace(",", ".")) || 0 })}
+                    onBlur={salvarValor}
                   />
                   <p className="mt-1 text-[11px] text-text-tertiary">
                     Ponderado: {money(Math.round((deal.amountCents * deal.probability) / 100))}
@@ -240,6 +283,7 @@ export function DealDrawer({
                 </div>
                 <div>
                   <Label htmlFor="d-data">Previsão de fechamento</Label>
+                  {/* Data sem hora: o servidor grava meio-dia UTC, e o dia é a parte UTC do ISO. */}
                   <Input
                     id="d-data"
                     type="date"
@@ -391,11 +435,7 @@ export function DealDrawer({
               <Button
                 variant="ghost"
                 className="text-danger hover:bg-danger/10"
-                onClick={async () => {
-                  await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
-                  onChanged();
-                  onClose();
-                }}
+                onClick={apagar}
               >
                 <Trash2 size={15} /> Apagar
               </Button>

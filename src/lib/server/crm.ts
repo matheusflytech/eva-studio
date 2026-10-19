@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/generated/prisma/client";
+import { conferirReferencias } from "@/lib/server/api-validacao";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import { registrarMudancaDeEtapa, type OrigemDoMovimento } from "@/lib/server/stage-events";
 
@@ -33,22 +35,84 @@ const DEFAULT_STAGES: { name: string; probability: number; type: string }[] = [
  * e org antiga (criada antes disso existir) funciona sem migração.
  */
 export async function ensureDefaultPipeline(orgId: string) {
-  const existing = await prisma.pipeline.findFirst({
+  const existing = await primeiroFunil(prisma, orgId);
+  if (existing) return existing;
+
+  // Duas telas abertas ao mesmo tempo chegam aqui juntas e cada uma criaria
+  // o seu "Vendas". A trava por org serializa; quem chega depois reencontra
+  // o funil que o primeiro criou.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${orgId}))`;
+    const criado = await primeiroFunil(tx, orgId);
+    if (criado) return criado;
+    return tx.pipeline.create({
+      data: {
+        orgId,
+        name: "Vendas",
+        isDefault: true,
+        stages: { create: DEFAULT_STAGES.map((s, i) => ({ ...s, position: i })) },
+      },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+  });
+}
+
+function primeiroFunil(db: Prisma.TransactionClient, orgId: string) {
+  return db.pipeline.findFirst({
     where: { orgId },
     include: { stages: { orderBy: { position: "asc" } } },
     orderBy: [{ isDefault: "desc" }, { position: "asc" }],
   });
-  if (existing) return existing;
+}
 
-  return prisma.pipeline.create({
-    data: {
-      orgId,
-      name: "Vendas",
-      isDefault: true,
-      stages: { create: DEFAULT_STAGES.map((s, i) => ({ ...s, position: i })) },
-    },
-    include: { stages: { orderBy: { position: "asc" } } },
-  });
+/**
+ * Erro de entrada nas ações de CRM (id de outra org, etapa de outro funil).
+ * As rotas convertem em resposta HTTP; o motor do fluxo trata como falha do
+ * bloco, como qualquer outro erro.
+ */
+export class ErroDeCrm extends Error {
+  constructor(
+    message: string,
+    public status: 400 | 404 = 400
+  ) {
+    super(message);
+    this.name = "ErroDeCrm";
+  }
+}
+
+/** Status da mensagem de conferirReferencias: id malformado é 400, inexistente na org é 404. */
+export function statusDaReferencia(mensagem: string): 400 | 404 {
+  return mensagem.endsWith("inválido.") ? 400 : 404;
+}
+
+/** Tipos de tarefa que as telas e o Builder oferecem. */
+export const TIPOS_DE_TAREFA = ["ligar", "email", "reuniao", "outro"] as const;
+
+/**
+ * Etapa onde um negócio novo entra, sempre dentro da org. Sem etapa, cai na
+ * primeira aberta do funil informado (ou do padrão).
+ */
+export async function resolverEtapaDeEntrada(orgId: string, pipelineId?: string, stageId?: string) {
+  if (!stageId) {
+    let funilId = pipelineId;
+    if (funilId) {
+      const funil = await prisma.pipeline.findFirst({ where: { id: funilId, orgId }, select: { id: true } });
+      if (!funil) throw new ErroDeCrm("Funil não encontrado.", 404);
+    } else {
+      funilId = (await ensureDefaultPipeline(orgId)).id;
+    }
+    const stages = await prisma.pipelineStage.findMany({
+      where: { pipelineId: funilId },
+      orderBy: { position: "asc" },
+    });
+    stageId = stages.find((s) => s.type === "open")?.id ?? stages[0]?.id;
+  }
+  if (!stageId) throw new ErroDeCrm("Funil sem etapas configuradas.");
+
+  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId, pipeline: { orgId } } });
+  if (!stage) throw new ErroDeCrm("Etapa não encontrada.", 404);
+  if (pipelineId && stage.pipelineId !== pipelineId) throw new ErroDeCrm("Etapa de outro funil.");
+  return stage;
 }
 
 export interface CreateDealInput {
@@ -78,24 +142,16 @@ export interface CreateDealInput {
  * ninguém digitar número.
  */
 export async function createDeal(input: CreateDealInput) {
-  let pipelineId = input.pipelineId;
-  let stageId = input.stageId;
-
-  if (!pipelineId || !stageId) {
-    const pipeline = await ensureDefaultPipeline(input.orgId);
-    pipelineId = pipelineId || pipeline.id;
-    if (!stageId) {
-      const stages = await prisma.pipelineStage.findMany({
-        where: { pipelineId },
-        orderBy: { position: "asc" },
-      });
-      stageId = stages.find((s) => s.type === "open")?.id ?? stages[0]?.id;
-    }
-  }
-  if (!stageId) throw new Error("Funil sem etapas configuradas.");
-
-  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
-  if (!stage) throw new Error("Etapa não encontrada.");
+  // Tudo conferido contra a org aqui dentro, não só na rota: o motor do fluxo
+  // também chama isto, com ids que vieram da configuração do bloco.
+  const stage = await resolverEtapaDeEntrada(input.orgId, input.pipelineId, input.stageId);
+  const stageId = stage.id;
+  const erroRef = await conferirReferencias(input.orgId, {
+    contactId: input.contactId,
+    companyId: input.companyId,
+    ownerId: input.ownerId,
+  });
+  if (erroRef) throw new ErroDeCrm(erroRef, statusDaReferencia(erroRef));
 
   // Campos personalizados: o que não bate com a definição é descartado em vez
   // de derrubar a criação. O motor do fluxo chama isto no meio de uma conversa
@@ -159,11 +215,14 @@ export async function moveDealStage(
   lostReason?: string,
   origem: OrigemDoMovimento = "usuario"
 ) {
-  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
-  if (!stage) throw new Error("Etapa não encontrada.");
+  const antes = await prisma.deal.findUnique({ where: { id: dealId }, select: { stageId: true, orgId: true } });
+  if (!antes) throw new ErroDeCrm("Negócio não encontrado.", 404);
+  // Etapa de outra org nunca: o id pode vir do corpo da requisição ou da
+  // configuração de um bloco.
+  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId, pipeline: { orgId: antes.orgId } } });
+  if (!stage) throw new ErroDeCrm("Etapa não encontrada.", 404);
 
   const closing = stage.type === "won" || stage.type === "lost";
-  const antes = await prisma.deal.findUnique({ where: { id: dealId }, select: { stageId: true } });
 
   const atualizado = await prisma.deal.update({
     where: { id: dealId },
@@ -184,7 +243,7 @@ export async function moveDealStage(
     orgId: atualizado.orgId,
     dealId,
     pipelineId: atualizado.pipelineId,
-    fromStageId: antes?.stageId ?? null,
+    fromStageId: antes.stageId,
     toStageId: stageId,
     origem,
   });

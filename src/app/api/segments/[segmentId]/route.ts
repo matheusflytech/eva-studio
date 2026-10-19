@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { buildSegmentWhere, lerRegras, parseRules } from "@/lib/server/segments";
+import { erro, JSON_INVALIDO, lerCorpo } from "@/lib/server/api-validacao";
 import { serializeContact } from "@/lib/server/contact-dto";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -46,8 +47,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ se
   const segment = await prisma.segment.findFirst({ where: { id: segmentId, orgId: ctx.orgId } });
   if (!segment) return NextResponse.json({ error: "Segmento não encontrado." }, { status: 404 });
 
-  const body = await request.json();
-  const rules = body.rules !== undefined ? parseRules(body.rules) : parseRules(segment.rules);
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  const lidas = body.rules !== undefined ? lerRegras(body.rules) : parseRules(segment.rules);
+  if (typeof lidas === "string") return erro(lidas);
+  const rules = lidas;
   const match = body.match === "any" ? "any" : body.match === "all" ? "all" : segment.match;
 
   const updated = await prisma.segment.update({

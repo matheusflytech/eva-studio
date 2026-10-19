@@ -16,13 +16,21 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { cn, formatRelativeDate, generateId } from "@/lib/utils";
 
+// Mesmo formato do LeadDto de src/lib/server/leads.ts (copiado: não dá pra
+// importar código de servidor aqui). Lead = contato com etapa, de qualquer canal.
 interface Lead {
   id: string;
-  agentId: string;
-  agentName: string;
-  contactId: string;
-  variables: Record<string, unknown>;
-  leadStage: string;
+  name: string;
+  email: string;
+  phone: string;
+  stage: string;
+  agentId: string | null;
+  agentName: string | null;
+  channel: string | null;
+  externalId: string | null;
+  conversationChannel: string | null;
+  conversationId: string | null;
+  fields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   lastMessage: { text: string; role: string } | null;
@@ -104,38 +112,73 @@ function pick(vars: Record<string, unknown>, candidates: string[]): string | nul
 }
 
 function leadName(lead: Lead): string {
-  return pick(lead.variables, ["nome", "nome_cliente", "name", "nome_completo"]) ?? lead.contactId;
+  return lead.name || pick(lead.fields, ["nome", "nome_cliente", "name", "nome_completo"]) || "Sem nome";
 }
 function leadEmail(lead: Lead): string | null {
-  return pick(lead.variables, ["email", "e-mail", "email_cliente"]);
+  return lead.email || pick(lead.fields, ["email", "e-mail", "email_cliente"]);
 }
 function leadPhone(lead: Lead): string | null {
-  return pick(lead.variables, ["telefone", "telefone_cliente", "phone", "whatsapp"]);
+  return lead.phone || pick(lead.fields, ["telefone", "telefone_cliente", "phone", "whatsapp"]);
 }
 function capturedVarCount(lead: Lead): number {
-  return Object.keys(lead.variables ?? {}).filter((k) => !k.startsWith("__")).length;
+  return Object.keys(lead.fields ?? {}).filter((k) => !k.startsWith("__")).length;
 }
 
-// Cada canal de captura usa seu próprio prefixo de contactId (ver
-// api/leads/route.ts e os scripts do site) — mais confiável que o nome do
-// agente pra diferenciar a origem, já que o agente pode ser renomeado.
-type LeadSource = "chat" | "form" | "manual";
+// Origem = canal em que o lead entrou (leadChannel, ou o canal da última
+// conversa). No canal "website" o prefixo do id externo separa o chat do
+// site ("site-"/"web_") do formulário ("landing_").
+type LeadSource = "chat" | "form" | "manual" | "whatsapp" | "instagram" | "messenger" | "telegram" | "outro";
 function leadSource(lead: Lead): LeadSource {
-  if (lead.contactId.startsWith("site-")) return "chat";
-  if (lead.contactId.startsWith("landing_")) return "form";
-  return "manual";
+  const ext = lead.externalId ?? "";
+  switch (lead.channel) {
+    case "website":
+      if (ext.startsWith("site-") || ext.startsWith("web_")) return "chat";
+      if (ext.startsWith("landing_")) return "form";
+      return "manual";
+    case "api":
+    case "manual":
+      return "manual";
+    case "whatsapp_meta":
+    case "whatsapp_qr":
+      return "whatsapp";
+    case "instagram":
+    case "messenger":
+    case "telegram":
+      return lead.channel;
+    default:
+      return "outro";
+  }
 }
-const SOURCE_LABEL: Record<LeadSource, string> = { chat: "Chat do site", form: "Formulário", manual: "Manual / API" };
-const SOURCE_ICON: Record<LeadSource, typeof MessageCircle> = { chat: MessageCircle, form: Smartphone, manual: Code2 };
+const SOURCE_LABEL: Record<LeadSource, string> = {
+  chat: "Chat do site",
+  form: "Formulário",
+  manual: "Manual / API",
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  messenger: "Messenger",
+  telegram: "Telegram",
+  outro: "Outro canal",
+};
+const SOURCE_ICON: Record<LeadSource, typeof MessageCircle> = {
+  chat: MessageCircle,
+  form: Smartphone,
+  manual: Code2,
+  whatsapp: Phone,
+  instagram: MessageCircle,
+  messenger: MessageCircle,
+  telegram: MessageCircle,
+  outro: Inbox,
+};
 
 function exportCsv(leads: Lead[]) {
-  const varKeys = Array.from(new Set(leads.flatMap((l) => Object.keys(l.variables ?? {})))).filter((k) => !k.startsWith("__"));
-  const header = ["Agente", "Estágio", "Criado em", ...varKeys];
+  const varKeys = Array.from(new Set(leads.flatMap((l) => Object.keys(l.fields ?? {})))).filter((k) => !k.startsWith("__"));
+  const header = ["Agente", "Origem", "Estágio", "Criado em", ...varKeys];
   const rows = leads.map((l) => [
-    l.agentName,
-    STAGE_LABEL[l.leadStage] ?? l.leadStage,
+    l.agentName ?? "",
+    SOURCE_LABEL[leadSource(l)],
+    STAGE_LABEL[l.stage] ?? l.stage,
     new Date(l.createdAt).toLocaleString("pt-BR"),
-    ...varKeys.map((k) => String(l.variables?.[k] ?? "")),
+    ...varKeys.map((k) => String(l.fields?.[k] ?? "")),
   ]);
   const csv = [header, ...rows].map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -259,17 +302,18 @@ function DroppableColumn({ stage, isOver, children }: { stage: string; isOver: b
   );
 }
 
-function LeadExecutions({ agentId, contactId }: { agentId: string; contactId: string }) {
+function LeadExecutions({ agentId, channel, externalId }: { agentId: string; channel: string; externalId: string }) {
   const [executions, setExecutions] = React.useState<FlowExecutionRow[] | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const conversationId = `website:${contactId}`;
+    // Mesmo formato que o motor grava em flowExecution.conversationId.
+    const conversationId = `${channel}:${externalId}`;
     fetch(`/api/agents/${agentId}/executions?conversationId=${encodeURIComponent(conversationId)}&limit=5`)
       .then((res) => res.json())
       .then((data) => setExecutions(data.executions ?? []))
       .catch(() => setExecutions([]));
-  }, [agentId, contactId]);
+  }, [agentId, channel, externalId]);
 
   if (!executions || executions.length === 0) return null;
 
@@ -322,12 +366,15 @@ function LeadExecutions({ agentId, contactId }: { agentId: string; contactId: st
 function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void }) {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const name = leadName(lead);
+  const conversationId = lead.conversationId;
 
   React.useEffect(() => {
-    fetch(`/api/conversations/${lead.id}/messages`)
-      .then((res) => res.json())
-      .then((data) => setMessages(data.messages ?? []));
-  }, [lead.id]);
+    if (!conversationId) return;
+    fetch(`/api/conversations/${conversationId}/messages`)
+      .then((res) => (res.ok ? res.json() : { messages: [] }))
+      .then((data) => setMessages(data.messages ?? []))
+      .catch(() => setMessages([]));
+  }, [conversationId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
@@ -348,7 +395,12 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
                   {SOURCE_LABEL[leadSource(lead)]}
                 </Badge>
               </div>
-              <p className="text-[11.5px] text-text-tertiary">{lead.agentName} · {formatRelativeDate(lead.createdAt)}</p>
+              <p className="text-[11.5px] text-text-tertiary">
+                {lead.agentName ? `${lead.agentName} · ` : ""}{formatRelativeDate(lead.createdAt)} ·{" "}
+                <a href={`/contatos?abrir=${lead.id}`} className="text-accent-400 hover:text-accent-500">
+                  Abrir ficha
+                </a>
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -359,7 +411,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
                 onClick={() => onStageChange(s)}
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors",
-                  lead.leadStage === s ? "border-border-strong bg-surface-3 text-text-primary" : "border-border-default text-text-tertiary hover:text-text-primary"
+                  lead.stage === s ? "border-border-strong bg-surface-3 text-text-primary" : "border-border-default text-text-tertiary hover:text-text-primary"
                 )}
               >
                 {STAGE_LABEL[s]}
@@ -368,7 +420,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
             <button
               type="button"
               onClick={onDelete}
-              title="Excluir lead"
+              title="Remover dos leads (o contato continua em Contatos)"
               className="ml-1 rounded-lg p-1 text-text-tertiary hover:bg-surface-3 hover:text-danger"
             >
               <Trash2 size={15} />
@@ -385,7 +437,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
               <p className="text-[12px] text-text-tertiary">Nenhum dado capturado ainda.</p>
             ) : (
               <div className="flex flex-col gap-2">
-                {Object.entries(lead.variables ?? {})
+                {Object.entries(lead.fields ?? {})
                   .filter(([key]) => !key.startsWith("__"))
                   .map(([key, value]) => (
                     <div key={key} className="rounded-lg border border-border-subtle bg-surface-2 px-2.5 py-1.5">
@@ -395,9 +447,14 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
                   ))}
               </div>
             )}
-            <LeadExecutions agentId={lead.agentId} contactId={lead.contactId} />
+            {lead.agentId && lead.conversationChannel && lead.externalId && (
+              <LeadExecutions agentId={lead.agentId} channel={lead.conversationChannel} externalId={lead.externalId} />
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-5">
+            {!conversationId && (
+              <p className="text-[12.5px] text-text-tertiary">Sem conversa — lead criado pela tela ou pela API.</p>
+            )}
             <div className="flex flex-col gap-3">
               {messages.map((m) => (
                 <div key={m.id} className={cn("flex", m.role === "contact" ? "justify-end" : "justify-start")}>
@@ -434,6 +491,7 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [fields, setFields] = React.useState<FieldRow[]>(DEFAULT_FIELDS.map((key) => ({ id: generateId(), key, value: "" })));
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -452,24 +510,28 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       setError("Escolha um agente.");
       return;
     }
-    const variables: Record<string, string> = {};
+    const dados: Record<string, string> = {};
     fields.forEach((f) => {
-      if (f.key.trim()) variables[f.key.trim()] = f.value;
+      if (f.key.trim()) dados[f.key.trim()] = f.value;
     });
-    if (Object.keys(variables).length === 0) {
+    if (Object.keys(dados).length === 0) {
       setError("Preencha pelo menos um dado.");
       return;
     }
     setIsSaving(true);
     setError(null);
+    setFieldErrors({});
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId, variables, leadStage: stage }),
+        body: JSON.stringify({ agentId, fields: dados, stage }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Erro inesperado.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.fieldErrors) setFieldErrors(data.fieldErrors);
+        throw new Error(data.error ?? "Erro inesperado.");
+      }
       onCreated();
       onClose();
     } catch (err) {
@@ -510,19 +572,31 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </button>
           </div>
           <div className="flex flex-col gap-1.5">
-            {fields.map((f) => (
-              <div key={f.id} className="flex items-center gap-1.5">
-                <Input value={f.key} onChange={(e) => updateField(f.id, { key: e.target.value })} placeholder="campo" className="w-[110px] shrink-0" />
-                <Input value={f.value} onChange={(e) => updateField(f.id, { value: e.target.value })} placeholder="valor" />
-                <button
-                  type="button"
-                  onClick={() => setFields((prev) => prev.filter((x) => x.id !== f.id))}
-                  className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))}
+            {fields.map((f) => {
+              const fieldError = fieldErrors[f.key.trim()];
+              return (
+                <div key={f.id}>
+                  <div className="flex items-center gap-1.5">
+                    <Input value={f.key} onChange={(e) => updateField(f.id, { key: e.target.value })} placeholder="campo" className="w-[110px] shrink-0" />
+                    <Input
+                      value={f.value}
+                      onChange={(e) => updateField(f.id, { value: e.target.value })}
+                      placeholder="valor"
+                      aria-invalid={fieldError ? true : undefined}
+                      className={cn(fieldError && "border-danger")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFields((prev) => prev.filter((x) => x.id !== f.id))}
+                      className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  {fieldError && <p className="mt-0.5 pl-[116px] text-[11.5px] text-danger">{fieldError}</p>}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -555,8 +629,8 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
   -H "X-Internal-Secret: SEU_INTERNAL_API_SECRET" \\
   -d '{
     "agentId": "ID_DO_AGENTE",
-    "variables": { "nome": "...", "email": "...", "telefone": "..." },
-    "leadStage": "${effectiveStage}"
+    "fields": { "nome": "...", "email": "...", "telefone": "..." },
+    "stage": "${effectiveStage}"
   }'`;
 
   return (
@@ -572,10 +646,11 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
         </div>
         <p className="text-[12.5px] text-text-secondary">
           Pra mandar lead de um n8n, formulário externo, etc., use o mesmo <code className="font-mono">INTERNAL_API_SECRET</code> que
-          já está no seu <code className="font-mono">.env.local</code>. <code className="font-mono">variables</code> aceita
-          qualquer campo, não só os do exemplo. Cada etapa do funil tem seu próprio valor de{" "}
-          <code className="font-mono">leadStage</code>, clique no ícone <code className="font-mono">{"</>"}</code> de outra
-          coluna do Kanban pra pegar o exemplo já configurado pra ela.
+          já está no seu <code className="font-mono">.env.local</code>. <code className="font-mono">fields</code> aceita
+          qualquer campo, não só os do exemplo: nome, e-mail e telefone são validados e vão para a ficha do contato
+          (mesmo e-mail ou telefone atualiza o contato existente em vez de duplicar); o resto vira campo livre. Cada etapa
+          do funil tem seu próprio valor de <code className="font-mono">stage</code>, clique no ícone{" "}
+          <code className="font-mono">{"</>"}</code> de outra coluna do Kanban pra pegar o exemplo já configurado pra ela.
         </p>
         <div className="grid grid-cols-5 gap-1.5">
           {STAGES.map((s) => (
@@ -608,6 +683,7 @@ export default function LeadsPage() {
   const [apiInfoStage, setApiInfoStage] = React.useState<(typeof STAGES)[number] | null>(null);
   const [sourceFilter, setSourceFilter] = React.useState<LeadSource | "all">("all");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [actionError, setActionError] = React.useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -623,21 +699,59 @@ export default function LeadsPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  async function handleStageChange(id: string, leadStage: string) {
-    setLeads((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, leadStage } : l)));
-    await fetch(`/api/leads/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leadStage }),
-    });
+  async function erroDaResposta(res: Response, padrao: string): Promise<string> {
+    const data = await res.json().catch(() => null);
+    return (data && typeof data.error === "string" && data.error) || padrao;
+  }
+
+  // Otimista: muda na hora e desfaz se o servidor recusar.
+  async function handleStageChange(id: string, stage: string) {
+    const anterior = leads?.find((l) => l.id === id)?.stage;
+    setActionError(null);
+    setLeads((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, stage } : l)));
+    try {
+      const res = await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage }),
+      });
+      if (!res.ok) throw new Error(await erroDaResposta(res, "Não foi possível mudar a etapa."));
+    } catch (err) {
+      if (anterior !== undefined) setLeads((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, stage: anterior } : l)));
+      setActionError(err instanceof Error ? err.message : "Não foi possível mudar a etapa.");
+    }
+  }
+
+  // Remove N leads da lista (o contato continua em Contatos). Os que o
+  // servidor recusar voltam para a tela.
+  async function removerDosLeads(ids: string[]) {
+    const removidos = (leads ?? []).filter((l) => ids.includes(l.id));
+    setActionError(null);
+    setLeads((prev) => (prev ?? []).filter((l) => !ids.includes(l.id)));
+    setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+    if (openId && ids.includes(openId)) setOpenId(null);
+
+    const resultados = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const res = await fetch(`/api/leads/${id}`, { method: "DELETE" });
+          return res.ok ? null : await erroDaResposta(res, "Não foi possível remover o lead.");
+        } catch {
+          return "Não foi possível remover o lead.";
+        }
+      })
+    );
+    const falhas = removidos.filter((l) => resultados[ids.indexOf(l.id)] !== null);
+    if (falhas.length > 0) {
+      setLeads((prev) => [...falhas, ...(prev ?? []).filter((l) => !falhas.some((f) => f.id === l.id))]);
+      const primeiro = resultados.find((r) => r !== null);
+      setActionError(falhas.length === 1 ? primeiro ?? "Não foi possível remover o lead." : `${falhas.length} leads não puderam ser removidos: ${primeiro}`);
+    }
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Excluir esse lead? Essa ação não pode ser desfeita.")) return;
-    setLeads((prev) => (prev ?? []).filter((l) => l.id !== id));
-    setOpenId(null);
-    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-    await fetch(`/api/leads/${id}`, { method: "DELETE" });
+    if (!window.confirm("Remover esse lead da lista? O contato, as conversas e os negócios continuam em Contatos.")) return;
+    await removerDosLeads([id]);
   }
 
   function toggleSelect(id: string) {
@@ -651,11 +765,8 @@ export default function LeadsPage() {
 
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Excluir ${selectedIds.size} lead(s) selecionado(s)? Essa ação não pode ser desfeita.`)) return;
-    const ids = Array.from(selectedIds);
-    setLeads((prev) => (prev ?? []).filter((l) => !selectedIds.has(l.id)));
-    setSelectedIds(new Set());
-    await Promise.all(ids.map((id) => fetch(`/api/leads/${id}`, { method: "DELETE" })));
+    if (!window.confirm(`Remover ${selectedIds.size} lead(s) da lista? Os contatos continuam em Contatos.`)) return;
+    await removerDosLeads(Array.from(selectedIds));
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -673,7 +784,7 @@ export default function LeadsPage() {
     setOverStage(null);
     if (stage && STAGES.includes(stage as (typeof STAGES)[number])) {
       const current = leads?.find((l) => l.id === id);
-      if (current && (current.leadStage || "novo") !== stage) handleStageChange(id, stage);
+      if (current && (current.stage || "novo") !== stage) handleStageChange(id, stage);
     }
   }
 
@@ -681,7 +792,7 @@ export default function LeadsPage() {
 
   const filtered = leads.filter((l) => {
     if (sourceFilter !== "all" && leadSource(l) !== sourceFilter) return false;
-    if (search.trim() && !`${leadName(l)} ${JSON.stringify(l.variables)}`.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    if (search.trim() && !`${leadName(l)} ${JSON.stringify(l.fields)}`.toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
   });
 
@@ -694,19 +805,19 @@ export default function LeadsPage() {
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Leads</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contatos capturados pelo chat e pelo formulário do seu site. Arraste entre colunas pra mudar o estágio.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contatos que viraram lead em qualquer canal (site, WhatsApp, Instagram, formulário, API). Arraste entre colunas pra mudar o estágio.</p>
         </div>
         <div className="flex items-center gap-2">
           {anySelected && (
             <Button type="button" variant="danger" size="sm" onClick={handleBulkDelete}>
-              <Trash2 size={14} /> Excluir {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
+              <Trash2 size={14} /> Remover {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
             </Button>
           )}
           <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as LeadSource | "all")} className="w-[150px]">
             <option value="all">Todas as origens</option>
-            <option value="chat">{SOURCE_LABEL.chat}</option>
-            <option value="form">{SOURCE_LABEL.form}</option>
-            <option value="manual">{SOURCE_LABEL.manual}</option>
+            {(Object.keys(SOURCE_LABEL) as LeadSource[]).map((s) => (
+              <option key={s} value={s}>{SOURCE_LABEL[s]}</option>
+            ))}
           </Select>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-[200px]" />
           <DropdownMenu>
@@ -730,10 +841,19 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {actionError && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-surface-2 px-3 py-2 text-[12.5px] text-danger">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="text-text-tertiary hover:text-text-primary" title="Fechar">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
           {STAGES.map((stage) => {
-            const stageLeads = filtered.filter((l) => (l.leadStage || "novo") === stage);
+            const stageLeads = filtered.filter((l) => (l.stage || "novo") === stage);
             const accent = STAGE_ACCENT[stage];
             return (
               <DroppableColumn key={stage} stage={stage} isOver={overStage === stage}>

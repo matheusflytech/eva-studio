@@ -86,12 +86,29 @@ export function quandoCurto(iso: string, agora: Date): string {
 
 const mesSP = (d: Date) => diaSP(d).slice(0, 7);
 
+/**
+ * Dia da previsão de fechamento (AAAA-MM-DD). É data sem hora: o servidor
+ * grava meio-dia UTC, e registro antigo ficou à meia-noite UTC — nos dois
+ * casos o dia escolhido é a parte UTC. Converter para SP jogaria o antigo
+ * para a véspera.
+ */
+export function diaDaPrevisao(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 10);
+}
+
+/** "28 out" de um dia AAAA-MM-DD, sem passar por fuso. */
+export function dataCurtaDoDia(dia: string): string {
+  const [, m, d] = dia.split("-");
+  return `${Number(d)} ${MESES[Number(m) - 1]}`;
+}
+
 function tarefaAtrasada(n: NegocioKanban, agora: Date): boolean {
   return !!n.nextTask?.dueAt && new Date(n.nextTask.dueAt).getTime() < agora.getTime();
 }
 
-function fechamentoPassou(n: NegocioKanban, agora: Date): boolean {
-  return !!n.expectedClosingAt && diaSP(new Date(n.expectedClosingAt)) < diaSP(agora);
+/** Previsão vencida: o dia previsto já passou no calendário de SP (o próprio dia ainda não conta). */
+export function fechamentoPassou(n: Pick<NegocioKanban, "expectedClosingAt">, agora: Date): boolean {
+  return !!n.expectedClosingAt && diaDaPrevisao(n.expectedClosingAt) < diaSP(agora);
 }
 
 /** Aberto e com algo pedindo ação agora: parado, tarefa atrasada ou previsão vencida. */
@@ -130,7 +147,9 @@ export function sinalDoNegocio(n: NegocioKanban, tipoDaEtapa: string, agora: Dat
     const dias = Math.max(1, Math.floor((agora.getTime() - new Date(n.nextTask!.dueAt!).getTime()) / DIA));
     return { tom: "bad", icone: "clock", texto: `Retorno atrasado ${dias}d` };
   }
-  if (fechamentoPassou(n, agora)) return { tom: "bad", icone: "cal", texto: `Fechamento passou ${dataCurta(n.expectedClosingAt!)}` };
+  if (fechamentoPassou(n, agora)) {
+    return { tom: "bad", icone: "cal", texto: `Fechamento passou ${dataCurtaDoDia(diaDaPrevisao(n.expectedClosingAt!))}` };
+  }
   if (estaParado(n, tipoDaEtapa, agora)) return { tom: "warn", icone: "hour", texto: `Parado ${diasParado(n, agora)} dias` };
 
   if (n.nextTask) {
@@ -140,7 +159,7 @@ export function sinalDoNegocio(n: NegocioKanban, tipoDaEtapa: string, agora: Dat
     const texto = n.nextTask.text.trim().slice(0, 40) || "Tarefa";
     return { tom: "neu", icone: "task", texto: quando ? `${texto} · ${quando}` : texto };
   }
-  if (n.expectedClosingAt) return { tom: "neu", icone: "cal", texto: `Fecha ${dataCurta(n.expectedClosingAt)}` };
+  if (n.expectedClosingAt) return { tom: "neu", icone: "cal", texto: `Fecha ${dataCurtaDoDia(diaDaPrevisao(n.expectedClosingAt))}` };
   return null;
 }
 
@@ -189,7 +208,7 @@ function passaNaVisao(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora
     case "parados":
       return estaParado(n, tipo, agora);
     case "fechando":
-      return tipo === "open" && !!n.expectedClosingAt && mesSP(new Date(n.expectedClosingAt)) === mesSP(agora);
+      return tipo === "open" && !!n.expectedClosingAt && diaDaPrevisao(n.expectedClosingAt).slice(0, 7) === mesSP(agora);
     default:
       return true;
   }

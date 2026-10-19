@@ -5,7 +5,8 @@ import { Prisma } from "@/generated/prisma/client";
 // Segmentos — público salvo, montado a partir de regras.
 //
 // Uma regra é { field, op, value }. O campo pode ser:
-//   - coluna da ficha: name | email | phone | channel | source | optIn
+//   - coluna da ficha: name | email | phone | source | optIn
+//   - canal: channel                (ops "equals"/"not_equals", via ContactChannel)
 //   - data: createdAt | lastSeenAt  (ops "before"/"after", valor ISO)
 //   - etiqueta: tag                 (ops "has"/"not_has", valor = id da Tag)
 //   - campo livre: custom:<chave>   (ops de texto, dentro do JSON customFields)
@@ -33,11 +34,19 @@ export interface SegmentRule {
   value?: string;
 }
 
-const TEXT_FIELDS = new Set(["name", "email", "phone", "channel", "source"]);
+// `channel` NÃO é coluna de Contact: o canal mora em ContactChannel (relação
+// `channels`). Tratar como coluna gerava PrismaClientValidationError (500).
+const TEXT_FIELDS = new Set(["name", "email", "phone", "source"]);
 const DATE_FIELDS = new Set(["createdAt", "lastSeenAt"]);
 const BOOL_FIELDS = new Set(["optIn"]);
 
+/** Where que nunca casa: regra inválida não pode virar "todo mundo". */
+export const WHERE_IMPOSSIVEL: Prisma.ContactWhereInput = { id: { in: [] } };
+
+const OPS_SEM_VALOR = new Set<SegmentOp>(["is_empty", "not_empty", "is_true", "is_false"]);
+
 function textCondition(field: string, op: SegmentOp, value: string): Prisma.ContactWhereInput | null {
+  if (!OPS_SEM_VALOR.has(op) && !value) return null;
   switch (op) {
     case "contains":
       return { [field]: { contains: value, mode: "insensitive" } } as Prisma.ContactWhereInput;
@@ -54,8 +63,50 @@ function textCondition(field: string, op: SegmentOp, value: string): Prisma.Cont
   }
 }
 
+function channelCondition(op: SegmentOp, value: string): Prisma.ContactWhereInput | null {
+  if (!value) return null;
+  if (op === "equals") return { channels: { some: { channel: value } } };
+  if (op === "not_equals") return { channels: { none: { channel: value } } };
+  return null;
+}
+
+/**
+ * Campo livre (JSON). SQL conferido no Prisma 7: `path + equals: AnyNull` vira
+ * `(#>path) = 'null' OR (#>path) IS NULL`, ou seja, pega chave ausente e null
+ * JSON; `string_contains` aceita `mode: "insensitive"` (LOWER ... LIKE).
+ */
+function customCondition(key: string, op: SegmentOp, value: string): Prisma.ContactWhereInput | null {
+  const vazio: Prisma.ContactWhereInput = {
+    OR: [
+      { customFields: { path: [key], equals: Prisma.AnyNull } },
+      { customFields: { path: [key], equals: "" } },
+    ],
+  };
+  if (!OPS_SEM_VALOR.has(op) && !value) return null;
+  switch (op) {
+    case "contains":
+      return { customFields: { path: [key], string_contains: value, mode: "insensitive" } };
+    case "equals":
+      return { customFields: { path: [key], equals: value } };
+    case "not_equals":
+      // Sem a chave também é "diferente de" (NOT sobre NULL não casaria).
+      return {
+        OR: [
+          { NOT: { customFields: { path: [key], equals: value } } },
+          { customFields: { path: [key], equals: Prisma.AnyNull } },
+        ],
+      };
+    case "is_empty":
+      return vazio;
+    case "not_empty":
+      return { NOT: vazio };
+    default:
+      return null;
+  }
+}
+
 function ruleToWhere(rule: SegmentRule): Prisma.ContactWhereInput | null {
-  const value = (rule.value ?? "").trim();
+  const value = String(rule.value ?? "").trim();
 
   if (rule.field === "tag") {
     if (!value) return null;
@@ -64,25 +115,12 @@ function ruleToWhere(rule: SegmentRule): Prisma.ContactWhereInput | null {
     return null;
   }
 
+  if (rule.field === "channel") return channelCondition(rule.op, value);
+
   if (rule.field.startsWith("custom:")) {
-    const key = rule.field.slice("custom:".length);
+    const key = rule.field.slice("custom:".length).trim();
     if (!key) return null;
-    // Prisma filtra JSON por caminho. `string_contains` cobre "contém" e
-    // `equals` cobre igualdade exata; vazio/não-vazio viram presença da chave.
-    switch (rule.op) {
-      case "contains":
-        return { customFields: { path: [key], string_contains: value } };
-      case "equals":
-        return { customFields: { path: [key], equals: value } };
-      case "not_equals":
-        return { NOT: { customFields: { path: [key], equals: value } } };
-      case "not_empty":
-        return { NOT: { customFields: { path: [key], equals: Prisma.DbNull } } } as Prisma.ContactWhereInput;
-      case "is_empty":
-        return { customFields: { path: [key], equals: Prisma.DbNull } } as Prisma.ContactWhereInput;
-      default:
-        return null;
-    }
+    return customCondition(key, rule.op, value);
   }
 
   if (TEXT_FIELDS.has(rule.field)) return textCondition(rule.field, rule.op, value);
@@ -102,24 +140,37 @@ function ruleToWhere(rule: SegmentRule): Prisma.ContactWhereInput | null {
     return null;
   }
 
-  return null; // campo desconhecido: ignora a regra em vez de quebrar a consulta
+  return null; // campo desconhecido
 }
 
 /**
- * Traduz as regras de um segmento no `where` do Prisma, já preso ao agente.
+ * Erros das regras, em português, um por regra inválida (vazio = tudo ok).
+ * POST/PATCH de segmento usam isso pra responder 400 em vez de salvar um
+ * segmento que, na prática, pegaria todo mundo.
+ */
+export function validarRegras(rules: SegmentRule[]): string[] {
+  const erros: string[] = [];
+  rules.forEach((r, i) => {
+    if (ruleToWhere(r) === null) erros.push(`Regra ${i + 1} inválida: confira o campo, a condição e o valor.`);
+  });
+  return erros;
+}
+
+/**
+ * Traduz as regras de um segmento no `where` do Prisma, já preso à org.
  *
- * Regra inválida é descartada silenciosamente (campo que não existe mais,
- * etiqueta apagada). Se sobrar zero regra válida, devolve só o filtro do
- * agente — um segmento vazio é "todo mundo", que é o comportamento menos
- * surpreendente na hora de montar um disparo.
+ * Sem regra nenhuma, o segmento é "todo mundo" (é o que a tela promete).
+ * Regra inválida (etiqueta vazia, campo que não existe mais) NUNCA alarga o
+ * público: ela vira um where impossível — em "todas as regras" o segmento
+ * fica vazio, em "qualquer regra" ela só não soma ninguém.
  */
 export function buildSegmentWhere(
   orgId: string,
   match: string,
   rules: SegmentRule[]
 ): Prisma.ContactWhereInput {
-  const conditions = rules.map(ruleToWhere).filter((c): c is Prisma.ContactWhereInput => c !== null);
-  if (conditions.length === 0) return { orgId };
+  if (rules.length === 0) return { orgId };
+  const conditions = rules.map((r) => ruleToWhere(r) ?? WHERE_IMPOSSIVEL);
   return match === "any" ? { orgId, OR: conditions } : { orgId, AND: conditions };
 }
 
@@ -130,3 +181,16 @@ export function parseRules(raw: unknown): SegmentRule[] {
   );
 }
 
+
+/**
+ * Regras vindas do corpo de POST/PATCH, ou a mensagem de erro (400). Nada é
+ * descartado em silêncio: regra malformada ou inválida recusa o salvamento.
+ */
+export function lerRegras(bruto: unknown): SegmentRule[] | string {
+  if (bruto === undefined || bruto === null) return [];
+  if (!Array.isArray(bruto)) return "As regras precisam ser uma lista.";
+  const rules = parseRules(bruto);
+  if (rules.length !== bruto.length) return "Há regra sem campo definido.";
+  const erros = validarRegras(rules);
+  return erros.length > 0 ? erros.join(" ") : rules;
+}

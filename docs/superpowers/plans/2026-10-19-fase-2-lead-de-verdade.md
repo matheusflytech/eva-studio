@@ -977,9 +977,9 @@ e fechar esse `else {` em volta do código antigo do ramo de Captura (o que trat
 **Files:**
 - Rewrite: `src/app/api/leads/route.ts`, `src/app/api/leads/[id]/route.ts`
 
-- [ ] **Step 1: Teste de rota** (`src/app/api/leads/route.test.ts`, mesmo padrão de `triggers/route.test.ts`): sem sessão → 401; GET chama `listarLeads(orgId)`; POST manual chama `salvarLeadExterno(orgId, {agentId, fields: variables, stage: leadStage}, "manual")` e devolve `{ id }`; POST com `X-Internal-Secret` exige `agentId` existente e usa o `orgId` do agente; erro de validação → 400 com `fieldErrors`; PATCH com etapa inválida → 400; DELETE tira da lista (`leadStage: null`) e **não** apaga o contato; contato de outra org → 404.
+- [x] **Step 1: Teste de rota** (`src/app/api/leads/route.test.ts`, mesmo padrão de `triggers/route.test.ts`): sem sessão → 401; GET chama `listarLeads(orgId)`; POST manual chama `salvarLeadExterno(orgId, {agentId, fields: variables, stage: leadStage}, "manual")` e devolve `{ id }`; POST com `X-Internal-Secret` exige `agentId` existente e usa o `orgId` do agente; erro de validação → 400 com `fieldErrors`; PATCH com etapa inválida → 400; DELETE tira da lista (`leadStage: null`) e **não** apaga o contato; contato de outra org → 404.
 
-- [ ] **Step 2: Implementar.**
+- [x] **Step 2: Implementar.**
 
 `src/app/api/leads/route.ts`:
 ```ts
@@ -1067,7 +1067,7 @@ export async function DELETE(_request: Request, { params }: Params) {
 }
 ```
 
-- [ ] **Step 3:** testes passam, `tsc` limpo. Commit local.
+- [x] **Step 3:** testes passam, `tsc` limpo. (Commit local pendente — aguardando o Alfredo.)
 
 ---
 
@@ -1096,11 +1096,11 @@ function publico(l: LeadDto) {
 }
 ```
 
-- [ ] **Step 1: Teste:** chave inválida → 401; limite de requisições → 429; `GET ?stage=` repassa etapa válida e ignora inválida; `POST` com e-mail inválido → 400 `{ error, fieldErrors }`; `POST` ok → 201 com `data.id` = id do contato; `GET /:id` com id **antigo de conversa** resolve via `resolverIdDoLead` e devolve o lead; `PATCH /:id` com `fields.email` inválido → 400; `PATCH` ok mescla `fields` no `customFields`/colunas; `DELETE` → `leadStage: null` e resposta `{ data: { removed: true } }`.
+- [x] **Step 1: Teste:** chave inválida → 401; limite de requisições → 429; `GET ?stage=` repassa etapa válida e ignora inválida; `POST` com e-mail inválido → 400 `{ error, fieldErrors }`; `POST` ok → 201 com `data.id` = id do contato; `GET /:id` com id **antigo de conversa** resolve via `resolverIdDoLead` e devolve o lead; `PATCH /:id` com `fields.email` inválido → 400; `PATCH` ok mescla `fields` no `customFields`/colunas; `DELETE` → `leadStage: null` e resposta `{ data: { removed: true } }`.
 
-- [ ] **Step 2: Implementar** — mesma autenticação/limite de hoje (`requireApiKeyOrgId`, `checkRateLimit(\`apikey:${orgId}\`, 120, 60)`); listagem por `listarLeads(orgId, { stage, limit })`; criação por `salvarLeadExterno(orgId, { agentId, fields, stage }, "api")` (o `contactId` do corpo antigo é ignorado); `/:id` sempre passa por `resolverIdDoLead` e depois `buscarLead`; `PATCH` reaproveita `salvarLeadExterno` só para validar/normalizar os `fields` (extrair a parte de validação para `validarCamposDeLead(fields)` em `leads.ts` e usar nas duas funções — com teste).
+- [x] **Step 2: Implementar** — mesma autenticação/limite de hoje (`requireApiKeyOrgId`, `checkRateLimit(\`apikey:${orgId}\`, 120, 60)`); listagem por `listarLeads(orgId, { stage, limit })`; criação por `salvarLeadExterno(orgId, { agentId, fields, stage }, "api")` (o `contactId` do corpo antigo é ignorado); `/:id` sempre passa por `resolverIdDoLead` e depois `buscarLead`; `PATCH` reaproveita `salvarLeadExterno` só para validar/normalizar os `fields` (extrair a parte de validação para `validarCamposDeLead(fields)` em `leads.ts` e usar nas duas funções — com teste).
 
-- [ ] **Step 3:** testes, `tsc`. Commit local.
+- [x] **Step 3:** testes, `tsc`. (Commit local pendente — aguardando o Alfredo.)
 
 ---
 
@@ -1109,15 +1109,28 @@ function publico(l: LeadDto) {
 **Files:**
 - Modify: `src/app/(app)/leads/page.tsx`
 
-- [ ] **Step 1: Tipo** — `interface Lead` passa a ser o `LeadDto` (copiar os campos; não importar de `server`).
-- [ ] **Step 2: Nome/e-mail/telefone** — `leadName = lead.name || pick(lead.fields, [...]) || "Sem nome"`; `leadEmail = lead.email || pick(...)`; `leadPhone = lead.phone || pick(...)`; trocar `lead.variables` por `lead.fields` no arquivo todo.
-- [ ] **Step 3: Origem** — `leadSource` passa a olhar `lead.channel` (`website` + `externalId` com `site-` = chat; `landing_` = formulário; `api`/`manual` = Manual/API; `instagram`, `whatsapp_meta`, `whatsapp_qr`, `messenger`, `telegram` ganham rótulo próprio). Atualizar `SOURCE_LABEL`/`SOURCE_ICON` e o filtro de origem.
-- [ ] **Step 4: Conversa e execuções** — mensagens: `fetch(\`/api/conversations/${lead.conversationId}/messages\`)` só se houver `conversationId` (senão mostrar "Sem conversa — lead criado pela tela ou API."). Execuções: `conversationId = \`${lead.channel}:${lead.externalId}\`` (sem fixar `website:`).
-- [ ] **Step 5: Ficha** — no cabeçalho do detalhe, link "Abrir ficha" → `/contatos?abrir=${lead.id}`; nos dados, mostrar Nome/E-mail/Telefone primeiro e depois os campos livres.
-- [ ] **Step 6: Excluir** — botão e confirmação passam a dizer "Remover dos leads" e explicar que o contato continua em Contatos.
-- [ ] **Step 7: Novo lead (modal)** — mostrar o erro por campo que vem em `fieldErrors`.
+- [x] **Step 1: Tipo** — `interface Lead` passa a ser o `LeadDto` (copiar os campos; não importar de `server`).
+- [x] **Step 2: Nome/e-mail/telefone** — `leadName = lead.name || pick(lead.fields, [...]) || "Sem nome"`; `leadEmail = lead.email || pick(...)`; `leadPhone = lead.phone || pick(...)`; trocar `lead.variables` por `lead.fields` no arquivo todo.
+- [x] **Step 3: Origem** — `leadSource` passa a olhar `lead.channel` (`website` + `externalId` com `site-` = chat; `landing_` = formulário; `api`/`manual` = Manual/API; `instagram`, `whatsapp_meta`, `whatsapp_qr`, `messenger`, `telegram` ganham rótulo próprio). Atualizar `SOURCE_LABEL`/`SOURCE_ICON` e o filtro de origem.
+- [x] **Step 4: Conversa e execuções** — mensagens: `fetch(\`/api/conversations/${lead.conversationId}/messages\`)` só se houver `conversationId` (senão mostrar "Sem conversa — lead criado pela tela ou API."). Execuções: `conversationId = \`${lead.channel}:${lead.externalId}\`` (sem fixar `website:`).
+- [x] **Step 5: Ficha** — no cabeçalho do detalhe, link "Abrir ficha" → `/contatos?abrir=${lead.id}`; nos dados, mostrar Nome/E-mail/Telefone primeiro e depois os campos livres.
+- [x] **Step 6: Excluir** — botão e confirmação passam a dizer "Remover dos leads" e explicar que o contato continua em Contatos.
+- [x] **Step 7: Novo lead (modal)** — mostrar o erro por campo que vem em `fieldErrors`.
 - [ ] **Step 8: Navegador:** lista carrega; mudar etapa arrastando; abrir detalhe; "Abrir ficha" abre o contato certo; remover dos leads some da lista e o contato continua em Contatos; criar lead com e-mail inválido mostra o erro no campo.
-- [ ] **Step 9:** `tsc`, lint sem erro novo. Commit local.
+- [x] **Step 9:** `tsc`, lint sem erro novo (os 3 `set-state-in-effect` da página já existiam). (Commit local pendente.)
+
+#### Como ficou (Tasks 7–9, 19/10/2026) — diferenças em relação ao plano
+
+- **Permissões (A3):** `/api/leads` GET e `/api/leads/:id` GET usam `requirePermission("read")`; POST (por sessão), PATCH e DELETE usam `requirePermission("contacts:manage")` (viewer → 403). POST com `X-Internal-Secret` continua sem sessão, org vem do agente.
+- **Corpo:** `fields`/`stage` são os nomes novos; `variables`/`leadStage` continuam aceitos como apelido (rota interna e v1). `contactId` (formato antigo) é aceito se for texto e ignorado; não-texto → 400. JSON inválido → 400 (`lerCorpo`/`JSON_INVALIDO`). Stage fora de `LEAD_STAGES` → 400.
+- **`leads.ts`:** `ResultadoLead` de erro agora carrega `status` (400/404); validação extraída para `validarCamposDeLead`; novos `atualizarLead`, `removerDosLeads`, `serializarLeadPublico`; `LeadDto` ganhou `conversationChannel` (canal da última conversa, usado para achar as execuções do fluxo).
+- **A7 — dedupe por telefone:** antes `contains telefone.slice(-10)` juntava DDDs diferentes. Agora o e-mail é procurado primeiro; o telefone pré-filtra por `contains` dos 4 últimos dígitos e compara o número inteiro com `normalizePhone` (sem 55). `11977776666` ≠ `21977776666`.
+- **`GET /api/leads/:id`** foi acrescentado (antes não existia). PATCH aceita `fields` além de `stage` e devolve `{ ok: true, lead }`.
+- **v1 `GET ?stage=` inválido → 400** (o plano dizia "ignora"; ignorar devolveria todos os leads, o que é pior para quem filtra).
+- **v1 `DELETE`** responde `{ data: { deleted: true, removed: true } }` — `deleted` mantido por compatibilidade com a resposta antiga.
+- **v1 resposta:** chaves antigas (`id`, `agentId`, `contactId`, `stage`, `fields`, `createdAt`, `updatedAt`) + `name`, `email`, `phone`, `channel`, `conversationId`. Mudanças de significado: `id` é o id do **contato** (ids antigos de conversa ainda resolvem em GET/PATCH/DELETE `/:id`); `contactId` é o id externo da última conversa e pode ser `null` (lead criado pela tela/API sem conversa).
+- **Página:** PATCH/DELETE otimistas com rollback e aviso de erro; remoção em lote também desfaz os que falharem.
+- **Pendente:** Step 8 (navegador) não foi feito; leads antigos (conversas `website` com `leadStage`) só aparecem depois do backfill da Task 10.
 
 ---
 

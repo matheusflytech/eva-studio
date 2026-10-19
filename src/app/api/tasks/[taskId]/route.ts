@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { TIPOS_DE_TAREFA, statusDaReferencia } from "@/lib/server/crm";
+import { JSON_INVALIDO, conferirReferencias, dataOpcional, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
 
 // PATCH { done: true|false, text?, dueAt?, assignedToId? }
 export async function PATCH(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -11,7 +13,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ta
   const task = await prisma.task.findFirst({ where: { id: taskId, orgId: ctx.orgId } });
   if (!task) return NextResponse.json({ error: "Tarefa não encontrada." }, { status: 404 });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+
+  if (body.type !== undefined && !(TIPOS_DE_TAREFA as readonly unknown[]).includes(body.type)) {
+    return erro("Tipo de tarefa inválido.");
+  }
+  const dueAt = dataOpcional(body.dueAt);
+  if (dueAt === "invalida") return erro("Prazo inválido.");
+  const erroRef = await conferirReferencias(ctx.orgId, { assignedToId: body.assignedToId });
+  if (erroRef) return erro(erroRef, statusDaReferencia(erroRef));
+  const text = typeof body.text === "string" ? texto(body.text, 5000) : undefined;
 
   const updated = await prisma.task.update({
     where: { id: task.id },
@@ -19,10 +31,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ta
       // Desmarcar zera a data em vez de guardar histórico: a informação que
       // importa é "está feita ou não", e guardar meia-verdade confunde.
       doneAt: body.done === true ? new Date() : body.done === false ? null : undefined,
-      text: typeof body.text === "string" && body.text.trim() ? body.text.trim() : undefined,
-      type: typeof body.type === "string" ? body.type : undefined,
-      dueAt: body.dueAt !== undefined ? (body.dueAt ? new Date(body.dueAt) : null) : undefined,
-      assignedToId: body.assignedToId !== undefined ? body.assignedToId || null : undefined,
+      text: text || undefined,
+      type: body.type !== undefined ? (body.type as string) : undefined,
+      dueAt,
+      assignedToId: body.assignedToId !== undefined ? (body.assignedToId as string) || null : undefined,
     },
   });
 

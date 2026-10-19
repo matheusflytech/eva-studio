@@ -4,7 +4,15 @@ import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import { requirePermission } from "@/lib/server/permissions";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { serializeContact } from "@/lib/server/contact-dto";
-import { normalizePhone } from "@/lib/server/contacts";
+import { CANAIS_DE_CONTATO, externalIdDoCanal, filtroDeTelefone, telefoneParaGravar } from "@/lib/server/contacts";
+import {
+  conferirReferencias,
+  erro,
+  JSON_INVALIDO,
+  lerCorpo,
+  respostaDeErroDoPrisma,
+} from "@/lib/server/api-validacao";
+import { validarEmail } from "@/lib/capture-validation";
 import type { Prisma } from "@/generated/prisma/client";
 
 const PAGE_SIZE = 50;
@@ -38,12 +46,22 @@ export async function GET(request: Request) {
 
   const and: Prisma.ContactWhereInput[] = [];
   if (q) {
+    // "(11) 99999-8888" também acha quem está gravado como 5511999998888.
+    const digitos = q.replace(/\D/g, "");
+    const porDigitos: Prisma.ContactWhereInput[] =
+      digitos.length >= 4 && digitos !== q
+        ? [
+            { phone: { contains: digitos } },
+            { channels: { some: { externalId: { contains: digitos } } } },
+          ]
+        : [];
     and.push({
       OR: [
         { name: { contains: q, mode: "insensitive" } },
         { email: { contains: q, mode: "insensitive" } },
         { phone: { contains: q, mode: "insensitive" } },
         { channels: { some: { externalId: { contains: q, mode: "insensitive" } } } },
+        ...porDigitos,
       ],
     });
   }
@@ -78,24 +96,52 @@ export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const name = String(body.name ?? "").trim();
-  const email = String(body.email ?? "").trim();
-  const phone = String(body.phone ?? "").trim();
+  const emailBruto = String(body.email ?? "").trim();
+  const email = emailBruto ? validarEmail(emailBruto) : "";
+  if (email === null) return erro("E-mail inválido.");
+  const phone = telefoneParaGravar(body.phone);
+  if (phone === null) return erro("Telefone inválido. Informe com DDD.");
 
   if (!name && !email && !phone) {
     return NextResponse.json({ error: "Informe pelo menos nome, e-mail ou telefone." }, { status: 400 });
   }
 
+  // Canal opcional no cadastro manual: dá pra criar a ficha antes de saber
+  // por onde falar com a pessoa. Sem externalId, o telefone faz o papel.
+  const agentId = typeof body.agentId === "string" ? body.agentId.trim() : "";
+  const channel = typeof body.channel === "string" ? body.channel.trim() : "";
+  let externalId: string | null = null;
+  if (agentId && channel) {
+    if (!CANAIS_DE_CONTATO.has(channel)) return erro("Canal inválido.");
+    const bruto = body.externalId !== undefined && body.externalId !== "" ? body.externalId : phone;
+    if (bruto) {
+      externalId = externalIdDoCanal(channel, bruto);
+      if (!externalId) return erro("Identificador do canal inválido.");
+    }
+  }
+
+  // Tudo que aponta pra outro registro precisa ser da mesma organização: o
+  // agentId vira ContactChannel, e aceitar o de outra org seria sequestrar o
+  // canal dela.
+  const refErro = await conferirReferencias(ctx.orgId, {
+    companyId: body.companyId,
+    ownerId: body.ownerId,
+    agentId: externalId ? agentId : undefined,
+  });
+  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
+
   // Não cria duplicata na cara do usuário: se já existe alguém com esse
   // e-mail ou telefone na org, devolve conflito em vez de sujar a base.
-  const phoneKey = normalizePhone(phone);
+  const porTelefone = filtroDeTelefone(phone);
   const dupe = await prisma.contact.findFirst({
     where: {
       orgId: ctx.orgId,
       OR: [
         ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
-        ...(phoneKey.length >= 10 ? [{ phone: { contains: phoneKey } }] : []),
+        ...(porTelefone ? [porTelefone] : []),
       ],
     },
     select: { id: true, name: true },
@@ -114,31 +160,30 @@ export async function POST(request: Request) {
     customFields = r.valores;
   }
 
-  const contact = await prisma.contact.create({
-    data: {
-      orgId: ctx.orgId,
-      name,
-      email,
-      phone,
-      jobTitle: String(body.jobTitle ?? ""),
-      companyId: body.companyId || null,
-      ownerId: body.ownerId || null,
-      notes: String(body.notes ?? ""),
-      customFields: customFields as Prisma.InputJsonValue,
-      source: "manual",
-      // Canal opcional no cadastro manual: dá pra criar a ficha antes de
-      // saber por onde falar com a pessoa.
-      channels:
-        body.agentId && body.channel && body.externalId
-          ? { create: { agentId: body.agentId, channel: body.channel, externalId: String(body.externalId) } }
-          : undefined,
-    },
-    include: {
-      tags: { include: { tag: true } },
-      channels: true,
-      company: { select: { id: true, name: true } },
-    },
-  });
-
-  return NextResponse.json({ contact: serializeContact(contact) });
+  try {
+    const contact = await prisma.contact.create({
+      data: {
+        orgId: ctx.orgId,
+        name,
+        email,
+        phone,
+        jobTitle: String(body.jobTitle ?? ""),
+        companyId: typeof body.companyId === "string" && body.companyId ? body.companyId : null,
+        ownerId: typeof body.ownerId === "string" && body.ownerId ? body.ownerId : null,
+        notes: String(body.notes ?? ""),
+        customFields: customFields as Prisma.InputJsonValue,
+        source: "manual",
+        channels: externalId ? { create: { agentId, channel, externalId } } : undefined,
+      },
+      include: {
+        tags: { include: { tag: true } },
+        channels: true,
+        company: { select: { id: true, name: true } },
+      },
+    });
+    return NextResponse.json({ contact: serializeContact(contact) });
+  } catch (e) {
+    // P2002 = esse canal (agente + id externo) já é de outra ficha.
+    return respostaDeErroDoPrisma(e);
+  }
 }

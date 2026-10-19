@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { etapaEquivalente } from "@/lib/server/funis";
+import { etapaEquivalente, moverNegociosDaEtapa } from "@/lib/server/funis";
+import { registrarMudancasEmLote } from "@/lib/server/stage-events";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await requirePermission("agents:manage");
@@ -37,38 +38,31 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
-  const funil = await prisma.pipeline.findFirst({ where: { id, orgId: ctx.orgId }, include: { stages: true } });
+  const funil = await prisma.pipeline.findFirst({ where: { id, orgId: ctx.orgId } });
   if (!funil) return NextResponse.json({ error: "Funil não encontrado." }, { status: 404 });
 
   const total = await prisma.pipeline.count({ where: { orgId: ctx.orgId } });
   if (total <= 1) return NextResponse.json({ error: "A conta precisa de pelo menos um funil." }, { status: 400 });
 
-  const qtd = await prisma.deal.count({ where: { pipelineId: id } });
   const moverPara = new URL(request.url).searchParams.get("moverPara");
-
   let destino: Awaited<ReturnType<typeof carregarDestino>> = null;
-  if (qtd > 0) {
-    if (!moverPara || moverPara === id) {
-      return NextResponse.json({ error: `Este funil tem ${qtd} negócio(s). Escolha para qual funil eles vão.`, deals: qtd }, { status: 409 });
-    }
+  if (moverPara && moverPara !== id) {
     destino = await carregarDestino(moverPara, ctx.orgId);
     if (!destino || destino.stages.length === 0) return NextResponse.json({ error: "Funil de destino inválido." }, { status: 400 });
   }
 
-  await prisma.$transaction(async (tx) => {
+  // Contar, mover e apagar na mesma transação: negócio criado no funil entre
+  // a contagem e o delete iria embora junto (cascade).
+  const eventos: { dealId: string; fromStageId: string; toStageId: string }[] = [];
+  const r = await prisma.$transaction(async (tx) => {
+    const qtd = await tx.deal.count({ where: { pipelineId: id } });
+    if (qtd > 0 && !destino) return { qtd, faltaDestino: true };
     if (destino) {
-      for (const etapa of funil.stages) {
+      const etapas = await tx.pipelineStage.findMany({ where: { pipelineId: id } });
+      for (const etapa of etapas) {
         const alvo = etapaEquivalente(destino.stages, etapa);
-        await tx.deal.updateMany({
-          where: { stageId: etapa.id },
-          data: {
-            pipelineId: destino.id,
-            stageId: alvo.id,
-            probability: alvo.probability,
-            stageSince: new Date(),
-            closedAt: alvo.type !== "open" ? new Date() : null,
-          },
-        });
+        const ids = await moverNegociosDaEtapa(tx, etapa.id, alvo);
+        for (const dealId of ids) eventos.push({ dealId, fromStageId: etapa.id, toStageId: alvo.id });
       }
     }
     await tx.pipeline.delete({ where: { id } });
@@ -76,9 +70,17 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       const outro = await tx.pipeline.findFirst({ where: { orgId: ctx.orgId }, orderBy: { position: "asc" } });
       if (outro) await tx.pipeline.update({ where: { id: outro.id }, data: { isDefault: true } });
     }
+    return { qtd, faltaDestino: false };
   });
+  if (r.faltaDestino) {
+    return NextResponse.json({ error: `Este funil tem ${r.qtd} negócio(s). Escolha para qual funil eles vão.`, deals: r.qtd }, { status: 409 });
+  }
 
-  return NextResponse.json({ ok: true, movidos: qtd });
+  if (destino) {
+    const pipelineId = destino.id;
+    await registrarMudancasEmLote(eventos.map((e) => ({ ...e, orgId: ctx.orgId, pipelineId })));
+  }
+  return NextResponse.json({ ok: true, movidos: r.qtd });
 }
 
 function carregarDestino(id: string, orgId: string) {

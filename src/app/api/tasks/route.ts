@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { createTask, parseRelativeDue } from "@/lib/server/crm";
+import { TIPOS_DE_TAREFA, createTask, parseRelativeDue, statusDaReferencia } from "@/lib/server/crm";
+import { JSON_INVALIDO, conferirReferencias, dataOpcional, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Tarefas da organização.
@@ -27,8 +28,9 @@ export async function GET(request: Request) {
       deal: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
     },
-    // Sem prazo vai pro fim: tarefa sem data não é urgente por definição.
-    orderBy: [{ doneAt: "asc" }, { dueAt: { sort: "asc", nulls: "last" } }],
+    // Em aberto primeiro (doneAt nulo; no Postgres NULL vem por último no
+    // "asc"). Sem prazo vai pro fim: tarefa sem data não é urgente por definição.
+    orderBy: [{ doneAt: { sort: "asc", nulls: "first" } }, { dueAt: { sort: "asc", nulls: "last" } }],
     take: 200,
   });
 
@@ -52,25 +54,39 @@ export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
-  const text = String(body.text ?? "").trim();
-  if (!text) return NextResponse.json({ error: "Descreva a tarefa." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  const text = texto(body.text, 5000) ?? "";
+  if (!text) return erro("Descreva a tarefa.");
+
+  const type = body.type === undefined || body.type === null || body.type === "" ? "ligar" : body.type;
+  if (!(TIPOS_DE_TAREFA as readonly unknown[]).includes(type)) return erro("Tipo de tarefa inválido.");
 
   // Aceita data absoluta (da tela) ou prazo relativo (de automação).
-  const dueAt = body.dueAt
-    ? new Date(body.dueAt)
-    : body.due
-      ? parseRelativeDue(String(body.due))
-      : null;
+  let dueAt: Date | null = null;
+  if (body.dueAt !== undefined && body.dueAt !== null && body.dueAt !== "") {
+    const d = dataOpcional(body.dueAt);
+    if (d === "invalida") return erro("Prazo inválido.");
+    dueAt = d ?? null;
+  } else if (body.due) {
+    dueAt = parseRelativeDue(String(body.due));
+  }
+
+  const erroRef = await conferirReferencias(ctx.orgId, {
+    contactId: body.contactId,
+    dealId: body.dealId,
+    assignedToId: body.assignedToId,
+  });
+  if (erroRef) return erro(erroRef, statusDaReferencia(erroRef));
 
   const task = await createTask({
     orgId: ctx.orgId,
     text,
-    type: String(body.type ?? "ligar"),
-    contactId: body.contactId || null,
-    dealId: body.dealId || null,
-    assignedToId: body.assignedToId || ctx.userId,
-    dueAt: dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt : null,
+    type: type as string,
+    contactId: (body.contactId as string) || null,
+    dealId: (body.dealId as string) || null,
+    assignedToId: (body.assignedToId as string) || ctx.userId,
+    dueAt,
   });
 
   return NextResponse.json({ task: { id: task.id } });

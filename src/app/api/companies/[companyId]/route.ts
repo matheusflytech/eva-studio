@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
+import { cnpjValido, tamanhoDaEmpresa } from "../cnpj";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -20,10 +22,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     include: {
       owner: { select: { id: true, name: true } },
       contacts: {
+        where: { orgId: ctx.orgId },
         select: { id: true, name: true, jobTitle: true, email: true, phone: true },
         orderBy: { name: "asc" },
       },
       deals: {
+        where: { orgId: ctx.orgId },
         include: { stage: { select: { name: true, type: true } }, pipeline: { select: { name: true } } },
         orderBy: { updatedAt: "desc" },
       },
@@ -121,18 +125,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   const company = await prisma.company.findFirst({ where: { id: companyId, orgId: ctx.orgId } });
   if (!company) return NextResponse.json({ error: "Empresa não encontrada." }, { status: 404 });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const data: Prisma.CompanyUpdateInput = {};
 
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   for (const campo of ["sector", "website", "phone", "linkedinUrl", "address", "city", "description", "revenue", "zipcode"] as const) {
-    if (typeof body[campo] === "string") data[campo] = body[campo];
+    const valor = body[campo];
+    if (typeof valor === "string") data[campo] = valor;
   }
   if (typeof body.uf === "string") data.uf = body.uf.toUpperCase().slice(0, 2);
-  if (body.size !== undefined) data.size = body.size ? Number(body.size) : null;
+  const size = tamanhoDaEmpresa(body.size);
+  if (size === "invalido") return erro("Número de funcionários inválido.");
+  if (size !== undefined) data.size = size;
+
+  const refErro = await conferirReferencias(ctx.orgId, { ownerId: body.ownerId });
+  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
 
   if (typeof body.cnpj === "string") {
     const cnpj = body.cnpj.replace(/\D/g, "");
+    if (cnpj && !cnpjValido(cnpj)) return erro("CNPJ inválido.");
     // Mesma regra do cadastro: CNPJ preenchido é chave única na organização.
     if (cnpj) {
       const dupe = await prisma.company.findFirst({
@@ -150,7 +162,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   }
 
   if (Object.keys(data).length > 0) {
-    await prisma.company.update({ where: { id: company.id }, data });
+    try {
+      await prisma.company.update({ where: { id: company.id }, data });
+    } catch (e) {
+      return respostaDeErroDoPrisma(e);
+    }
   }
 
   // Vincular ou desvincular pessoa da conta, sem precisar abrir o contato.

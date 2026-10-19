@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
+import { cnpjValido, tamanhoDaEmpresa } from "./cnpj";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -52,11 +54,18 @@ export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Nome da empresa é obrigatório." }, { status: 400 });
 
   const cnpj = String(body.cnpj ?? "").replace(/\D/g, "");
+  if (cnpj && !cnpjValido(cnpj)) return erro("CNPJ inválido.");
+  const size = tamanhoDaEmpresa(body.size);
+  if (size === "invalido") return erro("Número de funcionários inválido.");
+
+  const refErro = await conferirReferencias(ctx.orgId, { ownerId: body.ownerId });
+  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
 
   // CNPJ é o identificador natural de empresa no Brasil. Quando vem
   // preenchido, vale como chave de deduplicação — nome repete, CNPJ não.
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
       name,
       cnpj,
       sector: String(body.sector ?? ""),
-      size: body.size ? Number(body.size) : null,
+      size: size ?? null,
       website: String(body.website ?? ""),
       phone: String(body.phone ?? ""),
       linkedinUrl: String(body.linkedinUrl ?? ""),
@@ -86,9 +95,10 @@ export async function POST(request: Request) {
       zipcode: String(body.zipcode ?? ""),
       description: String(body.description ?? ""),
       revenue: String(body.revenue ?? ""),
-      ownerId: body.ownerId || ctx.userId,
+      ownerId: typeof body.ownerId === "string" && body.ownerId ? body.ownerId : ctx.userId,
     },
-  });
+  }).catch((e: unknown) => respostaDeErroDoPrisma(e));
+  if (company instanceof Response) return company;
 
   return NextResponse.json({ company: { id: company.id, name: company.name } });
 }

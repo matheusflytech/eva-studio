@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { createDeal, ensureDefaultPipeline } from "@/lib/server/crm";
+import { ErroDeCrm, createDeal, ensureDefaultPipeline, resolverEtapaDeEntrada } from "@/lib/server/crm";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
+import {
+  JSON_INVALIDO,
+  dataOpcional,
+  erro,
+  lerCorpo,
+  reaisParaCentavos,
+  respostaDeErroDoPrisma,
+  texto,
+} from "@/lib/server/api-validacao";
 
 // Negócios de um funil, agrupados por etapa (o kanban lê isso direto).
 //   ?pipeline=<id>  padrão: o funil padrão da org
@@ -115,38 +124,57 @@ export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
-  const name = String(body.name ?? "").trim();
-  if (!name) return NextResponse.json({ error: "Nome do negócio é obrigatório." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  const name = texto(body.name, 200) ?? "";
+  if (!name) return erro("Nome do negócio é obrigatório.");
 
-  // Campos personalizados: da tela, são validados de verdade (obrigatório,
-  // tipo). O motor do fluxo usa createDeal direto e é mais tolerante.
-  let customFields: Record<string, unknown> | undefined;
-  if (body.customFields && typeof body.customFields === "object") {
-    let pipelineId: string | undefined = body.pipelineId || undefined;
-    if (!pipelineId && body.stageId) {
-      pipelineId = (await prisma.pipelineStage.findFirst({ where: { id: String(body.stageId), pipeline: { orgId: ctx.orgId } }, select: { pipelineId: true } }))?.pipelineId;
+  const amountCents = reaisParaCentavos(body.amount);
+  if (amountCents === null) return erro("Valor inválido (máximo R$ 21 milhões).");
+  const expectedClosingAt = dataOpcional(body.expectedClosingAt);
+  if (expectedClosingAt === "invalida") return erro("Previsão de fechamento inválida.");
+  for (const campo of ["pipelineId", "stageId"] as const) {
+    if (body[campo] !== undefined && body[campo] !== null && typeof body[campo] !== "string") {
+      return erro(`${campo === "stageId" ? "Etapa" : "Funil"} inválido.`);
     }
-    if (!pipelineId) pipelineId = (await ensureDefaultPipeline(ctx.orgId)).id;
-    const defs = await carregarDefinicoes(ctx.orgId, "deal", pipelineId);
-    const r = aplicarValores(defs, {}, body.customFields as Record<string, unknown>, { exigirObrigatorios: true });
-    if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
-    customFields = r.valores;
   }
 
-  const deal = await createDeal({
-    orgId: ctx.orgId,
-    name,
-    pipelineId: body.pipelineId || undefined,
-    stageId: body.stageId || undefined,
-    contactId: body.contactId || null,
-    companyId: body.companyId || null,
-    ownerId: body.ownerId || ctx.userId,
-    amountCents: Math.round(Number(body.amount ?? 0) * 100),
-    description: String(body.description ?? ""),
-    expectedClosingAt: body.expectedClosingAt ? new Date(body.expectedClosingAt) : null,
-    customFields,
-  });
+  try {
+    // Etapa primeiro: é dela que sai o funil, e os campos personalizados são
+    // validados contra o funil onde o negócio vai de fato morar.
+    const stage = await resolverEtapaDeEntrada(
+      ctx.orgId,
+      (body.pipelineId as string) || undefined,
+      (body.stageId as string) || undefined
+    );
 
-  return NextResponse.json({ deal: { id: deal.id, name: deal.name } });
+    // Campos personalizados: da tela, são validados de verdade (obrigatório,
+    // tipo). O motor do fluxo usa createDeal direto e é mais tolerante.
+    let customFields: Record<string, unknown> | undefined;
+    if (body.customFields && typeof body.customFields === "object") {
+      const defs = await carregarDefinicoes(ctx.orgId, "deal", stage.pipelineId);
+      const r = aplicarValores(defs, {}, body.customFields as Record<string, unknown>, { exigirObrigatorios: true });
+      if (!r.ok) return NextResponse.json({ error: r.erros.join(" "), erros: r.erros }, { status: 400 });
+      customFields = r.valores;
+    }
+
+    const deal = await createDeal({
+      orgId: ctx.orgId,
+      name,
+      pipelineId: stage.pipelineId,
+      stageId: stage.id,
+      contactId: (body.contactId as string) || null,
+      companyId: (body.companyId as string) || null,
+      ownerId: (body.ownerId as string) || ctx.userId,
+      amountCents: amountCents ?? 0,
+      description: texto(body.description, 5000) ?? "",
+      expectedClosingAt: expectedClosingAt ?? null,
+      customFields,
+    });
+
+    return NextResponse.json({ deal: { id: deal.id, name: deal.name } });
+  } catch (e) {
+    if (e instanceof ErroDeCrm) return erro(e.message, e.status);
+    return respostaDeErroDoPrisma(e);
+  }
 }

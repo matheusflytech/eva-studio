@@ -7,6 +7,8 @@
 // servidor recusa, e a pessoa só descobriria depois de clicar em salvar.
 // ---------------------------------------------------------------------------
 
+import { parseReais } from "@/lib/dinheiro";
+
 export type EntidadeDoCampo = "deal" | "contact";
 
 export type TipoDeCampo =
@@ -106,6 +108,23 @@ export function parseMoeda(texto: string): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
+/**
+ * "1.500,5" -> 1500.5; "1,5" -> 1.5; "1.5" -> 1.5; "1.500" -> 1500. Ponto é
+ * milhar quando há vírgula ou quando tem cara de milhar (grupos de 3, como
+ * parseReais); fora disso é o decimal. NaN se não for número.
+ */
+export function parseNumero(texto: string): number {
+  return parseReais(texto);
+}
+
+/** "AAAA-MM-DD" de um dia que existe (recusa 2026-02-31, que o JS rola para março). */
+export function dataExiste(t: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return false;
+  const [a, m, d] = t.split("-").map(Number);
+  const conferida = new Date(Date.UTC(a, m - 1, d));
+  return conferida.getUTCFullYear() === a && conferida.getUTCMonth() === m - 1 && conferida.getUTCDate() === d;
+}
+
 const semAcento = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
 /**
@@ -144,7 +163,7 @@ export function normalizarValor(def: Pick<DefinicaoDeCampo, "type" | "label" | "
     }
 
     case "number": {
-      const n = typeof bruto === "number" ? bruto : Number(String(bruto).replace(/\./g, "").replace(",", "."));
+      const n = typeof bruto === "number" ? bruto : parseNumero(String(bruto));
       if (!Number.isFinite(n)) return { ok: false, erro: `${def.label}: informe um número.` };
       return { ok: true, valor: n };
     }
@@ -158,9 +177,7 @@ export function normalizarValor(def: Pick<DefinicaoDeCampo, "type" | "label" | "
 
     case "date": {
       const t = String(bruto).trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || Number.isNaN(new Date(t).getTime())) {
-        return { ok: false, erro: `${def.label}: informe uma data válida.` };
-      }
+      if (!dataExiste(t)) return { ok: false, erro: `${def.label}: informe uma data válida.` };
       return { ok: true, valor: t };
     }
 
@@ -259,7 +276,7 @@ export function valorNumerico(def: Pick<DefinicaoDeCampo, "type">, valor: unknow
     return Number.isFinite(n) ? n / 100 : null;
   }
   if (def.type === "number") {
-    const n = typeof valor === "number" ? valor : Number(String(valor).replace(/\./g, "").replace(",", "."));
+    const n = typeof valor === "number" ? valor : parseNumero(String(valor));
     return Number.isFinite(n) ? n : null;
   }
   return null;

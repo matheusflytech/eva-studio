@@ -20,12 +20,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { DealDrawer } from "@/components/crm/deal-drawer";
 import { cn } from "@/lib/utils";
+import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
 import { ListView } from "@/components/crm/negocios/list-view";
 import { ResumoDoFunilView, type EtapaDeConversao } from "@/components/crm/negocios/resumo";
+import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import {
@@ -333,6 +335,7 @@ export default function NegociosPage() {
               </button>
             ))}
           </div>
+          <LegendaDoQuadro />
         </div>
       </div>
 
@@ -469,6 +472,11 @@ function NewDealModal({
   }, [contactQuery]);
 
   async function save() {
+    const amount = reaisDigitados(form.amount);
+    if (amount === null) {
+      setError("Valor inválido (máximo R$ 21 milhões).");
+      return;
+    }
     setBusy(true);
     setError(null);
     const res = await fetch("/api/deals", {
@@ -478,7 +486,7 @@ function NewDealModal({
         name: form.name,
         pipelineId: pipeline?.id,
         stageId: form.stageId || undefined,
-        amount: Number(form.amount.replace(/\./g, "").replace(",", ".")) || 0,
+        amount,
         description: form.description,
         contactId: contactId || undefined,
         customFields: rascunhoParaEnvio(campos, rascunho),
