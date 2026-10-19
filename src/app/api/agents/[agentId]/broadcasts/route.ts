@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { runBroadcast } from "@/lib/server/broadcast-runner";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { validarHorario } from "@/lib/server/agendamento";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Canais que aceitam disparo. Instagram fica de fora de propósito: a Meta
@@ -26,7 +27,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 
   const [broadcasts, tags, segments] = await Promise.all([
     prisma.broadcast.findMany({
-      where: { agentId },
+      // Mensagem avulsa agendada (kind "single") aparece na conversa/ficha, não aqui.
+      where: { agentId, kind: "campaign" },
       include: { variants: true, segment: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 30,
@@ -53,6 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
       sentCount: b.sentCount,
       failedCount: b.failedCount,
       status: b.status,
+      lastError: b.lastError,
       scheduledAt: b.scheduledAt?.toISOString() ?? null,
       createdAt: b.createdAt.toISOString(),
       variants: b.variants.map((v) => ({
@@ -182,11 +185,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   }
 
   // Agendamento
+  // A tela manda o instante já convertido do horário de São Paulo (ISO com Z).
   const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
-  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
-    return NextResponse.json({ error: "Data de agendamento inválida." }, { status: 400 });
+  if (scheduledAt) {
+    const problema = validarHorario(scheduledAt);
+    if (problema) return NextResponse.json({ error: problema }, { status: 400 });
   }
-  const isScheduled = !!scheduledAt && scheduledAt.getTime() > Date.now();
+  const isScheduled = !!scheduledAt;
 
   let resolvedText = text;
   if (!resolvedText && templateId) {

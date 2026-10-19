@@ -64,6 +64,8 @@ export async function POST(request: Request) {
     broadcasts: {
       ran: broadcasts.ran,
       sent: broadcasts.results.reduce((sum, r) => sum + r.sentCount, 0),
+      // Foram pra fila do WhatsApp QR; o worker soma quando saírem.
+      queued: broadcasts.results.reduce((sum, r) => sum + r.queuedCount, 0),
       failed: broadcasts.results.reduce((sum, r) => sum + r.failedCount, 0),
     },
   });

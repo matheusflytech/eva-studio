@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { deliverToContact } from "@/lib/server/outbound";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { decidirEnvio } from "@/lib/whatsapp/janela";
 
 // ---------------------------------------------------------------------------
 // Execução de um disparo.
@@ -23,6 +24,8 @@ export interface RunResult {
   totalCount: number;
   sentCount: number;
   failedCount: number;
+  /** Foram pra fila do worker (WhatsApp QR) e ainda não saíram. */
+  queuedCount: number;
   errors: string[];
 }
 
@@ -131,16 +134,31 @@ function contactValues(contact: {
  * Entrega um disparo já criado. Idempotência é por status: só roda o que
  * está em "scheduled" ou "sending"; um disparo "done" é ignorado, então uma
  * varredura repetida do worker não reenvia nada.
+ *
+ * Agendado vira "sending" de forma atômica (updateMany com status no where):
+ * se duas batidas do relógio chegarem juntas, só uma entrega.
+ *
+ * Contagem: sentCount só recebe o que SAIU aqui (envio direto). Item que foi
+ * pra fila do WhatsApp QR é somado pelo worker quando ele manda de verdade —
+ * antes os dois somavam e o placar chegava ao dobro (e fechava "done" cedo).
  */
 export async function runBroadcast(broadcastId: string): Promise<RunResult> {
   const broadcast = await prisma.broadcast.findUnique({
     where: { id: broadcastId },
     include: { variants: true, agent: { select: { orgId: true } } },
   });
-  const result: RunResult = { totalCount: 0, sentCount: 0, failedCount: 0, errors: [] };
-  if (!broadcast || broadcast.status === "done" || broadcast.status === "canceled") return result;
+  const result: RunResult = { totalCount: 0, sentCount: 0, failedCount: 0, queuedCount: 0, errors: [] };
+  if (!broadcast) return result;
 
-  await prisma.broadcast.update({ where: { id: broadcastId }, data: { status: "sending" } });
+  if (broadcast.status === "scheduled") {
+    const claim = await prisma.broadcast.updateMany({
+      where: { id: broadcastId, status: "scheduled" },
+      data: { status: "sending" },
+    });
+    if (claim.count === 0) return result; // outra batida pegou, ou foi cancelado agora
+  } else if (broadcast.status !== "sending") {
+    return result; // done | canceled
+  }
 
   const recipients = await resolveRecipients({ ...broadcast, orgId: broadcast.agent.orgId });
   result.totalCount = recipients.length;
@@ -173,21 +191,54 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
           }
         : undefined;
 
+    // WhatsApp oficial sem modelo (ou mensagem avulsa): texto livre só com a
+    // janela de 24h aberta AGORA. Avulsa com modelo sai sempre como modelo.
+    let usarModelo = !!templatePayload;
+    if (broadcast.channel === "whatsapp_meta" && (broadcast.kind === "single" || !templatePayload)) {
+      const conversa = await prisma.conversation.findUnique({
+        where: {
+          agentId_channel_contactId: {
+            agentId: broadcast.agentId,
+            channel: broadcast.channel,
+            contactId: recipient.externalId,
+          },
+        },
+        select: { lastContactMessageAt: true },
+      });
+      const decisao = decidirEnvio({
+        channel: broadcast.channel,
+        lastContactMessageAt: conversa?.lastContactMessageAt ?? null,
+        quando: new Date(),
+        temTexto: !templatePayload && text.trim().length > 0,
+        temModelo: !!templatePayload,
+      });
+      if (!decisao.ok) {
+        result.failedCount += 1;
+        if (result.errors.length < 5) result.errors.push(decisao.erro);
+        if (variant) {
+          await prisma.broadcastVariant.update({ where: { id: variant.id }, data: { failedCount: { increment: 1 } } });
+        }
+        continue;
+      }
+      usarModelo = decisao.usarModelo;
+    }
+
     const delivery = await deliverToContact({
       agentId: broadcast.agentId,
       channel: broadcast.channel,
       to: recipient.externalId,
       text,
-      template: broadcast.channel === "whatsapp_meta" ? templatePayload : undefined,
+      template: broadcast.channel === "whatsapp_meta" && usarModelo ? templatePayload : undefined,
       broadcastId: broadcast.id,
       variantId: variant?.id,
     });
 
-    if (delivery.ok) {
+    if (delivery.ok && delivery.queued) {
+      // Ainda não saiu: o worker soma no disparo e na variante quando mandar.
+      result.queuedCount += 1;
+    } else if (delivery.ok) {
       result.sentCount += 1;
-      // Item de fila (whatsapp_qr) ainda não saiu: quem confirma é o worker,
-      // então o placar aqui conta "encaminhado", e o worker ajusta depois.
-      if (variant && !delivery.queued) {
+      if (variant) {
         await prisma.broadcastVariant.update({
           where: { id: variant.id },
           data: { sentCount: { increment: 1 } },
@@ -205,15 +256,23 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
     }
   }
 
-  await prisma.broadcast.update({
-    where: { id: broadcastId },
-    data: {
-      totalCount: result.totalCount,
-      sentCount: { increment: result.sentCount },
-      failedCount: { increment: result.failedCount },
-      status: "done",
-    },
-  });
+  // Uma instrução só: soma o que saiu aqui e decide o status com os números
+  // já somados (os do worker inclusive). Se ainda há itens na fila, fica
+  // "sending" e o worker fecha quando o último sair; se o worker já mandou
+  // tudo antes desta linha, ela mesma fecha.
+  const lastError = result.errors[0] ?? null;
+  await prisma.$executeRaw`
+    UPDATE "eva_studio_broadcasts" SET
+      "totalCount" = ${result.totalCount},
+      "sentCount" = "sentCount" + ${result.sentCount},
+      "failedCount" = "failedCount" + ${result.failedCount},
+      "lastError" = COALESCE(${lastError}::text, "lastError"),
+      "status" = CASE
+        WHEN "status" = 'canceled' THEN 'canceled'
+        WHEN "sentCount" + ${result.sentCount} + "failedCount" + ${result.failedCount} >= ${result.totalCount} THEN 'done'
+        ELSE 'sending'
+      END
+    WHERE "id" = ${broadcastId}`;
 
   return result;
 }

@@ -15,6 +15,7 @@ import makeWASocket, {
   downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { loadAuthState } from "./auth-store.js";
+import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -318,36 +319,25 @@ async function resumeDueWaits() {
   }
 }
 
-// Se a linha pertence a uma campanha (Disparos), atualiza o contador e
-// fecha a campanha quando todo mundo já foi processado.
-async function bumpBroadcast(broadcastId, field) {
-  await pool.query(`update eva_studio_broadcasts set "${field}" = "${field}" + 1 where id = $1`, [broadcastId]);
-  const { rows } = await pool.query(
-    `select "totalCount", "sentCount", "failedCount" from eva_studio_broadcasts where id = $1`,
-    [broadcastId]
-  );
-  const b = rows[0];
-  if (b && b.sentCount + b.failedCount >= b.totalCount) {
-    await pool.query(`update eva_studio_broadcasts set status = 'done' where id = $1`, [broadcastId]);
-  }
-}
-
 // Drena a fila de saída (respostas manuais de atendente + disparos em
 // massa) pro WhatsApp via QR — o app principal grava aqui porque ele não
 // segura o socket do Baileys (ver eva_studio_outbound_queue no schema).
+// Os itens são reivindicados com FOR UPDATE SKIP LOCKED (ver fila.js), e o
+// placar do disparo/variante é somado aqui, quando sai de verdade — o app só
+// soma o que ele mesmo mandou direto.
+let drenando = false;
 async function drainOutboundQueue() {
+  // setInterval não espera a rodada anterior: sem isto, uma rodada lenta
+  // (mídia grande) se sobreporia à seguinte no mesmo processo.
+  if (drenando) return;
+  drenando = true;
   try {
-    const { rows } = await pool.query(
-      `select id, "agentId", "contactId", text, "broadcastId", "mediaPath", "mediaType", "mediaMime", "mediaName" from eva_studio_outbound_queue where status = 'pending' order by "createdAt" asc limit 20`
-    );
+    await expirarTravados(pool, MINUTOS_TRAVADO);
+    const rows = await reivindicarItens(pool, 20);
     for (const row of rows) {
       const session = sessions.get(row.agentId);
       if (!session?.sock) {
-        await pool.query(
-          `update eva_studio_outbound_queue set status = 'failed', error = 'WhatsApp não conectado' where id = $1`,
-          [row.id]
-        );
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+        await marcarFalha(pool, row, "WhatsApp não conectado");
         continue;
       }
       try {
@@ -376,18 +366,15 @@ async function drainOutboundQueue() {
         } else {
           await session.sock.sendMessage(row.contactId, { text: row.text });
         }
-        await pool.query(`update eva_studio_outbound_queue set status = 'sent', "sentAt" = now() where id = $1`, [row.id]);
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "sentCount");
+        await marcarEnviado(pool, row);
       } catch (err) {
-        await pool.query(`update eva_studio_outbound_queue set status = 'failed', error = $2 where id = $1`, [
-          row.id,
-          String(err?.message ?? err),
-        ]);
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+        await marcarFalha(pool, row, String(err?.message ?? err));
       }
     }
   } catch (err) {
     logger.error({ err }, "Erro ao drenar fila de saída");
+  } finally {
+    drenando = false;
   }
 }
 
@@ -414,7 +401,8 @@ async function tickScheduler() {
       return;
     }
     const data = await res.json();
-    const entregues = (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0);
+    const entregues =
+      (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0) + (data.broadcasts?.queued ?? 0);
     if (entregues > 0) logger.info(data, "Scheduler entregou mensagens");
   } catch (err) {
     logger.error({ err }, "Erro ao chamar o scheduler");

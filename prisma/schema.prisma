@@ -370,12 +370,23 @@ model MessageTemplate {
   metaTemplateName String   @default("")
   metaLanguageCode String   @default("pt_BR")
   variableOrder    Json     @default("[]")
+  // Acompanhamento do template na Meta (preenchido quando ele foi criado por
+  // aqui ou quando chega um webhook de status). A consulta ao vivo em
+  // Aprovações continua sendo a fonte da tela; isto é o último aviso gravado,
+  // usado quando a Meta não responde.
+  metaTemplateId   String?
+  metaStatus       String? // PENDING | APPROVED | REJECTED | PAUSED | DISABLED | ...
+  metaStatusReason String?
+  metaStatusAt     DateTime?
+  // Componentes enviados à Meta (header/body/footer/botões), pra prévia.
+  metaComponents   Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([agentId])
+  @@index([metaTemplateId])
   @@map("eva_studio_message_templates")
 }
 
@@ -509,8 +520,11 @@ model OutboundQueueItem {
   mediaType      String?
   mediaMime      String?
   mediaName      String?
-  status         String    @default("pending") // pending | sent | failed
+  status         String    @default("pending") // pending | sending | sent | failed
   error          String?
+  // Quando o worker pegou o item (status "sending"). Trava com FOR UPDATE
+  // SKIP LOCKED; item preso em "sending" por muito tempo vira "failed".
+  claimedAt      DateTime?
   createdAt      DateTime  @default(now())
   sentAt         DateTime?
   // Quando o contato respondeu depois de receber esse item. So e usado pelo
@@ -559,6 +573,17 @@ model Broadcast {
   // polling — a Vercel no plano gratis so permite cron 1x/dia, entao o
   // agendamento NAO vive la. Ver docs/CHATBOT_ENGINE.md §15.
   scheduledAt DateTime?
+  // "campaign" = campanha da tela de Disparos; "single" = mensagem avulsa
+  // agendada pra um contato (a partir da conversa ou da ficha do negócio).
+  // Mesmo relógio, mesma fila, mesmo envio — só muda onde aparece.
+  kind            String  @default("campaign") // campaign | single
+  // Contexto da mensagem avulsa (sem FK de propósito: só pra listar na
+  // conversa/ficha; apagar o contato ou o negócio não deve travar nada).
+  contactRecordId String?
+  dealId          String?
+  createdById     String?
+  // Último motivo de falha legível (ex.: janela de 24h fechada sem modelo).
+  lastError       String?
   createdAt   DateTime @default(now())
 
   agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -568,6 +593,8 @@ model Broadcast {
 
   @@index([agentId])
   @@index([status, scheduledAt])
+  @@index([contactRecordId])
+  @@index([dealId])
   @@map("eva_studio_broadcasts")
 }
 
