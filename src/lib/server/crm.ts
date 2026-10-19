@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
+import { registrarMudancaDeEtapa, type OrigemDoMovimento } from "@/lib/server/stage-events";
 
 // ---------------------------------------------------------------------------
 // Ações de CRM (§24 do CHATBOT_ENGINE.md).
@@ -64,6 +65,8 @@ export interface CreateDealInput {
   expectedClosingAt?: Date | null;
   /** Valores dos campos personalizados, por chave. Chave desconhecida ou valor inválido é descartado. */
   customFields?: Record<string, unknown>;
+  /** Quem criou, para o histórico de etapas. Padrão: usuario. */
+  origem?: OrigemDoMovimento;
 }
 
 /**
@@ -133,6 +136,15 @@ export async function createDeal(input: CreateDealInput) {
     },
   });
 
+  await registrarMudancaDeEtapa({
+    orgId: deal.orgId,
+    dealId: deal.id,
+    pipelineId: deal.pipelineId,
+    fromStageId: null,
+    toStageId: deal.stageId,
+    origem: input.origem,
+  });
+
   return deal;
 }
 
@@ -141,13 +153,19 @@ export async function createDeal(input: CreateDealInput) {
  * fechamento, carimba `closedAt` — sem isso não existe tempo de ciclo nem
  * taxa de conversão.
  */
-export async function moveDealStage(dealId: string, stageId: string, lostReason?: string) {
+export async function moveDealStage(
+  dealId: string,
+  stageId: string,
+  lostReason?: string,
+  origem: OrigemDoMovimento = "usuario"
+) {
   const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
   if (!stage) throw new Error("Etapa não encontrada.");
 
   const closing = stage.type === "won" || stage.type === "lost";
+  const antes = await prisma.deal.findUnique({ where: { id: dealId }, select: { stageId: true } });
 
-  return prisma.deal.update({
+  const atualizado = await prisma.deal.update({
     where: { id: dealId },
     data: {
       stageId,
@@ -161,6 +179,17 @@ export async function moveDealStage(dealId: string, stageId: string, lostReason?
       lostReason: stage.type === "lost" ? lostReason ?? "" : "",
     },
   });
+
+  await registrarMudancaDeEtapa({
+    orgId: atualizado.orgId,
+    dealId,
+    pipelineId: atualizado.pipelineId,
+    fromStageId: antes?.stageId ?? null,
+    toStageId: stageId,
+    origem,
+  });
+
+  return atualizado;
 }
 
 /** Negócio aberto mais recente do contato — usado pelos blocos que agem "no negócio da conversa". */

@@ -378,6 +378,7 @@ async function runCrmTool(
       contactId,
       amountCents,
       description: overCeiling ? "Valor acima do teto configurado — revisar." : "",
+      origem: "fluxo",
     });
 
     if (overCeiling) {
@@ -410,7 +411,7 @@ async function runCrmTool(
       return "Não tenho permissão para mover o negócio para essa etapa. Um humano precisa fazer isso.";
     }
 
-    await moveDealStage(deal.id, stage.id);
+    await moveDealStage(deal.id, stage.id, undefined, "fluxo");
     return `Negócio movido para ${stage.name}.`;
   }
 
@@ -1268,6 +1269,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
             contactId,
             amountCents: toCents(node.data.crmDealAmount),
             description: interpolate(node.data.crmDealDescription ?? "", variables),
+            origem: "fluxo",
           });
           // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
           if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
@@ -1301,7 +1303,8 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           const moved = await moveDealStage(
             deal.id,
             node.data.crmStageId,
-            interpolate(node.data.crmLostReason ?? "", variables)
+            interpolate(node.data.crmLostReason ?? "", variables),
+            "fluxo"
           );
           output = `negócio movido (prob. ${moved.probability}%)`;
         }
