@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Star, TrendingUp, X } from "lucide-react";
+import { CalendarClock, MessageCircle, Phone, Sparkles, Star, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AcaoDoRecado, Recado } from "./eva-voz";
+import type { AcaoDaAtencao, AcaoDoRecado, Acontecimento, ItemDeAtencao, Recado } from "./eva-voz";
 
 /**
  * Topo de Negócios com a cara da Eva (variação 1 da humanização): cabeçalho
@@ -161,7 +161,7 @@ export function Momentos({ itens }: { itens: string[] }) {
   );
 }
 
-export type EstiloDaTela = "classico" | "v1" | "v2";
+export type EstiloDaTela = "classico" | "v1" | "v2" | "v3";
 
 /**
  * Liga a voz humana do quadro (variação 2) sem passar prop por cartão:
@@ -175,6 +175,7 @@ export function SeletorDeEstilo({ estilo, onMudar }: { estilo: EstiloDaTela; onM
     ["classico", "Atual"],
     ["v1", "Eva · 1"],
     ["v2", "Eva · 2"],
+    ["v3", "Eva · 3"],
   ];
   return (
     <div role="radiogroup" aria-label="Estilo da tela" className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-surface-1 p-0.5 text-[12px]">
@@ -242,5 +243,129 @@ export function IlustracaoVazia({ cor }: { cor: string }) {
       <circle cx="86" cy="18" r="5" fill="none" stroke={cor} strokeWidth="1.6" />
       <path d="M20 54h56" stroke="#2a2a32" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
+  );
+}
+
+const ESTILO_DA_ACAO: Record<AcaoDaAtencao, string> = {
+  whatsapp: "border-[#25d366]/35 bg-[#25d366]/10 text-[#7be3a4] hover:border-[#25d366]/60",
+  retorno: "border-rose-400/35 bg-rose-400/10 text-rose-200 hover:border-rose-400/60",
+  remarcar: "border-border-default text-text-secondary hover:border-border-strong hover:text-text-primary",
+  ligar: "border-[#f2a65a]/35 bg-[#f2a65a]/10 text-[#f6c38f] hover:border-[#f2a65a]/60",
+};
+const ICONE_DA_ACAO: Record<AcaoDaAtencao, typeof Phone> = {
+  whatsapp: MessageCircle,
+  retorno: Phone,
+  remarcar: CalendarClock,
+  ligar: Phone,
+};
+
+/**
+ * Variação 3 (direção C): o dia em duas colunas. À esquerda o que mudou desde
+ * ontem; à direita o que pede ação hoje, cada um com o botão certo.
+ */
+export function DiaDeHoje({
+  acontecimentos,
+  atencao,
+  total,
+  onAcao,
+  onVerTodos,
+}: {
+  acontecimentos: Acontecimento[];
+  atencao: ItemDeAtencao[];
+  total: number;
+  onAcao: (item: ItemDeAtencao) => void;
+  onVerTodos: () => void;
+}) {
+  if (acontecimentos.length === 0 && atencao.length === 0) return null;
+  return (
+    <section aria-label="Seu dia" className="grid shrink-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <div className="rounded-2xl border border-border-subtle bg-surface-1 px-5 py-4">
+        <h2 className="mb-2 font-display text-[16px] font-semibold text-text-primary">Desde ontem</h2>
+        {acontecimentos.length === 0 ? (
+          <p className="py-3 text-[13px] text-text-tertiary">Tudo quieto nas últimas horas.</p>
+        ) : (
+          <ol>
+            {acontecimentos.map((a) => (
+              <li key={a.id} className="flex gap-3 border-t border-border-subtle py-2.5 first:border-t-0">
+                <span className="w-12 shrink-0 text-[12px] tabular-nums text-text-tertiary">{a.quando}</span>
+                <span className="min-w-0 text-[13.5px] leading-snug text-text-secondary">
+                  {a.partes.map((p, i) =>
+                    p.forte ? (
+                      <strong key={i} className={cn("font-semibold", p.tom === "ok" ? "text-emerald-400" : "text-text-primary")}>
+                        {p.texto}
+                      </strong>
+                    ) : (
+                      <React.Fragment key={i}>{p.texto}</React.Fragment>
+                    )
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-baseline justify-between gap-3 px-1">
+          <h2 className="font-display text-[16px] font-semibold text-text-primary">Pede sua atenção hoje</h2>
+          {total > atencao.length && (
+            <button
+              type="button"
+              onClick={onVerTodos}
+              className="rounded text-[13px] text-accent-400 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+            >
+              Ver os {total}
+            </button>
+          )}
+        </div>
+        {atencao.length === 0 ? (
+          <p className="rounded-2xl border border-border-subtle bg-surface-1 px-5 py-4 text-[13px] text-text-tertiary">
+            Nada pedindo você agora. Bom momento para prospectar.
+          </p>
+        ) : (
+          atencao.map((item) => {
+            const Icone = ICONE_DA_ACAO[item.acao];
+            const titulo = item.deal.company?.name || item.deal.contacts[0]?.name || item.deal.name;
+            return (
+              <article
+                key={item.deal.id}
+                className={cn(
+                  "flex flex-wrap items-center gap-3 rounded-2xl border bg-surface-1 px-4 py-3",
+                  item.acao === "ligar" ? "border-[#f2a65a]/30" : "border-border-subtle"
+                )}
+              >
+                <div className="min-w-[200px] flex-1">
+                  <a
+                    href={`/negocios/${item.deal.id}`}
+                    className="block truncate text-[14px] font-semibold text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                  >
+                    {item.deal.name.startsWith(titulo) ? (
+                      // Nome do negócio já começa pela empresa ("Grupo X · Piloto"): mostra só ele.
+                      item.deal.name
+                    ) : (
+                      <>
+                        {titulo}
+                        {titulo !== item.deal.name && <span className="font-normal text-text-tertiary"> · {item.deal.name}</span>}
+                      </>
+                    )}
+                  </a>
+                  <p className="text-[12.5px] text-text-secondary">{item.motivo}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onAcao(item)}
+                  className={cn(
+                    "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
+                    ESTILO_DA_ACAO[item.acao]
+                  )}
+                >
+                  <Icone size={13} aria-hidden /> {item.rotulo}
+                </button>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </section>
   );
 }

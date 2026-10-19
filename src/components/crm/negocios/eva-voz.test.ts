@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comemoracao, gargaloDaConversao, listaHumana, momentos, montarRecado, saudacao, sinalHumano, vazioDaEtapa } from "./eva-voz";
+import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, listaHumana, momentos, montarRecado, saudacao, sinalHumano, vazioDaEtapa } from "./eva-voz";
 import type { EtapaKanban, NegocioKanban } from "./modelo";
 
 // 20/out/2026 9h em São Paulo (12h UTC).
@@ -93,5 +93,39 @@ describe("variação 2: textos do quadro", () => {
     expect(vazioDaEtapa("open", "Diagnóstico", "Qualificação").dica).toBe("Puxe um de Qualificação quando ele estiver pronto.");
     expect(vazioDaEtapa("won", "Ganho", "Negociação").titulo).toBe("A próxima venda aparece aqui.");
     expect(comemoracao("Clínica", 1_740_000, 3)).toEqual({ titulo: "Fechou! Clínica, R$ 17,4 mil.", detalhe: "Já são 3 vendas este mês." });
+  });
+});
+
+describe("variação 3: o dia", () => {
+  it("atenção ordenada pela urgência, com a ação certa", () => {
+    const lista = listaDeAtencao(
+      [
+        etapa("open", [
+          negocio({ id: "parado", stageSince: "2026-09-01T12:00:00Z" }),
+          negocio({ id: "zap", whatsapp: { conversationId: "c", naoLida: true } }),
+          negocio({ id: "retorno", nextTask: { type: "ligar", text: "x", dueAt: "2026-10-18T12:00:00Z" } }),
+          negocio({ id: "ok" }),
+        ]),
+      ],
+      AGORA
+    );
+    expect(lista.map((i) => [i.deal.id, i.acao])).toEqual([
+      ["zap", "whatsapp"],
+      ["retorno", "retorno"],
+      ["parado", "ligar"],
+    ]);
+    expect(lista[1].motivo).toContain("atrasou 2 dias");
+  });
+  it("desde ontem só com o que aconteceu nas últimas horas", () => {
+    const a = desdeOntem(
+      [
+        etapa("won", [negocio({ id: "g", company: { id: "c", name: "Clínica" }, closedAt: "2026-10-20T10:00:00Z" })]),
+        etapa("open", [negocio({ id: "velho", stageSince: "2026-09-01T12:00:00Z" }), negocio({ id: "mov", stageSince: "2026-10-19T20:00:00Z" })]),
+      ],
+      AGORA
+    );
+    expect(a.map((x) => x.id)).toEqual(["gg", "emov"]);
+    expect(a[0].quando).toBe("7h00");
+    expect(a[1].quando).toBe("Ontem");
   });
 });

@@ -28,17 +28,28 @@ import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
 import { ListView } from "@/components/crm/negocios/list-view";
-import { ResumoDoFunilView, type EtapaDeConversao } from "@/components/crm/negocios/resumo";
+import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
 import {
   CabecalhoAssinatura,
   Comemoracao,
+  DiaDeHoje,
   Momentos,
   RecadoDaEva,
   SeletorDeEstilo,
   VozDoQuadro,
   type EstiloDaTela,
 } from "@/components/crm/negocios/eva-topo";
-import { carimbo, comemoracao, gargaloDaConversao, momentos, montarRecado, type AcaoDoRecado } from "@/components/crm/negocios/eva-voz";
+import {
+  carimbo,
+  comemoracao,
+  desdeOntem,
+  gargaloDaConversao,
+  listaDeAtencao,
+  momentos,
+  montarRecado,
+  type AcaoDoRecado,
+  type ItemDeAtencao,
+} from "@/components/crm/negocios/eva-voz";
 import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
@@ -47,7 +58,6 @@ import {
   filtrarEtapas,
   precisaAtencao,
   resumoDoFunil,
-  serieDeGanhoDoMes,
   valorCurto,
   type EtapaKanban,
   type FiltrosDeNegocio,
@@ -77,7 +87,6 @@ export default function NegociosPage() {
   const [stages, setStages] = React.useState<EtapaKanban[]>([]);
   const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
   const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
-  const [ciclo, setCiclo] = React.useState<number | null>(null);
   const [meuId, setMeuId] = React.useState("");
   const [meuNome, setMeuNome] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
@@ -94,8 +103,7 @@ export default function NegociosPage() {
     visao: "todos",
   });
   const [visao, setVisao] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
-  const [resumoAberto, setResumoAberto] = usePreferencia("eva:negocios:resumo", "aberto", ["aberto", "recolhido"] as const);
-  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v2", ["classico", "v1", "v2"]);
+  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v3", ["classico", "v1", "v2", "v3"]);
   // Relógio da tela: muda só quando os dados chegam (dias parados, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
@@ -168,7 +176,6 @@ export default function NegociosPage() {
           : LAYOUT_PADRAO,
       );
       setConversao(dadosDoFunil?.conversao ?? []);
-      setCiclo(typeof dadosDoFunil?.cicloDeVenda === "number" ? dadosDoFunil.cicloDeVenda : null);
       setAgora(new Date());
     } catch (e) {
       if (carga !== ultimaCarga.current) return;
@@ -199,7 +206,6 @@ export default function NegociosPage() {
       ganhoMesCents: c.esteMesCents,
       ganhosNoMes: r.ganhosNoMes,
       variacaoGanho: c.variacao,
-      serieGanho: serieDeGanhoDoMes(stages, agora),
       atencao: precisaAtencao(stages, agora),
     };
   }, [stages, agora]);
@@ -213,6 +219,17 @@ export default function NegociosPage() {
     [isLoading, stages, agora, meuNome, conversao],
   );
   const momentosDoFunil = React.useMemo(() => momentos(stages, agora), [stages, agora]);
+  const atencaoDoDia = React.useMemo(() => listaDeAtencao(stages, agora), [stages, agora]);
+  const acontecimentosDoDia = React.useMemo(() => desdeOntem(stages, agora), [stages, agora]);
+  function aoAcaoDaAtencao(item: ItemDeAtencao) {
+    // WhatsApp vai direto para a conversa; o resto abre a prévia, onde estão
+    // a próxima tarefa, a previsão e o telefone.
+    if (item.acao === "whatsapp" && item.deal.whatsapp) {
+      window.location.href = `/conversas?c=${item.deal.whatsapp.conversationId}`;
+      return;
+    }
+    setPreviaId(item.deal.id);
+  }
   const fraseDoTopo = (
     <>
       <strong className="font-semibold text-text-primary">{valorCurto(dadosDoResumo.ganhoMesCents)}</strong> ganhos neste mês
@@ -267,7 +284,7 @@ export default function NegociosPage() {
     const ids = new Set(ganhos.map((d) => d.id));
     const antes = ganhosVistos.current;
     ganhosVistos.current = { quadro, ids };
-    if (!antes || antes.quadro !== quadro || estilo !== "v2") return;
+    if (!antes || antes.quadro !== quadro || (estilo !== "v2" && estilo !== "v3")) return;
     const novo = ganhos.find((d) => !antes.ids.has(d.id));
     if (!novo) return;
     const titulo = novo.company?.name || novo.contacts[0]?.name || novo.name;
@@ -436,20 +453,18 @@ export default function NegociosPage() {
         </header>
       )}
 
-      <ResumoDoFunilView
-        dados={dadosDoResumo}
-        conversao={conversao}
-        ciclo={ciclo}
-        recolhido={resumoAberto === "recolhido"}
-        onAlternar={() => setResumoAberto(resumoAberto === "recolhido" ? "aberto" : "recolhido")}
-        verAtencao={filtros.visao === "atencao"}
-        onVerAtencao={() =>
-          setFiltros((f) => ({
-            ...f,
-            visao: f.visao === "atencao" ? "todos" : "atencao",
-          }))
-        }
-      />
+      {estilo === "v3" && !isLoading && (
+        <DiaDeHoje
+          acontecimentos={acontecimentosDoDia}
+          atencao={atencaoDoDia.slice(0, 4)}
+          total={atencaoDoDia.length}
+          onAcao={aoAcaoDaAtencao}
+          onVerTodos={() => {
+            setFiltros((f) => ({ ...f, visao: "atencao" }));
+            document.querySelector("[aria-label=Visões]")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border-subtle pb-2.5">
         <nav aria-label="Visões" className="-mb-[11px] flex flex-wrap gap-0.5">
@@ -590,7 +605,7 @@ export default function NegociosPage() {
       ) : visao === "lista" ? (
         <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setPreviaId(d.id)} />
       ) : (
-        <VozDoQuadro.Provider value={estilo === "v2"}>
+        <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
               <div className="flex min-h-[440px] snap-x gap-2.5 overflow-x-auto pb-4 [max-height:calc(100dvh-300px)]">
@@ -633,7 +648,7 @@ export default function NegociosPage() {
       {festa && <Comemoracao titulo={festa.titulo} detalhe={festa.detalhe} onFim={fecharFesta} />}
 
       {previa && (
-        <VozDoQuadro.Provider value={estilo === "v2"}>
+        <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <PreviaDoNegocio
             key={previa.deal.id}
             deal={previa.deal}

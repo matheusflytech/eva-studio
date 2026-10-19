@@ -208,3 +208,91 @@ export function comemoracao(
     vendasNoMes <= 1 ? "Primeira venda do mês. Bom começo." : vendasNoMes === 2 ? "Segunda venda do mês." : `Já são ${vendasNoMes} vendas este mês.`;
   return { titulo: `Fechou! ${nome}${valor}.`, detalhe };
 }
+
+// ---- variação 3: o que pede atenção hoje e o que mudou desde ontem ----
+
+export type AcaoDaAtencao = "whatsapp" | "retorno" | "remarcar" | "ligar";
+
+export interface ItemDeAtencao {
+  deal: NegocioKanban;
+  etapa: string;
+  /** Frase do porquê, já com contexto ("R$ 24,8 mil em Qualificação. Quieto há 12 dias."). */
+  motivo: string;
+  acao: AcaoDaAtencao;
+  rotulo: string;
+  urgencia: number;
+}
+
+/**
+ * Os negócios abertos que pedem ação, do mais urgente para o menos, cada um
+ * com a ação certa: cliente esperando resposta, retorno vencido, previsão
+ * vencida e parado. Um item por negócio, pelo motivo mais forte.
+ */
+export function listaDeAtencao(etapas: EtapaKanban[], agora: Date): ItemDeAtencao[] {
+  const out: ItemDeAtencao[] = [];
+  for (const e of etapas) {
+    if (e.type !== "open") continue;
+    for (const d of e.deals) {
+      const onde = `${valorCurto(d.amountCents)} em ${e.name}.`;
+      if (d.whatsapp?.naoLida) {
+        out.push({ deal: d, etapa: e.name, motivo: `${onde} Mandou mensagem e está esperando você.`, acao: "whatsapp", rotulo: "Responder no WhatsApp", urgencia: 4 });
+      } else if (d.nextTask?.dueAt && new Date(d.nextTask.dueAt).getTime() < agora.getTime()) {
+        const dias = Math.max(0, Math.floor((agora.getTime() - new Date(d.nextTask.dueAt).getTime()) / DIA));
+        const quando = dias === 0 ? "era para hoje" : dias === 1 ? "era para ontem" : `atrasou ${dias} dias`;
+        out.push({ deal: d, etapa: e.name, motivo: `${onde} O retorno ${quando}.`, acao: "retorno", rotulo: "Ver o retorno", urgencia: 3 + Math.min(dias, 30) / 100 });
+      } else if (fechamentoPassou(d, agora)) {
+        out.push({ deal: d, etapa: e.name, motivo: `${onde} A previsão de fechar já passou.`, acao: "remarcar", rotulo: "Remarcar previsão", urgencia: 2 });
+      } else if (estaParado(d, e.type, agora)) {
+        const dias = diasParado(d, agora);
+        out.push({ deal: d, etapa: e.name, motivo: `${onde} Quieto há ${dias} dias.`, acao: "ligar", rotulo: "Dar um alô", urgencia: 1 + Math.min(dias, 365) / 1000 });
+      }
+    }
+  }
+  // Mais urgente primeiro; no empate, o de maior valor.
+  return out.sort((a, b) => b.urgencia - a.urgencia || b.deal.amountCents - a.deal.amountCents);
+}
+
+export interface Acontecimento {
+  id: string;
+  quando: string;
+  partes: { texto: string; forte?: boolean; tom?: "ok" }[];
+  em: number;
+}
+
+function quandoRelativo(iso: string, agora: Date): string {
+  const d = new Date(iso);
+  const dia = d.toLocaleDateString("sv-SE", { timeZone: FUSO });
+  if (dia === agora.toLocaleDateString("sv-SE", { timeZone: FUSO })) {
+    const [h, m] = d.toLocaleTimeString("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hour12: false }).split(":");
+    return `${Number(h)}h${m}`;
+  }
+  return "Ontem";
+}
+
+/**
+ * O que mudou nas últimas 36h, só com o que o quadro já sabe: vendas,
+ * perdas, negócios novos, mudanças de etapa e mensagens sem resposta.
+ */
+export function desdeOntem(etapas: EtapaKanban[], agora: Date, max = 6): Acontecimento[] {
+  const limite = agora.getTime() - 36 * 3_600_000;
+  const recente = (iso: string | null | undefined) => !!iso && new Date(iso).getTime() >= limite && new Date(iso).getTime() <= agora.getTime();
+  const out: Acontecimento[] = [];
+  for (const e of etapas) {
+    for (const d of e.deals) {
+      const nome = nomeDoNegocio(d);
+      if (e.type === "won" && recente(d.closedAt)) {
+        out.push({ id: `g${d.id}`, em: Date.parse(d.closedAt!), quando: quandoRelativo(d.closedAt!, agora), partes: [{ texto: `${nome} fechou`, forte: true, tom: "ok" }, { texto: d.amountCents ? ` ${valorCurto(d.amountCents)}.` : "." }] });
+      } else if (e.type === "lost" && recente(d.closedAt)) {
+        out.push({ id: `p${d.id}`, em: Date.parse(d.closedAt!), quando: quandoRelativo(d.closedAt!, agora), partes: [{ texto: nome, forte: true }, { texto: " saiu do funil como perdido." }] });
+      } else if (recente(d.createdAt) && Math.abs(Date.parse(d.createdAt) - Date.parse(d.stageSince)) < 60_000) {
+        out.push({ id: `n${d.id}`, em: Date.parse(d.createdAt), quando: quandoRelativo(d.createdAt, agora), partes: [{ texto: "Negócio novo: " }, { texto: nome, forte: true }, { texto: ` em ${e.name}.` }] });
+      } else if (e.type === "open" && recente(d.stageSince)) {
+        out.push({ id: `e${d.id}`, em: Date.parse(d.stageSince), quando: quandoRelativo(d.stageSince, agora), partes: [{ texto: nome, forte: true }, { texto: ` foi para ${e.name}.` }] });
+      }
+      if (e.type === "open" && d.whatsapp?.naoLida) {
+        out.push({ id: `w${d.id}`, em: agora.getTime() - 1, quando: "Agora", partes: [{ texto: nome, forte: true }, { texto: " mandou mensagem no WhatsApp." }] });
+      }
+    }
+  }
+  return out.sort((a, b) => b.em - a.em).slice(0, max);
+}
