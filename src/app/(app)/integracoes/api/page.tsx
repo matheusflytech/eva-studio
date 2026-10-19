@@ -80,6 +80,14 @@ export default function ApiDocsPage() {
       </div>
 
       <div className="flex flex-col gap-5">
+        <Link href="/integracoes/api/referencia" className="glass-card block rounded-3xl p-5 hover:border-border-strong">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Novo · API do CRM v1</p>
+          <p className="text-[13px] leading-relaxed text-text-secondary">
+            Contatos, empresas, negócios, funis, tarefas, notas, fluxos, sequências e importação/exportação em lote.
+            Abra a referência completa (OpenAPI em <code className="font-mono text-text-primary">/api/v1/openapi.json</code>).
+          </p>
+        </Link>
+
         <section className="glass-card rounded-3xl p-5">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Autenticação</p>
           <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">

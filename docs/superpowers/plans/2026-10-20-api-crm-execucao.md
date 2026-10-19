@@ -66,5 +66,13 @@
 - Assinatura `Eva-Signature: t=<unix>,v1=<hmac-sha256(secret, t + "." + corpo)>`, tolerância de 5 min.
 - Entrega no relógio (`/api/internal/scheduler`), espera crescente 1m, 5m, 30m, 2h, 12h; desliga o endpoint após 3 dias falhando. URL conferida com `src/lib/server/ssrf.ts`.
 
+## Status (20/10/2026)
+- API-0 a API-5 implementadas, com testes; API-6 só planejada (acima).
+- Desvios conscientes: negócio deduplica só por `external_id` (não tem e-mail/telefone; na importação, o contato do negócio é achado/criado por `contact_external_id` → `contact_email` → `contact_phone`); empresa usa o CNPJ como reserva do `external_id`; status da importação (`GET /imports/{id}`) pede `imports:write` (não existe `imports:read` no roteiro).
+- Exportação acumula no próprio job até terminar e sobe um arquivo só (teto 15 MB: o bucket aceita 16). Acima disso, dividir por filtro.
+- `dry_run` de negócio sem funil pode criar o funil padrão (é o `ensureDefaultPipeline` de sempre); nada além disso é gravado.
+- A tela de chaves ainda não oferece escolha de escopo (a rota já aceita `scopes`); a página de referência fica dentro do app, o JSON é público.
+- Pendente de quem aplica: rodar `prisma/sql/2026-10-20-api-v1.sql` antes do deploy.
+
 ## Verificação final
 `npx vitest run` (suíte inteira), `npx tsc --noEmit -p .`, `npx eslint` nos arquivos tocados.
