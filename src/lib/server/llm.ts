@@ -66,9 +66,16 @@ function safeJsonParse(raw: string): Record<string, string> {
   }
 }
 
-function jsonSchemaFor(tool: LlmTool) {
-  const properties: Record<string, { type: string; description?: string }> = {};
-  for (const p of tool.params) properties[p.name] = { type: "string", description: p.description };
+function jsonSchemaFor(tool: LlmTool, aceitaNulo = false) {
+  const properties: Record<string, { type: string | string[]; description?: string }> = {};
+  for (const p of tool.params) {
+    // Campo opcional: modelos costumam mandar null no que ainda não sabem, e a
+    // validação do provedor derruba a resposta inteira se o schema só aceita texto.
+    properties[p.name] = {
+      type: aceitaNulo && p.required === false ? ["string", "null"] : "string",
+      description: p.description,
+    };
+  }
   return {
     type: "object" as const,
     properties,
@@ -95,7 +102,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
   ];
   const tools = opts.tools.map((t) => ({
     type: "function" as const,
-    function: { name: t.name, description: t.description, parameters: jsonSchemaFor(t) },
+    function: { name: t.name, description: t.description, parameters: jsonSchemaFor(t, true) },
   }));
 
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {

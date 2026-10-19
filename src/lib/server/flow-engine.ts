@@ -274,7 +274,6 @@ async function montarFerramentaDeCampos(
   const defsNegocio = await carregarDefinicoes(orgId, "deal", deal?.pipelineId ?? null);
   const defsContato = await carregarDefinicoes(orgId, "contact");
   const todas = [...defsNegocio, ...defsContato];
-  if (todas.length === 0) return [];
 
   const dica = (d: (typeof todas)[number]): string => {
     const base = d.label;
@@ -286,7 +285,24 @@ async function montarFerramentaDeCampos(
     return base;
   };
 
+  const registrar: { action: string; tool: LlmTool } = {
+    action: "registrar_lead",
+    tool: {
+      name: "crm_registrar_lead",
+      description:
+        "Registra um lead no CRM em uma única chamada: cria o negócio (ou completa o que já existe), preenche os campos, aplica a etiqueta e anota o resumo. Use quando já tiver o nome e um contato da pessoa.",
+      params: [
+        { name: "nome", description: "Nome da pessoa." },
+        ...todas.map((d) => ({ name: d.key, description: dica(d), required: false })),
+        { name: "etiqueta", description: "Nome exato da etiqueta a aplicar, se houver.", required: false },
+        { name: "resumo", description: "Resumo curto do que a pessoa quer, para a equipe.", required: false },
+      ],
+    },
+  };
+  if (todas.length === 0) return [registrar];
+
   return [
+    registrar,
     {
       action: "atualizar_campos",
       tool: {
@@ -432,6 +448,44 @@ async function runCrmTool(
     return (partes.length > 0 ? `Campos salvos: ${partes.join(", ")}.` : "Nada foi salvo.") + (erros.length > 0 ? ` Problemas: ${erros.join(" ")}` : "");
   }
 
+  if (call.name === "crm_registrar_lead") {
+    const texto = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
+    const nome = texto(args.nome) || "Contato do site";
+
+    // Um lead, um negócio: se a pessoa já tem negócio aberto, só completa os dados.
+    let dealId = (await findOpenDealForContact(contactId))?.id ?? null;
+    const jaExistia = !!dealId;
+    if (!dealId) dealId = (await createDeal({ orgId, name: `Lead do site: ${nome}`, contactId })).id;
+
+    const dados: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args)) {
+      if (["nome", "etiqueta", "resumo"].includes(k)) continue;
+      if (texto(v)) dados[k] = v;
+    }
+    const noNegocio = await preencherCamposDoNegocio(orgId, dealId, dados);
+    const noContato = await preencherCamposDoContato(orgId, contactId, dados);
+
+    const partes = [jaExistia ? "negócio já existia, completado" : "negócio criado"];
+    const aplicados = noNegocio.aplicados + noContato.aplicados;
+    if (aplicados > 0) partes.push(`${aplicados} campo(s) preenchido(s)`);
+
+    const nomeTag = texto(args.etiqueta);
+    if (nomeTag) {
+      const tag = await prisma.tag.findFirst({ where: { orgId, name: { equals: nomeTag, mode: "insensitive" } } });
+      if (tag) {
+        const { applyTag } = await import("@/lib/server/contacts");
+        await applyTag(contactId, tag.id);
+        partes.push(`etiqueta "${tag.name}"`);
+      }
+    }
+    if (texto(args.resumo)) {
+      await addNote({ orgId, text: texto(args.resumo), contactId, dealId });
+      partes.push("nota registrada");
+    }
+    const erros = [...noNegocio.erros, ...noContato.erros];
+    return `Lead registrado: ${partes.join(", ")}.` + (erros.length > 0 ? ` Problemas: ${erros.join(" ")}` : "");
+  }
+
   if (call.name === "crm_criar_tarefa") {
     const deal = await findOpenDealForContact(contactId);
     await createTask({
@@ -465,6 +519,8 @@ async function runCrmTool(
 
   return "Ação de CRM desconhecida.";
 }
+
+const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
@@ -667,7 +723,7 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const result = await callLlmWithTools({
+    const chamarLlm = () => callLlmWithTools({
       provider: provider.id as LlmProvider,
       apiKey,
       model: node.data.aiModel || provider.models[0].id,
@@ -681,7 +737,7 @@ async function runAiAgent(
           const saved: string[] = [];
           for (const v of collectVars) {
             const value = call.arguments[v.key];
-            if (value !== undefined && String(value).trim()) {
+            if (value !== undefined && value !== null && String(value).trim() && String(value).trim().toLowerCase() !== "null") {
               setVar(variables, v.key, value);
               saved.push(v.key);
             }
@@ -720,6 +776,15 @@ async function runAiAgent(
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     });
+    let result = await chamarLlm().catch((e) => ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>);
+    // Limite de tokens por minuto do provedor (429): costuma liberar em segundos.
+    // Espera o que ele mandou esperar (no máximo 12s) e tenta uma vez mais.
+    if (!result.text && result.error && /\b429\b/.test(result.error)) {
+      const dito = /try again in ([\d.]+)s/i.exec(result.error);
+      const esperar = Math.min(12, (dito ? Number(dito[1]) : 6) + 0.5) * 1000;
+      await new Promise((r) => setTimeout(r, esperar));
+      result = await chamarLlm().catch((e) => ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>);
+    }
     return { text: result.text, error: result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`) };
   } catch (err) {
     return { text: null, error: err instanceof Error ? err.message : String(err) };
@@ -1076,6 +1141,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       resolveContactId: ensureContactId,
     });
     if (reply.text) messages.push({ text: reply.text });
+    else if (reply.error && !["playground", "builder_preview"].includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     return finish();
   } else if (parkedNode?.data.iconKey === "wait") {
@@ -1323,6 +1389,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       resolveContactId: ensureContactId,
     });
       if (reply.text) messages.push({ text: reply.text });
+      else if (reply.error && !["playground", "builder_preview"].includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       currentId = node.id; // fica "alugado" pra IA nativa até o contato parar de responder
       break;
