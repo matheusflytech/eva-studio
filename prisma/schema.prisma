@@ -1059,6 +1059,7 @@ model Deal {
   contacts     DealContact[]
   tasks        Task[]
   notes        Note[]
+  stageEvents  DealStageEvent[]
 
   @@index([orgId, stageId])
   @@index([pipelineId])
@@ -1077,6 +1078,28 @@ model DealContact {
   @@id([dealId, contactId])
   @@index([contactId])
   @@map("eva_studio_deal_contacts")
+}
+
+// Cada vez que um negócio entra numa etapa (inclusive ao nascer). É o que
+// permite medir conversão etapa a etapa e tempo em cada etapa — `stageSince`
+// só sabe da etapa atual. Gravado só por registrarMudancaDeEtapa
+// (src/lib/server/stage-events.ts). Sem FK para a etapa de propósito: etapa
+// apagada não pode apagar a história.
+model DealStageEvent {
+  id          String   @id @default(uuid())
+  orgId       String
+  dealId      String
+  pipelineId  String
+  fromStageId String?
+  toStageId   String
+  origem      String   @default("usuario") // usuario | fluxo | api | importacao | backfill
+  at          DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, pipelineId, at])
+  @@index([dealId, at])
+  @@map("eva_studio_deal_stage_events")
 }
 
 // No Atomic CRM a tarefa so amarra em contato e contact_id e obrigatorio.
