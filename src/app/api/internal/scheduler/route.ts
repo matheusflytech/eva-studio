@@ -3,6 +3,7 @@ import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { processDueEnrollments, enrollBySegments, enrollByDealStage } from "@/lib/server/sequences";
 import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
 import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
+import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -57,9 +58,19 @@ export async function POST(request: Request) {
   const newlyEnrolled = porSegmento + porEtapa;
   const [sequences, broadcasts] = await Promise.all([processDueEnrollments(50), runDueBroadcasts(10)]);
 
+  // Importação/exportação em lote da API v1, no tempo que sobrar da rodada
+  // (a trava do relógio é de 45 s). Nunca derruba a rodada: antes do SQL da
+  // v1 ser aplicado a tabela nem existe.
+  const orcamentoMs = Math.min(15_000, Math.max(0, 30_000 - (Date.now() - startedAt)));
+  const lotes = await processarJobs({ orcamentoMs }).catch((e) => {
+    console.error("[scheduler] jobs em lote falharam", e instanceof Error ? e.message : e);
+    return { jobs: 0, linhas: 0 };
+  });
+
   return NextResponse.json({
     ok: true,
     ms: Date.now() - startedAt,
+    bulkJobs: lotes,
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
       ran: broadcasts.ran,

@@ -176,6 +176,18 @@ export async function urlDeUpload(caminho: string): Promise<{ url: string; token
   }
 }
 
+/**
+ * Conteúdo de um arquivo como texto (importação em lote: o CSV/JSON que o
+ * cliente subiu direto para o Storage pela URL de upload). null se não existe.
+ */
+export async function baixarTexto(caminho: string): Promise<string | null> {
+  const { url, key } = config();
+  const res = await fetch(`${url}/storage/v1/object/${BUCKET}/${caminho}`, { headers: cabecalho(key) });
+  if (res.status === 404 || res.status === 400) return null;
+  if (!res.ok) throw new Error(`Falha ao ler o arquivo (${res.status}).`);
+  return res.text();
+}
+
 /** O arquivo existe de fato? Confere depois do upload, antes de aceitar o caminho. */
 export async function midiaExiste(caminho: string): Promise<{ existe: boolean; tamanho: number }> {
   try {
