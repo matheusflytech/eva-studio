@@ -2,55 +2,37 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Handshake, Plus, Loader2, X, CheckCircle2, XCircle, Clock, SlidersHorizontal } from "lucide-react";
+import { Handshake, Plus, Loader2, X, SlidersHorizontal, Search, Columns3, Rows3, Hourglass } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
-  useDraggable,
-  useDroppable,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { DealDrawer } from "@/components/crm/deal-drawer";
 import { cn } from "@/lib/utils";
-import { ChipsDeCampos, CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
-import { corDaEtapa, type DefinicaoDeCampo } from "@/lib/custom-fields";
-
-interface DealCard {
-  id: string;
-  name: string;
-  amountCents: number;
-  probability: number;
-  company: { id: string; name: string } | null;
-  owner: { id: string; name: string } | null;
-  contacts: { id: string; name: string }[];
-  openTasks: number;
-  expectedClosingAt: string | null;
-  closedAt: string | null;
-  customFields: Record<string, unknown>;
-}
-
-interface StageColumn {
-  id: string;
-  name: string;
-  type: string;
-  color: string;
-  probability: number;
-  totalCents: number;
-  weightedCents: number;
-  deals: DealCard[];
-}
+import { CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
+import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { DealCard } from "@/components/crm/negocios/deal-card";
+import { StageColumn } from "@/components/crm/negocios/stage-column";
+import { ListView } from "@/components/crm/negocios/list-view";
+import { ResumoDoFunilView } from "@/components/crm/negocios/resumo";
+import {
+  filtrarEtapas,
+  resumoDoFunil,
+  type EtapaKanban,
+  type FiltrosDeNegocio,
+  type NegocioKanban,
+} from "@/components/crm/negocios/modelo";
 
 interface PipelineOption {
   id: string;
@@ -58,135 +40,63 @@ interface PipelineOption {
   stages: { id: string; name: string; type: string }[];
 }
 
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+type Visao = "kanban" | "lista";
+const CHAVE_VISAO = "eva:negocios:visao";
+const EVENTO_VISAO = "eva:negocios:visao";
+// Navegador sem armazenamento: a escolha vale só enquanto a página está aberta.
+let visaoEmMemoria: Visao = "kanban";
+
+function lerVisao(): Visao {
+  try {
+    const salva = localStorage.getItem(CHAVE_VISAO);
+    if (salva === "lista" || salva === "kanban") return salva;
+  } catch {
+    // sem armazenamento
+  }
+  return visaoEmMemoria;
 }
 
-// A cor da etapa é escolha do cliente. Sem escolha, só ganho e perdido ganham
-// cor e o resto fica neutro.
-function stageAccent(type: string, color: string): { dot: string; label?: React.ReactNode } {
-  const cor = corDaEtapa(color, type);
-  if (type === "won") return { dot: cor.ponto, label: <CheckCircle2 size={12} className={cor.texto} /> };
-  if (type === "lost") return { dot: cor.ponto, label: <XCircle size={12} className={cor.texto} /> };
-  return { dot: cor.ponto };
+function gravarVisao(v: Visao) {
+  visaoEmMemoria = v;
+  try {
+    localStorage.setItem(CHAVE_VISAO, v);
+  } catch {
+    // sem armazenamento: fica em memória
+  }
+  window.dispatchEvent(new Event(EVENTO_VISAO));
 }
 
-function DealCardView({ deal, defs, dragging }: { deal: DealCard; defs: DefinicaoDeCampo[]; dragging?: boolean }) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl bg-surface-2 px-3.5 py-3 ring-1 ring-border-subtle transition-shadow",
-        dragging && "shadow-2xl"
-      )}
-    >
-      <div className="text-[13.5px] font-medium text-text-primary">{deal.name}</div>
-      {deal.company && <div className="mt-0.5 truncate text-[11.5px] text-text-tertiary">{deal.company.name}</div>}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {deal.amountCents > 0 && (
-          <span className="text-[13px] font-semibold text-text-primary">{money(deal.amountCents)}</span>
-        )}
-        <Badge>{deal.probability}%</Badge>
-        {deal.openTasks > 0 && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-text-tertiary">
-            <Clock size={11} /> {deal.openTasks}
-          </span>
-        )}
-      </div>
-      <ChipsDeCampos defs={defs} valores={deal.customFields} />
-      {deal.contacts.length > 0 && (
-        <div className="mt-2 truncate text-[11.5px] text-text-tertiary">
-          {deal.contacts.map((c) => c.name || "Sem nome").join(", ")}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DraggableDeal({ deal, defs, onOpen }: { deal: DealCard; defs: DefinicaoDeCampo[]; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
-  // Onde o dedo desceu. Sem isso, arrastar um card para outra coluna também
-  // abriria o painel no fim do movimento: o dnd-kit deixa o clique passar.
-  const origem = React.useRef<{ x: number; y: number } | null>(null);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }}
-      {...listeners}
-      {...attributes}
-      onPointerDownCapture={(e) => { origem.current = { x: e.clientX, y: e.clientY }; }}
-      onClick={(e) => {
-        const p = origem.current;
-        if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) return;
-        onOpen();
-      }}
-      className="cursor-grab active:cursor-grabbing"
-    >
-      <DealCardView deal={deal} defs={defs} />
-    </div>
-  );
-}
-
-function StageColumnView({
-  stage,
-  defs,
-  onOpenDeal,
-}: {
-  stage: StageColumn;
-  defs: DefinicaoDeCampo[];
-  onOpenDeal: (deal: DealCard) => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.id });
-  const accent = stageAccent(stage.type, stage.color);
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "flex w-[280px] shrink-0 flex-col rounded-3xl bg-surface-1/60 p-3 ring-1 transition-colors",
-        isOver ? "ring-accent-500/40" : "ring-border-subtle"
-      )}
-    >
-      <div className="mb-3 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span className={cn("h-1.5 w-1.5 rounded-full", accent.dot)} />
-          <span className="text-[13px] font-medium text-text-primary">{stage.name}</span>
-          {accent.label}
-          <span className="text-[11.5px] text-text-tertiary">{stage.deals.length}</span>
-        </div>
-      </div>
-
-      <div className="mb-3 px-1">
-        <div className="text-[13px] font-semibold text-text-primary">{money(stage.totalCents)}</div>
-        {stage.type === "open" && stage.totalCents > 0 && (
-          <div className="text-[11px] text-text-tertiary">{money(stage.weightedCents)} ponderado</div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2 overflow-y-auto">
-        {stage.deals.map((deal) => (
-          <DraggableDeal key={deal.id} deal={deal} defs={defs} onOpen={() => onOpenDeal(deal)} />
-        ))}
-        {stage.deals.length === 0 && (
-          <p className="px-1 py-6 text-center text-[12px] text-text-tertiary">Nenhum negócio aqui.</p>
-        )}
-      </div>
-    </div>
-  );
+function assinarVisao(avisar: () => void) {
+  window.addEventListener(EVENTO_VISAO, avisar);
+  window.addEventListener("storage", avisar);
+  return () => {
+    window.removeEventListener(EVENTO_VISAO, avisar);
+    window.removeEventListener("storage", avisar);
+  };
 }
 
 export default function NegociosPage() {
   const [pipelines, setPipelines] = React.useState<PipelineOption[]>([]);
   const [pipelineId, setPipelineId] = React.useState("");
-  const [stages, setStages] = React.useState<StageColumn[]>([]);
+  const [stages, setStages] = React.useState<EtapaKanban[]>([]);
   const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [showNew, setShowNew] = React.useState(false);
+  const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
   const [openDealId, setOpenDealId] = React.useState<string | null>(null);
-  const [dragging, setDragging] = React.useState<DealCard | null>(null);
+  const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({});
+  // Kanban ou lista, lembrado entre visitas (no servidor sempre começa kanban).
+  const visao = React.useSyncExternalStore(assinarVisao, lerVisao, () => "kanban" as Visao);
+  const trocarVisao = gravarVisao;
+  // Relógio da tela: muda só quando os dados chegam (dias parados, atrasos).
+  const [agora, setAgora] = React.useState(() => new Date());
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Teclado: espaço pega, setas movem, espaço solta (Enter fica para abrir).
+    useSensor(KeyboardSensor, { keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } })
+  );
 
   React.useEffect(() => {
     fetch("/api/pipelines")
@@ -200,19 +110,40 @@ export default function NegociosPage() {
 
   const refresh = React.useCallback(async () => {
     setIsLoading(true);
-    const res = await fetch(`/api/deals${pipelineId ? `?pipeline=${pipelineId}` : ""}`);
-    const data = await res.json();
-    setStages(data.stages ?? []);
-    setDefs(data.fields ?? []);
-    setIsLoading(false);
+    try {
+      const res = await fetch(`/api/deals${pipelineId ? `?pipeline=${pipelineId}` : ""}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
+      setStages(data.stages ?? []);
+      setDefs(data.fields ?? []);
+      setAgora(new Date());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível carregar os negócios.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [pipelineId]);
 
-  React.useEffect(() => { refresh(); }, [refresh]);
+  React.useEffect(() => {
+    refresh();
+  }, [refresh]);
 
-  const allDeals = React.useMemo(() => stages.flatMap((s) => s.deals), [stages]);
+  const visiveis = React.useMemo(() => filtrarEtapas(stages, filtros, agora), [stages, filtros, agora]);
+  const resumo = React.useMemo(() => resumoDoFunil(stages, agora), [stages, agora]);
+  const donos = React.useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of stages) for (const d of s.deals) if (d.owner) m.set(d.owner.id, d.owner.name || "Sem nome");
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [stages]);
+  const maiorTotalAberto = Math.max(0, ...visiveis.filter((s) => s.type === "open").map((s) => s.totalCents));
+  const filtrando = !!(filtros.busca?.trim() || filtros.dono || filtros.soParados);
+  const totalVisivel = visiveis.reduce((s, e) => s + e.deals.length, 0);
 
   function handleDragStart(event: DragStartEvent) {
-    setDragging(allDeals.find((d) => d.id === event.active.id) ?? null);
+    for (const s of stages) {
+      const deal = s.deals.find((d) => d.id === event.active.id);
+      if (deal) return setDragging({ deal, tipo: s.type });
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -224,15 +155,13 @@ export default function NegociosPage() {
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
 
-    // Move na tela antes da resposta: arrastar e esperar o servidor pra ver o
-    // card mudar de coluna é o que faz kanban parecer lento.
+    // Move na tela antes da resposta: esperar o servidor para ver o card mudar
+    // de coluna é o que faz kanban parecer lento.
+    const deal = from.deals.find((d) => d.id === dealId)!;
     setStages((prev) =>
       prev.map((s) => {
         if (s.id === from.id) return { ...s, deals: s.deals.filter((d) => d.id !== dealId) };
-        if (s.id === stageId) {
-          const deal = from.deals.find((d) => d.id === dealId)!;
-          return { ...s, deals: [deal, ...s.deals] };
-        }
+        if (s.id === stageId) return { ...s, deals: [{ ...deal, stageSince: new Date().toISOString() }, ...s.deals] };
         return s;
       })
     );
@@ -241,83 +170,195 @@ export default function NegociosPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stageId }),
-    });
-    if (!res.ok) setError("Não foi possível mover o negócio.");
-    // Recarrega de qualquer forma: os totais por etapa mudaram.
+    }).catch(() => null);
+    if (!res?.ok) setError(`Não foi possível mover "${deal.name}". A tela voltou ao estado salvo.`);
+    // Recarrega de qualquer forma: totais, chance e ordem mudaram.
     refresh();
   }
 
-  const totalOpen = stages
-    .filter((s) => s.type === "open")
-    .reduce((sum, s) => sum + s.weightedCents, 0);
-
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary">Negócios</h1>
-          <p className="mt-1 text-[15px] text-text-secondary">
-            Previsão ponderada em aberto: <span className="font-semibold text-text-primary">{money(totalOpen)}</span>
-          </p>
+    <div className="flex min-h-0 flex-col gap-5">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-2xl font-semibold text-text-primary">Negócios</h1>
+            {pipelines.length > 1 && (
+              <div className="w-[190px]">
+                <label htmlFor="pipeline" className="sr-only">
+                  Funil
+                </label>
+                <Select id="pipeline" value={pipelineId} onChange={(e) => setPipelineId(e.target.value)} className="h-9">
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+          </div>
+          <p className="mt-1 text-[13.5px] text-text-secondary">Arraste os cartões entre as etapas. Clique para ver detalhes.</p>
         </div>
-        <div className="flex items-end gap-3">
-          {pipelines.length > 1 && (
-            <div className="w-[200px]">
-              <Label htmlFor="pipeline">Funil</Label>
-              <Select id="pipeline" value={pipelineId} onChange={(e) => setPipelineId(e.target.value)}>
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </Select>
-            </div>
-          )}
+        <div className="flex items-center gap-2">
           <Link
             href="/negocios/configurar"
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-border-default bg-surface-2 px-4 text-sm text-text-secondary transition-colors hover:text-text-primary"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-surface-2 px-3.5 text-[13px] font-medium text-text-secondary ring-1 ring-border-subtle outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
           >
-            <SlidersHorizontal size={15} /> Personalizar
+            <SlidersHorizontal size={15} aria-hidden /> Personalizar
           </Link>
-          <Button onClick={() => setShowNew(true)}>
-            <Plus size={15} /> Novo negócio
+          <Button onClick={() => setNovoNaEtapa("")}>
+            <Plus size={15} aria-hidden /> Novo negócio
           </Button>
         </div>
       </header>
 
-      {error && <div className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
+      <ResumoDoFunilView
+        resumo={resumo}
+        soParados={!!filtros.soParados}
+        onAlternarParados={() => setFiltros((f) => ({ ...f, soParados: !f.soParados }))}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-[1_1_240px] sm:max-w-[340px]">
+          <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <label htmlFor="busca-negocio" className="sr-only">
+            Buscar negócio
+          </label>
+          <Input
+            id="busca-negocio"
+            value={filtros.busca ?? ""}
+            onChange={(e) => setFiltros((f) => ({ ...f, busca: e.target.value }))}
+            placeholder="Buscar por negócio, empresa ou contato"
+            className="h-10 pl-9"
+          />
+        </div>
+        <div className="w-[190px]">
+          <label htmlFor="filtro-dono" className="sr-only">
+            Responsável
+          </label>
+          <Select
+            id="filtro-dono"
+            value={filtros.dono ?? ""}
+            onChange={(e) => setFiltros((f) => ({ ...f, dono: e.target.value || undefined }))}
+            className="h-10"
+          >
+            <option value="">Todos os responsáveis</option>
+            {donos.map(([id, nome]) => (
+              <option key={id} value={id}>
+                {nome}
+              </option>
+            ))}
+            <option value="__sem">Sem responsável</option>
+          </Select>
+        </div>
+        <button
+          type="button"
+          aria-pressed={!!filtros.soParados}
+          onClick={() => setFiltros((f) => ({ ...f, soParados: !f.soParados }))}
+          className={cn(
+            "inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium ring-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
+            filtros.soParados
+              ? "bg-amber-400/12 text-amber-300 ring-amber-400/40"
+              : "bg-surface-2 text-text-secondary ring-border-subtle hover:text-text-primary"
+          )}
+        >
+          <Hourglass size={14} aria-hidden /> Parados
+          {resumo.parados > 0 && <span className="tabular-nums opacity-80">{resumo.parados}</span>}
+        </button>
+        {filtrando && (
+          <button
+            type="button"
+            onClick={() => setFiltros({})}
+            className="inline-flex h-10 items-center gap-1 rounded-xl px-2.5 text-[12.5px] text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+          >
+            <X size={13} aria-hidden /> Limpar
+          </button>
+        )}
+        <span className="text-[12px] text-text-tertiary" aria-live="polite">
+          {filtrando ? `${totalVisivel} ${totalVisivel === 1 ? "negócio" : "negócios"}` : ""}
+        </span>
+
+        <div role="radiogroup" aria-label="Visualização" className="ml-auto inline-flex shrink-0 rounded-xl bg-surface-2 p-1 ring-1 ring-border-subtle">
+          {(
+            [
+              ["kanban", "Kanban", Columns3],
+              ["lista", "Lista", Rows3],
+            ] as const
+          ).map(([v, rotulo, Icone]) => (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={visao === v}
+              onClick={() => trocarVisao(v)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
+                visao === v ? "bg-surface-3 text-text-primary" : "text-text-tertiary hover:text-text-primary"
+              )}
+            >
+              <Icone size={14} aria-hidden /> {rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)} aria-label="Fechar aviso" className="shrink-0 rounded p-0.5 hover:bg-danger/15">
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+      )}
 
       {isLoading && stages.length === 0 ? (
-        <p className="text-[14px] text-text-tertiary">Carregando...</p>
+        <div className="flex gap-3 overflow-hidden" aria-busy="true" aria-label="Carregando negócios">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-[420px] w-[292px] shrink-0 animate-pulse rounded-2xl bg-surface-1/70 ring-1 ring-border-subtle" />
+          ))}
+        </div>
       ) : stages.length === 0 ? (
         <EmptyState
           icon={<Handshake size={36} className="text-text-tertiary" />}
           title="Nenhum funil configurado"
           description="Um funil padrão é criado sozinho na primeira vez que você abre esta tela."
         />
+      ) : visao === "lista" ? (
+        <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setOpenDealId(d.id)} />
       ) : (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 overflow-x-auto pb-4">
-            {stages.map((stage) => (
-              <StageColumnView key={stage.id} stage={stage} defs={defs} onOpenDeal={(d) => setOpenDealId(d.id)} />
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
+          <div className="flex min-h-[460px] snap-x gap-3 overflow-x-auto pb-4 [max-height:calc(100dvh-330px)]">
+            {visiveis.map((stage) => (
+              <StageColumn
+                key={stage.id}
+                etapa={stage}
+                defs={defs}
+                agora={agora}
+                maiorTotalAberto={maiorTotalAberto}
+                arrastandoAlgo={!!dragging}
+                onAbrir={(d) => setOpenDealId(d.id)}
+                onNovo={(id) => setNovoNaEtapa(id)}
+              />
             ))}
           </div>
-          <DragOverlay>{dragging && <DealCardView deal={dragging} defs={defs} dragging />}</DragOverlay>
+          <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+            {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} arrastando />}
+          </DragOverlay>
         </DndContext>
       )}
 
-      {openDealId && (
-        <DealDrawer
-          dealId={openDealId}
-          onClose={() => setOpenDealId(null)}
-          onChanged={refresh}
-        />
-      )}
+      {openDealId && <DealDrawer dealId={openDealId} onClose={() => setOpenDealId(null)} onChanged={refresh} />}
 
-      {showNew && (
+      {novoNaEtapa !== null && (
         <NewDealModal
           pipelines={pipelines}
           pipelineId={pipelineId}
-          onClose={() => setShowNew(false)}
-          onCreated={() => { setShowNew(false); refresh(); }}
+          etapaInicial={novoNaEtapa}
+          onClose={() => setNovoNaEtapa(null)}
+          onCreated={() => {
+            setNovoNaEtapa(null);
+            refresh();
+          }}
         />
       )}
     </div>
@@ -327,15 +368,18 @@ export default function NegociosPage() {
 function NewDealModal({
   pipelines,
   pipelineId,
+  etapaInicial,
   onClose,
   onCreated,
 }: {
   pipelines: PipelineOption[];
   pipelineId: string;
+  /** Vazio = primeira etapa; o "+" da coluna já manda a etapa dela. */
+  etapaInicial: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [form, setForm] = React.useState({ name: "", amount: "", stageId: "", description: "" });
+  const [form, setForm] = React.useState({ name: "", amount: "", stageId: etapaInicial, description: "" });
   const [contactQuery, setContactQuery] = React.useState("");
   const [contacts, setContacts] = React.useState<{ id: string; name: string; email: string }[]>([]);
   const [contactId, setContactId] = React.useState("");

@@ -34,7 +34,8 @@ export async function GET(request: Request) {
       company: { select: { id: true, name: true } },
       owner: { select: { id: true, name: true } },
       contacts: { include: { contact: { select: { id: true, name: true } } } },
-      _count: { select: { tasks: true } },
+      // Só tarefas em aberto: o número no cartão é "o que falta fazer".
+      _count: { select: { tasks: { where: { doneAt: null } } } },
     },
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
         expectedClosingAt: d.expectedClosingAt?.toISOString() ?? null,
         closedAt: d.closedAt?.toISOString() ?? null,
         createdAt: d.createdAt.toISOString(),
+        stageSince: d.stageSince.toISOString(),
       })),
     };
   });

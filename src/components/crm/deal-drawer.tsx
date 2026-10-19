@@ -147,10 +147,20 @@ export function DealDrawer({
   // No servidor nao existe document; o portal so monta depois da hidratacao.
   const [montado, setMontado] = React.useState(false);
   React.useEffect(() => { setMontado(true); }, []);
+
+  // Esc fecha, como todo painel por cima da tela.
+  React.useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [onClose]);
+
   if (!montado) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-label="Detalhes do negócio">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Detalhes do negócio">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
       {/* glass-card-solid: sem ele o kanban aparece por baixo do painel. */}
       <aside className="glass-card glass-card-solid relative z-10 flex h-full w-full max-w-[520px] flex-col overflow-y-auto rounded-l-3xl">
@@ -178,7 +188,7 @@ export function DealDrawer({
                   )}
                 </div>
               </div>
-              <button onClick={onClose} className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-2 hover:text-text-primary">
+              <button onClick={onClose} aria-label="Fechar" className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-2 hover:text-text-primary">
                 <X size={18} />
               </button>
             </header>
