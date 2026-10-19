@@ -119,26 +119,31 @@ export async function criarMensagemAgendada(
 }
 
 /** Cancela um disparo/avulsa enquanto ainda está só agendado. */
-export async function cancelarAgendado(id: string, orgId: string): Promise<Resultado> {
+export async function cancelarAgendado(id: string, orgId: string, kind?: "campaign" | "single"): Promise<Resultado> {
   const r = await prisma.broadcast.updateMany({
-    where: { id, status: "scheduled", agent: { orgId } },
+    where: { id, status: "scheduled", agent: { orgId }, kind },
     data: { status: "canceled" },
   });
   if (r.count === 1) return { ok: true };
 
-  const atual = await prisma.broadcast.findFirst({ where: { id, agent: { orgId } }, select: { status: true } });
+  const atual = await prisma.broadcast.findFirst({ where: { id, agent: { orgId }, kind }, select: { status: true } });
   if (!atual) return { ok: false, status: 404, erro: "Agendamento não encontrado." };
   if (atual.status === "canceled") return { ok: true };
   return { ok: false, status: 409, erro: "Esse envio já começou (ou já saiu) e não dá mais para cancelar." };
 }
 
 /** Muda a hora enquanto ainda está agendado. Avulsa no oficial: confere a janela na hora nova. */
-export async function reagendar(id: string, orgId: string, quando: Date): Promise<Resultado> {
+export async function reagendar(
+  id: string,
+  orgId: string,
+  quando: Date,
+  kind?: "campaign" | "single"
+): Promise<Resultado> {
   const problemaHorario = validarHorario(quando);
   if (problemaHorario) return { ok: false, status: 400, erro: problemaHorario };
 
   const atual = await prisma.broadcast.findFirst({
-    where: { id, agent: { orgId } },
+    where: { id, agent: { orgId }, kind },
     select: { id: true, status: true, kind: true, channel: true, templateId: true, agentId: true, manualRecipients: true },
   });
   if (!atual) return { ok: false, status: 404, erro: "Agendamento não encontrado." };
@@ -159,7 +164,7 @@ export async function reagendar(id: string, orgId: string, quando: Date): Promis
   }
 
   const r = await prisma.broadcast.updateMany({
-    where: { id, status: "scheduled", agent: { orgId } },
+    where: { id, status: "scheduled", agent: { orgId }, kind },
     data: { scheduledAt: quando },
   });
   if (r.count === 0) return { ok: false, status: 409, erro: "Esse envio acabou de começar e não dá mais para mudar a hora." };

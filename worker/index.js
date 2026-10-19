@@ -401,7 +401,8 @@ async function tickScheduler() {
       return;
     }
     const data = await res.json();
-    const entregues = (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0);
+    const entregues =
+      (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0) + (data.broadcasts?.queued ?? 0);
     if (entregues > 0) logger.info(data, "Scheduler entregou mensagens");
   } catch (err) {
     logger.error({ err }, "Erro ao chamar o scheduler");
