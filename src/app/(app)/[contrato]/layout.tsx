@@ -47,7 +47,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* O menu de 248px não cabe num celular de 390px: ocupava a tela inteira e
           o conteúdo desaparecia. Abaixo de 1024px vira uma gaveta, aberta por
           uma barra no topo. */}
-      <div className="hidden lg:flex">
+      {/* Menu lateral sempre escuro, também no tema claro (como os CRMs de referência). */}
+      <div className="hidden lg:flex" data-theme="dark">
         <Sidebar />
       </div>
 
@@ -71,7 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {menuAberto && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Menu">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuAberto(false)} />
-          <div className="absolute inset-y-0 left-0 w-[290px] max-w-[88vw] p-3">
+          <div className="absolute inset-y-0 left-0 w-[290px] max-w-[88vw] p-3" data-theme="dark">
             <button
               type="button"
               onClick={() => setMenuAberto(false)}

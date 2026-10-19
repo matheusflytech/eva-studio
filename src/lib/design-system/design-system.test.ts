@@ -125,12 +125,12 @@ describe("tokens: globals.css igual ao espelho em TS", () => {
 });
 
 describe("tema", () => {
-  it("lê a preferência com padrão 'system'", () => {
+  it("lê a preferência com padrão claro", () => {
     expect(parseThemePreference("dark")).toBe("dark");
     expect(parseThemePreference("light")).toBe("light");
     expect(parseThemePreference("system")).toBe("system");
-    expect(parseThemePreference("roxo")).toBe("system");
-    expect(parseThemePreference(null)).toBe("system");
+    expect(parseThemePreference("roxo")).toBe("light");
+    expect(parseThemePreference(null)).toBe("light");
   });
 
   it("resolve 'system' pelo sistema e respeita escolha explícita", () => {
@@ -148,8 +148,8 @@ describe("tema", () => {
 
   it("lê e grava o cookie", () => {
     expect(readThemeCookie("a=1; eva-theme=dark; b=2")).toBe("dark");
-    expect(readThemeCookie("eva-theme=xyz")).toBe("system");
-    expect(readThemeCookie(undefined)).toBe("system");
+    expect(readThemeCookie("eva-theme=xyz")).toBe("light");
+    expect(readThemeCookie(undefined)).toBe("light");
     expect(serializeThemeCookie("light")).toMatch(/^eva-theme=light; Path=\/; Max-Age=\d+; SameSite=Lax$/);
   });
 
@@ -175,7 +175,7 @@ describe("tema", () => {
     expect(rodarScript({ salvo: null, escuro: false })).toBe("light");
     expect(rodarScript({ salvo: null, cookie: "x=1; eva-theme=dark" })).toBe("dark");
     expect(rodarScript({ lsQuebrado: true, cookie: "eva-theme=dark" })).toBe("dark");
-    expect(rodarScript({ salvo: "lixo", escuro: true })).toBe("dark");
+    expect(rodarScript({ salvo: "lixo", escuro: true })).toBe("light");
   });
 });
 

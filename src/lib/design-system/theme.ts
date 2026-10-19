@@ -1,7 +1,7 @@
 /**
  * Escolha de tema (claro/escuro) — lógica pura, sem React.
  *
- * Preferência do usuário: "light", "dark" ou "system" (padrão). Fica salva em
+ * Preferência do usuário: "light" (padrão: a Eva é clara, com menu escuro), "dark" ou "system". Fica salva em
  * localStorage e também num cookie, para o servidor poder ler um dia sem
  * mudar o formato. O tema resolvido vai no atributo data-theme do <html>.
  *
@@ -20,8 +20,11 @@ export const THEME_COOKIE = "eva-theme";
 /** Um ano: preferência de tema não expira na prática. */
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
+/** Sem escolha salva, a Eva abre clara (decisão do produto, 20/10/2026). */
+export const PREFERENCIA_PADRAO: ThemePreference = "light";
+
 export function parseThemePreference(valor: unknown): ThemePreference {
-  return valor === "light" || valor === "dark" ? valor : "system";
+  return valor === "light" || valor === "dark" || valor === "system" ? valor : PREFERENCIA_PADRAO;
 }
 
 export function resolveTheme(pref: ThemePreference, sistemaEscuro: boolean): ResolvedTheme {
@@ -36,7 +39,7 @@ export function nextThemePreference(pref: ThemePreference): ThemePreference {
 
 /** Lê a preferência de um header Cookie ("a=1; eva-theme=dark"). */
 export function readThemeCookie(cookieHeader: string | null | undefined): ThemePreference {
-  if (!cookieHeader) return "system";
+  if (!cookieHeader) return PREFERENCIA_PADRAO;
   const par = cookieHeader
     .split(";")
     .map((p) => p.trim())
@@ -52,4 +55,4 @@ export function serializeThemeCookie(pref: ThemePreference): string {
  * Script inline do <head>. ES5 de propósito (roda antes de qualquer bundle) e
  * todo envolto em try: localStorage pode lançar em aba anônima/bloqueada.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)/);p=m?m[1]:"system"}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)/);p=m?m[1]:${JSON.stringify("light")}}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
