@@ -60,6 +60,10 @@ model ApiKey {
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   revokedAt  DateTime?
+  // O que a chave pode fazer na API v1: "*" (tudo, o padrão das chaves
+  // antigas), "<recurso>:*" ou "<recurso>:read|write". Ver
+  // src/lib/server/api-v1/escopos.ts.
+  scopes     String[]  @default(["*"])
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -1328,4 +1332,119 @@ model CustomField {
   @@unique([orgId, entity, key])
   @@index([orgId, entity])
   @@map("eva_studio_custom_fields")
+}
+
+// ---------------------------------------------------------------------------
+// API pública v1 (docs/superpowers/plans/2026-10-19-api-crm-roadmap.md)
+//
+// Tabelas sem relação Prisma com Organization de propósito: são só da API,
+// e ficar fora do model da organização evita mexer no núcleo do schema.
+// Limpeza de org apagada fica por conta do orgId indexado.
+// ---------------------------------------------------------------------------
+
+// Idempotency-Key de POST/PATCH na API v1. Guarda a resposta por 24h: a
+// mesma chave com o mesmo corpo devolve a mesma resposta em vez de criar de
+// novo. status 0 = a primeira requisição ainda está rodando.
+model IdempotencyKey {
+  id        String   @id @default(uuid())
+  orgId     String
+  key       String
+  method    String
+  path      String
+  bodyHash  String
+  status    Int      @default(0)
+  response  Json?
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, key])
+  @@index([createdAt])
+  @@map("eva_studio_idempotency_keys")
+}
+
+// Id do registro no sistema de quem integra (ERP, planilha, outro CRM). É o
+// que faz reimportar ou reenviar não duplicar. Um id externo por registro e
+// por origem; entity = contact | company | deal.
+model ExternalRef {
+  id         String   @id @default(uuid())
+  orgId      String
+  entity     String
+  source     String   @default("api")
+  externalId String
+  entityId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([orgId, entity, source, externalId])
+  @@unique([orgId, entity, source, entityId])
+  @@index([orgId, entity, entityId])
+  @@map("eva_studio_external_refs")
+}
+
+// Lápide de exclusão: o registro some de verdade (as telas não sabem de
+// exclusão lógica), mas quem sincroniza pela API precisa saber que sumiu.
+model DeletedRecord {
+  id         String   @id @default(uuid())
+  orgId      String
+  entity     String
+  entityId   String
+  externalId String   @default("")
+  deletedAt  DateTime @default(now())
+
+  @@index([orgId, entity, deletedAt])
+  @@map("eva_studio_deleted_records")
+}
+
+// Importação/exportação em lote, processada em fatias pelo relógio
+// (/api/internal/scheduler). `cursor` é o ponto de retomada: a próxima rodada
+// continua de onde a anterior parou.
+model BulkJob {
+  id         String    @id @default(uuid())
+  orgId      String
+  apiKeyId   String?
+  kind       String // import | export
+  entity     String // contacts | deals
+  // pending_upload | queued | processing | completed | completed_with_errors | failed | canceled
+  status     String    @default("queued")
+  format     String    @default("json") // json | csv | jsonl
+  mode       String    @default("upsert") // upsert | create
+  dryRun     Boolean   @default(false)
+  options    Json      @default("{}")
+  records    Json?
+  inputText  String?   @db.Text
+  filePath   String?
+  cursor     String    @default("")
+  total      Int       @default(0)
+  processed  Int       @default(0)
+  created    Int       @default(0)
+  updated    Int       @default(0)
+  unchanged  Int       @default(0)
+  failed     Int       @default(0)
+  // [{ row, column?, code, message, value? }]
+  errors     Json      @default("[]")
+  result     Json      @default("{}")
+  buffer     String    @default("") @db.Text
+  lockedAt   DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([orgId, kind, status])
+  @@index([status, updatedAt])
+  @@map("eva_studio_bulk_jobs")
+}
+
+// Versão anterior do fluxo do agente, guardada a cada substituição pela API.
+// É o "desfazer": restaurar troca o fluxo atual por esta foto.
+model AgentFlowVersion {
+  id        String   @id @default(uuid())
+  orgId     String
+  agentId   String
+  nodes     Json
+  edges     Json
+  origem    String   @default("api")
+  createdAt DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@map("eva_studio_agent_flow_versions")
 }

@@ -21,13 +21,46 @@ export function generateApiKey(): { key: string; keyPrefix: string; keyHash: str
 // null se a chave for inválida/revogada. Atualiza lastUsedAt em segundo
 // plano (não espera, não deve atrasar a resposta por causa disso).
 export async function requireApiKeyOrgId(request: Request): Promise<string | null> {
-  const auth = request.headers.get("authorization");
-  const key = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : null;
-  if (!key || !key.startsWith(PREFIX)) return null;
+  const key = chaveDoHeader(request);
+  if (!key) return null;
 
-  const row = await prisma.apiKey.findFirst({ where: { keyHash: hashKey(key), revokedAt: null } });
+  // Select explícito: a coluna `scopes` é nova, e o /v1/leads não pode
+  // depender dela (continua funcionando antes do SQL da v1 ser aplicado).
+  const row = await prisma.apiKey.findFirst({
+    where: { keyHash: hashKey(key), revokedAt: null },
+    select: { id: true, orgId: true },
+  });
   if (!row) return null;
 
-  prisma.apiKey.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
+  marcarUso(row.id);
   return row.orgId;
+}
+
+function chaveDoHeader(request: Request): string | null {
+  const auth = request.headers.get("authorization");
+  const key = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : null;
+  return key && key.startsWith(PREFIX) ? key : null;
+}
+
+function marcarUso(id: string) {
+  prisma.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() }, select: { id: true } }).catch(() => {});
+}
+
+export interface ChaveAutenticada {
+  orgId: string;
+  keyId: string;
+  scopes: string[];
+}
+
+/** Como requireApiKeyOrgId, mas devolve também o id e os escopos da chave (API v1). */
+export async function autenticarChave(request: Request): Promise<ChaveAutenticada | null> {
+  const key = chaveDoHeader(request);
+  if (!key) return null;
+  const row = await prisma.apiKey.findFirst({
+    where: { keyHash: hashKey(key), revokedAt: null },
+    select: { id: true, orgId: true, scopes: true },
+  });
+  if (!row) return null;
+  marcarUso(row.id);
+  return { orgId: row.orgId, keyId: row.id, scopes: row.scopes?.length ? row.scopes : ["*"] };
 }
