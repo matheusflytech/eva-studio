@@ -91,53 +91,53 @@ Sem a tabela no banco: GET devolve `disponivel: false`; escrita devolve 503 "Pro
 ## Tarefas
 
 ### Task 1: Contas puras — `src/lib/produtos.ts`
-- [ ] Teste `src/lib/produtos.test.ts`:
+- [x] Teste `src/lib/produtos.test.ts`:
   - `totalDoItem`: 3 × R$ 100 = 30000; desconto 10% (1000 bp) → 27000; desconto R$ 50 → 25000; desconto maior que o bruto → 0; qtd 1,5 × R$ 33,33 arredonda certo.
   - `resumoDosItens`: total, `unicoCents`, `mrrCents` (mensal inteiro + anual/12 arredondado), `arrCents = mrr × 12`, `temRecorrencia`.
   - `resumoDosProdutos`: `[]` → ""; `["Plano Pro"]` → "1 produto · Plano Pro"; 3 nomes → "3 produtos · Plano Pro +2".
   - `lerQuantidade`: "1,5" → 1.5; 0/negativo/texto → null; > 1.000.000 → null; 3 casas.
   - `lerDesconto`: percentual "10,5" → 1050; > 100% → null; valor "R$ 50,00" → 5000.
   - `lerRecorrencia`, `rotuloDaRecorrencia`.
-- [ ] Implementa; roda; verde.
+- [x] Implementa; roda; verde.
 
 ### Task 2: Schema + SQL
-- [ ] Modelos acima em `prisma/schema.prisma`; `npx prisma generate` (não conecta no banco).
-- [ ] `prisma/sql/2026-10-20-produtos.sql`.
+- [x] Modelos acima em `prisma/schema.prisma`; `npx prisma generate` (não conecta no banco).
+- [x] `prisma/sql/2026-10-20-produtos.sql`.
 
 ### Task 3: Servidor — `src/lib/server/produtos.ts`
-- [ ] `recalcularValorDoNegocio(tx, dealId)`; `lerItensDoNegocio(orgId, dealId)`; `negocioUsaSomaDosItens(dealId)` (para o PATCH do negócio; falha de tabela = false); `nomesDosProdutosPorNegocio(orgId, ids)` (falha = mapa vazio); `tabelaDeProdutosAusente(e)`.
-- [ ] Teste `src/lib/server/produtos.test.ts`: recalcula com itens e sem manual; não mexe com manual; não mexe sem itens; teto estoura → erro.
+- [x] `recalcularValorDoNegocio(tx, dealId)`; `lerItensDoNegocio(orgId, dealId)`; `negocioUsaSomaDosItens(dealId)` (para o PATCH do negócio; falha de tabela = false); `nomesDosProdutosPorNegocio(orgId, ids)` (falha = mapa vazio); `tabelaDeProdutosAusente(e)`.
+- [x] Teste `src/lib/server/produtos.test.ts`: recalcula com itens e sem manual; não mexe com manual; não mexe sem itens; teto estoura → erro.
 
 ### Task 4: `/api/products`
-- [ ] Teste `src/app/api/products/route.test.ts` e `[productId]/route.test.ts`: 403 sem agents:manage; nome obrigatório; preço inválido 400; recorrência inválida 400; busca filtra por org; PATCH de produto de outra org → 404; arquivar grava `archivedAt`; DELETE de outra org → 404.
-- [ ] Implementa.
+- [x] Teste `src/app/api/products/route.test.ts` e `[productId]/route.test.ts`: 403 sem agents:manage; nome obrigatório; preço inválido 400; recorrência inválida 400; busca filtra por org; PATCH de produto de outra org → 404; arquivar grava `archivedAt`; DELETE de outra org → 404.
+- [x] Implementa.
 
 ### Task 5: `/api/deals/[dealId]/items`
-- [ ] Teste `src/app/api/deals/[dealId]/items/route.test.ts` e `[itemId]/route.test.ts`: negócio de outra org → 404; produto de outra org/arquivado → 404; congela nome/preço do produto; avulso sem nome → 400; quantidade inválida → 400; limite de 100; recalcula o valor (update do deal com a soma); reordenar com id estranho → 400; valorManual liga e desliga (desligar recalcula); PATCH de item de outro negócio → 404; DELETE recalcula.
-- [ ] Implementa.
+- [x] Teste `src/app/api/deals/[dealId]/items/route.test.ts` e `[itemId]/route.test.ts`: negócio de outra org → 404; produto de outra org/arquivado → 404; congela nome/preço do produto; avulso sem nome → 400; quantidade inválida → 400; limite de 100; recalcula o valor (update do deal com a soma); reordenar com id estranho → 400; valorManual liga e desliga (desligar recalcula); PATCH de item de outro negócio → 404; DELETE recalcula.
+- [x] Implementa.
 
 ### Task 6: Trava do valor no PATCH do negócio
-- [ ] Teste em `src/app/api/deals/[dealId]/route.test.ts`: `amount` com itens e sem manual → 409; com manual → passa.
-- [ ] Implementa (mínimo: uma checagem antes da escrita).
+- [x] Teste em `src/app/api/deals/[dealId]/route.test.ts`: `amount` com itens e sem manual → 409; com manual → passa.
+- [x] Implementa (mínimo: uma checagem antes da escrita).
 
 ### Task 7: Cartão
-- [ ] Teste em `cartao-layout.test.ts` (campo `produtos` válido) e `cartao.test.ts` (`textoDoCampo("produtos")`).
-- [ ] `CAMPOS_PADRAO.produtos`, `NegocioKanban.produtos?`, `textoDoCampo`, ícone no `deal-card.tsx`, nomes no `GET /api/deals`.
+- [x] Teste em `cartao-layout.test.ts` (campo `produtos` válido) e `cartao.test.ts` (`textoDoCampo("produtos")`).
+- [x] `CAMPOS_PADRAO.produtos`, `NegocioKanban.produtos?`, `textoDoCampo`, ícone no `deal-card.tsx`, nomes no `GET /api/deals`.
 
 ### Task 8: Exportação
-- [ ] Teste em `src/lib/exportar/negocios.test.ts`: coluna "Produtos"; `linhasDosItens` uma linha por item.
-- [ ] `dados.ts` carrega itens (falha = sem itens); rota aceita `?itens=1`; item no menu.
+- [x] Teste em `src/lib/exportar/negocios.test.ts`: coluna "Produtos"; `linhasDosItens` uma linha por item.
+- [x] `dados.ts` carrega itens (falha = sem itens); rota aceita `?itens=1`; item no menu.
 
 ### Task 9: Dashboard "Por produto"
-- [ ] Teste em `src/lib/server/consulta.test.ts`: soma de valor por produto usa o total do item; negócio sem itens em "Sem produtos"; contagem conta o negócio em cada produto.
-- [ ] `AGRUPAMENTOS_BASE` + `rodarConsulta` (inclui itens só quando agrupa por produto).
+- [x] Teste em `src/lib/server/consulta.test.ts`: soma de valor por produto usa o total do item; negócio sem itens em "Sem produtos"; contagem conta o negócio em cada produto.
+- [x] `AGRUPAMENTOS_BASE` + `rodarConsulta` (inclui itens só quando agrupa por produto).
 
 ### Task 10: UI do catálogo e da ficha
-- [ ] `produtos-editor.tsx` + aba.
-- [ ] `produtos.tsx` na ficha + `SobreONegocio` com valor travado.
+- [x] `produtos-editor.tsx` + aba.
+- [x] `produtos.tsx` na ficha + `SobreONegocio` com valor travado.
 
 ### Task 11: Verificação
-- [ ] `npx vitest run`, `npx tsc --noEmit -p .`, `npx eslint <arquivos tocados>`.
+- [x] `npx vitest run`, `npx tsc --noEmit -p .`, `npx eslint <arquivos tocados>`.
 
 ## Pendências (fora desta entrega)
 - Filtro "Produto" no montador do dashboard (precisa de fonte de opções `produtos` no `opcoes.ts` do dashboard e pré-seleção `items: { some: { productId: { in } } }`).

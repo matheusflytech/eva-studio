@@ -159,6 +159,14 @@ export interface ItemDoNegocio {
   position: number;
 }
 
+/**
+ * O valor do negócio está preso à soma dos produtos? (mesma regra de
+ * recalcularValorDoNegocio no servidor). Usado pela tela para travar o campo.
+ */
+export function valorVemDosProdutos(d: { disponivel: boolean; itens: unknown[]; valorManual: boolean } | null): boolean {
+  return !!d && d.disponivel && d.itens.length > 0 && !d.valorManual;
+}
+
 /** O que o servidor devolve de um produto do catálogo. */
 export interface ProdutoDoCatalogo {
   id: string;

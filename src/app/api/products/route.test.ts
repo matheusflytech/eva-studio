@@ -4,7 +4,7 @@ const db = vi.hoisted(() => ({
   product: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
 }));
 const perm = vi.hoisted(() => ({
-  requirePermission: vi.fn(async (_p: string) => ({ orgId: "org", userId: "u", role: "owner" }) as unknown),
+  requirePermission: vi.fn<(p: string) => Promise<unknown>>(async () => ({ orgId: "org", userId: "u", role: "owner" })),
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/permissions", () => perm);

@@ -7,8 +7,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FunisEditor } from "@/components/crm/config/funis-editor";
 import { CamposEditor } from "@/components/crm/config/campos-editor";
 import { CartaoEditor } from "@/components/crm/config/cartao-editor";
+import { ProdutosEditor } from "@/components/crm/config/produtos-editor";
 
-const ABAS = ["funis", "cartao", "deal", "contact"] as const;
+const ABAS = ["funis", "cartao", "deal", "contact", "produtos"] as const;
 
 // ?aba=cartao&funil=<id> abre direto no cartão daquele funil (o botão
 // "Personalizar" do quadro manda assim).
@@ -29,7 +30,7 @@ export default function PersonalizarCrmPage({
         </Link>
         <h1 className="font-display text-2xl font-semibold text-text-primary">Personalizar o CRM</h1>
         <p className="mt-1 max-w-[640px] text-[15px] text-text-secondary">
-          Cada negócio funciona de um jeito. Monte os funis, as etapas, o cartão e os campos do seu.
+          Cada negócio funciona de um jeito. Monte os funis, as etapas, o cartão, os campos e os produtos do seu.
         </p>
         <Link href="/comecar" className="mt-2 inline-flex items-center gap-1.5 text-[13px] text-accent-400 hover:underline">
           Prefere partir de um modelo pronto para o seu tipo de negócio?
@@ -42,12 +43,14 @@ export default function PersonalizarCrmPage({
           <TabsTrigger value="cartao">Cartão do negócio</TabsTrigger>
           <TabsTrigger value="deal">Campos do negócio</TabsTrigger>
           <TabsTrigger value="contact">Campos do contato</TabsTrigger>
+          <TabsTrigger value="produtos">Produtos</TabsTrigger>
         </TabsList>
         <div className="mt-6">
           <TabsContent value="funis"><FunisEditor /></TabsContent>
           <TabsContent value="cartao"><CartaoEditor funilInicial={funil} /></TabsContent>
           <TabsContent value="deal"><CamposEditor entity="deal" /></TabsContent>
           <TabsContent value="contact"><CamposEditor entity="contact" /></TabsContent>
+          <TabsContent value="produtos"><ProdutosEditor /></TabsContent>
         </div>
       </Tabs>
     </div>

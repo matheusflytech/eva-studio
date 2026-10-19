@@ -8,6 +8,7 @@ import {
   rotuloDaRecorrencia,
   textoDoDesconto,
   totalDoItem,
+  valorVemDosProdutos,
 } from "./produtos";
 
 describe("totalDoItem", () => {
@@ -119,6 +120,16 @@ describe("recorrência", () => {
     expect(rotuloDaRecorrencia("unico")).toBe("Único");
     expect(rotuloDaRecorrencia("mensal")).toBe("Mensal");
     expect(rotuloDaRecorrencia("anual")).toBe("Anual");
+  });
+});
+
+describe("valorVemDosProdutos", () => {
+  it("só com itens, sem valor manual e com a tabela ativa", () => {
+    expect(valorVemDosProdutos({ disponivel: true, itens: [1], valorManual: false })).toBe(true);
+    expect(valorVemDosProdutos({ disponivel: true, itens: [1], valorManual: true })).toBe(false);
+    expect(valorVemDosProdutos({ disponivel: true, itens: [], valorManual: false })).toBe(false);
+    expect(valorVemDosProdutos({ disponivel: false, itens: [1], valorManual: false })).toBe(false);
+    expect(valorVemDosProdutos(null)).toBe(false);
   });
 });
 

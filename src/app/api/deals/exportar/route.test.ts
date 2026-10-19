@@ -6,7 +6,7 @@ const db = vi.hoisted(() => ({
   customField: { findMany: vi.fn(async () => [] as unknown[]) },
   pipelineCardLayout: { findUnique: vi.fn(async () => null) },
   organization: { findUnique: vi.fn(async () => ({ name: "Acme Solar" })) },
-  dealItem: { findMany: vi.fn(async (_a?: { where: unknown }) => [] as unknown[]) },
+  dealItem: { findMany: vi.fn<(a?: { where: unknown }) => Promise<unknown[]>>(async () => []) },
 }));
 const auth = vi.hoisted(() => ({
   requirePermission: vi.fn(async (): Promise<Record<string, unknown>> => ({ orgId: "org", userId: "u", role: "viewer" })),
