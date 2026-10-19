@@ -64,6 +64,7 @@ export default function NegociosPage() {
   const [stages, setStages] = React.useState<EtapaKanban[]>([]);
   const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
   const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
+  const [ciclo, setCiclo] = React.useState<number | null>(null);
   const [meuId, setMeuId] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
@@ -125,7 +126,9 @@ export default function NegociosPage() {
       if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
       setStages(data.stages ?? []);
       setDefs(data.fields ?? []);
-      setConversao(funil?.ok ? ((await funil.json()).conversao ?? []) : []);
+      const dadosDoFunil = funil?.ok ? await funil.json() : null;
+      setConversao(dadosDoFunil?.conversao ?? []);
+      setCiclo(typeof dadosDoFunil?.cicloDeVenda === "number" ? dadosDoFunil.cicloDeVenda : null);
       setAgora(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível carregar os negócios.");
@@ -244,6 +247,7 @@ export default function NegociosPage() {
       <ResumoDoFunilView
         dados={dadosDoResumo}
         conversao={conversao}
+        ciclo={ciclo}
         recolhido={resumoAberto === "recolhido"}
         onAlternar={() => setResumoAberto(resumoAberto === "recolhido" ? "aberto" : "recolhido")}
         verAtencao={filtros.visao === "atencao"}

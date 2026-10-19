@@ -993,9 +993,27 @@ model Pipeline {
   stages       PipelineStage[]
   deals        Deal[]
   customFields CustomField[]
+  cardLayout   PipelineCardLayout?
 
   @@index([orgId])
   @@map("eva_studio_pipelines")
+}
+
+// Como o cartão do negócio aparece neste funil (campos, prévia, densidade).
+// Tabela à parte em vez de coluna no funil: sem o registro, o padrão de
+// src/lib/cartao-layout.ts vale, e o resto do CRM não depende desta tabela.
+model PipelineCardLayout {
+  id         String   @id @default(uuid())
+  orgId      String
+  pipelineId String   @unique
+  // { campos: string[], previa: string[], densidade: "compacto" | "confortavel" }
+  layout     Json     @default("{}")
+  updatedAt  DateTime @updatedAt
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_pipeline_card_layouts")
 }
 
 model PipelineStage {
