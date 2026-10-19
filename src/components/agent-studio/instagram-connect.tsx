@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "@/lib/contrato/navegacao";
 import { CheckCircle2, AtSign, ExternalLink, Lock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input, Label } from "@/components/ui/input";

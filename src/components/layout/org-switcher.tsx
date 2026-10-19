@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { ChevronsUpDown, LogOut, Settings, ImageUp } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import {

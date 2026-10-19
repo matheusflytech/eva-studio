@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { Building2, CalendarDays, Mail, Phone, Plus, Repeat, X } from "lucide-react";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { Avatar } from "@/components/crm/negocios/deal-card";

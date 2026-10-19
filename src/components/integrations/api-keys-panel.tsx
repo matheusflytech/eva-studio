@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { KeyRound, Plus, Trash2, Copy, Check, AlertTriangle, FileText } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

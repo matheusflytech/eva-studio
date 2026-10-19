@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   Plus, X, Check, Phone, Mail, Building2, ExternalLink, Handshake, Loader2, Clock, UserRoundX, UserRound,
 } from "lucide-react";

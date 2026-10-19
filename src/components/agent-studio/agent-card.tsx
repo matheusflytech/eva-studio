@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { Aperture, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

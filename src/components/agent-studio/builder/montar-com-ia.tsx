@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "@/components/contrato/link";
 import type { Node, Edge } from "@xyflow/react";
 import { Sparkles, Loader2, AlertTriangle, Undo2, X, ArrowRight, RotateCcw } from "lucide-react";
 import { Modal, ModalContent } from "@/components/ui/modal";
@@ -347,9 +348,9 @@ export function MontarComIa({
               <div className="rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
                 {erro.msg}
                 {erro.semChave && (
-                  <a href="/integracoes" className="ml-1 font-medium underline">
+                  <Link href="/integracoes" className="ml-1 font-medium underline">
                     Abrir Integrações
-                  </a>
+                  </Link>
                 )}
               </div>
             )}

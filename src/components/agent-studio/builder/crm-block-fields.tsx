@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -408,9 +408,9 @@ export function CrmBlockFields({
           {tags.length === 0 && (
             <p className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-text-tertiary">
               Nenhuma etiqueta ainda. Crie em{" "}
-              <a href="/contatos" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
+              <Link href="/contatos" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
                 Contatos <ExternalLink size={11} />
-              </a>
+              </Link>
             </p>
           )}
         </div>

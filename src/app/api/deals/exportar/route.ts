@@ -22,7 +22,8 @@ const DIA = 86_400_000;
 //   ?itens=1               (csv) uma linha por item/produto do negócio
 //   ?dias=90               janela do relatório (ganho, taxa de ganho, ciclo, conversão)
 export async function GET(request: Request) {
-  const ctx = await requirePermission("read");
+  // Download por <a href> não passa pelo fetch do app: o contrato vem na query.
+  const ctx = await requirePermission("negocios:exportar", { contrato: new URL(request.url).searchParams.get("contrato") });
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const url = new URL(request.url);

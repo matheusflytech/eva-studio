@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { CheckCircle2, Loader2, Maximize2, MessageCircle, X, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

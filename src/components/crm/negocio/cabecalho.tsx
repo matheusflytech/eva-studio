@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link from "@/components/contrato/link";
+import { useRouter } from "@/lib/contrato/navegacao";
 import {
   Archive, ArchiveRestore, Building2, ChevronRight, Ellipsis, Link2, Loader2, ThumbsDown, ThumbsUp, Trash2, User,
 } from "lucide-react";

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "@/components/contrato/link";
 import { ExternalLink, AlertTriangle } from "lucide-react";
 import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -67,9 +68,9 @@ export function McpToolPicker({
         {servers && servers.length === 0 && (
           <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-text-tertiary">
             Nenhum servidor cadastrado. Cadastre em{" "}
-            <a href="/integracoes" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
+            <Link href="/integracoes" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
               Integrações <ExternalLink size={11} />
-            </a>
+            </Link>
           </p>
         )}
       </div>
