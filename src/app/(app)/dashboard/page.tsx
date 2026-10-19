@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   RefreshCw, Plus, X, Pencil, ArrowLeft, ArrowRight, Check, LayoutGrid,
-  Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel,
+  Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel, FilterX,
 } from "lucide-react";
 import { FunnelChart, type EtapaDoFunil } from "@/components/charts/funnel-chart";
 import { Input, Label } from "@/components/ui/input";
@@ -14,7 +15,20 @@ import { DonutChart } from "@/components/charts/donut-chart";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
-import { descreverConsulta, tiposPermitidos as tiposPermitidos_, type Consulta, type TipoDeCartao } from "@/lib/consulta";
+import { BarraDeFiltros } from "@/components/dashboard/barra-de-filtros";
+import { rotulosDasOpcoes, useOpcoesDoDashboard, type OpcoesDoDashboard } from "@/components/dashboard/opcoes";
+import {
+  ROTULO_CANAL,
+  descreverConsulta,
+  diasEntre,
+  filtrosGlobaisParaQuery,
+  sanearFiltrosGlobais,
+  tiposPermitidos as tiposPermitidos_,
+  type Consulta,
+  type FiltrosGlobais,
+  type RotulosDaConsulta,
+  type TipoDeCartao,
+} from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // Dashboard montado pela própria pessoa.
@@ -30,21 +44,11 @@ import { descreverConsulta, tiposPermitidos as tiposPermitidos_, type Consulta, 
 //    não um campo de banco — e tipo de gráfico sem dado é decoração.
 // 2. Tipo incompatível com a fonte nem aparece. Pizza de série temporal não é
 //    um erro pra avisar depois: é uma opção que não deveria existir.
+//
+// A barra de filtros do topo (período, funis, responsável) vale pra todos os
+// cartões e mora na URL. Fonte que não sabe respeitar um filtro diz isso no
+// próprio cartão, em vez de mostrar um número que parece filtrado e não é.
 // ---------------------------------------------------------------------------
-
-const PERIODOS = [
-  { label: "Hoje", dias: 1 },
-  { label: "7 dias", dias: 7 },
-  { label: "30 dias", dias: 30 },
-  { label: "90 dias", dias: 90 },
-  { label: "6 meses", dias: 180 },
-];
-
-const CANAL_LABEL: Record<string, string> = {
-  whatsapp_meta: "WhatsApp oficial", whatsapp_qr: "WhatsApp", instagram: "Instagram",
-  messenger: "Messenger", telegram: "Telegram", tiktok: "TikTok",
-  webchat: "Site", website: "Site", "sem canal": "Sem canal",
-};
 
 interface Fonte {
   chave: string;
@@ -53,6 +57,7 @@ interface Fonte {
   tipo: "numero" | "serie" | "quebra" | "tabela" | "funil";
   formato?: "dinheiro" | "inteiro" | "porcento" | "dias";
   grupo: string;
+  filtros?: "todos" | "um-funil" | "nenhum";
 }
 
 interface Widget {
@@ -63,11 +68,6 @@ interface Widget {
   largura: number;
   /** Só para fonte "custom": o cartão que a pessoa montou. */
   consulta?: Consulta;
-}
-
-interface Rotulos {
-  campos: { key: string; label: string }[];
-  funis: { id: string; name: string }[];
 }
 
 interface Ponto { label: string; value: number }
@@ -86,6 +86,8 @@ interface Dados {
   tabelas: Record<string, LinhaTabela[]>;
   funis: Record<string, EtapaDoFunil[]>;
   historicoDesde: string | null;
+  funilDasFontesDeFunil?: { id: string; name: string } | null;
+  periodo?: { de: string; ate: string };
 }
 
 /** Que cartões cada tipo de fonte aceita. É isto que impede pizza de série. */
@@ -133,25 +135,52 @@ function formatar(valor: number | null, formato: Fonte["formato"]): string {
 }
 
 function rotular(label: string): string {
-  return CANAL_LABEL[label] ?? label;
+  return ROTULO_CANAL[label] ?? label;
 }
 
+/** Selo do cartão de fonte fixa quando um filtro do painel não vale pra ela. */
+function seloDeFiltro(fonte: Fonte, globais: FiltrosGlobais, dados: Dados | null, totalDeFunis: number): string | null {
+  const comFiltro = globais.funis.length > 0 || globais.donos.length > 0;
+  if (fonte.filtros === "nenhum") return comFiltro ? "Não usa os filtros de funil e responsável" : null;
+  if (fonte.filtros === "um-funil") {
+    const nome = dados?.funilDasFontesDeFunil?.name;
+    if (globais.funis.length > 1) return `Não soma funis: mostra só ${nome ? `“${nome}”` : "o funil padrão"}`;
+    if (globais.funis.length === 0 && totalDeFunis > 1 && nome) return `Funil “${nome}”`;
+  }
+  return null;
+}
+
+// useSearchParams precisa de um Suspense em volta para a página poder ser
+// pré-renderizada (sem ele o build falha).
 export default function DashboardPage() {
-  const [dias, setDias] = React.useState(30);
+  return (
+    <React.Suspense fallback={<div className="flex-1 p-8 text-[13px] text-text-tertiary">Carregando...</div>}>
+      <Painel />
+    </React.Suspense>
+  );
+}
+
+function Painel() {
+  const parametros = useSearchParams();
+  const consultaDaUrl = parametros.toString();
+  const globais = React.useMemo(() => sanearFiltrosGlobais(new URLSearchParams(consultaDaUrl)), [consultaDaUrl]);
+  const dias = globais.de && globais.ate ? diasEntre(globais.de, globais.ate) : globais.dias;
+
+  // A URL é o estado: replaceState avisa o roteador do Next (useSearchParams
+  // acompanha) sem recarregar a página nem empilhar histórico a cada clique.
+  const mudarGlobais = React.useCallback((g: FiltrosGlobais) => {
+    const q = filtrosGlobaisParaQuery(g);
+    window.history.replaceState(null, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+  }, []);
+
   const [dados, setDados] = React.useState<Dados | null>(null);
   const [widgets, setWidgets] = React.useState<Widget[] | null>(null);
   const [editando, setEditando] = React.useState(false);
   const [selecionado, setSelecionado] = React.useState<string | null>(null);
   const [adicionando, setAdicionando] = React.useState(false);
   const [construtor, setConstrutor] = React.useState<{ editandoId: string | null } | null>(null);
-  const [rotulos, setRotulos] = React.useState<Rotulos>({ campos: [], funis: [] });
-
-  React.useEffect(() => {
-    Promise.all([
-      fetch("/api/custom-fields?entity=deal&todos=1").then((r) => r.json()).catch(() => ({})),
-      fetch("/api/pipelines").then((r) => r.json()).catch(() => ({})),
-    ]).then(([c, pp]) => setRotulos({ campos: c.fields ?? [], funis: pp.pipelines ?? [] }));
-  }, []);
+  const { opcoes } = useOpcoesDoDashboard();
+  const rotulos = React.useMemo(() => rotulosDasOpcoes(opcoes), [opcoes]);
   const [carregando, setCarregando] = React.useState(true);
   const [estadoSalvar, setEstadoSalvar] = React.useState<"parado" | "salvando" | "salvo">("parado");
   const [atualizadoEm, setAtualizadoEm] = React.useState<string | null>(null);
@@ -164,7 +193,8 @@ export default function DashboardPage() {
   const carregarDados = React.useCallback(async () => {
     setCarregando(true);
     try {
-      const res = await fetch(`/api/analytics/fontes?dias=${dias}`);
+      const q = filtrosGlobaisParaQuery(globais);
+      const res = await fetch(`/api/analytics/fontes${q ? `?${q}` : ""}`);
       const d = await res.json();
       if (res.ok) {
         setDados(d);
@@ -174,7 +204,7 @@ export default function DashboardPage() {
     } finally {
       setCarregando(false);
     }
-  }, [dias]);
+  }, [globais]);
 
   React.useEffect(() => { carregarDados(); }, [carregarDados]);
 
@@ -266,7 +296,10 @@ export default function DashboardPage() {
   const historicoRecente =
     temCartaoDeFunil &&
     carregadoEm !== null &&
-    (!dados?.historicoDesde || new Date(dados.historicoDesde).getTime() > carregadoEm - dias * 86_400_000);
+    (!dados?.historicoDesde ||
+      (dados.periodo
+        ? new Date(dados.historicoDesde).toISOString().slice(0, 10) > dados.periodo.de
+        : new Date(dados.historicoDesde).getTime() > carregadoEm - dias * 86_400_000));
 
   function salvarDoConstrutor(r: ResultadoDoConstrutor) {
     const alvo = construtor?.editandoId;
@@ -356,29 +389,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="glass-card mb-4 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
-        <span className="text-[12.5px] text-text-tertiary">Período:</span>
-        <div className="flex flex-wrap gap-1.5">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.dias}
-              type="button"
-              onClick={() => setDias(p.dias)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-                dias === p.dias
-                  ? "bg-ice text-bg-base"
-                  : "bg-surface-2 text-text-secondary hover:text-text-primary"
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <span className="ml-auto text-[11.5px] text-text-tertiary">
-          Vale para todos os cartões.
-        </span>
-      </div>
+      <BarraDeFiltros globais={globais} aoMudar={mudarGlobais} opcoes={opcoes} />
 
       {historicoRecente && (
         <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-text-secondary ring-1 ring-border-subtle">
@@ -398,7 +409,8 @@ export default function DashboardPage() {
               widget={w}
               fonte={fontePorChave.get(w.fonte)}
               dados={dados}
-              dias={dias}
+              globais={globais}
+              opcoes={opcoes}
               rotulos={rotulos}
               editando={editando}
               selecionado={selecionado === w.id}
@@ -457,7 +469,8 @@ export default function DashboardPage() {
 
       {construtor && (
         <ConstrutorDeConsulta
-          dias={dias}
+          globais={globais}
+          opcoes={opcoes}
           inicial={(() => {
             const w = (widgets ?? []).find((x) => x.id === construtor.editandoId);
             return w?.consulta ? { consulta: w.consulta, tipo: tipoDeConsulta(w.tipo), titulo: w.titulo } : undefined;
@@ -473,14 +486,15 @@ export default function DashboardPage() {
 // ── Cartão ─────────────────────────────────────────────────────────────────
 
 function Cartao({
-  widget, fonte, dados, dias, rotulos, editando, selecionado, primeiro, ultimo,
+  widget, fonte, dados, globais, opcoes, rotulos, editando, selecionado, primeiro, ultimo,
   onSelecionar, onRemover, onMover,
 }: {
   widget: Widget;
   fonte: Fonte | undefined;
   dados: Dados | null;
-  dias: number;
-  rotulos: Rotulos;
+  globais: FiltrosGlobais;
+  opcoes: OpcoesDoDashboard;
+  rotulos: RotulosDaConsulta;
   editando: boolean;
   selecionado: boolean;
   primeiro: boolean;
@@ -520,7 +534,7 @@ function Cartao({
 
       {widget.fonte === "custom" && widget.consulta ? (
         <div className="mt-2 flex-1">
-          <ConteudoDeConsulta consulta={widget.consulta} tipo={tipoDeConsulta(widget.tipo)} dias={dias} />
+          <ConteudoDeConsulta consulta={widget.consulta} tipo={tipoDeConsulta(widget.tipo)} globais={globais} />
         </div>
       ) : !fonte ? (
         <p className="mt-3 text-[12.5px] text-text-tertiary">Fonte não encontrada.</p>
@@ -530,11 +544,19 @@ function Cartao({
         </div>
       )}
 
+      {fonte && !editando && (() => {
+        const selo = seloDeFiltro(fonte, globais, dados, opcoes.funis.length);
+        return selo ? (
+          <p className="mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-text-tertiary ring-1 ring-border-subtle">
+            <FilterX size={10} /> {selo}
+          </p>
+        ) : null;
+      })()}
       {fonte && !editando && (
         <p className="mt-2 text-[11px] text-text-tertiary">{fonte.explicacao}</p>
       )}
       {widget.fonte === "custom" && widget.consulta && !editando && (
-        <p className="mt-2 text-[11px] text-text-tertiary">{descreverConsulta(widget.consulta, rotulos.campos, rotulos.funis)}</p>
+        <p className="mt-2 text-[11px] text-text-tertiary">{descreverConsulta(widget.consulta, rotulos)}</p>
       )}
     </div>
   );
@@ -675,7 +697,7 @@ function Propriedades({
   widget, fonte, catalogo, rotulos, onChange, onEditarConsulta, onRemover, onFechar,
 }: {
   widget: Widget;
-  rotulos: Rotulos;
+  rotulos: RotulosDaConsulta;
   fonte: Fonte | undefined;
   catalogo: Fonte[];
   onChange: (m: Partial<Widget>) => void;
@@ -717,7 +739,7 @@ function Propriedades({
         {ehCustom ? (
           <div>
             <Label>O que o cartão mostra</Label>
-            <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-secondary">{descreverConsulta(widget.consulta!, rotulos.campos, rotulos.funis)}</p>
+            <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-secondary">{descreverConsulta(widget.consulta!, rotulos)}</p>
             <button
               type="button"
               onClick={onEditarConsulta}

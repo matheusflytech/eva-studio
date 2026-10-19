@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/server/permissions";
 import { rodarConsulta, listarNegociosDaConsulta } from "@/lib/server/consulta";
-import { sanearConsulta } from "@/lib/consulta";
+import { sanearConsulta, sanearFiltrosGlobais } from "@/lib/consulta";
 
 // Calcula um cartão montado pelo cliente. POST porque a consulta é um objeto
-// (medida, campo, agrupamento, filtros), não cabe numa query string decente.
-// `lista: true` devolve os negócios em vez do número, pro cartão de tabela.
+// (medida, campo, agrupamento, grupos de filtros), não cabe numa query string
+// decente. `lista: true` devolve os negócios em vez do número, pro cartão de
+// tabela. `dias`/`de`/`ate`/`funis`/`donos` são os filtros globais da barra do
+// painel: valem junto com os do cartão.
 export async function POST(request: Request) {
   const ctx = await requirePermission("read");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await request.json().catch(() => ({}));
-  const consulta = sanearConsulta(body.consulta);
+  const consulta = sanearConsulta(body?.consulta);
   if (!consulta) return NextResponse.json({ error: "Consulta inválida." }, { status: 400 });
 
-  const dias = Math.min(Math.max(Number(body.dias) || 30, 1), 365);
+  const globais = sanearFiltrosGlobais(body && typeof body === "object" ? body : {});
 
   try {
-    const resultado = body.lista === true ? await listarNegociosDaConsulta(ctx.orgId, consulta, dias) : await rodarConsulta(ctx.orgId, consulta, dias);
+    const resultado =
+      body.lista === true
+        ? await listarNegociosDaConsulta(ctx.orgId, consulta, { globais })
+        : await rodarConsulta(ctx.orgId, consulta, { globais });
     return NextResponse.json({ resultado });
   } catch (err) {
     console.error("[consulta]", err);

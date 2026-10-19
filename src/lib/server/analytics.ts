@@ -1,7 +1,18 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { coletarFunil } from "@/lib/server/funil-dados";
 import type { LinhaDeConversao } from "@/lib/funil-metricas";
+import {
+  FILTROS_GLOBAIS_PADRAO,
+  SEM_VALOR,
+  diaLocal,
+  diasEntre,
+  inicioDoDia,
+  janelaDoPainel,
+  somarDias,
+  type FiltrosGlobais,
+} from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // Catálogo de fontes do Dashboard.
@@ -13,9 +24,12 @@ import type { LinhaDeConversao } from "@/lib/funil-metricas";
 //
 // A regra do que entra aqui: número que sai de tabela. Nada de estimativa,
 // nada de "simulado" — se não dá pra contar, não vira fonte.
+//
+// Filtros globais da barra do painel: o período vale pra tudo; funis e
+// responsável valem pras fontes de negócio (ver `filtros` no catálogo). As
+// de atendimento não são de negócio e ignoram os dois.
 // ---------------------------------------------------------------------------
 
-const DIA = 24 * 60 * 60 * 1000;
 const CANAIS_INTERNOS = ["playground", "builder_preview"];
 
 export { FONTES, FONTE_POR_CHAVE } from "@/lib/analytics-catalog";
@@ -41,29 +55,73 @@ export interface Fontes {
   funis: Record<string, LinhaDeConversao[]>;
   /** Desde quando existe histórico de etapas (para a tela avisar). */
   historicoDesde: string | null;
+  /** Funil usado pelas fontes de um funil só (conversão, dias por etapa...). */
+  funilDasFontesDeFunil: { id: string; name: string } | null;
+  /** O período efetivo, em dias de São Paulo. */
+  periodo: { de: string; ate: string };
 }
 
-export async function coletarFontes(orgId: string, dias: number): Promise<Fontes> {
-  const desde = new Date();
-  desde.setHours(0, 0, 0, 0);
-  desde.setTime(desde.getTime() - (dias - 1) * DIA);
+/** Funis e responsáveis escolhidos na barra, como `where` de negócio. */
+function whereGlobal(g: FiltrosGlobais): Prisma.DealWhereInput[] {
+  const e: Prisma.DealWhereInput[] = [];
+  if (g.funis.length) e.push({ pipelineId: { in: g.funis } });
+  if (g.donos.length) {
+    const ids = g.donos.filter((d) => d !== SEM_VALOR);
+    const ou: Prisma.DealWhereInput[] = [];
+    if (ids.length) ou.push({ ownerId: { in: ids } });
+    if (g.donos.includes(SEM_VALOR)) ou.push({ ownerId: null });
+    e.push({ OR: ou });
+  }
+  return e;
+}
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+/** O mesmo, em SQL, pra consulta crua de canais. Valores vão como parâmetro, nunca no texto. */
+function sqlGlobal(g: FiltrosGlobais): Prisma.Sql {
+  const partes: Prisma.Sql[] = [];
+  if (g.funis.length) partes.push(Prisma.sql`AND d."pipelineId" IN (${Prisma.join(g.funis)})`);
+  if (g.donos.length) {
+    const ids = g.donos.filter((d) => d !== SEM_VALOR);
+    const ou: Prisma.Sql[] = [];
+    if (ids.length) ou.push(Prisma.sql`d."ownerId" IN (${Prisma.join(ids)})`);
+    if (g.donos.includes(SEM_VALOR)) ou.push(Prisma.sql`d."ownerId" IS NULL`);
+    partes.push(Prisma.sql`AND (${Prisma.join(ou, " OR ")})`);
+  }
+  return partes.length ? Prisma.join(partes, " ") : Prisma.empty;
+}
 
-  const [ganhos, criados, abertos, recentes, canalVendas, conversas, mensagens, porHora, funil] =
+/**
+ * `filtros` aceita um número (dias, como antes) ou os filtros globais da
+ * barra do painel.
+ */
+export async function coletarFontes(orgId: string, filtros: number | FiltrosGlobais, agora = new Date()): Promise<Fontes> {
+  const g: FiltrosGlobais = typeof filtros === "number" ? { ...FILTROS_GLOBAIS_PADRAO, dias: filtros } : filtros;
+  const janela = janelaDoPainel(g.dias, g.de, g.ate, agora);
+  // Dias de São Paulo, não do relógio do servidor (que roda em UTC).
+  const desde = inicioDoDia(janela.de);
+  const fim = inicioDoDia(somarDias(janela.ate, 1));
+  const hoje = inicioDoDia(diaLocal(agora));
+  const periodo = { gte: desde, lt: fim };
+  const doPainel = whereGlobal(g);
+  const comGlobais = (w: Prisma.DealWhereInput): Prisma.DealWhereInput => (doPainel.length ? { ...w, AND: doPainel } : w);
+
+  const [ganhos, deHoje, criados, abertos, recentes, canalVendas, conversas, mensagens, porHora, funil] =
     await Promise.all([
       prisma.deal.findMany({
-        where: { orgId, closedAt: { gte: desde }, stage: { type: "won" } },
+        where: comGlobais({ orgId, archivedAt: null, closedAt: periodo, stage: { type: "won" } }),
         select: { amountCents: true, closedAt: true },
       }),
-      prisma.deal.count({ where: { orgId, createdAt: { gte: desde } } }),
+      // "De hoje" não depende do período escolhido: um intervalo no passado não zera a venda de hoje.
       prisma.deal.findMany({
-        where: { orgId, closedAt: null, archivedAt: null },
+        where: comGlobais({ orgId, archivedAt: null, closedAt: { gte: hoje }, stage: { type: "won" } }),
+        select: { amountCents: true },
+      }),
+      prisma.deal.count({ where: comGlobais({ orgId, archivedAt: null, createdAt: periodo }) }),
+      prisma.deal.findMany({
+        where: comGlobais({ orgId, closedAt: null, archivedAt: null }),
         select: { amountCents: true, probability: true, stage: { select: { name: true, position: true } } },
       }),
       prisma.deal.findMany({
-        where: { orgId, closedAt: { gte: desde }, stage: { type: "won" } },
+        where: comGlobais({ orgId, archivedAt: null, closedAt: periodo, stage: { type: "won" } }),
         include: {
           owner: { select: { name: true } },
           contacts: { take: 1, include: { contact: { select: { name: true, phone: true } } } },
@@ -77,17 +135,19 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
           JOIN eva_studio_pipeline_stages st ON st.id = d."stageId"
           LEFT JOIN eva_studio_deal_contacts dc ON dc."dealId" = d.id
           LEFT JOIN eva_studio_contact_channels ch ON ch."contactId" = dc."contactId"
-         WHERE d."orgId" = ${orgId} AND st.type = 'won' AND d."closedAt" >= ${desde}
+         WHERE d."orgId" = ${orgId} AND st.type = 'won' AND d."archivedAt" IS NULL
+           AND d."closedAt" >= ${desde} AND d."closedAt" < ${fim}
+           ${sqlGlobal(g)}
          GROUP BY 1 ORDER BY 2 DESC
       `,
       prisma.conversation.findMany({
-        where: { agent: { orgId }, updatedAt: { gte: desde }, channel: { notIn: CANAIS_INTERNOS } },
+        where: { agent: { orgId }, updatedAt: periodo, channel: { notIn: CANAIS_INTERNOS } },
         select: { channel: true, status: true },
       }),
       prisma.message.count({
         where: {
           role: "contact",
-          createdAt: { gte: desde },
+          createdAt: periodo,
           conversation: { agent: { orgId }, channel: { notIn: CANAIS_INTERNOS } },
         },
       }),
@@ -99,28 +159,29 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
           JOIN eva_studio_agents a ON a.id = c."agentId"
          WHERE a."orgId" = ${orgId} AND m.role = 'contact'
            AND c.channel <> ALL(${CANAIS_INTERNOS})
-           AND m."createdAt" >= ${desde}
+           AND m."createdAt" >= ${desde} AND m."createdAt" < ${fim}
          GROUP BY 1
       `,
-      coletarFunil(orgId, desde),
+      // As fontes de funil são de UM funil (as etapas são dele): com um só
+      // escolhido na barra, é esse; senão, o padrão.
+      coletarFunil(orgId, desde, agora, g.funis.length === 1 ? g.funis[0] : undefined, { donos: g.donos, ate: fim }),
     ]);
 
   const receita = ganhos.reduce((s, d) => s + d.amountCents, 0);
-  const deHoje = ganhos.filter((d) => d.closedAt && d.closedAt >= hoje);
   // Duas perguntas diferentes: "quantas precisaram de gente" (conta quem esta
   // com um atendente tambem) e "quantas esperam gente agora" (so as paradas).
   const escalaram = conversas.filter((c) => c.status === "waiting_human" || c.status === "human").length;
   const esperandoAgora = conversas.filter((c) => c.status === "waiting_human").length;
 
   // Baldes fixos: dia sem venda tem que aparecer como zero, senão a linha
-  // "pula" o dia ruim e o gráfico mente pra quem olha rápido.
+  // "pula" o dia ruim e o gráfico mente pra quem olha rápido. O dia é o de
+  // São Paulo: venda das 22h não pode cair no dia seguinte.
   const porDia = new Map<string, number>();
-  for (let i = 0; i < dias; i += 1) {
-    porDia.set(new Date(desde.getTime() + i * DIA).toISOString().slice(0, 10), 0);
-  }
+  const totalDeDias = Math.min(diasEntre(janela.de, janela.ate), 400);
+  for (let i = 0; i < totalDeDias; i += 1) porDia.set(somarDias(janela.de, i), 0);
   for (const d of ganhos) {
     if (!d.closedAt) continue;
-    const k = d.closedAt.toISOString().slice(0, 10);
+    const k = diaLocal(d.closedAt);
     if (porDia.has(k)) porDia.set(k, (porDia.get(k) ?? 0) + d.amountCents);
   }
 
@@ -154,8 +215,8 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
       ...funil.numeros,
     },
     series: {
-      receitaPorDia: Array.from(porDia.entries()).map(([data, cents]) => ({
-        label: new Date(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      receitaPorDia: Array.from(porDia.entries()).map(([dia, cents]) => ({
+        label: `${dia.slice(8, 10)}/${dia.slice(5, 7)}`,
         value: Math.round(cents / 100),
       })),
       conversasPorHora: Array.from({ length: 24 }, (_, h) => ({
@@ -186,5 +247,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
     },
     funis: funil.funis,
     historicoDesde: funil.historicoDesde?.toISOString() ?? null,
+    funilDasFontesDeFunil: funil.funil ?? null,
+    periodo: janela,
   };
 }

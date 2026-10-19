@@ -2,20 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { AreaChart } from "@/components/charts/area-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
-import { formatRelativeDate } from "@/lib/utils";
-import { formatarResultado, type Consulta, type ResultadoDeConsulta, type TipoDeCartao } from "@/lib/consulta";
+import { cn, formatRelativeDate } from "@/lib/utils";
+import { formatarResultado, LIMITE_DE_NEGOCIOS, type Consulta, type FiltrosGlobais, type ResultadoDeConsulta, type TipoDeCartao } from "@/lib/consulta";
 
 // Busca e desenha o resultado de um cartão montado pelo cliente.
 
-/** Busca o resultado. Refaz quando a consulta, o período ou o tipo (lista x número) mudam. */
-export function useResultadoDeConsulta(consulta: Consulta, tipo: TipoDeCartao, dias: number, atraso = 0) {
+/** Busca o resultado. Refaz quando a consulta, os filtros do painel ou o tipo (lista x número) mudam. */
+export function useResultadoDeConsulta(consulta: Consulta, tipo: TipoDeCartao, globais: FiltrosGlobais, atraso = 0) {
   const [resultado, setResultado] = React.useState<ResultadoDeConsulta | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
   const [carregando, setCarregando] = React.useState(true);
-  const chave = JSON.stringify({ consulta, tipo, dias });
+  const chave = JSON.stringify({ consulta, tipo, globais });
 
   React.useEffect(() => {
     let cancelado = false;
@@ -25,7 +25,7 @@ export function useResultadoDeConsulta(consulta: Consulta, tipo: TipoDeCartao, d
         const res = await fetch("/api/analytics/consulta", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ consulta, dias, lista: tipo === "tabela" }),
+          body: JSON.stringify({ consulta, ...globais, lista: tipo === "tabela" }),
         });
         const d = await res.json().catch(() => ({}));
         if (cancelado) return;
@@ -53,16 +53,17 @@ function Vazio({ texto = "Sem dados com esses filtros." }: { texto?: string }) {
   return <p className="rounded-2xl bg-surface-2 px-4 py-7 text-center text-[12px] text-text-tertiary">{texto}</p>;
 }
 
+
 export function ConteudoDeConsulta({
   consulta,
   tipo,
-  dias,
+  globais,
 }: {
   consulta: Consulta;
   tipo: TipoDeCartao;
-  dias: number;
+  globais: FiltrosGlobais;
 }) {
-  const { resultado, erro, carregando } = useResultadoDeConsulta(consulta, tipo, dias);
+  const { resultado, erro, carregando } = useResultadoDeConsulta(consulta, tipo, globais);
   return <VisaoDoResultado resultado={resultado} erro={erro} carregando={carregando} tipo={tipo} />;
 }
 
@@ -79,14 +80,49 @@ export function VisaoDoResultado({
 }) {
   if (erro) return <p className="text-[12.5px] text-danger">{erro}</p>;
   if (!resultado) return <p className="text-[12.5px] text-text-tertiary">{carregando ? "Carregando..." : "Sem dados."}</p>;
+  return (
+    <div className={cn("transition-opacity", carregando && "opacity-60")}>
+      <Desenho resultado={resultado} tipo={tipo} />
+      {resultado.truncado && (
+        <p className="mt-2 flex items-start gap-1.5 rounded-xl bg-amber-500/10 px-2.5 py-1.5 text-[11.5px] leading-snug text-amber-300">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          Calculado sobre os {LIMITE_DE_NEGOCIOS.toLocaleString("pt-BR")} negócios mais recentes. Filtre mais para ver o número exato.
+        </p>
+      )}
+    </div>
+  );
+}
 
+/** "▲ 12% vs. período anterior". Subir é bom em quase tudo que se mede aqui. */
+function Variacao({ variacao, anterior, formato }: { variacao: number | null | undefined; anterior: number | null | undefined; formato: Parameters<typeof formatarResultado>[1] }) {
+  if (anterior === undefined) return null;
+  const textoAnterior = `antes: ${formatarResultado(anterior ?? null, formato)}`;
+  if (variacao === null || variacao === undefined) {
+    return <p className="mt-1 text-[11.5px] text-text-tertiary">Sem base de comparação ({textoAnterior})</p>;
+  }
+  const sobe = variacao > 0;
+  const igual = Math.abs(variacao) < 0.0005;
+  const Icone = sobe ? TrendingUp : TrendingDown;
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11.5px]">
+      <span className={cn("inline-flex items-center gap-1 font-medium", igual ? "text-text-tertiary" : sobe ? "text-emerald-400" : "text-danger")}>
+        {!igual && <Icone size={12} />}
+        {igual ? "igual" : `${sobe ? "+" : "−"}${Math.abs(variacao * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+      </span>
+      <span className="text-text-tertiary">vs. período anterior · {textoAnterior}</span>
+    </p>
+  );
+}
+
+function Desenho({ resultado, tipo }: { resultado: ResultadoDeConsulta; tipo: TipoDeCartao }) {
   if (resultado.tipo === "numero") {
     return (
       <div>
         <p className="font-display text-[30px] font-semibold leading-tight tabular-nums text-text-primary">
           {formatarResultado(resultado.valor, resultado.formato)}
         </p>
-        <p className="mt-0.5 text-[11.5px] text-text-tertiary">{resultado.negocios} negócio(s) considerados</p>
+        <Variacao variacao={resultado.variacao} anterior={resultado.anterior} formato={resultado.formato} />
+        <p className="mt-0.5 text-[11.5px] text-text-tertiary">{resultado.negocios.toLocaleString("pt-BR")} negócio(s) considerados</p>
       </div>
     );
   }

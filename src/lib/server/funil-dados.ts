@@ -37,6 +37,16 @@ export interface DadosDoFunil {
   funis: { funilConversao: LinhaDeConversao[] };
   /** Evento mais antigo da organização: antes disso, o histórico é só a etapa atual. */
   historicoDesde: Date | null;
+  /** O funil que foi usado (o pedido ou o padrão). */
+  funil?: { id: string; name: string } | null;
+}
+
+/** Filtros extras do Dashboard. O /negocios não passa nenhum. */
+export interface FiltrosDoFunil {
+  /** Responsáveis; "__nenhum" = sem responsável. */
+  donos?: string[];
+  /** Fim (exclusivo) do período, para intervalos que não terminam hoje. */
+  ate?: Date;
 }
 
 const VAZIO: DadosDoFunil = {
@@ -45,22 +55,33 @@ const VAZIO: DadosDoFunil = {
   tabelas: { negociosParados: [] },
   funis: { funilConversao: [] },
   historicoDesde: null,
+  funil: null,
 };
 
 export async function coletarFunil(
   orgId: string,
   desde: Date,
   agora = new Date(),
-  pipelineId?: string
+  pipelineId?: string,
+  filtros: FiltrosDoFunil = {}
 ): Promise<DadosDoFunil> {
   // Funil pedido (sempre da organização) ou, sem pedido, o padrão; sem
   // padrão, o primeiro da lista.
   const funil = await prisma.pipeline.findFirst({
     where: pipelineId ? { orgId, id: pipelineId } : { orgId },
     orderBy: [{ isDefault: "desc" }, { position: "asc" }],
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!funil) return VAZIO;
+
+  const donos = filtros.donos ?? [];
+  const idsDonos = donos.filter((d) => d !== "__nenhum");
+  const porDono =
+    donos.length === 0
+      ? {}
+      : { AND: [{ OR: [...(idsDonos.length ? [{ ownerId: { in: idsDonos } }] : []), ...(donos.includes("__nenhum") ? [{ ownerId: null }] : [])] }] };
+  const ate = filtros.ate;
+  const noPeriodo = (d: Date | null) => !!d && d >= desde && (!ate || d < ate);
 
   const [linhasEtapa, linhasNegocio] = await Promise.all([
     prisma.pipelineStage.findMany({ where: { pipelineId: funil.id }, orderBy: { position: "asc" } }),
@@ -70,6 +91,7 @@ export async function coletarFunil(
         pipelineId: funil.id,
         archivedAt: null,
         OR: [{ createdAt: { gte: desde } }, { closedAt: null }, { closedAt: { gte: desde } }],
+        ...porDono,
       },
       select: { id: true, name: true, stageId: true, createdAt: true, closedAt: true, stageSince: true, amountCents: true, lostReason: true },
       orderBy: { createdAt: "desc" },
@@ -106,8 +128,8 @@ export async function coletarFunil(
   }));
   const eventos: EventoF[] = linhasEvento.map((e) => ({ dealId: e.dealId, de: e.fromStageId, para: e.toStageId, em: e.at }));
 
-  const criadosNoPeriodo = todos.filter((n) => n.criadoEm >= desde);
-  const fechadosNoPeriodo = todos.filter((n) => n.fechadoEm && n.fechadoEm >= desde);
+  const criadosNoPeriodo = todos.filter((n) => noPeriodo(n.criadoEm));
+  const fechadosNoPeriodo = todos.filter((n) => noPeriodo(n.fechadoEm));
   const idsDoPeriodo = new Set(criadosNoPeriodo.map((n) => n.id));
 
   return {
@@ -134,5 +156,6 @@ export async function coletarFunil(
     },
     funis: { funilConversao: conversaoPorEtapa(etapas, criadosNoPeriodo, eventos) },
     historicoDesde: primeiro?.at ?? null,
+    funil: { id: funil.id, name: funil.name },
   };
 }

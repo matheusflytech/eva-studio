@@ -13,7 +13,9 @@ import { sanearConsulta, tiposPermitidos, type Consulta } from "@/lib/consulta";
 // de configurar; ver, todo mundo vê.
 // ---------------------------------------------------------------------------
 
-const TIPOS = new Set(["numero", "linha", "pizza", "barras", "tabela"]);
+// "funil" entra aqui: sem ele, o cartão de conversão do Painel do funil voltava
+// como "numero" ao salvar.
+const TIPOS = new Set(["numero", "linha", "pizza", "barras", "tabela", "funil"]);
 const LARGURAS = new Set([1, 2, 3]);
 
 export interface Widget {
@@ -42,10 +44,21 @@ export async function GET() {
   if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const salvo = await prisma.dashboardLayout.findUnique({ where: { orgId } });
-  return NextResponse.json({
-    widgets: (salvo?.widgets as unknown as Widget[]) ?? PADRAO,
-    padrao: !salvo,
-  });
+  // Cartão montado e salvo no formato antigo (`funilId`, filtros em lista)
+  // sai já no formato novo: a tela só conhece um.
+  const widgets = Array.isArray(salvo?.widgets)
+    ? (salvo.widgets as unknown as Widget[]).flatMap((w) => {
+        if (w?.fonte !== "custom") {
+          // Fonte de funil salva antes da correção acima voltou como "numero" e
+          // aparece vazia: devolve o tipo que a fonte desenha.
+          const fonte = FONTE_POR_CHAVE.get(w?.fonte);
+          return [fonte?.tipo === "funil" && w.tipo !== "funil" ? { ...w, tipo: "funil" } : w];
+        }
+        const consulta = sanearConsulta(w.consulta);
+        return consulta ? [{ ...w, consulta }] : [];
+      })
+    : PADRAO;
+  return NextResponse.json({ widgets, padrao: !salvo });
 }
 
 export async function PUT(request: Request) {
