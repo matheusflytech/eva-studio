@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { Plus } from "lucide-react";
 import { AgentCard } from "./agent-card";
 import { buttonVariants } from "@/components/ui/button";

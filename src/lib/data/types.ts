@@ -1,9 +1,28 @@
+export interface ContratoDaSessao {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+}
+
 export interface Session {
   userId: string;
   name: string;
   email: string;
   orgName: string;
   orgLogoUrl?: string;
+  /** Contrato ativo (o da URL, já conferido no servidor). */
+  contratoId?: string;
+  /** Papel de sistema base no contrato e, se houver, o personalizado. */
+  papel?: string;
+  papelNome?: string;
+  permissoes?: string[];
+  superadmin?: boolean;
+  /** Contratos que a pessoa pode abrir (seletor do menu). */
+  contratos?: ContratoDaSessao[];
+  /** Para onde ir quando a URL não diz (/ir, sem acesso). */
+  contratoPadrao?: string | null;
+  /** A URL pediu um contrato onde a pessoa não tem vínculo. */
+  semAcesso?: boolean;
 }
 
 export interface KnowledgeDoc {

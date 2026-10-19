@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   Aperture, AlertTriangle, Sparkles, FileText, MessageSquare,
   UserCheck, Activity, ArrowRight, Wrench, PlugZap, PlayCircle, CheckCircle2,

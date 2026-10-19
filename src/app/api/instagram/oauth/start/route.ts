@@ -17,7 +17,10 @@ export async function GET(request: Request) {
   const agentId = url.searchParams.get("agentId");
   if (!agentId) return NextResponse.json({ error: "agentId é obrigatório." }, { status: 400 });
 
-  const orgId = await requireOrgId();
+  // Navegação de página inteira: o contrato vem na query (conferido como o
+  // cabeçalho) e vai junto no cookie do state, para o callback voltar ao
+  // mesmo contrato mesmo com outra aba aberta em outro.
+  const orgId = await requireOrgId({ contrato: url.searchParams.get("contrato") });
   if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
@@ -30,7 +33,7 @@ export async function GET(request: Request) {
 
   const nonce = crypto.randomBytes(24).toString("hex");
   const cookieStore = await cookies();
-  cookieStore.set(STATE_COOKIE, `${agentId}|${nonce}`, {
+  cookieStore.set(STATE_COOKIE, `${orgId}:${agentId}|${nonce}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { ErroDeCrm, createDeal, ensureDefaultPipeline, resolverEtapaDeEntrada } from "@/lib/server/crm";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import {
@@ -19,7 +20,7 @@ import { nomesDosProdutosPorNegocio } from "@/lib/server/produtos";
 //   ?pipeline=<id>  padrão: o funil padrão da org
 //   ?archived=1     inclui arquivados
 export async function GET(request: Request) {
-  const ctx = await requirePermission("read");
+  const ctx = await requirePermission("negocios:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const url = new URL(request.url);
@@ -39,6 +40,8 @@ export async function GET(request: Request) {
     where: {
       orgId: ctx.orgId,
       pipelineId: pipeline.id,
+      // "Só os meus" / "da minha equipe" do papel (vazio = todos).
+      ...(await filtroDeEscopo(ctx, "negocios")),
       ...(includeArchived ? {} : { archivedAt: null }),
     },
     include: {
@@ -140,7 +143,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("negocios:criar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await lerCorpo(request);

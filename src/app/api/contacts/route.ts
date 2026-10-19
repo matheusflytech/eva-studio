@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import { requirePermission } from "@/lib/server/permissions";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { serializeContact } from "@/lib/server/contact-dto";
 import { CANAIS_DE_CONTATO, externalIdDoCanal, filtroDeTelefone, telefoneParaGravar } from "@/lib/server/contacts";
@@ -27,7 +28,7 @@ const PAGE_SIZE = 50;
 //   ?company=<id>
 //   ?page=1
 export async function GET(request: Request) {
-  const ctx = await requirePermission("read");
+  const ctx = await requirePermission("contatos:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const url = new URL(request.url);
@@ -67,6 +68,9 @@ export async function GET(request: Request) {
   }
   if (tagId) and.push({ tags: { some: { tagId } } });
   if (companyId) and.push({ companyId });
+  // Escopo do papel: "só os meus" / "da minha equipe" (vazio = todos).
+  const escopo = await filtroDeEscopo(ctx, "contatos");
+  if (Object.keys(escopo).length > 0) and.push(escopo);
   if (and.length > 0) where = { AND: [where, ...and] };
 
   const [total, rows] = await Promise.all([
@@ -93,7 +97,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("contatos:criar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await lerCorpo(request);

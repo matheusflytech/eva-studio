@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { contratoDoCaminho } from "@/lib/contrato/rotas";
 import type { Session } from "@/lib/data/types";
 
 type AuthResult = { ok: true } | { ok: false; error: string };
@@ -15,10 +17,17 @@ interface AuthContextValue {
   updateOrgLogo: (dataUrl: string) => void;
   updateOrgName: (orgName: string) => void;
   updateUserName: (name: string) => void;
+  /** Contrato da URL para o qual a sessão atual foi buscada. */
+  sessaoDoContrato: string | null | undefined;
+  /** Relê a sessão (ex.: depois de criar contrato no /admin). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
+// O /api/me recebe o contrato da URL pelo cabeçalho que o fetch do app põe
+// (src/lib/contrato/fetch-do-app.ts) e devolve o papel/permissões daquele
+// contrato.
 async function fetchSession(): Promise<Session | null> {
   const res = await fetch("/api/me");
   const data = await res.json();
@@ -28,12 +37,35 @@ async function fetchSession(): Promise<Session | null> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  // Trocou de contrato na URL: a sessão (nome, papel, permissões) é outra.
+  const contratoDaUrl = contratoDoCaminho(usePathname());
+  // Só a resposta mais recente vale: trocar de contrato rápido não pode deixar
+  // a sessão do contrato anterior chegar por último e ficar na tela.
+  const pedido = React.useRef(0);
+
+  // Para qual contrato da URL a sessão atual foi buscada (o layout espera a
+  // sessão certa antes de desenhar, inclusive o aviso de "sem acesso").
+  const [sessaoDoContrato, setSessaoDoContrato] = React.useState<string | null | undefined>(undefined);
+  const urlAtual = React.useRef(contratoDaUrl);
+
+  const refresh = React.useCallback(async () => {
+    const meu = ++pedido.current;
+    const para = urlAtual.current;
+    try {
+      const s = await fetchSession();
+      if (meu === pedido.current) {
+        setSession(s);
+        setSessaoDoContrato(para);
+      }
+    } finally {
+      if (meu === pedido.current) setIsLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
-    fetchSession()
-      .then(setSession)
-      .finally(() => setIsLoading(false));
-  }, []);
+    urlAtual.current = contratoDaUrl;
+    refresh();
+  }, [contratoDaUrl, refresh]);
 
   const signUp: AuthContextValue["signUp"] = async (input) => {
     const res = await fetch("/api/auth/signup", {
@@ -85,7 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, isLoading, signUp, logIn, logOut, updateOrgLogo, updateOrgName, updateUserName }}
+      value={{
+        session,
+        isLoading,
+        sessaoDoContrato,
+        signUp,
+        logIn,
+        logOut,
+        updateOrgLogo,
+        updateOrgName,
+        updateUserName,
+        refresh,
+      }}
     >
       {children}
     </AuthContext.Provider>

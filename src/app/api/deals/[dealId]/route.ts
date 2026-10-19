@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { ErroDeCrm, moveDealStage, statusDaReferencia } from "@/lib/server/crm";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import {
@@ -18,12 +19,13 @@ import { negocioUsaSomaDosItens } from "@/lib/server/produtos";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
-  const ctx = await requirePermission("read");
+  const ctx = await requirePermission("negocios:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { dealId } = await params;
 
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, orgId: ctx.orgId },
+    // Escopo do papel ("só os meus"/"da equipe"): fora dele, o negócio "não existe".
+    where: { id: dealId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "negocios")) },
     include: {
       stage: true,
       pipeline: { include: { stages: { orderBy: { position: "asc" } } } },
@@ -53,11 +55,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
 // Tudo é validado antes da primeira escrita: um campo inválido não pode
 // deixar o negócio movido de etapa e o resto sem salvar.
 export async function PATCH(request: Request, { params }: { params: Promise<{ dealId: string }> }) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("negocios:editar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { dealId } = await params;
 
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId: ctx.orgId } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "negocios")) } });
   if (!deal) return NextResponse.json({ error: "Negócio não encontrado." }, { status: 404 });
 
   const body = await lerCorpo(request);
@@ -180,11 +182,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("negocios:apagar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { dealId } = await params;
 
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId: ctx.orgId } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "negocios")) } });
   if (!deal) return NextResponse.json({ error: "Negócio não encontrado." }, { status: 404 });
 
   await prisma.deal.delete({ where: { id: deal.id } });

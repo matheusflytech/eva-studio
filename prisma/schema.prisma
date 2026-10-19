@@ -39,6 +39,11 @@ model Organization {
   dashboard   DashboardLayout?
   customFieldDefs CustomField[]
   products        Product[]
+  // Contratos e permissões (ver o fim do arquivo).
+  memberships      Membership[]
+  customRoles      CustomRole[]
+  permissionGroups PermissionGroup[]
+  teams            Team[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -64,8 +69,13 @@ model ApiKey {
   // antigas), "<recurso>:*" ou "<recurso>:read|write". Ver
   // src/lib/server/api-v1/escopos.ts.
   scopes     String[]  @default(["*"])
+  // Quem criou (se a pessoa sair, a chave continua) e, se quiser, até quando
+  // vale. Vencida = 401, igual revogada.
+  createdById String?
+  expiresAt   DateTime?
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    Profile?     @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([keyHash])
@@ -111,6 +121,10 @@ model Profile {
   assignedTasks   Task[]         @relation("TaskAssignee")
   authoredNotes   Note[]         @relation("NoteAuthor")
   messages        Message[]      @relation("MessageAuthor")
+  memberships     Membership[]   @relation("ProfileMemberships")
+  teamMemberships TeamMember[]   @relation("TeamMemberships")
+  ledTeams        Team[]         @relation("TeamLeader")
+  createdApiKeys  ApiKey[]       @relation("ApiKeyCreator")
 
   @@index([orgId])
   @@map("eva_studio_profiles")
@@ -1447,4 +1461,106 @@ model AgentFlowVersion {
 
   @@index([agentId, createdAt])
   @@map("eva_studio_agent_flow_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Contratos e permissões (ver docs/superpowers/plans/2026-10-20-contratos-permissoes.md).
+// O contrato é a Organization. Profile.orgId continua sendo o contrato padrão
+// (compatibilidade); o acesso a N contratos mora no vínculo abaixo.
+// ---------------------------------------------------------------------------
+
+// Vínculo pessoa × contrato. Sem linha aqui e com Profile.orgId = contrato, a
+// pessoa ainda entra (legado, antes do backfill). Status "removido" bloqueia
+// mesmo assim — é por isso que remover não apaga a linha.
+model Membership {
+  id          String   @id @default(uuid())
+  orgId       String
+  userId      String
+  // Papel de sistema (owner | admin | agent | viewer). Com roleId preenchido,
+  // as permissões vêm do papel personalizado e este fica como base/legado.
+  role        String   @default("viewer")
+  roleId      String?
+  // Grupos de permissões somados ao papel, só desta pessoa.
+  groupIds    String[] @default([])
+  status      String   @default("ativo") // ativo | convidado | removido
+  invitedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         Profile      @relation("ProfileMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@map("eva_studio_memberships")
+}
+
+// Papel personalizado do contrato: nome + permissões do catálogo
+// (src/lib/permissoes/catalogo.ts) + escopo de dados por módulo.
+model CustomRole {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String   @default("")
+  permissions String[] @default([])
+  // Grupos que todo mundo com este papel ganha.
+  groupIds    String[] @default([])
+  // { negocios, contatos, conversas }: "proprios" | "equipe" | "todos"
+  dataScope   Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+
+  @@index([orgId])
+  @@map("eva_studio_roles")
+}
+
+// Grupo de permissões: pacote extra reutilizável ("Financeiro", "Exportar
+// dados"), somado ao papel de quem recebe.
+model PermissionGroup {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String   @default("")
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_permission_groups")
+}
+
+// Equipe: base do escopo de dados "os da minha equipe".
+model Team {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  leaderId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leader       Profile?     @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  members      TeamMember[]
+
+  @@index([orgId])
+  @@map("eva_studio_teams")
+}
+
+model TeamMember {
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  team Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user Profile @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@map("eva_studio_team_members")
 }

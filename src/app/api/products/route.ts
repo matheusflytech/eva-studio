@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("produtos:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await lerCorpo(request);

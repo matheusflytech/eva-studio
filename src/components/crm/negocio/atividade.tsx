@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, ThumbsDown, ThumbsUp, type LucideIcon,
 } from "lucide-react";

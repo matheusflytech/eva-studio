@@ -5,7 +5,7 @@ import { erro, JSON_INVALIDO, lerCorpo } from "@/lib/server/api-validacao";
 
 // Recebe { ids: [...] } na nova ordem e regrava a posição de cada campo.
 export async function POST(request: Request) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await lerCorpo(request);

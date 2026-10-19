@@ -5,9 +5,9 @@ import { requirePermission } from "@/lib/server/permissions";
 // Revoga (não apaga a linha — mantém histórico de quando existiu e foi
 // revogada, mesma lógica de qualquer API séria: uma chave revogada some da
 // lista de "ativas" mas não vira um buraco silencioso no histórico).
-// Só admin/dono, como criar.
+// Só quem gerencia chaves (admin/dono), como criar.
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("api:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 

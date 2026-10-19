@@ -4,6 +4,7 @@ import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
 import { encryptSecret } from "@/lib/server/crypto";
 import { assinarEventosInstagram } from "@/lib/server/instagram-subscribe";
+import { ehIdDeContrato, rotaDoContrato } from "@/lib/contrato/rotas";
 
 const STATE_COOKIE = "ig_oauth_state";
 
@@ -22,7 +23,12 @@ export async function GET(request: Request) {
   const cookieStore = await cookies();
   const stateCookie = cookieStore.get(STATE_COOKIE)?.value ?? "";
   const sep = stateCookie.lastIndexOf("|");
-  const agentId = sep > 0 ? stateCookie.slice(0, sep) : "";
+  // "<orgId>:<agentId>|<nonce>" (o formato antigo, sem orgId, ainda vale).
+  const cabeca = sep > 0 ? stateCookie.slice(0, sep) : "";
+  const doisPontos = cabeca.indexOf(":");
+  const prefixo = doisPontos > 0 ? cabeca.slice(0, doisPontos) : null;
+  const contrato = ehIdDeContrato(prefixo) ? prefixo : null;
+  const agentId = doisPontos > 0 ? cabeca.slice(doisPontos + 1) : cabeca;
   const cookieNonce = sep > 0 ? stateCookie.slice(sep + 1) : "";
 
   // Consome o cookie de uma vez (single-use), independente do resultado.
@@ -32,14 +38,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "state inválido (possível CSRF)." }, { status: 400 });
   }
 
-  const redirectBack = new URL(`/agent-studio/${agentId}`, url.origin);
+  const redirectBack = new URL(rotaDoContrato(contrato, `/agent-studio/${agentId}`), url.origin);
 
   if (errorParam || !code) {
     redirectBack.searchParams.set("instagram_error", errorParam ?? "cancelado");
     return NextResponse.redirect(redirectBack);
   }
 
-  const orgId = await requireOrgId();
+  const orgId = await requireOrgId({ contrato });
   if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });

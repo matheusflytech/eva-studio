@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { applyTag, removeTag, optOutContact, filtroDeTelefone, telefoneParaGravar } from "@/lib/server/contacts";
 import {
   conferirReferencias,
@@ -21,12 +22,12 @@ const INCLUDE = {
 } as const;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ contactId: string }> }) {
-  const ctx = await requirePermission("read");
+  const ctx = await requirePermission("contatos:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { contactId } = await params;
 
   const contact = await prisma.contact.findFirst({
-    where: { id: contactId, orgId: ctx.orgId },
+    where: { id: contactId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "contatos")) },
     include: INCLUDE,
   });
   if (!contact) return NextResponse.json({ error: "Contato não encontrado." }, { status: 404 });
@@ -99,11 +100,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
 //                            que dispara auto-enrollment de sequência)
 //   optIn: false           — opt-out de verdade: para toda régua ativa
 export async function PATCH(request: Request, { params }: { params: Promise<{ contactId: string }> }) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("contatos:editar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { contactId } = await params;
 
-  const contact = await prisma.contact.findFirst({ where: { id: contactId, orgId: ctx.orgId } });
+  const contact = await prisma.contact.findFirst({ where: { id: contactId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "contatos")) } });
   if (!contact) return NextResponse.json({ error: "Contato não encontrado." }, { status: 404 });
 
   const body = await lerCorpo(request);
@@ -202,11 +203,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ contactId: string }> }) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("contatos:apagar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { contactId } = await params;
 
-  const contact = await prisma.contact.findFirst({ where: { id: contactId, orgId: ctx.orgId } });
+  const contact = await prisma.contact.findFirst({ where: { id: contactId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "contatos")) } });
   if (!contact) return NextResponse.json({ error: "Contato não encontrado." }, { status: 404 });
 
   await prisma.contact.delete({ where: { id: contact.id } });

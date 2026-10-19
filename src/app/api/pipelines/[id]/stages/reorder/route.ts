@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/server/permissions";
 import { ErroDeFunil, reordenarEtapas } from "@/lib/server/funis-acoes";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 

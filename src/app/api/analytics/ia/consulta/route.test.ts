@@ -76,9 +76,13 @@ describe("POST /api/analytics/ia/consulta", () => {
   it("org isolada: catálogo, credencial e limite saem só da org da sessão, mesmo que o corpo diga outra", async () => {
     llm.callLlmWithTools.mockResolvedValue(respostaDoModelo({ consulta: { medida: "contagem", agrupar: "" } }));
     await post({ pedido: "quantos negócios", orgId: "org-B" });
-    for (const m of [db.credential, db.pipeline, db.profile, db.tag, db.company, db.deal, db.customField]) {
+    for (const m of [db.credential, db.pipeline, db.tag, db.company, db.deal, db.customField]) {
       expect(m.findMany.mock.calls[0][0].where).toMatchObject({ orgId: "org-A" });
     }
+    // Membros = vínculo com o contrato (ou contrato padrão), sempre o da sessão.
+    const ondeMembros = JSON.stringify(db.profile.findMany.mock.calls[0][0].where);
+    expect(ondeMembros).toContain('"orgId":"org-A"');
+    expect(ondeMembros).not.toContain("org-B");
     expect(db.contactChannel.findMany.mock.calls[0][0].where).toMatchObject({ contact: { orgId: "org-A" } });
     expect(rl.checkRateLimit).toHaveBeenCalledWith("ia-consulta:org-A", expect.any(Number), expect.any(Number));
   });

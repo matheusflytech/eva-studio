@@ -69,7 +69,7 @@ describe("POST /api/products", () => {
     perm.requirePermission.mockResolvedValueOnce({ error: "Seu perfil não tem permissão para essa ação.", status: 403 });
     const res = await post({ name: "X" });
     expect(res.status).toBe(403);
-    expect(perm.requirePermission).toHaveBeenCalledWith("agents:manage");
+    expect(perm.requirePermission).toHaveBeenCalledWith("produtos:gerenciar");
     expect(db.product.create).not.toHaveBeenCalled();
   });
 

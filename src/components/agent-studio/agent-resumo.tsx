@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   CheckCircle2, Circle, ArrowRight, PlayCircle, MessageSquare, Workflow,
   UserCheck, Activity, AlertTriangle, MessagesSquare,

@@ -58,7 +58,7 @@ interface Linha {
  * disparo naquele agente.
  */
 export async function POST(request: Request) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("contatos:importar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const body = await lerCorpo(request);

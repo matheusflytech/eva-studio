@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db/prisma";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
 import { itensPorNegocio } from "@/lib/server/produtos";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
+import type { EscoposDoPapel } from "@/lib/permissoes/catalogo";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { filtrarEtapas, type EtapaKanban, type FiltrosDeNegocio, type VisaoSalva } from "@/components/crm/negocios/modelo";
@@ -42,7 +44,7 @@ export interface DadosDaExportacao {
 
 /** null = funil não existe nesta organização. */
 export async function carregarExportacao(
-  ctx: { orgId: string; userId: string },
+  ctx: { orgId: string; userId: string; escopo?: EscoposDoPapel },
   pipelineId: string | undefined,
   filtros: FiltrosDaExportacao,
   agora = new Date(),
@@ -62,6 +64,8 @@ export async function carregarExportacao(
       orgId: ctx.orgId,
       pipelineId: pipeline.id,
       ...(filtros.arquivados ? {} : { archivedAt: null }),
+      // Exporta só o que o papel deixa ver ("só os meus" / "da equipe").
+      ...(await filtroDeEscopo(ctx, "negocios")),
     },
     include: {
       company: { select: { id: true, name: true } },
