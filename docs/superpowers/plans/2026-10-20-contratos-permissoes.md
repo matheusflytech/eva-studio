@@ -70,7 +70,9 @@ em toda chamada `/api/*` pelo cabeçalho **`x-eva-contrato`**:
   `apiDoContrato`), ou é deduzido do caminho do arquivo (anexos já têm o orgId
   como prefixo).
 - Servidor (`resolverContratoAtivo` em `src/lib/server/contratos.ts`), em ordem:
-  cabeçalho → `?contrato=` → cookie `eva_contrato` (último usado) →
+  contrato explícito da rota (`requirePermission(p, { contrato })`, usado só
+  por exportação `?contrato=`, OAuth `state` e anexos pelo prefixo do caminho)
+  → cabeçalho → cookie `eva_contrato` (último usado) →
   `Profile.orgId` → primeiro vínculo ativo. **Cabeçalho ou query presentes e
   sem acesso = 403**, sem cair em outro contrato (nada de mostrar dados de um
   contrato numa aba que pediu outro). Cookie inválido só é ignorado.
@@ -101,7 +103,12 @@ herdam a validação sem mudar uma linha**. `requireOrgId()` vira um atalho de
   ficam com `rotaDoContrato` explícito.
 - Seletor de contrato no menu: troca o segmento mantendo a página (lista,
   não o registro: `/A/negocios/123` → `/B/negocios`, porque o negócio 123
-  não existe em B).
+  não existe em B). "Trocar de contrato" abre a tela de escolha.
+- **Tela de escolha** `/contratos` ("Olá <nome>, qual contrato deseja
+  acessar?"): busca por nome ou id, tabela Id (8 caracteres + copiar o
+  completo) / Nome / Acessar, último usado no topo, "Mostrar mais" de 50 em 50
+  (superadmin vê todos, busca no banco). Depois do login vai para lá; quem tem
+  um contrato só (e não é superadmin) entra direto. `GET /api/contratos`.
 
 ## Permissões
 
@@ -230,5 +237,13 @@ continua funcionando (fallback).
 
 - Convite de usuário novo usa `inviteUserByEmail` do Supabase: o modelo de
   e-mail/redirect precisa estar configurado no projeto Supabase; a pessoa
-  define a senha pelo link.
-- Escopo de dados nas telas listadas em "Falta".
+  define a senha pelo link (hoje o app não tem tela de "definir senha"; o link
+  cai em /login).
+- Escopo de dados nas telas listadas em "Falta" (o relatório do funil em
+  PDF agrega o funil inteiro; a lista de negócios exportada respeita o escopo).
+- Quem tem "membros:gerenciar" num papel personalizado pode criar papel com
+  mais permissões e dá-lo a outra pessoa (não a si mesmo, nem dono). Se for
+  problema, restringir criação de papel a dono.
+- `PATCH /api/me` de nome/logo do contrato agora exige `contrato:gerenciar`
+  (antes qualquer membro renomeava a organização).
+- `next build` não foi rodado no worktree (o .env aponta para produção).
