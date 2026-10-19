@@ -8,6 +8,7 @@ import { decryptSecret } from "@/lib/server/crypto";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
 import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
+import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
 import {
   baixarEGuardar,
   guardarMidiaWhatsApp,
@@ -329,8 +330,20 @@ async function lerEntradaWhatsApp(
 }
 
 async function handleWhatsAppEntries(entries: unknown[]) {
-  for (const entry of entries as { changes?: { value?: MetaValue }[] }[]) {
+  for (const entry of entries as { id?: string; changes?: { field?: string; value?: MetaValue }[] }[]) {
     for (const change of entry.changes ?? []) {
+      // Status/categoria de template: não tem phone_number_id, vem pelo WABA
+      // (entry.id). Tratado antes do filtro de número logo abaixo.
+      if (change.field && CAMPOS_DE_TEMPLATE.has(change.field)) {
+        const evento = lerEventoDeTemplate(change.field, change.value);
+        if (evento && entry.id) {
+          await aplicarEventoDeTemplate(entry.id, evento).catch((e) =>
+            console.error("[webhook/meta] falha ao gravar status de template", e instanceof Error ? e.message : e)
+          );
+        }
+        continue;
+      }
+
       const value: MetaValue = change.value ?? {};
       const phoneNumberId = value.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
