@@ -4,11 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import {
   CheckCheck, RefreshCw, AlertTriangle, CheckCircle2, Clock, XCircle,
-  PauseCircle, ArrowRight, Plug,
+  PauseCircle, ArrowRight, Plug, Plus,
 } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Select } from "@/components/ui/select";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { CriarTemplate } from "@/components/aprovacoes/criar-template";
+import { formatarSaoPaulo } from "@/lib/fuso-sp";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,10 @@ interface TemplateLocal {
   idioma: string;
   corpo: string;
   situacao: string | null;
+  /** true = a Meta não respondeu agora e o status é o último aviso do webhook. */
+  situacaoReserva?: boolean;
+  motivoGravado?: string | null;
+  statusGravadoEm?: string | null;
 }
 
 interface Payload {
@@ -64,6 +70,8 @@ const STATUS: Record<
   REJECTED: { rotulo: "Rejeitado", classe: "bg-danger/12 text-danger", icone: XCircle },
   PAUSED: { rotulo: "Pausado", classe: "bg-danger/12 text-danger", icone: PauseCircle },
   DISABLED: { rotulo: "Desativado", classe: "bg-danger/12 text-danger", icone: XCircle },
+  FLAGGED: { rotulo: "Sinalizado", classe: "bg-amber-400/12 text-amber-300", icone: AlertTriangle },
+  REINSTATED: { rotulo: "Reativado", classe: "bg-emerald-500/12 text-emerald-300", icone: CheckCircle2 },
   PENDING_DELETION: { rotulo: "Sendo apagado", classe: "bg-surface-3 text-text-tertiary", icone: Clock },
   AUSENTE: { rotulo: "Não existe na Meta", classe: "bg-danger/12 text-danger", icone: AlertTriangle },
 };
@@ -88,6 +96,8 @@ export default function AprovacoesPage() {
   const [agentId, setAgentId] = React.useState("");
   const [dados, setDados] = React.useState<Payload | null>(null);
   const [carregando, setCarregando] = React.useState(false);
+  const [criando, setCriando] = React.useState(false);
+  const [aviso, setAviso] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -138,6 +148,11 @@ export default function AprovacoesPage() {
               </Select>
             </div>
           )}
+          {dados?.conectado && (
+            <Button type="button" className="h-11" onClick={() => setCriando(true)}>
+              <Plus size={15} /> Novo template
+            </Button>
+          )}
           <button
             type="button"
             onClick={carregar}
@@ -148,6 +163,23 @@ export default function AprovacoesPage() {
           </button>
         </div>
       </header>
+
+      {agentId && (
+        <CriarTemplate
+          agentId={agentId}
+          aberto={criando}
+          onFechar={() => setCriando(false)}
+          onCriado={(nome) => {
+            setCriando(false);
+            setAviso(`Template ${nome} enviado. A Meta revisa em minutos ou até 24h; o status muda aqui sozinho.`);
+            void carregar();
+          }}
+        />
+      )}
+
+      {aviso && (
+        <p className="mb-4 rounded-2xl bg-emerald-500/10 px-4 py-3 text-[13px] text-emerald-300">{aviso}</p>
+      )}
 
       {!isLoaded || (carregando && !dados) ? (
         <p className="text-[13px] text-text-tertiary">Consultando a Meta...</p>
@@ -176,9 +208,25 @@ export default function AprovacoesPage() {
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-[13px] text-text-secondary">{dados.erro}</p>
           <p className="mx-auto mt-2 max-w-lg text-[12px] text-text-tertiary">
-            Costuma ser token expirado ou sem permissão na conta de negócio. A tela não inventa status: se não
-            conseguiu perguntar, não afirma nada.
+            Costuma ser token expirado ou sem permissão na conta de negócio. A tela não inventa status: abaixo, só
+            o último aviso que a própria Meta mandou pelo webhook, com a data.
           </p>
+          {dados.locais.some((l) => l.situacaoReserva) && (
+            <div className="mx-auto mt-5 flex max-w-lg flex-col gap-1.5 text-left">
+              {dados.locais.filter((l) => l.situacaoReserva).map((l) => (
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[12.5px] text-text-primary">{l.metaTemplateName}</p>
+                    <p className="mt-0.5 text-[11px] text-text-tertiary">
+                      último aviso da Meta{l.statusGravadoEm ? ` em ${formatarSaoPaulo(l.statusGravadoEm)}` : ""}
+                      {l.motivoGravado ? ` · ${l.motivoGravado.toLowerCase().replaceAll("_", " ")}` : ""}
+                    </p>
+                  </div>
+                  <Etiqueta status={l.situacao ?? "AUSENTE"} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -242,7 +290,7 @@ export default function AprovacoesPage() {
             </div>
             <p className="mb-4 text-[12.5px] text-text-secondary">
               Direto da conta de negócio {dados.wabaId ? <span className="font-mono text-[11.5px]">{dados.wabaId}</span> : null}.
-              Criar e editar template é no Gerenciador da Meta — aqui é só a leitura do que ela decidiu.
+              Crie um novo pelo botão &quot;Novo template&quot;; editar e apagar continuam no Gerenciador da Meta.
             </p>
 
             {dados.templates.length === 0 ? (

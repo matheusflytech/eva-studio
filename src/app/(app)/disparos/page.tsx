@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Send, Clock, FlaskConical, Users, Plus, X } from "lucide-react";
+import { Send, Clock, FlaskConical, Users, Plus, X, CalendarClock, Ban } from "lucide-react";
+import { CampoDataSP } from "@/components/whatsapp/campo-data-sp";
+import { deSaoPaulo, formatarSaoPaulo, paraCampoSaoPaulo } from "@/lib/fuso-sp";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -33,9 +35,91 @@ interface BroadcastRow {
   sentCount: number;
   failedCount: number;
   status: string;
+  lastError: string | null;
   scheduledAt: string | null;
   createdAt: string;
   variants: Variant[];
+}
+
+/** Cancelar ou mudar a hora, enquanto o disparo ainda está só agendado. */
+function AcoesDoAgendado({
+  agentId,
+  broadcast,
+  onMudou,
+}: {
+  agentId: string;
+  broadcast: BroadcastRow;
+  onMudou: () => Promise<void> | void;
+}) {
+  const [editando, setEditando] = React.useState(false);
+  const [quando, setQuando] = React.useState(() =>
+    broadcast.scheduledAt ? paraCampoSaoPaulo(new Date(broadcast.scheduledAt)) : ""
+  );
+  const [ocupado, setOcupado] = React.useState(false);
+  const [erro, setErro] = React.useState<string | null>(null);
+
+  async function enviar(body: Record<string, unknown>) {
+    setOcupado(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/agents/${agentId}/broadcasts/${broadcast.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Não deu certo.");
+      setEditando(false);
+      await onMudou();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não deu certo.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 border-t border-border-subtle pt-2">
+      {editando ? (
+        <div className="flex flex-col gap-2">
+          <CampoDataSP valor={quando} onChange={setQuando} />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={ocupado}
+              onClick={() => {
+                const d = deSaoPaulo(quando);
+                if (!d) return setErro("Data ou hora inválida.");
+                void enviar({ scheduledAt: d.toISOString() });
+              }}
+            >
+              Salvar nova hora
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditando(false)}>Voltar</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant="secondary" disabled={ocupado} onClick={() => setEditando(true)}>
+            <CalendarClock size={13} /> Reagendar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="danger"
+            disabled={ocupado}
+            onClick={() => {
+              if (window.confirm("Cancelar este disparo agendado? Ninguém vai receber.")) void enviar({ acao: "cancelar" });
+            }}
+          >
+            <Ban size={13} /> Cancelar
+          </Button>
+        </div>
+      )}
+      {erro && <p className="mt-1.5 text-[12px] text-danger">{erro}</p>}
+    </div>
+  );
 }
 
 interface Channels {
@@ -152,7 +236,16 @@ export default function DisparosPage() {
       payload.templateId = isMeta ? templateId : undefined;
     }
 
-    if (scheduledAt) payload.scheduledAt = new Date(scheduledAt).toISOString();
+    // O campo é horário de São Paulo, não o fuso do navegador.
+    if (scheduledAt) {
+      const quando = deSaoPaulo(scheduledAt);
+      if (!quando) {
+        setError("Data ou hora inválida.");
+        setIsSending(false);
+        return;
+      }
+      payload.scheduledAt = quando.toISOString();
+    }
 
     try {
       const res = await fetch(`/api/agents/${agentId}/broadcasts`, {
@@ -165,8 +258,10 @@ export default function DisparosPage() {
 
       setNotice(
         data.scheduled
-          ? `Agendado para ${new Date(data.scheduledAt).toLocaleString("pt-BR")} — ${data.estimatedCount} contato(s).`
-          : `Disparo concluído: ${data.sentCount} enviados, ${data.failedCount} falharam.`
+          ? `Agendado para ${formatarSaoPaulo(data.scheduledAt)} (horário de São Paulo) — ${data.estimatedCount} contato(s).`
+          : data.queuedCount > 0
+            ? `${data.queuedCount} na fila do WhatsApp; o placar abaixo sobe conforme cada um sai.${data.failedCount ? ` ${data.failedCount} falharam.` : ""}`
+            : `Disparo concluído: ${data.sentCount} enviados, ${data.failedCount} falharam.`
       );
       setRecipients("");
       setText("");
@@ -434,15 +529,14 @@ export default function DisparosPage() {
             <Label htmlFor="disparo-quando">
               <span className="inline-flex items-center gap-1.5"><Clock size={13} /> Quando enviar</span>
             </Label>
-            <Input
-              id="disparo-quando"
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-            />
+            <CampoDataSP id="disparo-quando" valor={scheduledAt} onChange={setScheduledAt} />
             <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-              Em branco, sai agora. Com hora marcada, quem entrega é o worker — a Vercel no plano grátis só roda cron
-              uma vez por dia.
+              Em branco, sai agora. Agendado, dá para cancelar ou mudar a hora no histórico até começar a enviar.
+              {scheduledAt && (
+                <button type="button" onClick={() => setScheduledAt("")} className="ml-1.5 underline hover:text-text-secondary">
+                  Mandar agora
+                </button>
+              )}
             </p>
           </div>
 
@@ -482,15 +576,27 @@ export default function DisparosPage() {
                     )}
                   </div>
                   <span className="text-[11px] text-text-tertiary">
-                    {b.scheduledAt && b.status === "scheduled"
-                      ? new Date(b.scheduledAt).toLocaleString("pt-BR")
-                      : formatRelativeDate(b.createdAt)}
+                    {b.scheduledAt && b.status === "scheduled" ? (
+                      <span className="inline-flex items-center gap-1 font-medium text-accent-400">
+                        <CalendarClock size={11} /> agendado para {formatarSaoPaulo(b.scheduledAt)}
+                      </span>
+                    ) : (
+                      formatRelativeDate(b.createdAt)
+                    )}
                   </span>
                 </div>
                 <p className="truncate text-[13px] text-text-secondary">{b.text}</p>
                 <p className="mt-1 text-[11.5px] text-text-tertiary">
-                  {b.sentCount} enviados · {b.failedCount} falharam · {b.totalCount} no total
+                  {b.status === "scheduled"
+                    ? `${b.totalCount} contato(s) estimado(s) · horário de São Paulo`
+                    : `${b.sentCount} enviados · ${b.failedCount} falharam · ${b.totalCount} no total`}
                 </p>
+                {b.lastError && b.failedCount > 0 && (
+                  <p className="mt-1 text-[11.5px] text-danger">Último erro: {b.lastError}</p>
+                )}
+                {b.status === "scheduled" && agentId && (
+                  <AcoesDoAgendado agentId={agentId} broadcast={b} onMudou={() => refresh(agentId)} />
+                )}
                 {b.variants.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-3 border-t border-border-subtle pt-2">
                     {b.variants.map((v) => (

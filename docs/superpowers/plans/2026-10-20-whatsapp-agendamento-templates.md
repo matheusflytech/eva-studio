@@ -55,43 +55,43 @@
 ## Tarefas (TDD)
 
 ### 1. Fuso de São Paulo — `src/lib/fuso-sp.ts`
-- [ ] Teste: `deSaoPaulo("2026-10-20T09:00")` = `2026-10-20T12:00:00.000Z`; entrada inválida → `null`; `paraCampoSaoPaulo(date)` devolve o inverso; `formatarSaoPaulo` → `"20/10/2026 às 09:00"`; atalho "amanhã 9h" a partir de um instante às 23h30 de SP cai no dia seguinte de SP (não no de UTC).
-- [ ] Implementar com `Intl.DateTimeFormat` (offset calculado, não fixo em -3).
+- [x] Teste: `deSaoPaulo("2026-10-20T09:00")` = `2026-10-20T12:00:00.000Z`; entrada inválida → `null`; `paraCampoSaoPaulo(date)` devolve o inverso; `formatarSaoPaulo` → `"20/10/2026 às 09:00"`; atalho "amanhã 9h" a partir de um instante às 23h30 de SP cai no dia seguinte de SP (não no de UTC).
+- [x] Implementar com `Intl.DateTimeFormat` (offset calculado, não fixo em -3).
 
 ### 2. Janela de 24h — `src/lib/whatsapp/janela.ts`
-- [ ] Teste: QR/Telegram → texto sempre; Meta com última mensagem do cliente há 2h e envio em 1h → texto; envio depois de expirar e com modelo → modelo; sem modelo → erro legível; nunca escreveu (`null`) → precisa de modelo; Meta com só modelo e janela aberta → modelo.
-- [ ] Implementar `decidirEnvio({ channel, lastContactMessageAt, quando, temTexto, temModelo })`.
+- [x] Teste: QR/Telegram → texto sempre; Meta com última mensagem do cliente há 2h e envio em 1h → texto; envio depois de expirar e com modelo → modelo; sem modelo → erro legível; nunca escreveu (`null`) → precisa de modelo; Meta com só modelo e janela aberta → modelo.
+- [x] Implementar `decidirEnvio({ channel, lastContactMessageAt, quando, temTexto, temModelo })`.
 
 ### 3. Payload e validação do template — `src/lib/whatsapp/template-meta.ts`
-- [ ] Teste `normalizarVariaveis`: `{{1}} {{2}}` mantém; `{nome}`/`{{nome}}` viram `{{1}}` com chave `nome`; `{{ 1 }}` com espaços; repetida reaproveita a mesma posição; mistura `{nome}` e `{{2}}` numera na ordem de aparição.
-- [ ] Teste `validarTemplate`: nome snake_case (maiúscula, espaço, acento, hífen → erro); body vazio / >1024; header texto >60 / mais de 1 variável; footer >60 / com variável; >10 botões, >2 URL, >1 telefone, texto de botão >25; URL com variável sem exemplo; exemplo de variável faltando; body começando/terminando em variável; mídia sem exemplo.
-- [ ] Teste `montarPayloadTemplate`: MARKETING com header texto + variável, body com 2 variáveis (`example.body_text: [[...]]`), footer, botões agrupados (respostas rápidas antes das ações), URL dinâmica com exemplo, telefone; header IMAGE com `header_handle`; AUTHENTICATION no formato fixo.
-- [ ] Teste `previaTemplate` troca variáveis pelos exemplos.
+- [x] Teste `normalizarVariaveis`: `{{1}} {{2}}` mantém; `{nome}`/`{{nome}}` viram `{{1}}` com chave `nome`; `{{ 1 }}` com espaços; repetida reaproveita a mesma posição; mistura `{nome}` e `{{2}}` numera na ordem de aparição.
+- [x] Teste `validarTemplate`: nome snake_case (maiúscula, espaço, acento, hífen → erro); body vazio / >1024; header texto >60 / mais de 1 variável; footer >60 / com variável; >10 botões, >2 URL, >1 telefone, texto de botão >25; URL com variável sem exemplo; exemplo de variável faltando; body começando/terminando em variável; mídia sem exemplo.
+- [x] Teste `montarPayloadTemplate`: MARKETING com header texto + variável, body com 2 variáveis (`example.body_text: [[...]]`), footer, botões agrupados (respostas rápidas antes das ações), URL dinâmica com exemplo, telefone; header IMAGE com `header_handle`; AUTHENTICATION no formato fixo.
+- [x] Teste `previaTemplate` troca variáveis pelos exemplos.
 
 ### 4. Graph — `src/lib/server/meta-templates.ts`
-- [ ] Teste (fetch mockado): POST em `/{WABA}/message_templates` com Bearer; devolve `{ id, status, category }`; erro da Meta vira mensagem em português; upload de mídia faz as 2 chamadas da Resumable Upload e devolve o handle; sem `META_APP_ID` → erro claro.
+- [x] Teste (fetch mockado): POST em `/{WABA}/message_templates` com Bearer; devolve `{ id, status, category }`; erro da Meta vira mensagem em português; upload de mídia faz as 2 chamadas da Resumable Upload e devolve o handle; sem `META_APP_ID` → erro claro.
 
 ### 5. Webhook de status — `src/lib/server/meta-template-eventos.ts`
-- [ ] Teste do parser: `message_template_status_update` APPROVED/REJECTED (com `reason`), `template_category_update` (`new_category`), campo desconhecido → null, value malformado → null; `reason: "NONE"` → null.
-- [ ] Teste de gravação (prisma mockado): acha por `metaTemplateId` entre agentes com aquele WABA; cai para nome+idioma; categoria em minúsculas.
-- [ ] Rota do webhook despacha antes de exigir `phone_number_id`.
+- [x] Teste do parser: `message_template_status_update` APPROVED/REJECTED (com `reason`), `template_category_update` (`new_category`), campo desconhecido → null, value malformado → null; `reason: "NONE"` → null.
+- [x] Teste de gravação (prisma mockado): acha por `metaTemplateId` entre agentes com aquele WABA; cai para nome+idioma; categoria em minúsculas.
+- [x] Rota do webhook despacha antes de exigir `phone_number_id`.
 
 ### 6. Contagem do disparo — `broadcast-runner.ts`
-- [ ] Teste: 3 destinatários no QR (todos na fila) → `sentCount` não soma nada no app, status fica `sending`; Meta direto → soma e fecha `done`; falha soma `failedCount`; agendado já reivindicado por outra batida → não roda; `single` no Meta fora da janela sem modelo → falha com `lastError`.
+- [x] Teste: 3 destinatários no QR (todos na fila) → `sentCount` não soma nada no app, status fica `sending`; Meta direto → soma e fecha `done`; falha soma `failedCount`; agendado já reivindicado por outra batida → não roda; `single` no Meta fora da janela sem modelo → falha com `lastError`.
 
 ### 7. Trava da fila — `worker/fila.js`
-- [ ] Teste (pool falso): SQL do claim tem `FOR UPDATE SKIP LOCKED`, muda para `sending`, grava `claimedAt` e usa `RETURNING`; `somarNoDisparo` faz incremento + fechamento numa instrução e soma na variante; `expirarTravados` marca `failed` e soma falha no disparo.
+- [x] Teste (pool falso): SQL do claim tem `FOR UPDATE SKIP LOCKED`, muda para `sending`, grava `claimedAt` e usa `RETURNING`; `somarNoDisparo` faz incremento + fechamento numa instrução e soma na variante; `expirarTravados` marca `failed` e soma falha no disparo.
 
 ### 8. Agendamento avulso e cancelar/reagendar — `src/lib/server/agendamento.ts`
-- [ ] Teste: data no passado → erro; Meta fora da janela sem modelo → erro; cria Broadcast `single` `scheduled`; cancelar só em `scheduled` (`updateMany` com count 0 → erro "já começou"); reagendar valida data e janela.
+- [x] Teste: data no passado → erro; Meta fora da janela sem modelo → erro; cria Broadcast `single` `scheduled`; cancelar só em `scheduled` (`updateMany` com count 0 → erro "já começou"); reagendar valida data e janela.
 
 ### 9. Telas
-- [ ] Disparos: campo SP + atalhos, "agendado para 20/10/2026 às 09:00 (horário de São Paulo)", botões Cancelar/Reagendar.
-- [ ] Aprovações: "Novo template" com formulário, contador, erros ao vivo, prévia estilo WhatsApp; status local como reserva.
-- [ ] Conversa (compositor) e ficha do negócio (cabeçalho): "Agendar mensagem".
+- [x] Disparos: campo SP + atalhos, "agendado para 20/10/2026 às 09:00 (horário de São Paulo)", botões Cancelar/Reagendar.
+- [x] Aprovações: "Novo template" com formulário, contador, erros ao vivo, prévia estilo WhatsApp; status local como reserva.
+- [x] Conversa (compositor) e ficha do negócio (cabeçalho): "Agendar mensagem".
 
 ### 10. Verificação
-- [ ] `npx vitest run`, `npx tsc --noEmit -p .`, eslint nos arquivos tocados.
+- [x] `npx vitest run`, `npx tsc --noEmit -p .`, eslint nos arquivos tocados.
 
 ## Configuração na Meta (manual, fora do código)
 - App → WhatsApp → Configuração → Webhook: assinar os campos **`messages`** (já usado), **`message_template_status_update`** e **`template_category_update`** (opcional: `message_template_quality_update`).

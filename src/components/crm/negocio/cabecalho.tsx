@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from "@/lib/utils";
 import { dinheiro } from "@/components/crm/negocios/modelo";
 import { mensagemDeErro, type Membro, type NegocioDaFicha } from "./use-ficha";
+import { AgendarMensagem } from "@/components/whatsapp/agendar-mensagem";
 
 /**
  * Topo da ficha: onde estou (funil), o que é (título editável), de quem
@@ -107,6 +108,9 @@ export function CabecalhoDoNegocio({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {deal.contacts.length > 0 && (
+            <AgendarMensagem dealId={deal.id} contatos={deal.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name }))} />
+          )}
           {!fechado && etapaGanha && (
             <Button
               variant="secondary"
