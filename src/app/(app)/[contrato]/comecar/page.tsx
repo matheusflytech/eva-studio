@@ -82,7 +82,7 @@ export default function ComecarPage() {
               <span
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full text-[11.5px] font-semibold",
-                  passo >= n ? "bg-accent-500 text-white" : "bg-surface-3 text-text-tertiary"
+                  passo >= n ? "bg-accent-500 text-text-on-accent" : "bg-surface-3 text-text-tertiary"
                 )}
               >
                 {passo > n ? <Check size={13} /> : n}

@@ -40,7 +40,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         title="Negócio não encontrado"
         description="Ele pode ter sido apagado, ou o link é de outra organização."
         action={
-          <Link href="/negocios" className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent-500 px-4 text-sm font-medium text-white outline-none hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base">
+          <Link href="/negocios" className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent-500 px-4 text-sm font-medium text-text-on-accent outline-none hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base">
             <ArrowLeft size={15} aria-hidden /> Voltar para Negócios
           </Link>
         }

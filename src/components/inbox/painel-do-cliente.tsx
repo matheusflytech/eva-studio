@@ -325,7 +325,7 @@ export function PainelDoCliente({
                       type="button"
                       onClick={criarNegocio}
                       disabled={salvandoNegocio || !formNegocio.nome.trim()}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent-500 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent-500 py-1.5 text-[12.5px] font-medium text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-50"
                     >
                       {salvandoNegocio ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Criar
                     </button>

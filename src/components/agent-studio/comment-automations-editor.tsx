@@ -147,7 +147,7 @@ function CommentSimulator({ agentId }: { agentId: string }) {
               <div
                 className={cn(
                   "max-w-[85%] rounded-2xl px-3 py-2 text-[12.5px] leading-relaxed",
-                  m.role === "user" ? "bg-accent-500 text-white" : "border border-border-subtle bg-surface-2 text-text-primary"
+                  m.role === "user" ? "bg-accent-500 text-text-on-accent" : "border border-border-subtle bg-surface-2 text-text-primary"
                 )}
               >
                 {m.text}

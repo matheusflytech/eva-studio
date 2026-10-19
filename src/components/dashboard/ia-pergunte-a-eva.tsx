@@ -140,7 +140,7 @@ export function CampoDePedido({
           type="submit"
           disabled={!pedido || carregando}
           aria-label="Enviar para a Eva"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white transition-colors hover:bg-accent-400 disabled:pointer-events-none disabled:opacity-40"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-text-on-accent transition-colors hover:bg-accent-400 disabled:pointer-events-none disabled:opacity-40"
         >
           {carregando ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={16} />}
         </button>

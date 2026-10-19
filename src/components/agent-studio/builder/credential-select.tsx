@@ -95,7 +95,7 @@ export function CredentialSelect({
               type="button"
               disabled={saving}
               onClick={handleCreate}
-              className="flex-1 rounded-lg bg-accent-500 px-2 py-1.5 text-[12px] font-medium text-white hover:bg-accent-600 disabled:opacity-60"
+              className="flex-1 rounded-lg bg-accent-500 px-2 py-1.5 text-[12px] font-medium text-text-on-accent hover:bg-accent-600 disabled:opacity-60"
             >
               {saving ? "Salvando..." : "Salvar"}
             </button>

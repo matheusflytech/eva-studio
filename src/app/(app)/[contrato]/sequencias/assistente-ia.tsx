@@ -185,7 +185,7 @@ export function AssistenteIaSequencia({
 
               <ol className="relative flex flex-col gap-3 border-l border-border-subtle pl-5">
                 <li className="relative">
-                  <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent-500 text-white">
+                  <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent-500 text-text-on-accent">
                     <Zap size={10} />
                   </span>
                   <p className="text-[13px] font-medium text-text-primary">{descreverGatilho(r, catalogo)}</p>

@@ -20,7 +20,7 @@ export function Switch({
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb className="block h-4 w-4 translate-x-0.5 rounded-full bg-text-on-accent transition-transform duration-160 ease-standard data-[state=checked]:translate-x-[18px]" />
+      <SwitchPrimitive.Thumb className="block h-4 w-4 translate-x-0.5 rounded-full bg-text-on-danger transition-transform duration-160 ease-standard data-[state=checked]:translate-x-[18px]" />
     </SwitchPrimitive.Root>
   );
 }

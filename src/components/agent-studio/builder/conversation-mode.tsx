@@ -415,7 +415,7 @@ function ItemDaConversa({
           onClick={onSelect}
           className={cn(
             "inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-            selecionado ? "bg-accent-500 text-white" : "bg-white/10 text-white/65 hover:bg-white/15"
+            selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/10 text-text-on-accent/65 hover:bg-white/15"
           )}
         >
           <GitBranch size={11} className="shrink-0" />
@@ -454,7 +454,7 @@ function ItemDaConversa({
         onClick={onSelect}
         className={cn(
           "mx-auto my-1 inline-flex max-w-[92%] items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-          selecionado ? "bg-accent-500 text-white" : "bg-white/8 text-white/55 hover:bg-white/14 hover:text-white/80"
+          selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/8 text-text-on-accent/55 hover:bg-white/14 hover:text-text-on-accent/80"
         )}
       >
         {React.createElement(especial ?? Icone, { size: 11, className: "shrink-0" })}

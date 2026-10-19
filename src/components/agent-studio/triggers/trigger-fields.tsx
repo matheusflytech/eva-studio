@@ -337,7 +337,7 @@ export function ReplyPreview({ text, kind }: { text: string; kind: string }) {
         <span
           className={cn(
             "max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-[13px]",
-            text ? "bg-accent-500 text-white" : "border border-dashed border-border-default bg-surface-2 text-text-tertiary"
+            text ? "bg-accent-500 text-text-on-accent" : "border border-dashed border-border-default bg-surface-2 text-text-tertiary"
           )}
         >
           {text || "Sua resposta aparece aqui"}

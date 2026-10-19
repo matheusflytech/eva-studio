@@ -23,7 +23,7 @@ export const buttonVariants = cva(
         solid: "bg-accent-solid text-text-on-accent hover:bg-accent-solid-hover",
         secondary: "border border-border-default bg-panel text-text-primary hover:border-border-strong hover:bg-raised",
         ghost: "text-text-secondary hover:bg-hover hover:text-text-primary",
-        danger: "bg-danger-solid text-text-on-accent hover:opacity-90",
+        danger: "bg-danger-solid text-text-on-danger hover:opacity-90",
       },
       size: {
         sm: "h-7 px-2.5 text-small",

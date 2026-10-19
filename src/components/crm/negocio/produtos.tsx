@@ -439,7 +439,7 @@ function Adicionar({
           <button
             type="submit"
             disabled={!nome.trim() || !!enviando}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-white outline-none hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-text-on-accent outline-none hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-40"
           >
             {enviando && <Loader2 size={13} className="animate-spin" aria-hidden />} Adicionar
           </button>

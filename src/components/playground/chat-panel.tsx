@@ -131,7 +131,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
                 className={cn(
                   "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
                   m.role === "user"
-                    ? "bg-accent-500 text-white"
+                    ? "bg-accent-500 text-text-on-accent"
                     : m.isError
                       ? "flex items-start gap-2 border border-danger/25 bg-danger/10 text-danger"
                       : "border border-border-subtle bg-surface-2 text-text-primary"
@@ -179,7 +179,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
         <button
           type="submit"
           disabled={!draft.trim() || isTyping}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-white transition-colors hover:bg-accent-400 disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-40"
         >
           <Send size={16} />
         </button>

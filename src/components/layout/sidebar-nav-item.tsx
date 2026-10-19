@@ -27,17 +27,18 @@ export function SidebarNavItem({
     <Link
       href={href}
       className={cn(
-        "group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium transition-colors",
+        "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body font-medium transition-colors",
+        // Item ativo no acento da marca (o menu é navy em qualquer tema).
         isActive
-          ? "bg-ice text-bg-base shadow-sm"
-          : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+          ? "bg-accent-subtle text-accent-fg"
+          : "text-text-secondary hover:bg-hover hover:text-text-primary"
       )}
     >
       <Icon
         size={17}
         className={cn(
           "shrink-0",
-          isActive ? "text-bg-base" : "text-text-tertiary group-hover:text-text-secondary",
+          isActive ? "text-accent-fg" : "text-text-tertiary group-hover:text-text-secondary",
           animated && isActive && "animate-aperture-breathe"
         )}
       />

@@ -20,28 +20,42 @@
    =========================================================================== */
 
 :root {
-  /* escala neutra única (levemente fria) */
+  /* Identidade da Eva (site oficial evaholdingroup.com.br): escala navy,
+     tinta com leve tom azulado (matiz 215–220) e o azul da marca. */
+  --navy-950: #080d17; /* hsl(220 50% 6%) */
+  --navy-900: #0b1322; /* hsl(220 50% 9%) */
+  --navy-800: #121b2b; /* hsl(220 40% 12%) */
+  --navy-700: #20293c; /* hsl(220 30% 18%) */
+  --navy-600: #303c55; /* hsl(220 28% 26%) */
+  --ink-100: #f1f5f9; /* hsl(210 40% 96%) */
+  --ink-300: #a9b5c6; /* hsl(215 20% 72%) */
+  --ink-500: #7588a3; /* hsl(215 20% 55%) */
+  --ink-d900: #0f1a2e; /* hsl(220 50% 12%): texto no claro */
+  --ink-d500: #5b667b; /* hsl(220 15% 42%): texto secundário no claro */
+  --bg-light: #f5f7fa; /* hsl(220 30% 97%) */
+
+  /* escala neutra (levemente azulada, como o site) */
   --gray-0: #ffffff;
-  --gray-50: #fafafa;
-  --gray-100: #f4f4f5;
-  --gray-150: #ebebee;
-  --gray-200: #dcdce1;
-  --gray-300: #c4c4cc;
-  --gray-400: #a1a1aa;
-  --gray-500: #63636d;
-  --gray-600: #52525b;
-  --gray-700: #3d3d45;
-  --gray-800: #26262b;
-  --gray-850: #1c1c20;
-  --gray-900: #151518;
-  --gray-950: #0e0e10;
+  --gray-50: #f5f7fa;
+  --gray-100: #eef1f6;
+  --gray-150: #e2e6ee;
+  --gray-200: #d4d8e1;
+  --gray-300: #bbc2cf;
+  --gray-400: #a2aab9;
+  --gray-500: #5e6778;
+  --gray-600: #5b667b;
+  --gray-700: #35425b;
+  --gray-800: #20293c;
+  --gray-850: #121b2b;
+  --gray-900: #0b1322;
+  --gray-950: #080d17;
 
   /* acento de marca (único) */
-  --blue-50: #edf2fd;
-  --blue-300: #8cb0f7;
-  --blue-500: #3b67cc;
-  --blue-600: #2f5fd3;
-  --blue-700: #264fb3;
+  --blue-50: #eaf4fd;
+  --blue-300: #99ccff; /* accent-2 do site */
+  --blue-500: #308ce8; /* accent do site: hsl(210 80% 55%) */
+  --blue-600: #519eec;
+  --blue-700: #1361ae;
 }
 
 /* ---- Tema claro (padrão quando não há data-theme) ---- */
@@ -49,26 +63,27 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --surface-page: #fafafa;
+  --surface-page: #f5f7fa;
   --surface-panel: #ffffff;
-  --surface-raised: #f4f4f5;
-  --surface-hover: #ebebee;
+  --surface-raised: #eef1f6;
+  --surface-hover: #e2e6ee;
   --surface-overlay: #ffffff;
 
-  --border-subtle: #ececef;
-  --border-default: #dcdce1;
-  --border-strong: #c4c4cc;
+  --border-subtle: #e6e8ed;
+  --border-default: #d4d8e1;
+  --border-strong: #bbc2cf;
 
-  --text-primary: #18181b;
-  --text-secondary: #52525b;
-  --text-tertiary: #63636d;
-  --text-disabled: #a1a1aa;
-  --text-on-accent: #ffffff;
+  --text-primary: #0f1a2e;
+  --text-secondary: #5b667b;
+  --text-tertiary: #5e6778;
+  --text-disabled: #a2aab9;
+  --text-on-danger: #ffffff;
+  --text-on-accent: #080d17;
 
-  --accent-solid: #2f5fd3;
-  --accent-solid-hover: #264fb3;
-  --accent-fg: #2a56c4;
-  --accent-subtle: #edf2fd;
+  --accent-solid: #308ce8;
+  --accent-solid-hover: #519eec;
+  --accent-fg: #1361ae;
+  --accent-subtle: #eaf4fd;
 
   --success-fg: #17734a;
   --success-subtle: #e7f5ee;
@@ -80,38 +95,39 @@
   --info-fg: #1f66a8;
   --info-subtle: #e8f1fa;
 
-  --focus-ring: #2f5fd3;
-  --inverse-bg: #18181b;
-  --inverse-fg: #fafafa;
+  --focus-ring: #308ce8;
+  --inverse-bg: #0b1322;
+  --inverse-fg: #f1f5f9;
 
-  --overlay-backdrop: rgba(14, 14, 16, 0.4);
-  --elevation-overlay: 0 1px 2px rgba(14, 14, 16, 0.06), 0 8px 24px rgba(14, 14, 16, 0.12);
+  --overlay-backdrop: rgba(8, 13, 23, 0.4);
+  --elevation-overlay: 0 1px 2px rgba(8, 13, 23, 0.06), 0 8px 24px rgba(8, 13, 23, 0.12);
 }
 
 /* ---- Tema escuro ---- */
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-page: #0e0e10;
-  --surface-panel: #151518;
-  --surface-raised: #1c1c20;
-  --surface-hover: #26262b;
-  --surface-overlay: #1c1c20;
+  --surface-page: #080d17;
+  --surface-panel: #0b1322;
+  --surface-raised: #121b2b;
+  --surface-hover: #20293c;
+  --surface-overlay: #121b2b;
 
-  --border-subtle: #222227;
-  --border-default: #2e2e34;
-  --border-strong: #3d3d45;
+  --border-subtle: #1d273a;
+  --border-default: #263146;
+  --border-strong: #35425b;
 
-  --text-primary: #ececef;
-  --text-secondary: #a6a6b0;
-  --text-tertiary: #91919b;
-  --text-disabled: #55555e;
-  --text-on-accent: #ffffff;
+  --text-primary: #f1f5f9;
+  --text-secondary: #a9b5c6;
+  --text-tertiary: #8d9bb0;
+  --text-disabled: #525e6f;
+  --text-on-danger: #ffffff;
+  --text-on-accent: #080d17;
 
-  --accent-solid: #3b67cc;
-  --accent-solid-hover: #3359b3;
-  --accent-fg: #8cb0f7;
-  --accent-subtle: #17213a;
+  --accent-solid: #308ce8;
+  --accent-solid-hover: #519eec;
+  --accent-fg: #99ccff;
+  --accent-subtle: #112642;
 
   --success-fg: #4cc38a;
   --success-subtle: #11261b;
@@ -123,9 +139,9 @@
   --info-fg: #6cb1ef;
   --info-subtle: #122338;
 
-  --focus-ring: #8cb0f7;
-  --inverse-bg: #ececef;
-  --inverse-fg: #151518;
+  --focus-ring: #99ccff;
+  --inverse-bg: #f1f5f9;
+  --inverse-fg: #0b1322;
 
   --overlay-backdrop: rgba(0, 0, 0, 0.6);
   --elevation-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -254,6 +270,7 @@
 
   --color-text-disabled: var(--text-disabled);
   --color-text-on-accent: var(--text-on-accent);
+  --color-text-on-danger: var(--text-on-danger);
 
   --color-accent-solid: var(--accent-solid);
   --color-accent-solid-hover: var(--accent-solid-hover);
@@ -324,16 +341,29 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Uma família só para a interface (Inter). font-display continua
-     existindo por compatibilidade e aponta para a mesma fonte. */
+  /* Inter na interface e na tabela; Plus Jakarta Sans (a dos títulos do
+     site da Eva) só em título de página e número grande; JetBrains Mono no
+     rótulo "eyebrow" e em código. */
   --font-sans: var(--font-inter);
-  --font-display: var(--font-inter);
+  --font-display: var(--font-jakarta);
   --font-mono: var(--font-jetbrains-mono);
 }
 
 html,
 body {
   height: 100%;
+}
+
+/* Rótulo de seção no estilo do site da Eva ("O QUE MOVEMOS"): mono, caixa
+   alta, espaçamento largo, cor do acento. Só para rótulo curto de seção. */
+@utility eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-fg);
 }
 
 body {

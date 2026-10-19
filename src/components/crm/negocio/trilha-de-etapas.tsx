@@ -62,7 +62,7 @@ export function TrilhaDeEtapas({
                   "flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium outline-none transition-colors",
                   "focus-visible:ring-2 focus-visible:ring-accent-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base disabled:cursor-wait",
                   atual
-                    ? "bg-accent-500 text-white"
+                    ? "bg-accent-500 text-text-on-accent"
                     : feita
                       ? "bg-accent-soft text-accent-400 hover:bg-accent-500/20"
                       : "bg-surface-2 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"

@@ -234,7 +234,7 @@ export function PreviaDoNegocio({
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
             href={`/negocios/${deal.id}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-white outline-none transition-colors hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-text-on-accent outline-none transition-colors hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
           >
             <Maximize2 size={13} aria-hidden /> Abrir ficha completa
           </Link>

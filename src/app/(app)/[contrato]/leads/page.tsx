@@ -215,7 +215,7 @@ function LeadCardContent({
           onClick={onToggleSelect}
           className={cn(
             "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-opacity",
-            selected ? "border-accent-500 bg-accent-500 text-white opacity-100" : "border-border-default opacity-0 group-hover:opacity-100",
+            selected ? "border-accent-500 bg-accent-500 text-text-on-accent opacity-100" : "border-border-default opacity-0 group-hover:opacity-100",
             anySelected && "opacity-100"
           )}
         >
@@ -462,7 +462,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
                   <div
                     className={cn(
                       "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-sm",
-                      m.role === "contact" ? "bg-accent-500 text-white" : "border border-border-subtle bg-surface-2 text-text-primary"
+                      m.role === "contact" ? "bg-accent-500 text-text-on-accent" : "border border-border-subtle bg-surface-2 text-text-primary"
                     )}
                   >
                     {m.text}

@@ -30,7 +30,7 @@ export function Stat({
   return (
     <div className={cn("flex min-w-0 flex-col gap-0.5", className)}>
       <span className="truncate text-small text-text-secondary">{label}</span>
-      <span className={cn("tabular-nums text-text-primary", size === "lg" ? "text-display" : "text-title")}>{value}</span>
+      <span className={cn("tabular-nums text-text-primary", size === "lg" ? "font-display text-display font-bold" : "text-title")}>{value}</span>
       {delta !== undefined && (
         <span className="flex items-center gap-1 text-caption text-text-tertiary">
           <span

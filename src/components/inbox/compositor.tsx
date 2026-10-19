@@ -126,7 +126,7 @@ function EscolherModelo({
                     await onEscolher(m);
                     setEnviando(null);
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-[12.5px] font-medium text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-50"
                 >
                   {enviando === m.id && <Loader2 size={12} className="animate-spin" />} Enviar este modelo
                 </button>
