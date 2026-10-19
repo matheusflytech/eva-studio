@@ -58,6 +58,9 @@ export interface AdvanceInput {
   // Id da mensagem do lado de fora (wamid), pra recibo de entrega e pra não
   // gravar a mesma mensagem duas vezes se a Meta reentregar.
   externalId?: string;
+  // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
+  // da pergunta para o modelo, mas não é gravado na conversa.
+  anexoContexto?: string;
 }
 
 export interface AdvanceResult {
@@ -518,6 +521,14 @@ async function runCrmTool(
   }
 
   return "Ação de CRM desconhecida.";
+}
+
+/** A pergunta do visitante mais o que a IA entendeu do anexo dele, se houver. */
+function textoParaIA(input: { text?: string; anexoContexto?: string }): string {
+  const texto = input.text ?? "";
+  return input.anexoContexto ? `${texto}
+
+${input.anexoContexto}`.trim() : texto;
 }
 
 const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
@@ -1136,7 +1147,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     pushStep(parkedNode, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" });
     return finish();
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+    const reply = await runAiAgent(parkedNode, agent.id, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
@@ -1384,7 +1395,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+      const reply = await runAiAgent(node, agent.id, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
