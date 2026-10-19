@@ -47,6 +47,13 @@ describe("coletarFunil", () => {
     expect(r.historicoDesde).toEqual(D("01"));
   });
 
+  it("o aviso de histórico conta só registros reais, não os do backfill", async () => {
+    await coletarFunil("o1", D("01"), D("15"));
+    expect(db.dealStageEvent.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { orgId: "o1", origem: { not: "backfill" } } })
+    );
+  });
+
   it("organização sem funil: tudo vazio, sem erro", async () => {
     db.pipeline.findFirst.mockResolvedValue(null);
     const r = await coletarFunil("o1", D("01"), D("15"));

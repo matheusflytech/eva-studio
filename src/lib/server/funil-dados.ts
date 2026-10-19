@@ -80,7 +80,11 @@ export async function coletarFunil(orgId: string, desde: Date, agora = new Date(
       : prisma.dealStageEvent
           .findMany({ where: { orgId, dealId: { in: ids } }, select: { dealId: true, fromStageId: true, toStageId: true, at: true } })
           .catch(() => []),
-    prisma.dealStageEvent.findFirst({ where: { orgId }, orderBy: { at: "asc" }, select: { at: true } }).catch(() => null),
+    // O backfill grava datas aproximadas (a criação do negócio); o aviso conta
+    // a partir do primeiro movimento registrado de verdade.
+    prisma.dealStageEvent
+      .findFirst({ where: { orgId, origem: { not: "backfill" } }, orderBy: { at: "asc" }, select: { at: true } })
+      .catch(() => null),
   ]);
 
   const etapas: EtapaF[] = linhasEtapa.map((e) => ({ id: e.id, nome: e.name, posicao: e.position, tipo: e.type }));
