@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { coletarFunil } from "@/lib/server/funil-dados";
+import type { LinhaDeConversao } from "@/lib/funil-metricas";
 
 // ---------------------------------------------------------------------------
 // Catálogo de fontes do Dashboard.
@@ -27,6 +29,8 @@ export interface LinhaDeTabela {
   contato: string;
   responsavel: string;
   valorCents: number;
+  /** Só nas tabelas de funil (negócios parados). */
+  etapa?: string;
 }
 
 export interface Fontes {
@@ -34,6 +38,9 @@ export interface Fontes {
   series: Record<string, Ponto[]>;
   quebras: Record<string, Ponto[]>;
   tabelas: Record<string, LinhaDeTabela[]>;
+  funis: Record<string, LinhaDeConversao[]>;
+  /** Desde quando existe histórico de etapas (para a tela avisar). */
+  historicoDesde: string | null;
 }
 
 export async function coletarFontes(orgId: string, dias: number): Promise<Fontes> {
@@ -44,7 +51,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
-  const [ganhos, criados, abertos, recentes, canalVendas, conversas, mensagens, porHora] =
+  const [ganhos, criados, abertos, recentes, canalVendas, conversas, mensagens, porHora, funil] =
     await Promise.all([
       prisma.deal.findMany({
         where: { orgId, closedAt: { gte: desde }, stage: { type: "won" } },
@@ -95,6 +102,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
            AND m."createdAt" >= ${desde}
          GROUP BY 1
       `,
+      coletarFunil(orgId, desde),
     ]);
 
   const receita = ganhos.reduce((s, d) => s + d.amountCents, 0);
@@ -143,6 +151,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
       autonomia: conversas.length > 0 ? 1 - escalaram / conversas.length : null,
       esperandoHumano: esperandoAgora,
       mensagens,
+      ...funil.numeros,
     },
     series: {
       receitaPorDia: Array.from(porDia.entries()).map(([data, cents]) => ({
@@ -162,6 +171,7 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
       porCanalConversas: Array.from(canaisConversa.entries())
         .map(([label, value]) => ({ label, value }))
         .sort((a, b) => b.value - a.value),
+      ...funil.quebras,
     },
     tabelas: {
       vendasRecentes: recentes.map((d) => ({
@@ -172,6 +182,9 @@ export async function coletarFontes(orgId: string, dias: number): Promise<Fontes
         responsavel: d.owner?.name ?? "—",
         valorCents: d.amountCents,
       })),
+      ...funil.tabelas,
     },
+    funis: funil.funis,
+    historicoDesde: funil.historicoDesde?.toISOString() ?? null,
   };
 }

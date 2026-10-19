@@ -4,7 +4,7 @@
 // banco) para que a tela de ajuda possa listar as mesmas fontes sem duplicar
 // a lista. Documentação que repete a fonte de verdade envelhece em silêncio.
 
-export type TipoDeFonte = "numero" | "serie" | "quebra" | "tabela";
+export type TipoDeFonte = "numero" | "serie" | "quebra" | "tabela" | "funil";
 
 export interface DefinicaoDeFonte {
   chave: string;
@@ -13,7 +13,7 @@ export interface DefinicaoDeFonte {
   explicacao: string;
   tipo: TipoDeFonte;
   /** Como formatar um `numero`. */
-  formato?: "dinheiro" | "inteiro" | "porcento";
+  formato?: "dinheiro" | "inteiro" | "porcento" | "dias";
   grupo: "Vendas" | "Funil" | "Atendimento";
 }
 
@@ -32,6 +32,12 @@ export const FONTES: DefinicaoDeFonte[] = [
   { chave: "negociosAbertos", rotulo: "Negócios abertos", explicacao: "Quantos negócios estão em andamento agora.", tipo: "numero", formato: "inteiro", grupo: "Funil" },
   { chave: "porEtapa", rotulo: "Onde o dinheiro está", explicacao: "Valor em aberto somado por etapa do funil.", tipo: "quebra", grupo: "Funil" },
   { chave: "porCanalVendas", rotulo: "Vendas por canal", explicacao: "Por qual canal chegou quem comprou.", tipo: "quebra", grupo: "Funil" },
+  { chave: "funilConversao", rotulo: "Conversão do funil", explicacao: "Dos negócios criados no período, quantos chegaram em cada etapa.", tipo: "funil", grupo: "Funil" },
+  { chave: "tempoPorEtapa", rotulo: "Dias em cada etapa", explicacao: "Mediana de dias que um negócio fica em cada etapa do funil.", tipo: "quebra", grupo: "Funil" },
+  { chave: "negociosParados", rotulo: "Negócios parados", explicacao: "Abertos e sem mudar de etapa há mais de 7 dias.", tipo: "tabela", grupo: "Funil" },
+  { chave: "motivosDePerda", rotulo: "Motivos de perda", explicacao: "Por que os negócios perdidos no período foram perdidos.", tipo: "quebra", grupo: "Funil" },
+  { chave: "taxaDeGanho", rotulo: "Taxa de ganho", explicacao: "Dos negócios fechados no período, quantos foram ganhos.", tipo: "numero", formato: "porcento", grupo: "Funil" },
+  { chave: "cicloDeVenda", rotulo: "Ciclo de venda", explicacao: "Mediana de dias entre criar o negócio e ganhar.", tipo: "numero", formato: "dias", grupo: "Funil" },
 
   { chave: "conversas", rotulo: "Conversas", explicacao: "Atendimentos no período, sem contar testes.", tipo: "numero", formato: "inteiro", grupo: "Atendimento" },
   { chave: "autonomia", rotulo: "Resolvido pelo agente", explicacao: "Conversas que não precisaram de atendente humano.", tipo: "numero", formato: "porcento", grupo: "Atendimento" },
