@@ -1,34 +1,158 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   Design system do Eva Studio — tokens.
+
+   Documentação: docs/design-system.md. Página viva: /design-system.
+   Espelho em TS (contraste e testes): src/lib/design-system/tokens.ts — um
+   teste compara os dois; mudou valor aqui, mude lá.
+
+   Camadas:
+   1. Escala crua (gray, blue): não muda com o tema. Componente NÃO usa direto.
+   2. Tokens semânticos por tema (surface-*, text-*, border-*, accent-*,
+      status): é isto que os componentes usam.
+   3. Nomes antigos (bg-surface-1, text-accent-400, glass-card...) e a ponte
+      shadcn: apontam para os semânticos, para nenhuma tela quebrar.
+
+   Tema: atributo data-theme="light|dark" no <html>, aplicado antes da
+   primeira pintura pelo script de src/lib/design-system/theme.ts. Também
+   vale num elemento qualquer (ex.: <aside data-theme="dark">).
+   =========================================================================== */
+
 :root {
-  /* matte-black surface scale */
-  --bg-base: #0a0a0a;
-  --bg-surface-1: #121212;
-  --bg-surface-2: #1a1a1a;
-  --bg-surface-3: #232323;
+  /* escala neutra única (levemente fria) */
+  --gray-0: #ffffff;
+  --gray-50: #fafafa;
+  --gray-100: #f4f4f5;
+  --gray-150: #ebebee;
+  --gray-200: #dcdce1;
+  --gray-300: #c4c4cc;
+  --gray-400: #a1a1aa;
+  --gray-500: #63636d;
+  --gray-600: #52525b;
+  --gray-700: #3d3d45;
+  --gray-800: #26262b;
+  --gray-850: #1c1c20;
+  --gray-900: #151518;
+  --gray-950: #0e0e10;
 
-  /* borders */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* acento de marca (único) */
+  --blue-50: #edf2fd;
+  --blue-300: #8cb0f7;
+  --blue-500: #3b67cc;
+  --blue-600: #2f5fd3;
+  --blue-700: #264fb3;
+}
 
-  /* text */
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --text-tertiary: rgba(255, 255, 255, 0.38);
+/* ---- Tema claro (padrão quando não há data-theme) ---- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
 
-  /* accent — reserved for primary CTAs only */
-  --accent-400: #7ba3f5;
-  --accent-500: #5b8def;
-  --accent-600: #3f6fd1;
-  --accent-soft: rgba(91, 141, 239, 0.12);
+  --surface-page: #fafafa;
+  --surface-panel: #ffffff;
+  --surface-raised: #f4f4f5;
+  --surface-hover: #ebebee;
+  --surface-overlay: #ffffff;
 
-  /* ice-white — used for selection/active states (nav, avatar, chips) */
-  --ice: #f5f7fa;
-  --ice-soft: rgba(245, 247, 250, 0.1);
-  --ice-border: rgba(245, 247, 250, 0.3);
+  --border-subtle: #ececef;
+  --border-default: #dcdce1;
+  --border-strong: #c4c4cc;
 
-  --danger: #f2555a;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-tertiary: #63636d;
+  --text-disabled: #a1a1aa;
+  --text-on-accent: #ffffff;
+
+  --accent-solid: #2f5fd3;
+  --accent-solid-hover: #264fb3;
+  --accent-fg: #2a56c4;
+  --accent-subtle: #edf2fd;
+
+  --success-fg: #17734a;
+  --success-subtle: #e7f5ee;
+  --warning-fg: #935a00;
+  --warning-subtle: #fcf2df;
+  --danger-fg: #c22f2f;
+  --danger-subtle: #fdeded;
+  --danger-solid: #c22f2f;
+  --info-fg: #1f66a8;
+  --info-subtle: #e8f1fa;
+
+  --focus-ring: #2f5fd3;
+  --inverse-bg: #18181b;
+  --inverse-fg: #fafafa;
+
+  --overlay-backdrop: rgba(14, 14, 16, 0.4);
+  --elevation-overlay: 0 1px 2px rgba(14, 14, 16, 0.06), 0 8px 24px rgba(14, 14, 16, 0.12);
+}
+
+/* ---- Tema escuro ---- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-page: #0e0e10;
+  --surface-panel: #151518;
+  --surface-raised: #1c1c20;
+  --surface-hover: #26262b;
+  --surface-overlay: #1c1c20;
+
+  --border-subtle: #222227;
+  --border-default: #2e2e34;
+  --border-strong: #3d3d45;
+
+  --text-primary: #ececef;
+  --text-secondary: #a6a6b0;
+  --text-tertiary: #91919b;
+  --text-disabled: #55555e;
+  --text-on-accent: #ffffff;
+
+  --accent-solid: #3b67cc;
+  --accent-solid-hover: #3359b3;
+  --accent-fg: #8cb0f7;
+  --accent-subtle: #17213a;
+
+  --success-fg: #4cc38a;
+  --success-subtle: #11261b;
+  --warning-fg: #e3a547;
+  --warning-subtle: #2a2010;
+  --danger-fg: #f07575;
+  --danger-subtle: #2d1617;
+  --danger-solid: #c43b3b;
+  --info-fg: #6cb1ef;
+  --info-subtle: #122338;
+
+  --focus-ring: #8cb0f7;
+  --inverse-bg: #ececef;
+  --inverse-fg: #151518;
+
+  --overlay-backdrop: rgba(0, 0, 0, 0.6);
+  --elevation-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Nomes antigos -> tokens novos (compatibilidade; não use em código novo) ---- */
+:root,
+[data-theme] {
+  --bg-base: var(--surface-page);
+  --bg-surface-1: var(--surface-panel);
+  --bg-surface-2: var(--surface-raised);
+  --bg-surface-3: var(--surface-hover);
+
+  /* accent-500 = fundo do botão primário; accent-400 = texto em acento;
+     accent-600 = pressionado. */
+  --accent-400: var(--accent-fg);
+  --accent-500: var(--accent-solid);
+  --accent-600: var(--accent-solid-hover);
+  --accent-soft: var(--accent-subtle);
+
+  /* "ice" era o branco de seleção do tema escuro: vira o par inverso
+     (escuro no tema claro, claro no escuro). */
+  --ice: var(--inverse-bg);
+  --ice-soft: color-mix(in srgb, var(--inverse-bg) 10%, transparent);
+  --ice-border: color-mix(in srgb, var(--inverse-bg) 30%, transparent);
+
+  --danger: var(--danger-fg);
 
   /* ---------------------------------------------------------------------
      Ponte para shadcn/ui.
@@ -39,31 +163,120 @@
      sem fork e sem duas paletas brigando no mesmo app.
 
      Regra: nunca editar valor aqui. Para mudar a aparencia, mexer nos tokens
-     do bloco acima, que sao a fonte de verdade.
+     semânticos acima, que sao a fonte de verdade.
      --------------------------------------------------------------------- */
-  --background: var(--bg-base);
+  --background: var(--surface-page);
   --foreground: var(--text-primary);
-  --card: var(--bg-surface-1);
+  --card: var(--surface-panel);
   --card-foreground: var(--text-primary);
-  --popover: var(--bg-surface-1);
+  --popover: var(--surface-overlay);
   --popover-foreground: var(--text-primary);
-  --primary: var(--accent-500);
-  --primary-foreground: #ffffff;
-  --secondary: var(--bg-surface-2);
+  --primary: var(--accent-solid);
+  --primary-foreground: var(--text-on-accent);
+  --secondary: var(--surface-raised);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--bg-surface-2);
+  --muted: var(--surface-raised);
   --muted-foreground: var(--text-tertiary);
-  --accent: var(--bg-surface-3);
+  --accent: var(--surface-hover);
   --accent-foreground: var(--text-primary);
-  --destructive: var(--danger);
-  --destructive-foreground: #ffffff;
+  --destructive: var(--danger-solid);
+  --destructive-foreground: var(--text-on-accent);
   --border: var(--border-subtle);
   --input: var(--border-default);
-  --ring: var(--accent-500);
-  --radius: 0.75rem;
+  --ring: var(--focus-ring);
+  --radius: 0.5rem;
+}
+
+/* Ponte temporária: telas antigas escrevem status com a paleta crua do
+   Tailwind (text-emerald-400, text-amber-300...), clara demais para fundo
+   branco. No tema claro elas passam a usar os tokens de status. Remover
+   quando as telas forem migradas para text-success/text-warning/... */
+[data-theme="light"] {
+  --color-emerald-200: var(--success-fg);
+  --color-emerald-300: var(--success-fg);
+  --color-emerald-400: var(--success-fg);
+  --color-amber-200: var(--warning-fg);
+  --color-amber-300: var(--warning-fg);
+  --color-amber-400: var(--warning-fg);
+  --color-rose-200: var(--danger-fg);
+  --color-rose-300: var(--danger-fg);
+  --color-rose-400: var(--danger-fg);
+  --color-sky-300: var(--info-fg);
+  --color-sky-400: var(--info-fg);
+  --color-blue-400: var(--info-fg);
+}
+
+/* Valores fixos (não mudam com o tema). */
+@theme {
+  /* Escala tipográfica nomeada: text-caption ... text-display. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.125rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-title-sm: 1.125rem;
+  --text-title-sm--line-height: 1.625rem;
+  --text-title-sm--font-weight: 600;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--font-weight: 600;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 2rem;
+  --text-heading--font-weight: 600;
+  --text-heading--letter-spacing: -0.01em;
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.375rem;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.015em;
+
+  /* Raios: 4 / 6 / 8, e 12 só em overlay. 2xl/3xl foram achatados para as
+     telas antigas (rounded-2xl em tudo) já ficarem no padrão sem reescrita. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.75rem;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @theme inline {
+  /* tokens semânticos */
+  --color-page: var(--surface-page);
+  --color-panel: var(--surface-panel);
+  --color-raised: var(--surface-raised);
+  --color-hover: var(--surface-hover);
+  --color-overlay: var(--surface-overlay);
+
+  --color-text-disabled: var(--text-disabled);
+  --color-text-on-accent: var(--text-on-accent);
+
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-solid-hover: var(--accent-solid-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-subtle: var(--accent-subtle);
+
+  --color-success: var(--success-fg);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning-fg);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-solid: var(--danger-solid);
+  --color-info: var(--info-fg);
+  --color-info-subtle: var(--info-subtle);
+
+  --color-focus: var(--focus-ring);
+  --color-inverse: var(--inverse-bg);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-backdrop: var(--overlay-backdrop);
+
+  --shadow-overlay: var(--elevation-overlay);
+
+  /* nomes antigos (compatibilidade) */
   --color-bg-base: var(--bg-base);
   --color-surface-1: var(--bg-surface-1);
   --color-surface-2: var(--bg-surface-2);
@@ -90,7 +303,7 @@
 
   /* Ponte para shadcn/ui: registra no Tailwind os nomes que os componentes de
      terceiros usam (bg-card, text-muted-foreground, border-border...). Os
-     valores vêm dos nossos tokens no :root, então não há paleta duplicada. */
+     valores vêm dos nossos tokens, então não há paleta duplicada. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -111,8 +324,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-display: var(--font-plus-jakarta-sans);
+  /* Uma família só para a interface (Inter). font-display continua
+     existindo por compatibilidade e aponta para a mesma fonte. */
   --font-sans: var(--font-inter);
+  --font-display: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
 }
 
@@ -122,30 +337,57 @@ body {
 }
 
 body {
-  background: var(--bg-base);
+  background: var(--surface-page);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Elemento com data-theme próprio (ex.: menu lateral sempre escuro) repinta
+   o texto com as variáveis dele. */
+[data-theme]:not(html) {
+  color: var(--text-primary);
 }
 
 * {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.glass-card {
-  background: var(--glass-card-bg, rgba(255, 255, 255, 0.035));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+@layer base {
+  /* Foco visível padrão. Classes de utilitário (outline-none, ring-*) de uma
+     tela vencem esta regra, porque base perde para utilities. */
+  :where(a, button, input, select, textarea, summary, [tabindex], [role="button"]):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
 }
 
-/* Dialogs/overlays need a fully opaque backing (content sitting behind them
-   must not show through). Tailwind's own bg-* utilities can't do this here:
-   they live in Tailwind's utilities @layer, which always loses to this
-   plain (unlayered) .glass-card rule regardless of class order — so a
-   dedicated modifier class is what actually wins the cascade. */
-.glass-card-solid { --glass-card-bg: var(--bg-surface-1); }
+/* Movimento mínimo: quem pediu menos movimento não vê animação nenhuma. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Antes era vidro (blur + sombra pesada). Agora é só um painel com borda
+   fina; a classe continua existindo para as telas que ainda a usam. */
+.glass-card {
+  background: var(--glass-card-bg, var(--surface-panel));
+  border: 1px solid var(--border-subtle);
+}
+
+/* Overlays antigos (menus, diálogos) que usam glass-card-solid. Fica fora de
+   @layer de propósito: precisa vencer o bg-* de utilitário. */
+.glass-card-solid {
+  --glass-card-bg: var(--surface-overlay);
+}
 
 @keyframes aperture-breathe {
   0%, 100% { transform: rotate(0deg); }
@@ -166,17 +408,31 @@ body {
 .animate-mtn-drift-back { animation: mtn-drift-back 22s ease-in-out infinite; }
 .animate-mtn-drift-front { animation: mtn-drift-front 18s ease-in-out infinite; }
 
-/* React Flow — restyled to the matte-black/glass theme, edges kept nearly imperceptible */
+/* Toast e overlays do design system: entrada curta, sem quique. */
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-slide-in-right {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ds-pop-in {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* React Flow — linhas e controles nos tokens (valem nos dois temas). */
 .react-flow__attribution {
   display: none;
 }
 .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.14) !important;
+  stroke: var(--border-strong) !important;
   stroke-width: 1.5px !important;
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.34) !important;
+  stroke: var(--text-tertiary) !important;
 }
 .react-flow__handle {
   background: var(--border-strong) !important;
@@ -188,49 +444,36 @@ body {
   border: none !important;
 }
 .react-flow__controls-button {
-  background: var(--bg-surface-2) !important;
+  background: var(--surface-raised) !important;
   border: 1px solid var(--border-default) !important;
   color: var(--text-secondary) !important;
-  border-radius: 10px !important;
+  border-radius: 6px !important;
   margin-bottom: 6px !important;
 }
 .react-flow__controls-button:hover {
-  background: var(--bg-surface-3) !important;
+  background: var(--surface-hover) !important;
   color: var(--text-primary) !important;
 }
 .react-flow__controls-button svg {
   fill: currentColor !important;
 }
 
-/* Minimapa — nó colorido igual o bloco real (ver nodeColor no MiniMap), fundo
-   e moldura combinando com o resto do canvas em vez do cinza padrão. */
+/* Minimapa — fundo e moldura combinando com o resto do canvas. */
 .react-flow__minimap {
-  background: var(--bg-surface-2) !important;
-  border-radius: 16px;
+  background: var(--surface-raised) !important;
+  border-radius: 8px;
   overflow: hidden;
 }
 .react-flow__minimap-mask {
-  fill: rgba(0, 0, 0, 0.55) !important;
+  fill: var(--overlay-backdrop) !important;
   stroke: var(--border-strong) !important;
 }
 
-/* subtle ambient texture so glass panels have something to read as "glass" against */
+/* Fundo da casca do app: cor de página lisa (sem brilho radial). */
 .app-backdrop {
-  background:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(245, 247, 250, 0.06), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 100%, rgba(91, 141, 239, 0.05), transparent 60%),
-    var(--bg-base);
+  background: var(--surface-page);
 }
 
-/* ---------------------------------------------------------------------------
-   Impressão (relatório do funil em PDF e dashboard).
-
-   A casca do app (barra lateral, barra do celular) some e a área de conteúdo
-   deixa de ser uma caixa de rolagem de 100dvh: sem isso o navegador imprime
-   só a primeira tela. A paleta escura vira clara, porque fundo preto em PDF
-   é ilegível e gasta toner. Os gráficos desenham com branco fixo (feitos para
-   o fundo escuro), então ganham as cores do acento aqui.
-   --------------------------------------------------------------------------- */
 /* Eva: o brilho do cabeçalho respira devagar e o recado entra de leve. */
 @keyframes eva-respira {
   0%, 100% { opacity: 0.6; transform: translate3d(0, 0, 0); }
@@ -247,19 +490,32 @@ body {
   100% { opacity: 0; transform: translateY(6px); }
 }
 
+/* ---------------------------------------------------------------------------
+   Impressão (relatório do funil em PDF e dashboard).
+
+   A casca do app (barra lateral, barra do celular) some e a área de conteúdo
+   deixa de ser uma caixa de rolagem de 100dvh: sem isso o navegador imprime
+   só a primeira tela. Imprime sempre no tema claro, porque fundo preto em PDF
+   é ilegível e gasta toner. Os gráficos usam os tokens de texto, então
+   acompanham sozinhos.
+   --------------------------------------------------------------------------- */
 @media print {
-  :root {
-    --bg-base: #ffffff;
-    --bg-surface-1: #ffffff;
-    --bg-surface-2: #f4f4f5;
-    --bg-surface-3: #e4e4e7;
-    --border-subtle: rgba(0, 0, 0, 0.1);
-    --border-default: rgba(0, 0, 0, 0.16);
-    --border-strong: rgba(0, 0, 0, 0.24);
+  :root,
+  [data-theme] {
+    --surface-page: #ffffff;
+    --surface-panel: #ffffff;
+    --surface-raised: #f4f4f5;
+    --surface-hover: #ebebee;
+    --surface-overlay: #ffffff;
+    --border-subtle: #dcdce1;
+    --border-default: #c4c4cc;
+    --border-strong: #a1a1aa;
     --text-primary: #18181b;
-    --text-secondary: #3f3f46;
-    --text-tertiary: #71717a;
-    --glass-card-bg: #ffffff;
+    --text-secondary: #52525b;
+    --text-tertiary: #63636d;
+    --accent-solid: #2f5fd3;
+    --accent-fg: #2a56c4;
+    --accent-subtle: #edf2fd;
   }
 
   * {
@@ -291,27 +547,9 @@ body {
 
   .glass-card {
     background: #ffffff !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-    border: 1px solid #d4d4d8 !important;
+    border: 1px solid #c4c4cc !important;
     break-inside: avoid;
   }
-
-  /* Gráficos (src/components/charts) */
-  svg [stroke="rgba(255,255,255,0.75)"] { stroke: #3f6fd1; }
-  svg circle[fill="white"] { fill: #3f6fd1; }
-  svg stop[stop-color="rgba(255,255,255,0.16)"] { stop-color: rgba(91, 141, 239, 0.35); }
-  svg circle[stroke="rgba(255,255,255,0.06)"] { stroke: #e4e4e7; }
-  svg circle[stroke="rgba(255,255,255,0.85)"] { stroke: #3f6fd1; }
-  svg circle[stroke="rgba(255,255,255,0.45)"] { stroke: #7ba3f5; }
-  svg circle[stroke="rgba(255,255,255,0.2)"] { stroke: #b4c8f4; }
-  svg circle[stroke="rgba(255,255,255,0.1)"] { stroke: #dde6fa; }
-  [style*="255,255,255,0.85"], [style*="255, 255, 255, 0.85"] { background: #3f6fd1 !important; }
-  [style*="255,255,255,0.45"], [style*="255, 255, 255, 0.45"] { background: #7ba3f5 !important; }
-  [style*="255,255,255,0.2)"], [style*="255, 255, 255, 0.2)"] { background: #b4c8f4 !important; }
-  [style*="255,255,255,0.1)"], [style*="255, 255, 255, 0.1)"] { background: #dde6fa !important; }
-  .bg-white\/15 { background: rgba(0, 0, 0, 0.18) !important; }
 
   /* Dashboard: grade de duas colunas na folha em pé. */
   @page { size: A4; margin: 12mm; }

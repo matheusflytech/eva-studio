@@ -503,7 +503,7 @@ export default function AgentBuilderPage() {
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
             >
-              <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(255,255,255,0.07)" />
+              <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-default)" />
               <Controls showInteractive={false} position="bottom-left" />
               <MiniMap
                 position="bottom-right"

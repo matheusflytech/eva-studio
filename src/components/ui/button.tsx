@@ -1,24 +1,36 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { focusRing } from "./styles";
 
+/*
+ * Botão. Um primário por área da tela; o resto é secondary ou ghost.
+ * "solid" é o nome antigo de "primary" (continua valendo). Tamanhos "lg",
+ * "pill" e "icon" ficam por compatibilidade: pill não é mais redondo.
+ */
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ice/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
+  cn(
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium select-none",
+    "transition-colors duration-120 ease-standard",
+    "disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress",
+    focusRing
+  ),
   {
     variants: {
       variant: {
-        solid: "bg-accent-500 text-white hover:bg-accent-400 active:bg-accent-600",
-        secondary:
-          "bg-surface-2 text-text-primary border border-border-default hover:bg-surface-3 hover:border-border-strong",
-        ghost: "text-text-secondary hover:text-text-primary hover:bg-surface-2",
-        danger: "bg-danger/15 text-danger hover:bg-danger/25 border border-danger/20",
+        primary: "bg-accent-solid text-text-on-accent hover:bg-accent-solid-hover",
+        solid: "bg-accent-solid text-text-on-accent hover:bg-accent-solid-hover",
+        secondary: "border border-border-default bg-panel text-text-primary hover:border-border-strong hover:bg-raised",
+        ghost: "text-text-secondary hover:bg-hover hover:text-text-primary",
+        danger: "bg-danger-solid text-text-on-accent hover:opacity-90",
       },
       size: {
-        sm: "h-8 px-3 text-[13px] rounded-lg",
-        md: "h-10 px-4 text-sm rounded-xl",
-        lg: "h-12 px-6 text-[15px] rounded-2xl",
-        pill: "h-12 px-7 text-[15px] rounded-full",
-        icon: "h-9 w-9 rounded-lg",
+        sm: "h-7 px-2.5 text-small",
+        md: "h-8 px-3 text-body",
+        lg: "h-9 px-4 text-body",
+        pill: "h-9 px-4 text-body",
+        icon: "h-8 w-8 [&_svg]:size-4",
       },
     },
     defaultVariants: {
@@ -30,16 +42,24 @@ export const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /** Mostra o indicador de progresso e bloqueia novo clique. */
+  loading?: boolean;
+}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => {
+  ({ className, variant, size, loading = false, disabled, children, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={cn(buttonVariants({ variant, size }), className)}
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
         {...props}
-      />
+      >
+        {loading && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+        {children}
+      </button>
     );
   }
 );

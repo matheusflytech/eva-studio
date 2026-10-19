@@ -1,5 +1,17 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// O tailwind-merge precisa conhecer a escala tipográfica do design system:
+// sem isso ele acha que text-body é cor e descarta a classe quando vem junto
+// de text-text-primary.
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: ["caption", "small", "body", "body-lg", "title-sm", "title", "heading", "display"],
+      shadow: ["overlay"],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
