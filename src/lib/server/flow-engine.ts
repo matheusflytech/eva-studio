@@ -734,10 +734,11 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const chamarLlm = () => callLlmWithTools({
+    const modeloPrincipal = node.data.aiModel || provider.models[0].id;
+    const chamarLlm = (modelo: string = modeloPrincipal) => callLlmWithTools({
       provider: provider.id as LlmProvider,
       apiKey,
-      model: node.data.aiModel || provider.models[0].id,
+      model: modelo,
       effort: node.data.aiEffort,
       systemPrompt,
       userMessage,
@@ -787,14 +788,29 @@ async function runAiAgent(
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     });
-    let result = await chamarLlm().catch((e) => ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>);
-    // Limite de tokens por minuto do provedor (429): costuma liberar em segundos.
-    // Espera o que ele mandou esperar (no máximo 12s) e tenta uma vez mais.
-    if (!result.text && result.error && /\b429\b/.test(result.error)) {
-      const dito = /try again in ([\d.]+)s/i.exec(result.error);
+    const falhou = (e: unknown) =>
+      ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>;
+    const noLimite = (r: { text: string | null; error?: string }) => !r.text && !!r.error && /\b429\b/.test(r.error);
+
+    let result = await chamarLlm().catch(falhou);
+    // O limite de tokens por minuto (429) vale por modelo. Se o principal estourou,
+    // tenta os modelos reserva do bloco (mesma conta), cada um com o seu próprio limite.
+    if (noLimite(result)) {
+      for (const reserva of node.data.aiFallbackModels ?? []) {
+        if (!reserva || reserva === modeloPrincipal) continue;
+        const tentativa = await chamarLlm(reserva).catch(falhou);
+        if (tentativa.text || !noLimite(tentativa)) {
+          result = tentativa;
+          break;
+        }
+      }
+    }
+    // Todos no limite: espera o que o provedor mandou esperar (no máximo 12s) e tenta uma vez mais.
+    if (noLimite(result)) {
+      const dito = /try again in ([\d.]+)s/i.exec(result.error ?? "");
       const esperar = Math.min(12, (dito ? Number(dito[1]) : 6) + 0.5) * 1000;
       await new Promise((r) => setTimeout(r, esperar));
-      result = await chamarLlm().catch((e) => ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>);
+      result = await chamarLlm().catch(falhou);
     }
     return { text: result.text, error: result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`) };
   } catch (err) {
