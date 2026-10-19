@@ -268,7 +268,10 @@ async function montarFerramentaDeCampos(
 ): Promise<{ action: string; tool: LlmTool }[]> {
   const contactId = await resolveContactId().catch(() => null);
   const deal = contactId ? await findOpenDealForContact(contactId).catch(() => null) : null;
-  const defsNegocio = deal ? await carregarDefinicoes(orgId, "deal", deal.pipelineId) : [];
+  // Sem negócio aberto ainda, oferece os campos que valem em todos os funis: a IA
+  // costuma criar o negócio e preencher no mesmo turno, e a lista de parâmetros
+  // da ferramenta é montada antes, quando o negócio ainda não existe.
+  const defsNegocio = await carregarDefinicoes(orgId, "deal", deal?.pipelineId ?? null);
   const defsContato = await carregarDefinicoes(orgId, "contact");
   const todas = [...defsNegocio, ...defsContato];
   if (todas.length === 0) return [];
