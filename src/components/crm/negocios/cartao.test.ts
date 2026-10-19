@@ -108,6 +108,13 @@ describe("textoDoCampo", () => {
       expect(textoDoCampo(c, d, ctx)).toBe("");
     }
   });
+  it("produtos: resumo curto, vazio sem itens (e em quadro antigo sem o campo)", () => {
+    expect(textoDoCampo("produtos", negocio({ produtos: ["Plano Pro", "Implantação", "Treinamento"] }), ctx)).toBe(
+      "3 produtos · Plano Pro +2"
+    );
+    expect(textoDoCampo("produtos", negocio({ produtos: [] }), ctx)).toBe("");
+    expect(textoDoCampo("produtos", negocio(), ctx)).toBe("");
+  });
   it("próximo passo usa o sinal do cartão", () => {
     const d = negocio({ nextTask: { type: "ligar", text: "", dueAt: "2026-10-20T13:00:00.000Z" } });
     expect(textoDoCampo("proximoPasso", d, ctx)).toBe("Ligar amanhã 10h");

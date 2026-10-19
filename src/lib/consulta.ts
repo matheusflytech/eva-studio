@@ -178,6 +178,7 @@ export const AGRUPAMENTOS_BASE: { id: string; rotulo: string; grupo: "" | "Negó
   { id: "empresa", rotulo: "Por empresa", grupo: "Negócio" },
   { id: "motivoPerda", rotulo: "Por motivo de perda", grupo: "Negócio" },
   { id: "canal", rotulo: "Por canal do contato", grupo: "Negócio" },
+  { id: "produto", rotulo: "Por produto", grupo: "Negócio" },
   { id: "dia", rotulo: "Por dia", grupo: "Tempo" },
   { id: "semana", rotulo: "Por semana", grupo: "Tempo" },
   { id: "mes", rotulo: "Por mês", grupo: "Tempo" },

@@ -4,6 +4,7 @@
 
 import { CAMPOS_PADRAO, type CampoDoCartao, type CampoPadrao, type Densidade } from "@/lib/cartao-layout";
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
+import { resumoDosProdutos } from "@/lib/produtos";
 import { dataCurta, dataCurtaDoDia, diaDaPrevisao, diasParado, dinheiro, sinalDoNegocio, type NegocioKanban } from "./modelo";
 
 const FUSO = "America/Sao_Paulo";
@@ -128,6 +129,8 @@ export function textoDoCampo(
       return contato?.phone || "";
     case "email":
       return contato?.email || "";
+    case "produtos":
+      return resumoDosProdutos(deal.produtos ?? []);
     default:
       return "";
   }

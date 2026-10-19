@@ -27,4 +27,11 @@ describe("erroDoLayout", () => {
     expect(erroDoLayout({ campos: [], previa: [], densidade: "x" }, [])).toMatch(/Densidade/);
     expect(erroDoLayout("x", [])).toMatch(/inválido/);
   });
+  it("produtos é um campo padrão do cartão e da prévia", () => {
+    expect(erroDoLayout({ campos: ["valor", "produtos"], previa: ["produtos"], densidade: "confortavel" }, [])).toBeNull();
+    expect(normalizarLayout({ campos: ["produtos"], previa: [], densidade: "compacto" }).campos).toEqual(["produtos"]);
+  });
+  it("o padrão não muda: quadro de quem não escolheu nada fica igual", () => {
+    expect(LAYOUT_PADRAO.campos).not.toContain("produtos");
+  });
 });

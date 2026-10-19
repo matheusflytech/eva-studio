@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   customField: { findMany: vi.fn(async () => [] as unknown[]) },
   pipelineCardLayout: { findUnique: vi.fn(async () => null) },
   organization: { findUnique: vi.fn(async () => ({ name: "Acme Solar" })) },
+  dealItem: { findMany: vi.fn<(a?: { where: unknown }) => Promise<unknown[]>>(async () => []) },
 }));
 const auth = vi.hoisted(() => ({
   requirePermission: vi.fn(async (): Promise<Record<string, unknown>> => ({ orgId: "org", userId: "u", role: "viewer" })),
@@ -113,6 +114,28 @@ describe("GET /api/deals/exportar", () => {
     const csv = await (await get("pipeline=p1&dono=u2")).text();
     expect(csv).toContain("Primeiro");
     expect(csv).not.toContain("Segundo");
+  });
+
+  it("coluna Produtos com os itens de cada negócio, buscados só da org", async () => {
+    db.dealItem.findMany.mockResolvedValueOnce([
+      { id: "i1", dealId: "b", productId: null, name: "Plano Pro", sku: "", unit: "un", recurrence: "mensal", unitPriceCents: 9_900, quantity: "2.000", discountType: "percentual", discountValue: 0, totalCents: 19_800, position: 0 },
+    ]);
+    const csv = await (await get("pipeline=p1")).text();
+    expect(csv).toContain("2 × Plano Pro");
+    expect(db.dealItem.findMany.mock.calls[0]?.[0]?.where).toEqual({ orgId: "org", dealId: { in: ["a", "b"] } });
+  });
+
+  it("itens=1 baixa uma linha por item", async () => {
+    db.dealItem.findMany.mockResolvedValueOnce([
+      { id: "i1", dealId: "b", productId: null, name: "Plano Pro", sku: "PRO", unit: "un", recurrence: "mensal", unitPriceCents: 9_900, quantity: "2.000", discountType: "percentual", discountValue: 0, totalCents: 19_800, position: 0 },
+      { id: "i2", dealId: "b", productId: null, name: "Frete", sku: "", unit: "un", recurrence: "unico", unitPriceCents: 1_000, quantity: "1.000", discountType: "percentual", discountValue: 0, totalCents: 1_000, position: 1 },
+    ]);
+    const res = await get("pipeline=p1&itens=1");
+    expect(res.headers.get("Content-Disposition")).toMatch(/itens-vendas-sul-/);
+    const linhas = (await res.text()).split("\r\n").filter(Boolean);
+    expect(linhas[0]).toMatch(/Produto;Código;Quantidade/);
+    expect(linhas).toHaveLength(3);
+    expect(linhas[1]).toMatch(/^Vendas Sul;Novo;Em andamento;Primeiro;/);
   });
 
   it("formato json alimenta o relatório com totais e números da capa", async () => {

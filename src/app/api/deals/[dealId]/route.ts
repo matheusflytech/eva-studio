@@ -14,6 +14,7 @@ import {
   respostaDeErroDoPrisma,
   texto,
 } from "@/lib/server/api-validacao";
+import { negocioUsaSomaDosItens } from "@/lib/server/produtos";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
@@ -115,6 +116,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
   if (body.amount !== undefined) {
     const centavos = reaisParaCentavos(body.amount);
     if (centavos === null || centavos === undefined) return erro("Valor inválido (máximo R$ 21 milhões).");
+    // Com produtos e sem "valor manual", o valor é a soma dos itens.
+    if (await negocioUsaSomaDosItens(deal.id)) {
+      return erro("O valor deste negócio vem dos produtos. Ligue \"Usar valor manual\" na ficha para digitar outro.", 409);
+    }
     data.amountCents = centavos;
   }
   if (body.probability !== undefined) {

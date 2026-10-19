@@ -11,6 +11,8 @@ import { TrilhaDeEtapas } from "./trilha-de-etapas";
 import { SobreONegocio } from "./sobre-o-negocio";
 import { AtividadeDoNegocio, type AbaDaAtividade } from "./atividade";
 import { VinculosDoNegocio } from "./vinculos";
+import { ProdutosDoNegocio, useItensDoNegocio } from "./produtos";
+import { valorVemDosProdutos } from "@/lib/produtos";
 
 /**
  * Ficha completa do negócio, com endereço próprio (/negocios/<id>) para
@@ -23,6 +25,8 @@ import { VinculosDoNegocio } from "./vinculos";
 export function FichaDoNegocio({ dealId }: { dealId: string }) {
   const ficha = useFicha(dealId);
   const { estado, deal, defs, linha, linhaFalhou, membros, agora, carregar, patch } = ficha;
+  // Itens mudam o valor do negócio: cada mudança recarrega a ficha.
+  const produtos = useItensDoNegocio(dealId, carregar);
   const [erro, setErro] = React.useState<string | null>(null);
   const [aba, setAba] = React.useState<AbaDaAtividade>("atividade");
   const atividadeRef = React.useRef<HTMLDivElement>(null);
@@ -101,9 +105,16 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         }
       >
         <div className="min-w-0 [grid-area:sobre]">
-          <SobreONegocio deal={deal} defs={defs} membros={membros} patch={patch} />
+          <SobreONegocio
+            deal={deal}
+            defs={defs}
+            membros={membros}
+            patch={patch}
+            valorDosProdutos={valorVemDosProdutos(produtos.dados)}
+          />
         </div>
-        <div ref={atividadeRef} className="min-w-0 scroll-mt-4 [grid-area:atividade]">
+        <div ref={atividadeRef} className="flex min-w-0 scroll-mt-4 flex-col gap-4 [grid-area:atividade]">
+          <ProdutosDoNegocio estado={produtos} />
           <AtividadeDoNegocio
             deal={deal}
             itens={linha.itens}

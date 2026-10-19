@@ -12,6 +12,7 @@ import {
   Mail,
   Maximize2,
   MessageCircle,
+  Package,
   Phone,
   Tag,
   User,
@@ -67,6 +68,7 @@ const ICONE_DA_LINHA: Partial<Record<CampoDoCartao, LucideIcon>> = {
   contato: User,
   telefone: Phone,
   email: Mail,
+  produtos: Package,
 };
 
 export const TOM_DO_SINAL = {

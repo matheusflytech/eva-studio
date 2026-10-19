@@ -13,6 +13,7 @@ import {
   texto,
 } from "@/lib/server/api-validacao";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
+import { nomesDosProdutosPorNegocio } from "@/lib/server/produtos";
 
 // Negócios de um funil, agrupados por etapa (o kanban lê isso direto).
 //   ?pipeline=<id>  padrão: o funil padrão da org
@@ -120,9 +121,19 @@ export async function GET(request: Request) {
   // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
   const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
 
+  // Nomes dos produtos só quando o cartão ou a prévia mostram produtos (sem a
+  // tabela no banco, nomesDosProdutosPorNegocio devolve vazio e nada quebra).
+  const comProdutos =
+    layout.campos.includes("produtos") || layout.previa.includes("produtos")
+      ? await nomesDosProdutosPorNegocio(ctx.orgId, deals.map((d) => d.id))
+      : null;
+  const stagesComProdutos = comProdutos
+    ? stages.map((s) => ({ ...s, deals: s.deals.map((d) => ({ ...d, produtos: comProdutos.get(d.id) ?? [] })) }))
+    : stages;
+
   return NextResponse.json({
     pipeline: { id: pipeline.id, name: pipeline.name },
-    stages,
+    stages: stagesComProdutos,
     fields,
     layout,
   });

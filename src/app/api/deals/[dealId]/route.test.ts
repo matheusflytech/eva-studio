@@ -9,6 +9,8 @@ const db = vi.hoisted(() => ({
   company: { findFirst: vi.fn() },
   profile: { findFirst: vi.fn() },
   customField: { findMany: vi.fn(async () => []) },
+  dealItem: { count: vi.fn(async () => 0) },
+  dealAmountSetting: { findUnique: vi.fn(async (): Promise<{ manualAmount: boolean } | null> => null) },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/permissions", () => ({
@@ -85,6 +87,21 @@ describe("PATCH /api/deals/[dealId]", () => {
     const res = await patch({ stageId: "s9" });
     expect(res.status).toBe(400);
     expect(db.deal.update).not.toHaveBeenCalled();
+  });
+
+  it("valor digitado num negócio cujo valor vem dos produtos → 409, sem gravar", async () => {
+    db.dealItem.count.mockResolvedValueOnce(2);
+    const res = await patch({ amount: 500 });
+    expect(res.status).toBe(409);
+    expect(db.deal.update).not.toHaveBeenCalled();
+  });
+
+  it("com valor manual ligado, o valor digitado passa", async () => {
+    db.dealItem.count.mockResolvedValueOnce(2);
+    db.dealAmountSetting.findUnique.mockResolvedValueOnce({ manualAmount: true });
+    const res = await patch({ amount: 500 });
+    expect(res.status).toBe(200);
+    expect(db.deal.update).toHaveBeenCalledWith({ where: { id: "d1" }, data: { amountCents: 50_000 } });
   });
 
   it("motivo da perda gravado quando a etapa enviada é a atual", async () => {

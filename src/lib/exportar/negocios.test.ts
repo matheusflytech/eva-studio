@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
-import { linhasDaPlanilha, csvDosNegocios, ordenarPorEtapa, resumoDaExportacao, type NegocioParaExportar } from "./negocios";
+import {
+  linhasDaPlanilha,
+  linhasDosItens,
+  csvDosNegocios,
+  ordenarPorEtapa,
+  resumoDaExportacao,
+  type ItemParaExportar,
+  type NegocioParaExportar,
+} from "./negocios";
 
 const etapas = [
   { id: "s2", name: "Proposta", type: "open", position: 1, probability: 50 },
@@ -126,6 +134,61 @@ describe("planilha de negócios", () => {
   it("coluna de arquivados só quando pedida", () => {
     const [cab] = linhasDaPlanilha({ funil: "V", etapas, negocios: [], defs: [], agora, comArquivados: true });
     expect(cab).toContain("Arquivado em");
+  });
+
+  const item = (o: Partial<ItemParaExportar>): ItemParaExportar => ({
+    name: "Plano Pro",
+    sku: "PRO",
+    unit: "mês",
+    recurrence: "mensal",
+    unitPriceCents: 9_900,
+    quantity: 2,
+    discountType: "percentual",
+    discountValue: 0,
+    totalCents: 19_800,
+    ...o,
+  });
+
+  it("coluna Produtos: lista resumida com a quantidade", () => {
+    const [cab, linha] = linhasDaPlanilha({
+      funil: "V",
+      etapas,
+      defs: [],
+      agora,
+      negocios: [negocio({ itens: [item({}), item({ name: "Implantação", quantity: 1.5 })] })],
+    });
+    expect(cab).toContain("Produtos");
+    expect(linha[cab.indexOf("Produtos")]).toBe("2 × Plano Pro; 1,5 × Implantação");
+  });
+
+  it("coluna Produtos vazia sem itens (e sem quebrar negócio antigo)", () => {
+    const [cab, linha] = linhasDaPlanilha({ funil: "V", etapas, defs: [], agora, negocios: [negocio({})] });
+    expect(linha[cab.indexOf("Produtos")]).toBe("");
+  });
+
+  it("planilha de itens: uma linha por item, com o negócio repetido", () => {
+    const linhas = linhasDosItens({
+      funil: "Vendas",
+      etapas,
+      defs: [],
+      agora,
+      negocios: [
+        negocio({ id: "a", name: "Solar", stageId: "s2", company: { id: "c", name: "Acme" }, itens: [item({}), item({ name: "Frete", sku: "", recurrence: "unico", unitPriceCents: 3_550, quantity: 1, discountType: "valor", discountValue: 550, totalCents: 3_000 })] }),
+        negocio({ id: "b", name: "Sem itens" }),
+      ],
+    });
+    const [cab, l1, l2] = linhas;
+    expect(linhas).toHaveLength(3);
+    const col = (l: unknown[], nome: string) => l[cab.indexOf(nome)];
+    expect(col(l1, "Negócio")).toBe("Solar");
+    expect(col(l1, "Empresa")).toBe("Acme");
+    expect(col(l1, "Produto")).toBe("Plano Pro");
+    expect(col(l1, "Quantidade")).toBe("2");
+    expect(col(l1, "Recorrência")).toBe("Mensal");
+    expect(col(l1, "Total")).toBe("R$ 198,00");
+    expect(col(l2, "Produto")).toBe("Frete");
+    expect(col(l2, "Desconto")).toBe("R$ 5,50");
+    expect(col(l2, "Total (número)")).toBe("30,00");
   });
 
   it("resumo: aberto, ponderado e ganho a partir da data", () => {

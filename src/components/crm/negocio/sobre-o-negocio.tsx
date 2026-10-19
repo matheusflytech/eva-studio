@@ -23,11 +23,14 @@ export function SobreONegocio({
   defs,
   membros,
   patch,
+  valorDosProdutos = false,
 }: {
   deal: NegocioDaFicha;
   defs: DefinicaoDeCampo[];
   membros: Membro[];
   patch: (body: Record<string, unknown>) => Promise<string | null>;
+  /** O valor é a soma dos produtos (sem valor manual): o campo fica só leitura. */
+  valorDosProdutos?: boolean;
 }) {
   const [erroDono, setErroDono] = React.useState<string | null>(null);
 
@@ -47,16 +50,24 @@ export function SobreONegocio({
   return (
     <Secao titulo="Sobre o negócio">
       <div className="flex flex-col gap-2">
-        <CampoInline
-          id="ficha-valor"
-          rotulo="Valor"
-          prefixo="R$"
-          tipo="numero"
-          placeholder="0,00"
-          valor={reaisParaTexto(deal.amountCents)}
-          onSalvar={salvarValor}
-          className="font-display tabular-nums"
-        />
+        {valorDosProdutos ? (
+          <div className="px-2 py-0.5">
+            <div className="text-[11.5px] text-text-tertiary">Valor</div>
+            <div className="py-1 font-display text-[13px] tabular-nums text-text-primary">R$ {reaisParaTexto(deal.amountCents) || "0,00"}</div>
+            <div className="text-[11.5px] text-text-tertiary">Soma dos produtos. Para digitar outro, ligue &quot;Usar valor manual&quot; em Produtos.</div>
+          </div>
+        ) : (
+          <CampoInline
+            id="ficha-valor"
+            rotulo="Valor"
+            prefixo="R$"
+            tipo="numero"
+            placeholder="0,00"
+            valor={reaisParaTexto(deal.amountCents)}
+            onSalvar={salvarValor}
+            className="font-display tabular-nums"
+          />
+        )}
         <CampoInline
           id="ficha-prob"
           rotulo="Probabilidade"

@@ -38,6 +38,7 @@ model Organization {
   notes       Note[]
   dashboard   DashboardLayout?
   customFieldDefs CustomField[]
+  products        Product[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -1078,6 +1079,10 @@ model Deal {
   tasks        Task[]
   notes        Note[]
   stageEvents  DealStageEvent[]
+  // Só relações (nenhuma coluna nova em eva_studio_deals): sem o SQL dos
+  // produtos aplicado, o resto do negócio continua funcionando.
+  items         DealItem[]
+  amountSetting DealAmountSetting?
 
   @@index([orgId, stageId])
   @@index([pipelineId])
@@ -1118,6 +1123,81 @@ model DealStageEvent {
   @@index([orgId, pipelineId, at])
   @@index([dealId, at])
   @@map("eva_studio_deal_stage_events")
+}
+
+// Catálogo de produtos e serviços da organização (o "Products" do HubSpot e
+// do Pipedrive). O negócio não aponta para o preço daqui: cada item copia
+// nome, código, unidade, preço e recorrência na hora em que entra, e mudar o
+// catálogo depois não reescreve proposta antiga.
+model Product {
+  id          String    @id @default(uuid())
+  orgId       String
+  name        String
+  sku         String    @default("")
+  description String    @default("") @db.Text
+  // Centavos, como em Deal.amountCents.
+  priceCents  Int       @default(0)
+  currency    String    @default("BRL")
+  // "un", "h", "mês", "licença"... texto livre e curto.
+  unit        String    @default("un")
+  // unico | mensal | anual
+  recurrence  String    @default("unico")
+  category    String    @default("")
+  // Arquivado some da busca para adicionar, mas os itens antigos ficam.
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items        DealItem[]
+
+  @@index([orgId, archivedAt])
+  @@map("eva_studio_products")
+}
+
+// Item (linha) do negócio. productId nulo = item avulso, ou produto apagado
+// depois: o nome e o preço congelados seguem contando a história.
+model DealItem {
+  id             String   @id @default(uuid())
+  orgId          String
+  dealId         String
+  productId      String?
+  name           String
+  sku            String   @default("")
+  unit           String   @default("un")
+  recurrence     String   @default("unico")
+  unitPriceCents Int      @default(0)
+  quantity       Decimal  @default(1) @db.Decimal(12, 3)
+  // percentual: centésimos de ponto (1050 = 10,50%); valor: centavos.
+  discountType   String   @default("percentual")
+  discountValue  Int      @default(0)
+  // Calculado no servidor (src/lib/produtos.ts → totalDoItem).
+  totalCents     Int      @default(0)
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([dealId, position])
+  @@index([orgId, productId])
+  @@map("eva_studio_deal_items")
+}
+
+// Escolha "usar valor manual" do negócio. Tabela à parte em vez de coluna em
+// eva_studio_deals pelo mesmo motivo de PipelineCardLayout: sem o registro,
+// vale o padrão (o valor é a soma dos itens quando há itens).
+model DealAmountSetting {
+  dealId       String   @id
+  orgId        String
+  manualAmount Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_deal_amount_settings")
 }
 
 // No Atomic CRM a tarefa so amarra em contato e contact_id e obrigatorio.

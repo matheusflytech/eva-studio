@@ -67,6 +67,8 @@ export interface Linha {
   pipeline?: { id: string; name: string } | null;
   company?: { id: string; name: string } | null;
   contacts?: { contact: { tags?: { tagId: string }[]; channels?: { channel: string }[] } }[];
+  /** Só quando agrupa por produto. */
+  items?: { productId: string | null; name: string; totalCents: number }[];
 }
 
 /** O que muda de fora do cartão: período do painel e filtros globais. */
@@ -451,6 +453,8 @@ async function buscarLinhas(orgId: string, c: Consulta, ctx: ContextoDaConsulta,
       ...(precisaContatos
         ? { contacts: { select: { contact: { select: { tags: { select: { tagId: true } }, channels: { select: { channel: true } } } } } } }
         : {}),
+      // Itens só para "por produto": sem a tabela no banco, só esse cartão falha.
+      ...(c.agrupar === "produto" ? { items: { select: { productId: true, name: true, totalCents: true } } } : {}),
     },
     orderBy: { createdAt: "desc" },
     // Um a mais que o limite: é assim que se sabe que houve corte.
@@ -584,6 +588,22 @@ export function preencherBuracos(inicio: string, fim: string, g: string): string
 
 const NAO_INFORMADO = { chave: "", label: "Não informado", ordem: 9999 };
 
+/** Produto do catálogo pelo id; item avulso pelo nome. */
+function chaveDoProduto(i: { productId: string | null; name: string }): string {
+  return i.productId ? `p:${i.productId}` : `a:${i.name.trim().toLowerCase()}`;
+}
+
+/**
+ * A linha como entra no grupo de um produto: o valor passa a ser o total dos
+ * itens daquele produto no negócio. Assim "soma do valor por produto" não
+ * conta o negócio inteiro em cada produto que ele tem.
+ */
+function linhaDoProduto(l: Linha, chave: string): Linha {
+  if (!chave || !l.items?.length) return l;
+  const total = l.items.filter((i) => chaveDoProduto(i) === chave).reduce((s, i) => s + i.totalCents, 0);
+  return { ...l, amountCents: total };
+}
+
 /** Em quais grupos a linha entra. Lista de várias opções (e canais) entra em cada uma. */
 export function chavesDeGrupo(
   l: Linha,
@@ -617,6 +637,16 @@ export function chavesDeGrupo(
     }
     case "faixaValor":
       return [faixaDeValor(l.amountCents / 100)];
+    case "produto": {
+      const itens = l.items ?? [];
+      if (itens.length === 0) return [{ chave: "", label: "Sem produtos", ordem: 9999 }];
+      const vistos = new Map<string, { chave: string; label: string; ordem: number }>();
+      for (const i of itens) {
+        const chave = chaveDoProduto(i);
+        if (!vistos.has(chave)) vistos.set(chave, { chave, label: i.name, ordem: 0 });
+      }
+      return [...vistos.values()];
+    }
   }
 
   if (agrupamentoTemporal(g)) {
@@ -703,7 +733,7 @@ export async function rodarConsulta(orgId: string, c: Consulta, ctx: ContextoDaC
   for (const l of filtradas) {
     for (const k of chavesDeGrupo(l, c, defs, faixas, variosFunis)) {
       const g = grupos.get(k.chave) ?? { label: k.label, ordem: k.ordem, linhas: [] };
-      g.linhas.push(l);
+      g.linhas.push(c.agrupar === "produto" ? linhaDoProduto(l, k.chave) : l);
       grupos.set(k.chave, g);
     }
   }

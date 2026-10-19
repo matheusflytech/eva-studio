@@ -6,6 +6,7 @@ import { carregarExportacao, lerFiltrosDaUrl } from "@/lib/exportar/dados";
 import { disposicaoDeAnexo, hojeSP, slugDoArquivo } from "@/lib/exportar/csv";
 import {
   LIMITE_DE_EXPORTACAO,
+  csvDosItens,
   csvDosNegocios,
   resumoDaExportacao,
   totaisPorEtapa,
@@ -18,6 +19,7 @@ const DIA = 86_400_000;
 //   ?formato=csv|json      csv baixa a planilha; json alimenta o relatório em PDF
 //   ?busca= &dono= &visao= os mesmos filtros da tela de Negócios (opcionais)
 //   ?arquivados=1          inclui arquivados
+//   ?itens=1               (csv) uma linha por item/produto do negócio
 //   ?dias=90               janela do relatório (ganho, taxa de ganho, ciclo, conversão)
 export async function GET(request: Request) {
   const ctx = await requirePermission("read");
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
   const filtros = lerFiltrosDaUrl(url.searchParams);
   const agora = new Date();
 
-  const dados = await carregarExportacao(ctx, pipelineId, filtros, agora);
+  const dados = await carregarExportacao(ctx, pipelineId, filtros, agora, { itens: formato === "csv" });
   if (!dados) return NextResponse.json({ error: "Funil não encontrado." }, { status: 404 });
 
   const aviso = dados.truncado
@@ -37,7 +39,9 @@ export async function GET(request: Request) {
     : null;
 
   if (formato === "csv") {
-    const csv = csvDosNegocios({
+    // ?itens=1: uma linha por item (produto) em vez de uma por negócio.
+    const porItem = url.searchParams.get("itens") === "1";
+    const opcoes = {
       funil: dados.funil.name,
       etapas: dados.etapas,
       negocios: dados.negocios,
@@ -45,8 +49,9 @@ export async function GET(request: Request) {
       agora,
       comArquivados: filtros.arquivados,
       aviso,
-    });
-    const arquivo = `negocios-${slugDoArquivo(dados.funil.name)}-${hojeSP(agora)}.csv`;
+    };
+    const csv = porItem ? csvDosItens(opcoes) : csvDosNegocios(opcoes);
+    const arquivo = `${porItem ? "itens" : "negocios"}-${slugDoArquivo(dados.funil.name)}-${hojeSP(agora)}.csv`;
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
