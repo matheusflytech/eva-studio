@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 

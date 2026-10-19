@@ -26,7 +26,7 @@ export default function LoginPage() {
       setError(result.error);
       return;
     }
-    router.push("/ir");
+    router.push("/contratos");
   }
 
   return (

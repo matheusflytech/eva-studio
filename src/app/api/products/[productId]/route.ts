@@ -31,7 +31,7 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("produtos:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { productId } = await params;
 
@@ -55,7 +55,7 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("produtos:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { productId } = await params;
   try {

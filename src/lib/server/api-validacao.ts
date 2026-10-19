@@ -2,6 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { ehMembroDoContrato } from "@/lib/server/contratos";
 
 /**
  * Peças comuns às rotas do CRM: ler o corpo sem estourar 500 com JSON
@@ -135,7 +136,8 @@ export async function conferirReferencias(orgId: string, refs: Referencias): Pro
         break;
       case "ownerId":
       case "assignedToId":
-        q = prisma.profile.findFirst({ where: { id, orgId }, ...select });
+        // Responsável = quem tem vínculo ativo com o contrato.
+        q = ehMembroDoContrato(orgId, id);
         break;
       case "dealId":
         q = prisma.deal.findFirst({ where: { id, orgId }, ...select });

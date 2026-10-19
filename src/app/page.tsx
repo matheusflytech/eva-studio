@@ -10,7 +10,7 @@ export default function RootPage() {
 
   React.useEffect(() => {
     if (isLoading) return;
-    router.replace(session ? "/ir" : "/login");
+    router.replace(session ? "/contratos" : "/login");
   }, [isLoading, session, router]);
 
   return <div className="min-h-screen bg-bg-base" />;

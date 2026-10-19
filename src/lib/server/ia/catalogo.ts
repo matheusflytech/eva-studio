@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { membrosDoContrato } from "@/lib/server/contratos";
 import { serializarDefinicao } from "@/lib/server/custom-fields";
 import { LIMITES_DO_CATALOGO, type CatalogoDoCrm } from "@/lib/server/ia/consulta-ia";
 
@@ -16,7 +17,7 @@ export async function carregarCatalogo(orgId: string): Promise<CatalogoDoCrm> {
       select: { id: true, name: true, stages: { select: { id: true, name: true, type: true }, orderBy: { position: "asc" } } },
       orderBy: [{ isDefault: "desc" }, { position: "asc" }],
     }),
-    prisma.profile.findMany({ where: { orgId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: LIMITES_DO_CATALOGO.membros }),
+    membrosDoContrato(orgId, { id: true, name: true }, { orderBy: { name: "asc" }, take: LIMITES_DO_CATALOGO.membros }),
     prisma.tag.findMany({ where: { orgId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: LIMITES_DO_CATALOGO.etiquetas }),
     prisma.company.findMany({ where: { orgId }, select: { id: true, name: true }, orderBy: { name: "asc" }, take: LIMITES_DO_CATALOGO.empresas }),
     prisma.contactChannel.findMany({

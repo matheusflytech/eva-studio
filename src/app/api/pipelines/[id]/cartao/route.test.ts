@@ -118,11 +118,11 @@ describe("PUT /api/pipelines/[id]/cartao", () => {
 
   it("viewer → 403", async () => {
     auth.requirePermission.mockImplementation(async (p: string) =>
-      p === "agents:manage" ? { error: "Sem permissão.", status: 403 } : { orgId: "org", userId: "u", role: "viewer" }
+      p === "funis:configurar" ? { error: "Sem permissão.", status: 403 } : { orgId: "org", userId: "u", role: "viewer" }
     );
     const res = await put(valido);
     expect(res.status).toBe(403);
-    expect(auth.requirePermission).toHaveBeenCalledWith("agents:manage");
+    expect(auth.requirePermission).toHaveBeenCalledWith("funis:configurar");
     expect(db.pipelineCardLayout.upsert).not.toHaveBeenCalled();
     // Ler continua liberado.
     expect((await get()).status).toBe(200);

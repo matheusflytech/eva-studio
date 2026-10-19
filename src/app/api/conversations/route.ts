@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { CANAIS_DE_TESTE, INCLUDE_CONVERSA, montarItens } from "@/lib/server/conversas";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
 
   if (!comTestes) e.push({ channel: { notIn: CANAIS_DE_TESTE } });
   if (canal) e.push({ channel: canal });
+  // Escopo do papel em conversas: só as que eu (ou minha equipe) atendo.
+  const escopo = await filtroDeEscopo(ctx, "conversas", "assignedToId");
+  if (Object.keys(escopo).length > 0) e.push(escopo);
 
   if (filtro === "esperando") e.push({ status: "waiting_human" });
   else if (filtro === "minhas") e.push({ assignedToId: ctx.userId, status: { in: ["human", "waiting_human"] } });

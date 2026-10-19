@@ -1,6 +1,7 @@
 import "server-only";
 import type { Node, Edge } from "@xyflow/react";
 import { prisma } from "@/lib/db/prisma";
+import { membrosDoContrato } from "@/lib/server/contratos";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
@@ -129,7 +130,7 @@ async function conferirIdsDaOrg(orgId: string, nodes: Node<FlowNodeData>[]): Pro
       (ids) => prisma.credential.findMany({ where: { orgId, id: { in: ids } }, select: { id: true } }),
     ],
     ["Servidor MCP", pegar((d) => d.mcpServerId), (ids) => prisma.mcpServer.findMany({ where: { orgId, id: { in: ids } }, select: { id: true } })],
-    ["Responsável", pegar((d) => d.crmTaskAssigneeId), (ids) => prisma.profile.findMany({ where: { orgId, id: { in: ids } }, select: { id: true } })],
+    ["Responsável", pegar((d) => d.crmTaskAssigneeId), (ids) => membrosDoContrato(orgId, { id: true }, { where: { id: { in: ids } } })],
   ];
   const problemas: Problema[] = [];
   for (const [nome, lista, buscar] of grupos) {

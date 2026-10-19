@@ -8,7 +8,7 @@ function respostaDoErro(e: unknown) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; stageId: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id, stageId } = await params;
 
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 // Apagar etapa com negócios exige ?moverPara=etapaId (do mesmo funil).
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string; stageId: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id, stageId } = await params;
 

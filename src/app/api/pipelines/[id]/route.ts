@@ -8,7 +8,7 @@ function respostaDoErro(e: unknown) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 // Cada negócio cai na etapa de mesmo nome do funil de destino, ou na de mesmo
 // tipo (ganho/perdido), ou na primeira etapa aberta.
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 

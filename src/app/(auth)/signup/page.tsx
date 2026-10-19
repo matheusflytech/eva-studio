@@ -28,7 +28,7 @@ export default function SignupPage() {
       setError(result.error);
       return;
     }
-    router.push("/ir");
+    router.push("/contratos");
   }
 
   return (

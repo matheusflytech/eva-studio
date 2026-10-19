@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { ehMembroDoContrato } from "@/lib/server/contratos";
 import { requirePermission } from "@/lib/server/permissions";
 
 // Atribuição de conversa no inbox humano. Sem isso, um time de dois
@@ -21,7 +22,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const assignedToId = body.assignedToId === null ? null : String(body.assignedToId ?? "").trim();
 
   if (assignedToId) {
-    const member = await prisma.profile.findFirst({ where: { id: assignedToId, orgId: ctx.orgId } });
+    // Atendente = quem tem vínculo ativo com o contrato.
+    const member = await ehMembroDoContrato(ctx.orgId, assignedToId);
     if (!member) return NextResponse.json({ error: "Atendente não encontrado nessa organização." }, { status: 404 });
   }
 

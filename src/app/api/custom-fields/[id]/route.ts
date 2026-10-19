@@ -10,7 +10,7 @@ import { TIPO_POR_ID, type TipoDeCampo } from "@/lib/custom-fields";
 // nos negócios e contatos estão guardados por chave, no formato do tipo.
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
