@@ -714,6 +714,10 @@ model Contact {
   @@index([orgId, phone])
   @@index([orgId, leadStage])
   @@index([companyId])
+  // Listas (prisma/sql/2026-10-20-indices-listas.sql): ordem por atividade/criação e filtro por responsável.
+  @@index([orgId, lastSeenAt])
+  @@index([orgId, ownerId])
+  @@index([orgId, createdAt])
   @@map("eva_studio_contacts")
 }
 
@@ -1132,6 +1136,10 @@ model Deal {
   @@index([orgId, stageId])
   @@index([pipelineId])
   @@index([companyId])
+  // Listas (prisma/sql/2026-10-20-indices-listas.sql): coluna do quadro paginada por (position, id).
+  @@index([orgId, pipelineId, stageId, position, id])
+  @@index([orgId, ownerId])
+  @@index([orgId, createdAt])
   @@map("eva_studio_deals")
 }
 

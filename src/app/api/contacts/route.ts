@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import { requirePermission } from "@/lib/server/permissions";
-import { filtroDeEscopo } from "@/lib/server/escopo-dados";
-import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { atalhosDeContato, comBusca, listarContatos } from "@/lib/server/listas-crm";
 import { serializeContact } from "@/lib/server/contact-dto";
 import { CANAIS_DE_CONTATO, externalIdDoCanal, filtroDeTelefone, telefoneParaGravar } from "@/lib/server/contacts";
 import {
@@ -16,7 +15,8 @@ import {
 import { validarEmail } from "@/lib/capture-validation";
 import type { Prisma } from "@/generated/prisma/client";
 
-const PAGE_SIZE = 50;
+/** Tamanho da página quando a tela não pede (a tela de hoje conta com 50). */
+const TAMANHO_DE_SEMPRE = 50;
 
 // Contatos da ORGANIZAÇÃO (não mais por agente): o contato é a pessoa, e uma
 // pessoa que fala com dois agentes é uma ficha só. Onde falar com ela mora em
@@ -27,73 +27,27 @@ const PAGE_SIZE = 50;
 //   ?segment=<id>
 //   ?company=<id>
 //   ?page=1
+//   ?filtro=<JSON>  filtro das listas (src/lib/filtro-crm.ts), E com os atalhos acima
+//   ?sort=campo[:asc|desc] (ou &dir=)  só colunas permitidas (ORDENACOES.contatos)
+//   ?pageSize=25|50|100  sem o parâmetro: 50 (o de sempre); inválido: 25
+// Resposta: { total, page, pageSize, contacts, avisos, truncado, ordenacao }.
+// O escopo do papel ("só os meus"/"equipe") e o contrato entram no motor.
 export async function GET(request: Request) {
   const ctx = await requirePermission("contatos:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const url = new URL(request.url);
-  const q = url.searchParams.get("q")?.trim() ?? "";
-  const tagId = url.searchParams.get("tag")?.trim() ?? "";
-  const segmentId = url.searchParams.get("segment")?.trim() ?? "";
-  const companyId = url.searchParams.get("company")?.trim() ?? "";
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? "1") || 1);
-
-  let where: Prisma.ContactWhereInput = { orgId: ctx.orgId };
-
-  if (segmentId) {
-    const segment = await prisma.segment.findFirst({ where: { id: segmentId, orgId: ctx.orgId } });
-    if (segment) where = buildSegmentWhere(ctx.orgId, segment.match, parseRules(segment.rules));
-  }
-
-  const and: Prisma.ContactWhereInput[] = [];
-  if (q) {
-    // "(11) 99999-8888" também acha quem está gravado como 5511999998888.
-    const digitos = q.replace(/\D/g, "");
-    const porDigitos: Prisma.ContactWhereInput[] =
-      digitos.length >= 4 && digitos !== q
-        ? [
-            { phone: { contains: digitos } },
-            { channels: { some: { externalId: { contains: digitos } } } },
-          ]
-        : [];
-    and.push({
-      OR: [
-        { name: { contains: q, mode: "insensitive" } },
-        { email: { contains: q, mode: "insensitive" } },
-        { phone: { contains: q, mode: "insensitive" } },
-        { channels: { some: { externalId: { contains: q, mode: "insensitive" } } } },
-        ...porDigitos,
-      ],
-    });
-  }
-  if (tagId) and.push({ tags: { some: { tagId } } });
-  if (companyId) and.push({ companyId });
-  // Escopo do papel: "só os meus" / "da minha equipe" (vazio = todos).
-  const escopo = await filtroDeEscopo(ctx, "contatos");
-  if (Object.keys(escopo).length > 0) and.push(escopo);
-  if (and.length > 0) where = { AND: [where, ...and] };
-
-  const [total, rows] = await Promise.all([
-    prisma.contact.count({ where }),
-    prisma.contact.findMany({
-      where,
-      include: {
-        tags: { include: { tag: true } },
-        channels: true,
-        company: { select: { id: true, name: true } },
-      },
-      orderBy: { lastSeenAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-  ]);
-
-  return NextResponse.json({
-    total,
-    page,
-    pageSize: PAGE_SIZE,
-    contacts: rows.map(serializeContact),
+  const sp = new URL(request.url).searchParams;
+  const ler = (k: string) => sp.get(k)?.trim() ?? "";
+  const r = await listarContatos(ctx, {
+    filtro: comBusca(sp.get("filtro"), ler("q")),
+    sort: sp.get("sort") ?? undefined,
+    dir: sp.get("dir") ?? undefined,
+    page: sp.get("page") ?? undefined,
+    pageSize: sp.get("pageSize") ?? undefined,
+    tamanhoSemPedido: TAMANHO_DE_SEMPRE,
+    extras: atalhosDeContato({ tag: ler("tag"), segment: ler("segment"), company: ler("company") }),
   });
+  return NextResponse.json(r);
 }
 
 export async function POST(request: Request) {

@@ -114,9 +114,13 @@ function valorDaLinha(l: Linha, campo: CampoDeFiltro, agora: Date): unknown {
     case "fechadoEm": return l.closedAt ? diaLocal(l.closedAt) : null;
     case "previsao": return l.expectedClosingAt ? diaLocal(l.expectedClosingAt) : null;
   }
+  return campo.def ? valorDoCampoPersonalizado(campo, valorCf(l, campo.def.key)) : null;
+}
+
+/** Valor gravado de um campo personalizado, no formato do tipo de filtro. Serve a negócio e a contato. */
+export function valorDoCampoPersonalizado(campo: Pick<CampoDeFiltro, "tipo" | "def">, v: unknown): unknown {
   const def = campo.def;
   if (!def) return null;
-  const v = valorCf(l, def.key);
   if (vazio(v)) return null;
   if (campo.tipo === "numero") return valorNumerico(def, v);
   if (campo.tipo === "multi") return Array.isArray(v) ? v.map(String) : [String(v)];
@@ -133,8 +137,14 @@ export function passaNaCondicao(l: Linha, bruta: FiltroDeConsulta, defs: Defs, a
   const campo = campoDeFiltro(bruta.campo, defs);
   if (!campo) return true;
   const f = normalizarCondicao(bruta, campo.tipo);
-  const atual = valorDaLinha(l, campo, agora);
+  return avaliarValor(valorDaLinha(l, campo, agora), campo, f, agora);
+}
 
+/**
+ * Uma condição (já normalizada pro tipo) sobre um valor já lido. Usada pelo
+ * dashboard e pela parte em memória dos filtros das listas do CRM.
+ */
+export function avaliarValor(atual: unknown, campo: Pick<CampoDeFiltro, "tipo">, f: FiltroDeConsulta, agora = new Date()): boolean {
   if (campo.tipo === "sim_nao") {
     // Checkbox nunca marcado é "não".
     return (atual === true) === (f.valor === "true");
@@ -198,7 +208,7 @@ export function passaNaCondicao(l: Linha, bruta: FiltroDeConsulta, defs: Defs, a
 }
 
 /** Dias (inclusive, AAAA-MM-DD) que uma condição de data aceita. Ponta ausente = aberta. */
-function intervaloDaData(f: FiltroDeConsulta, agora: Date): { de?: string; ate?: string } | null {
+export function intervaloDaData(f: FiltroDeConsulta, agora: Date): { de?: string; ate?: string } | null {
   const v = f.valor ?? "";
   const hoje = diaLocal(agora);
   switch (f.op) {
@@ -230,28 +240,33 @@ export function passaNosFiltros(l: Linha, filtros: FiltrosDeConsulta, defs: Defs
 
 const NADA: Prisma.DealWhereInput = { id: { in: [] } };
 
-function whereDeLista(
-  coluna: "pipelineId" | "stageId" | "ownerId" | "companyId",
+/**
+ * Lista sobre uma coluna (id). Genérica no modelo: serve a negócio e a
+ * contato (src/lib/server/filtro-crm.ts). null = sem restrição.
+ */
+export function whereDeLista<W = Prisma.DealWhereInput>(
+  coluna: string,
   op: string,
   valores: string[],
   anulavel: boolean
-): Prisma.DealWhereInput | null {
+): W | null {
   const ids = valores.filter((v) => v !== SEM_VALOR);
   const comSem = anulavel && valores.includes(SEM_VALOR);
+  const w = (x: Record<string, unknown>) => x as W;
   if (op === "qualquer") {
-    const ou: Prisma.DealWhereInput[] = [];
+    const ou: Record<string, unknown>[] = [];
     if (ids.length) ou.push({ [coluna]: { in: ids } });
     if (comSem) ou.push({ [coluna]: null });
-    return ou.length === 0 ? NADA : ou.length === 1 ? ou[0] : { OR: ou };
+    return w(ou.length === 0 ? NADA : ou.length === 1 ? ou[0] : { OR: ou });
   }
   if (op === "nenhum") {
-    if (comSem) return { [coluna]: ids.length ? { not: null, notIn: ids } : { not: null } };
+    if (comSem) return w({ [coluna]: ids.length ? { not: null, notIn: ids } : { not: null } });
     if (!ids.length) return null;
     // NOT IN em SQL descarta o nulo; quem não tem responsável "não é nenhum de" também.
-    return anulavel ? { OR: [{ [coluna]: null }, { [coluna]: { notIn: ids } }] } : { [coluna]: { notIn: ids } };
+    return w(anulavel ? { OR: [{ [coluna]: null }, { [coluna]: { notIn: ids } }] } : { [coluna]: { notIn: ids } });
   }
-  if (op === "preenchido") return anulavel ? { [coluna]: { not: null } } : null;
-  if (op === "vazio") return anulavel ? { [coluna]: null } : NADA;
+  if (op === "preenchido") return anulavel ? w({ [coluna]: { not: null } }) : null;
+  if (op === "vazio") return w(anulavel ? { [coluna]: null } : NADA);
   return null;
 }
 
@@ -300,28 +315,37 @@ function whereDeNumero(coluna: "amountCents" | "probability", f: FiltroDeConsult
   return null;
 }
 
-function whereDeData(coluna: "createdAt" | "closedAt" | "expectedClosingAt", f: FiltroDeConsulta, agora: Date): Prisma.DealWhereInput | null {
-  if (f.op === "preenchido") return coluna === "createdAt" ? null : { [coluna]: { not: null } };
-  if (f.op === "vazio") return coluna === "createdAt" ? NADA : { [coluna]: null };
+/** Data (dia em SP) sobre uma coluna. Genérica no modelo. `anulavel` = a coluna aceita nulo. */
+export function whereDeData<W = Prisma.DealWhereInput>(
+  coluna: string,
+  f: FiltroDeConsulta,
+  agora: Date,
+  anulavel = coluna !== "createdAt"
+): W | null {
+  const w = (x: Record<string, unknown>) => x as W;
+  if (f.op === "preenchido") return anulavel ? w({ [coluna]: { not: null } }) : null;
+  if (f.op === "vazio") return w(anulavel ? { [coluna]: null } : NADA);
   const i = intervaloDaData(f, agora);
   if (!i) return null;
-  return {
+  return w({
     [coluna]: {
       ...(i.de ? { gte: inicioDoDia(i.de) } : {}),
       ...(i.ate ? { lt: inicioDoDia(somarDias(i.ate, 1)) } : {}),
     },
-  };
+  });
 }
 
-function whereDeTexto(coluna: "name" | "lostReason", f: FiltroDeConsulta): Prisma.DealWhereInput | null {
+/** Texto (sem diferenciar maiúsculas) sobre uma coluna que nunca é nula. Genérica no modelo. */
+export function whereDeTexto<W = Prisma.DealWhereInput>(coluna: string, f: FiltroDeConsulta): W | null {
   const v = String(f.valor ?? "").trim();
+  const w = (x: Record<string, unknown>) => x as W;
   switch (f.op) {
-    case "eq": return { [coluna]: { equals: v, mode: "insensitive" } };
-    case "neq": return { NOT: { [coluna]: { equals: v, mode: "insensitive" } } };
-    case "contem": return { [coluna]: { contains: v, mode: "insensitive" } };
-    case "naoContem": return { NOT: { [coluna]: { contains: v, mode: "insensitive" } } };
-    case "vazio": return { [coluna]: "" };
-    case "preenchido": return { NOT: { [coluna]: "" } };
+    case "eq": return w({ [coluna]: { equals: v, mode: "insensitive" } });
+    case "neq": return w({ NOT: { [coluna]: { equals: v, mode: "insensitive" } } });
+    case "contem": return w({ [coluna]: { contains: v, mode: "insensitive" } });
+    case "naoContem": return w({ NOT: { [coluna]: { contains: v, mode: "insensitive" } } });
+    case "vazio": return w({ [coluna]: "" });
+    case "preenchido": return w({ NOT: { [coluna]: "" } });
   }
   return null;
 }

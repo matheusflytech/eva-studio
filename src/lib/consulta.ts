@@ -315,7 +315,7 @@ export const OPERADORES_POR_TIPO: Record<TipoDeFiltro, { id: OperadorDeFiltro; r
 };
 
 /** Operadores que cabem no campo (sem "vazio" em campo que nunca fica vazio). */
-export function operadoresDoCampo(campo: CampoDeFiltro): { id: OperadorDeFiltro; rotulo: string }[] {
+export function operadoresDoCampo(campo: Pick<CampoDeFiltro, "tipo" | "semVazio">): { id: OperadorDeFiltro; rotulo: string }[] {
   const ops = OPERADORES_POR_TIPO[campo.tipo];
   return campo.semVazio ? ops.filter((o) => o.id !== "vazio" && o.id !== "preenchido") : ops;
 }
@@ -478,15 +478,38 @@ function texto(v: unknown, max = 120): string {
   return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v).slice(0, max) : "";
 }
 
-/** Uma condição vinda do navegador. null = inválida ou ainda rascunho (sem valor). */
-export function sanearCondicao(bruto: unknown): FiltroDeConsulta | null {
-  if (!bruto || typeof bruto !== "object") return null;
+/** Catálogo de campos base que o saneamento conhece (o do dashboard, ou o das listas do CRM). */
+export type CatalogoDeCampos = ReadonlyMap<string, Pick<CampoDeFiltro, "tipo" | "semVazio">>;
+
+/** Por que uma condição foi descartada (para o aviso que volta à tela). */
+export type MotivoDeDescarte = "campo" | "operador" | "valor";
+
+/**
+ * Uma condição vinda do navegador. null = inválida ou ainda rascunho (sem valor).
+ * `catalogo`: campos base aceitos (padrão: os do dashboard). `motivo` recebe
+ * por que a condição foi descartada, para quem quer avisar.
+ */
+export function sanearCondicao(
+  bruto: unknown,
+  catalogo: CatalogoDeCampos = CAMPO_BASE_POR_ID,
+  motivo?: (m: MotivoDeDescarte) => void
+): FiltroDeConsulta | null {
+  if (!bruto || typeof bruto !== "object") {
+    motivo?.("campo");
+    return null;
+  }
   const b = bruto as Record<string, unknown>;
   const campo = texto(b.campo, 44);
-  const base = CAMPO_BASE_POR_ID.get(campo);
-  if (!base && !CHAVE_CF.test(campo)) return null;
+  const base = catalogo.get(campo);
+  if (!base && !CHAVE_CF.test(campo)) {
+    motivo?.("campo");
+    return null;
+  }
   const opBruto = texto(b.op, 20);
-  if (!TODOS_OS_OPERADORES.has(opBruto)) return null;
+  if (!TODOS_OS_OPERADORES.has(opBruto)) {
+    motivo?.("operador");
+    return null;
+  }
 
   let f: FiltroDeConsulta = { campo, op: opBruto as OperadorDeFiltro };
   const valor = texto(b.valor).trim();
@@ -503,31 +526,57 @@ export function sanearCondicao(bruto: unknown): FiltroDeConsulta | null {
   // existe (servidor e tela), porque o tipo depende dela.
   if (base) {
     f = normalizarCondicao(f, base.tipo);
-    if (!operadoresDoCampo(base).some((o) => o.id === f.op)) return null;
+    if (!operadoresDoCampo(base).some((o) => o.id === f.op)) {
+      motivo?.("operador");
+      return null;
+    }
   }
 
+  const invalido = (): null => {
+    motivo?.("valor");
+    return null;
+  };
   // Filtro sem valor escolhido ainda é rascunho: ignora, em vez de zerar o cartão.
   if (OPS_SEM_VALOR.has(f.op)) return { campo, op: f.op };
   if (OPS_DE_LISTA.has(f.op)) {
     const lista = f.valores ?? (f.valor ? [f.valor] : []);
-    return lista.length ? { campo, op: f.op, valores: lista } : null;
+    return lista.length ? { campo, op: f.op, valores: lista } : invalido();
   }
-  if (!f.valor) return null;
-  if (f.op === "entre" && !f.ate) return null;
+  if (!f.valor) return invalido();
+  if (f.op === "entre" && !f.ate) return invalido();
   if (f.op === "ultimos" || f.op === "proximos") {
     const n = Math.round(Number(f.valor));
-    if (!Number.isFinite(n) || n < 1 || n > 3650) return null;
+    if (!Number.isFinite(n) || n < 1 || n > 3650) return invalido();
     return { campo, op: f.op, valor: String(n) };
   }
-  if (base?.tipo === "data" && (!dataExiste(f.valor) || (f.op === "entre" && !dataExiste(f.ate ?? "")))) return null;
-  if (base?.tipo === "numero" && (!Number.isFinite(parseNumero(f.valor)) || (f.op === "entre" && !Number.isFinite(parseNumero(f.ate ?? ""))))) return null;
+  if (base?.tipo === "data" && (!dataExiste(f.valor) || (f.op === "entre" && !dataExiste(f.ate ?? "")))) return invalido();
+  if (base?.tipo === "numero" && (!Number.isFinite(parseNumero(f.valor)) || (f.op === "entre" && !Number.isFinite(parseNumero(f.ate ?? ""))))) return invalido();
   return { campo, op: f.op, valor: f.valor, ...(f.op === "entre" ? { ate: f.ate } : {}) };
 }
 
+export interface OpcoesDeSaneamento {
+  /** Campos base aceitos (padrão: os do dashboard). */
+  catalogo?: CatalogoDeCampos;
+  /** Recebe um aviso em português por condição descartada. */
+  avisar?: (aviso: string) => void;
+}
+
+const TEXTO_DO_MOTIVO: Record<MotivoDeDescarte, string> = {
+  campo: "campo desconhecido",
+  operador: "operador não cabe no campo",
+  valor: "valor ausente ou inválido",
+};
+
 /** Filtros no formato novo (grupos) ou no antigo (lista = um grupo "e"). */
-export function sanearFiltros(bruto: unknown): FiltrosDeConsulta {
+export function sanearFiltros(bruto: unknown, opcoes: OpcoesDeSaneamento = {}): FiltrosDeConsulta {
+  const catalogo = opcoes.catalogo ?? CAMPO_BASE_POR_ID;
+  const sanear = (c: unknown): FiltroDeConsulta | null =>
+    sanearCondicao(c, catalogo, (m) => {
+      const nome = c && typeof c === "object" ? texto((c as Record<string, unknown>).campo, 44) : "";
+      opcoes.avisar?.(`Condição ${nome ? `“${nome}” ` : ""}ignorada: ${TEXTO_DO_MOTIVO[m]}.`);
+    });
   if (Array.isArray(bruto)) {
-    const condicoes = bruto.slice(0, LIMITE_DE_CONDICOES).map(sanearCondicao).filter((f): f is FiltroDeConsulta => !!f);
+    const condicoes = bruto.slice(0, LIMITE_DE_CONDICOES).map(sanear).filter((f): f is FiltroDeConsulta => !!f);
     return { logica: "e", grupos: condicoes.length ? [{ logica: "e", condicoes }] : [] };
   }
   if (!bruto || typeof bruto !== "object") return { logica: "e", grupos: [] };
@@ -536,7 +585,7 @@ export function sanearFiltros(bruto: unknown): FiltrosDeConsulta {
   for (const g of Array.isArray(b.grupos) ? b.grupos.slice(0, LIMITE_DE_GRUPOS) : []) {
     const gg = (g ?? {}) as Record<string, unknown>;
     const condicoes = (Array.isArray(gg.condicoes) ? gg.condicoes.slice(0, LIMITE_DE_CONDICOES) : [])
-      .map(sanearCondicao)
+      .map(sanear)
       .filter((f): f is FiltroDeConsulta => !!f);
     if (condicoes.length) grupos.push({ logica: gg.logica === "ou" ? "ou" : "e", condicoes });
   }

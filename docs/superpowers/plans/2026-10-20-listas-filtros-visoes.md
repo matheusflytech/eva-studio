@@ -58,7 +58,29 @@ referência de função).
 
 ## 4. Fases e tarefas (cada uma com teste antes do código)
 
-### Fase L1. Motor de filtro e listas no servidor
+### Fase L1. Motor de filtro e listas no servidor — FEITA (2026-10-19, branch feat/dashboards-funil)
+
+**O que foi entregue**
+- `src/lib/filtro-crm.ts` (sem server-only, a tela usa): catálogos `CAMPOS_DE_CONTATO` e `CAMPOS_DE_NEGOCIO` (os do dashboard + equipe, contato, produto, tarefa), `VALORES_DE_TAREFA`, `sanearFiltroCrm`, `ORDENACOES`, `lerOrdenacao`, `lerTamanhoDePagina`, `lerPagina`. Filtro = formato do dashboard + `busca` (texto da caixa).
+- `src/lib/server/filtro-crm.ts`: `whereDeContatos(ctx, filtro)` / `whereDeNegocios(ctx, filtro)` → `{ where, emMemoria, avisos }`, sempre `{ orgId, AND: [escopo, (archivedAt: null), atalhos, busca, filtro] }`; `resolverConjunto` (parte em memória), `idsDoFiltro(ctx, entidade, filtro, limite)` para a L5, `orderByDe`.
+- Reaproveitado do dashboard (sem duplicar): `sanearCondicao/sanearFiltros` aceitam outro catálogo e avisam o descarte; `whereDeLista/whereDeData/whereDeTexto/whereDaCondicao/avaliarValor/valorDoCampoPersonalizado` exportados e genéricos no modelo.
+- Rotas: `GET /api/contacts` (+`filtro`, `sort`, `dir`, `pageSize`), `POST /api/contacts/busca`, `GET /api/deals` (+`porEtapa`, `etapa`+`depois`, `filtro`), `POST /api/deals/busca`. Cartão do quadro saiu para `src/lib/server/quadro-negocios.ts`; listas em `src/lib/server/listas-crm.ts`.
+- Índices: `prisma/sql/2026-10-20-indices-listas.sql` + `@@index` no schema (NÃO aplicado).
+
+**Decisões / o que mudou do plano**
+- Tudo exato no banco, inclusive "dias na etapa" (vira faixa de `stageSince` relativa a agora) e valor (limites arredondados para dentro, em centavos). Só campo personalizado de número/data vai para memória (até 5.000 linhas da pré-seleção, na ordem pedida; passou = `truncado`). Condição do banco dentro de um OU com condição de memória é conferida por ids — resultado continua exato.
+- Campo personalizado texto: "é/não é" compara o texto como gravado (JSON do Prisma não tem `equals` sem maiúsculas); "contém" ignora maiúsculas.
+- Tarefa: "atrasada" = aberta com prazo < agora; "hoje" = de agora até o fim do dia em São Paulo (mesma regra do Início, sem sobreposição).
+- Quadro: SEM `porEtapa` devolve tudo como antes (+ `count` e `temMais:false` aditivos), então a tela atual não muda. COM `porEtapa` (padrão 30, máx. 100) usa agregado no banco (groupBy por etapa+probabilidade; ponderado arredondado por faixa, pode diferir centavos da soma cartão a cartão). Ordem da coluna paginada = (position, id); a tela antiga usa (position, createdAt desc).
+- `GET /api/contacts` sem `pageSize` mantém 50 (a tela de hoje); com `pageSize` inválido, 25. `?segment=` de segmento inexistente/de outro contrato agora devolve vazio (antes ignorava o filtro).
+- Ordenar por campo personalizado: não viável no Prisma sem SQL cru → ordem padrão + aviso.
+- API v1 NÃO usa o motor: lista por cursor de `updatedAt` (sincronização incremental), filtros simples por query documentados no OpenAPI e chave de API sem escopo de papel. Encaixar filtros E/OU lá é mudança de contrato público — fica para quando houver pedido.
+
+**Para L2/L3**
+- Contatos: `POST /api/contacts/busca` `{ filtro, q, tag, segment, company, sort, dir, page, pageSize }` → `{ total, page, pageSize, contacts (com ownerId/owner), avisos, truncado, ordenacao }`.
+- Negócios lista: `POST /api/deals/busca` `{ filtro, q, pipeline, arquivados, sort, dir, page, pageSize }` → `{ total, page, pageSize, deals (cartão + stage + pipeline), somaCents, avisos, truncado, ordenacao }`.
+- Quadro: `GET /api/deals?pipeline=&porEtapa=30&filtro=<JSON>` → `stages[] { count, totalCents, weightedCents, deals, temMais, depois }`; mais cartões: `GET /api/deals?etapa=<id>&depois=<cursor>&porEtapa=30&filtro=<mesmo>` → `{ etapa, deals, temMais, depois }`. Mandar o MESMO filtro nas duas chamadas.
+- Mostrar `avisos` (condição descartada, ordenação recusada) e `truncado`. Opções das listas vêm de: membros, equipes (`/api/teams`), empresas, etiquetas, segmentos, canais, contatos, produtos, `VALORES_DE_TAREFA`; `SEM_VALOR` = "sem responsável/empresa/equipe".
 - `src/lib/server/filtro-crm.ts`: `whereDeContatos(orgId, filtro)` e `whereDeNegocios(orgId, filtro)` a partir do formato de condição. Campos de contato: responsável, equipe*, empresa, etiqueta, segmento, canal, criado em, última atividade (`lastSeenAt`), opt-in, e-mail/telefone preenchido, campos personalizados. Campos de negócio: os do dashboard mais contato, tarefa (atrasada, hoje, sem tarefa), produto, fechado em.
   - Testes: cada campo × operador vira o `where` esperado; E/OU aninhado; isolamento por org sempre presente; campo desconhecido é descartado com aviso.
 - `GET /api/contacts`: aceita `filtro` (JSON na query ou POST `/api/contacts/busca`), `sort` (coluna + direção, só colunas permitidas), `page`, `pageSize` (25/50/100). Mantém `q`, `tag`, `segment`, `company` como atalhos.

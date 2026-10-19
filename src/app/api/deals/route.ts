@@ -14,11 +14,32 @@ import {
   texto,
 } from "@/lib/server/api-validacao";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
-import { nomesDosProdutosPorNegocio } from "@/lib/server/produtos";
+import { resolverConjunto, whereDeNegocios } from "@/lib/server/filtro-crm";
+import {
+  INCLUDE_CARTAO,
+  ORDEM_DA_COLUNA,
+  comProdutos,
+  decodificarCursor,
+  lerPorEtapa,
+  paginaDaColuna,
+  serializarCartao,
+  totaisPorEtapa,
+  type Cartao,
+} from "@/lib/server/quadro-negocios";
 
 // Negócios de um funil, agrupados por etapa (o kanban lê isso direto).
 //   ?pipeline=<id>  padrão: o funil padrão da org
 //   ?archived=1     inclui arquivados
+//   ?filtro=<JSON>  filtro das listas (src/lib/filtro-crm.ts), somado ao escopo
+//
+// Dois modos (decisão da Fase L1, para a tela atual não quebrar):
+//   - SEM ?porEtapa: o contrato de sempre — todos os cartões do funil. Cada
+//     etapa ganha `count` e `temMais: false` (aditivos).
+//   - COM ?porEtapa=N (1..100; inválido = 30): por etapa { count, totalCents,
+//     weightedCents } agregados no banco + os N primeiros cartões na ordem
+//     (position, id), `temMais` e `depois` (cursor do último entregue).
+//   - ?etapa=<id>&depois=<cursor>[&porEtapa=N][&filtro=...]: mais cartões
+//     daquela etapa, a partir do cursor — não repete nem pula.
 export async function GET(request: Request) {
   const ctx = await requirePermission("negocios:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -26,6 +47,41 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const requested = url.searchParams.get("pipeline")?.trim() ?? "";
   const includeArchived = url.searchParams.get("archived") === "1";
+  const filtroBruto = url.searchParams.get("filtro");
+  const porEtapaBruto = url.searchParams.get("porEtapa");
+  const etapa = url.searchParams.get("etapa")?.trim() ?? "";
+
+  // Filtro + escopo + funil num conjunto exato (com a parte em memória resolvida).
+  const conjunto = async (pipelineId: string) => {
+    const w = await whereDeNegocios(ctx, filtroBruto ?? "", {
+      extras: [{ campo: "funil", op: "qualquer", valores: [pipelineId] }],
+      incluirArquivados: includeArchived,
+    });
+    const r = await resolverConjunto(w, { orderBy: ORDEM_DA_COLUNA });
+    return { where: r.where, avisos: w.avisos, truncado: r.truncado };
+  };
+
+  const mostraProdutos = (layout: { campos: string[]; previa: string[] }) =>
+    layout.campos.includes("produtos") || layout.previa.includes("produtos");
+
+  // "Carregar mais" de uma coluna.
+  if (etapa) {
+    const stage = await prisma.pipelineStage.findFirst({
+      where: { id: etapa, pipeline: { orgId: ctx.orgId } },
+      select: { id: true, pipelineId: true },
+    });
+    if (!stage) return NextResponse.json({ error: "Etapa não encontrada." }, { status: 404 });
+    const depoisBruto = url.searchParams.get("depois")?.trim() ?? "";
+    const cursor = depoisBruto ? decodificarCursor(depoisBruto) : null;
+    if (depoisBruto && !cursor) return erro("Cursor inválido.");
+    const c = await conjunto(stage.pipelineId);
+    const pagina = await paginaDaColuna(c.where, stage.id, lerPorEtapa(porEtapaBruto), cursor);
+    const fields = await carregarDefinicoes(ctx.orgId, "deal", stage.pipelineId);
+    const { layout } = await lerLayoutDoFunil(stage.pipelineId, fields);
+    let deals: Cartao[] = pagina.linhas.map(serializarCartao);
+    if (mostraProdutos(layout)) deals = await comProdutos(ctx.orgId, deals);
+    return NextResponse.json({ etapa: stage.id, deals, temMais: pagina.temMais, depois: pagina.depois, avisos: c.avisos, truncado: c.truncado });
+  }
 
   const pipeline = requested
     ? await prisma.pipeline.findFirst({
@@ -36,6 +92,51 @@ export async function GET(request: Request) {
 
   if (!pipeline) return NextResponse.json({ error: "Funil não encontrado." }, { status: 404 });
 
+  // Definições dos campos: o kanban mostra como etiqueta os marcados "no cartão".
+  const fields = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);
+  // Layout do cartão junto, para o quadro não esperar uma segunda chamada.
+  // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
+  const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
+  const etapaBase = (stage: (typeof pipeline.stages)[number]) => ({
+    id: stage.id,
+    name: stage.name,
+    type: stage.type,
+    color: stage.color,
+    probability: stage.probability,
+  });
+
+  if (porEtapaBruto !== null) {
+    const n = lerPorEtapa(porEtapaBruto);
+    const c = await conjunto(pipeline.id);
+    const [totais, paginas] = await Promise.all([
+      totaisPorEtapa(c.where),
+      Promise.all(pipeline.stages.map((s) => paginaDaColuna(c.where, s.id, n))),
+    ]);
+    let cartoes: Cartao[][] = paginas.map((p) => p.linhas.map(serializarCartao));
+    if (mostraProdutos(layout)) {
+      const todos = await comProdutos(ctx.orgId, cartoes.flat());
+      const porId = new Map(todos.map((d) => [d.id, d]));
+      cartoes = cartoes.map((l) => l.map((d) => porId.get(d.id) ?? d));
+    }
+    return NextResponse.json({
+      pipeline: { id: pipeline.id, name: pipeline.name },
+      porEtapa: n,
+      stages: pipeline.stages.map((stage, i) => ({
+        ...etapaBase(stage),
+        ...(totais.get(stage.id) ?? { count: 0, totalCents: 0, weightedCents: 0 }),
+        deals: cartoes[i],
+        temMais: paginas[i].temMais,
+        depois: paginas[i].depois,
+      })),
+      fields,
+      layout,
+      avisos: c.avisos,
+      truncado: c.truncado,
+    });
+  }
+
+  // Modo de sempre: todos os cartões do funil.
+  const c = filtroBruto ? await conjunto(pipeline.id) : null;
   const deals = await prisma.deal.findMany({
     where: {
       orgId: ctx.orgId,
@@ -43,102 +144,38 @@ export async function GET(request: Request) {
       // "Só os meus" / "da minha equipe" do papel (vazio = todos).
       ...(await filtroDeEscopo(ctx, "negocios")),
       ...(includeArchived ? {} : { archivedAt: null }),
+      ...(c ? { AND: [c.where] } : {}),
     },
-    include: {
-      company: { select: { id: true, name: true } },
-      owner: { select: { id: true, name: true } },
-      contacts: {
-        include: {
-          contact: {
-            select: {
-              id: true,
-              name: true,
-              // Telefone e e-mail: campos que o cartão e a prévia podem mostrar.
-              phone: true,
-              email: true,
-              // Conversa de WhatsApp mais recente: o cartão mostra o atalho e
-              // se há mensagem do cliente ainda não lida.
-              conversations: {
-                where: { channel: { in: ["whatsapp_meta", "whatsapp_qr"] } },
-                orderBy: { lastContactMessageAt: "desc" },
-                take: 1,
-                select: { id: true, readAt: true, lastContactMessageAt: true },
-              },
-            },
-          },
-        },
-      },
-      // Próxima tarefa em aberto (a de prazo mais próximo; sem prazo fica por último).
-      tasks: { where: { doneAt: null }, orderBy: { dueAt: "asc" }, take: 1, select: { type: true, text: true, dueAt: true } },
-      // Só tarefas em aberto: o número no cartão é "o que falta fazer".
-      _count: { select: { tasks: { where: { doneAt: null } } } },
-    },
+    include: INCLUDE_CARTAO,
     orderBy: [{ position: "asc" }, { createdAt: "desc" }],
   });
 
   // Total ponderado por etapa: é o número que a pessoa olha para saber se o
   // mês fecha. Valor bruto sozinho engana, porque trata "Novo" como se
   // valesse o mesmo que "Negociação".
+  let cartoes: Cartao[] = deals.map(serializarCartao);
+  // Nomes dos produtos só quando o cartão ou a prévia mostram produtos (sem a
+  // tabela no banco, nomesDosProdutosPorNegocio devolve vazio e nada quebra).
+  if (mostraProdutos(layout)) cartoes = await comProdutos(ctx.orgId, cartoes);
   const stages = pipeline.stages.map((stage) => {
     const stageDeals = deals.filter((d) => d.stageId === stage.id);
+    const ids = new Set(stageDeals.map((d) => d.id));
     return {
-      id: stage.id,
-      name: stage.name,
-      type: stage.type,
-      color: stage.color,
-      probability: stage.probability,
+      ...etapaBase(stage),
+      count: stageDeals.length,
       totalCents: stageDeals.reduce((sum, d) => sum + d.amountCents, 0),
       weightedCents: stageDeals.reduce((sum, d) => sum + Math.round((d.amountCents * d.probability) / 100), 0),
-      deals: stageDeals.map((d) => ({
-        id: d.id,
-        name: d.name,
-        amountCents: d.amountCents,
-        currency: d.currency,
-        probability: d.probability,
-        company: d.company,
-        owner: d.owner,
-        contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name, phone: c.contact.phone, email: c.contact.email })),
-        whatsapp: (() => {
-          const conversa = d.contacts.map((c) => c.contact.conversations[0]).find(Boolean);
-          if (!conversa) return null;
-          const naoLida =
-            !!conversa.lastContactMessageAt && (!conversa.readAt || conversa.lastContactMessageAt > conversa.readAt);
-          return { conversationId: conversa.id, naoLida };
-        })(),
-        nextTask: d.tasks[0]
-          ? { type: d.tasks[0].type, text: d.tasks[0].text, dueAt: d.tasks[0].dueAt?.toISOString() ?? null }
-          : null,
-        openTasks: d._count.tasks,
-        customFields: (d.customFields ?? {}) as Record<string, unknown>,
-        expectedClosingAt: d.expectedClosingAt?.toISOString() ?? null,
-        closedAt: d.closedAt?.toISOString() ?? null,
-        createdAt: d.createdAt.toISOString(),
-        stageSince: d.stageSince.toISOString(),
-      })),
+      deals: cartoes.filter((d) => ids.has(d.id)),
+      temMais: false,
     };
   });
 
-  // Definições dos campos: o kanban mostra como etiqueta os marcados "no cartão".
-  const fields = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);
-  // Layout do cartão junto, para o quadro não esperar uma segunda chamada.
-  // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
-  const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
-
-  // Nomes dos produtos só quando o cartão ou a prévia mostram produtos (sem a
-  // tabela no banco, nomesDosProdutosPorNegocio devolve vazio e nada quebra).
-  const comProdutos =
-    layout.campos.includes("produtos") || layout.previa.includes("produtos")
-      ? await nomesDosProdutosPorNegocio(ctx.orgId, deals.map((d) => d.id))
-      : null;
-  const stagesComProdutos = comProdutos
-    ? stages.map((s) => ({ ...s, deals: s.deals.map((d) => ({ ...d, produtos: comProdutos.get(d.id) ?? [] })) }))
-    : stages;
-
   return NextResponse.json({
     pipeline: { id: pipeline.id, name: pipeline.name },
-    stages: stagesComProdutos,
+    stages,
     fields,
     layout,
+    ...(c ? { avisos: c.avisos, truncado: c.truncado } : {}),
   });
 }
 
