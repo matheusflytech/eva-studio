@@ -25,7 +25,7 @@ design system com a identidade da Eva.
 | 2 | ✅ **(feito — ver notas abaixo)** **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
 | 3 | ✅ **(feito — ver notas abaixo)** **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
 | 4 | ✅ **(feito — ver notas abaixo)** **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
-| 5 | **Visões salvas** (fase L4) e **ações em massa por filtro** (fase L5) | Abas fixas; seleção sem ações | crm-list-views-search |
+| 5 | ✅ **(feito — ver notas abaixo)** **Visões salvas** (fase L4) e **ações em massa por filtro** (fase L5) | Abas fixas; seleção sem ações | crm-list-views-search |
 | 6 | **Mesclar duplicados** (contato e empresa) com aviso de possível duplicado na ficha e mescla reversível | Dedupe só na criação/importação | crm-record-pages, crm-leads-import-dedupe |
 | 7 | **CNPJ que se preenche** (BrasilAPI: razão social, fantasia, CNAE, porte, endereço, sócios opcional) e **telefone E.164** de verdade (`+55...`) | CNPJ só validado; telefone gravado como `55...` sem `+` | crm-brazil-integrations, crm-leads-import-dedupe |
 | 8 | **Auditoria**: quem mudou o quê e quando (valor antigo/novo) em negócio, contato, empresa, permissões e chaves | Só histórico de etapa | crm-data-model |
@@ -244,6 +244,40 @@ design system com a identidade da Eva.
   na gaveta antiga do negócio e no painel da conversa; busca em transcrições
   de áudio; `C` criar contextual (não entrou para não brigar com digitação e
   com o G); Recentes mais frequentes primeiro.
+
+### Notas do item 5 (visões salvas e ações em massa) — feito em 20/10/2026
+
+- **Onde mora:** visões — parte pura em `src/lib/visoes/visoes.ts` (config,
+  saneamento, estado ↔ config, campo removido, quem vê/mexe), servidor em
+  `src/lib/server/visoes-salvas.ts`, rotas `GET|POST /api/visoes`,
+  `PATCH|DELETE /api/visoes/[id]`, `PUT /api/visoes/padrao`; tela em
+  `src/components/crm/listas/visoes-salvas.tsx`. Lote — parte pura em
+  `src/lib/lote/lote.ts`, servidor em `src/lib/server/lote.ts`, rotas
+  `POST /api/contacts/lote` e `POST /api/deals/lote`; tela em
+  `src/components/crm/listas/acoes-em-massa.tsx` + `BulkActionBar` (novo em
+  `src/components/ui`). Detalhes de comportamento nas fases L4/L5 de
+  `2026-10-20-listas-filtros-visoes.md`.
+- **Banco:** `prisma/sql/2026-10-20-visoes-salvas.sql` (só aditivo, NÃO
+  aplicado): `eva_studio_saved_views` e `eva_studio_saved_view_defaults`. Sem
+  ele: abas de sistema, colunas/recolhidas no navegador, aviso discreto; o
+  "+" avisa que não está ativado; escrita responde 409 `visoes_indisponiveis`.
+  O lote não precisa de tabela nova (apagar usa a lixeira do item 2; sem ela,
+  409 `lixeira_indisponivel` e a tela pede confirmação de definitivo).
+- **Visibilidade:** pessoal (só o dono, nem admin vê), equipe (membros da
+  equipe; equipe apagada = só o dono) e contrato (só admin — `membros:gerenciar`
+  ou `funis:configurar` — compartilha com todos). Alterar/apagar: dono, ou
+  admin numa compartilhada. Quem não pode mexer só tem "Salvar como nova".
+  Tudo preso ao `orgId` do contrato ativo; visão de outro contrato = 404.
+- **Lote:** permissão granular por ação (contatos:editar, contatos:apagar,
+  sequencias:gerenciar, negocios:editar, negocios:apagar); por filtro refaz a
+  busca (`idsDoFiltro`, até 5.000, aviso ao cortar); por ids confere contrato
+  + escopo. Mover/ganho/perdido um a um por `moveDealStage` (regras da etapa),
+  histórico gravado em lote (`registrarMudancasEmLote`, origem `usuario`).
+- **Pendente:** fixar visão no menu lateral (opcional, ficou de fora);
+  reordenar abas por arrastar (a coluna `position` existe); o evento de etapa
+  não marca "ação em massa" (precisaria de coluna nova em tabela existente);
+  ações em massa no quadro (só na lista); "editar campo" em massa; RLS das
+  tabelas novas junto com o item 22.
 
 ## P1
 

@@ -145,12 +145,85 @@ referência de função).
 - Importar negócios pela tela (CSV, mesma lógica da importação de contatos e da API v1 em lote).
 - Testes: texto do tempo na etapa ("31 minutos", "3 horas", "2 dias"), estado recolhido por visão, totais do rodapé com filtro.
 
-### Fase L4. Visões salvas em abas
+### Fase L4. Visões salvas em abas — FEITA (2026-10-20, branch feat/dashboards-funil)
+
+**O que foi entregue**
+- Tabelas `eva_studio_saved_views` (orgId, entity contatos|negocios,
+  pipelineId?, name, ownerId, visibility pessoal|equipe|contrato, teamId?,
+  config JSON, position) e `eva_studio_saved_view_defaults` (padrão por
+  pessoa e lista; id de salva ou de sistema). SQL
+  `prisma/sql/2026-10-20-visoes-salvas.sql`, NÃO aplicado.
+- Config = `{ visaoBase, estado: { busca, listas, datas, avancado, ordem,
+  tamanho }, colunas?, recolhidas?, modo? }`. `visaoBase` é a de sistema em
+  que a salva se apoia ("Meus" continua sendo de quem olha).
+- Abas: de sistema (fixas) + salvas visíveis, com contagem ao vivo (mesmo
+  motor, `apenasTotal`). "+" cria do que está na tela (pede nome e quem vê).
+  Menu da aba ativa: Renomear, Duplicar, Mudar visibilidade, Definir como
+  padrão, Apagar (as de sistema só têm Duplicar e Definir como padrão).
+- "Não salvo": ponto na aba + faixa "Alterações não salvas em busca,
+  Proprietário…" com Salvar (só quem pode mexer), Salvar como nova e
+  Descartar. Ajuste de quem não é dono nunca grava na compartilhada.
+- URL: `?v=<id>` + SÓ o que difere da visão (parâmetro vazio = "tirei o
+  filtro que a visão tinha"; `cols=` e `rec=` para colunas/recolhidas).
+  Trocar de aba usa pushState (Voltar volta à aba anterior); o resto,
+  replaceState. Link para visão que a pessoa não enxerga: aviso + os filtros
+  do link continuam valendo (dados sempre pelo escopo do servidor).
+- Campo removido: condição dos avançados com `cf:` apagado ou id fora do
+  catálogo vira chip vermelho "campo removido: x" com "Tirar do filtro" (o
+  motor já ignorava com aviso).
+- Colunas (lista de contatos e de negócios) e recolhidas (quadro) vêm da
+  visão salva; nas de sistema (e sem as tabelas) continuam no navegador. O
+  "+" leva as do navegador para a visão (a migração). Modo quadro/lista
+  guardado na visão é aplicado ao abri-la.
+
+**Mudanças de comportamento**
+- De uma visão salva para uma de sistema, a lista começa limpa (os filtros
+  eram da visão); entre visões de sistema continua mantendo os filtros.
+- Com visão padrão definida, `/contatos` e `/negocios` sem `?v=` abrem nela
+  (a lista espera o GET das visões antes da primeira busca).
+
 - Tabela nova `eva_studio_saved_views` (orgId, entidade, pipelineId?, nome, dono, compartilhada, filtro, colunas, ordenação, recolhidas, posição).
 - Abas com contagem ao vivo, "+" cria a partir do filtro atual, renomear, duplicar, compartilhar, apagar. Visão alterada mostra "Salvar alterações / Salvar como nova".
 - Testes: contagem da aba = total da lista; visão pessoal não aparece para outro usuário; compartilhada sim; isolamento por contrato.
 
-### Fase L5. Ações em massa
+### Fase L5. Ações em massa — FEITA (2026-10-20, branch feat/dashboards-funil)
+
+**O que foi entregue**
+- `POST /api/contacts/lote` e `/api/deals/lote` `{ acao, ids? | filtro?,
+  pipelineId?, parametros, simular? }` → `{ total, ok, ignorados, falhas[{id,
+  nome, motivo, codigo, faltando}], truncado, avisos, previa, desfazer }`.
+  Contatos: atribuir, etiqueta (+/−; adicionar dispara a sequência de
+  gatilho, como o applyTag), sequência, apagar. Negócios: atribuir, mover,
+  ganho, perdido (motivo obrigatório da lista do funil), arquivar, apagar.
+  Exportar = link para os exportar com `?ids=` (até 500) ou `?filtro=`.
+- Por filtro ("Selecionar todos os N resultados"): `idsDoFiltro` no
+  servidor, contrato + escopo (+ funil), até 5.000 com aviso. Por ids:
+  conferidos contra `{ orgId, escopo }`, o resto conta como ignorado.
+- Permissão por ação (`PERMISSAO_DA_ACAO`); atribuir não passa para membro
+  de outro contrato (404) nem para fora do escopo do papel (403).
+- Escritas simples em transações de 200; mover/ganho/perdido um a um por
+  `moveDealStage` (com as regras; 6 em paralelo), histórico com
+  `registrarMudancasEmLote` (origem `usuario`, novo `historicoEmLote` no
+  moveDealStage); apagar um a um por `apagarComLixeira` (foto).
+- `simular: true` = prévia (mover simula pelo próprio moveDealStage):
+  "12 negócios vão de Proposta → Negociação; 3 bloqueados por campos
+  obrigatórios; 2 sem mudança". A tela sempre mostra a prévia antes de
+  aplicar; bloqueados voltam listados com o que falta e "Abrir".
+- Desfazer (toast de 8 s): a resposta traz o corpo pronto — atribuir →
+  `restaurar_responsavel` (dono de antes por registro), etiqueta → a
+  inversa só nos que mudaram, mover/ganho/perdido → `restaurar_etapa`
+  (reabrir, mesmas regras), arquivar → `desarquivar`, apagar →
+  `restaurar_lixeira` (restaura da lixeira em lote). Limites: vale enquanto
+  o toast está na tela (o "antes" fica só no navegador); quem mexeu nos
+  registros nesse meio-tempo é sobrescrito; voltar de etapa pode ser
+  bloqueado pelas regras (vem em `falhas`); desfazer etiqueta não tira das
+  sequências em que o gatilho inscreveu; sequência e apagar definitivo (sem
+  lixeira) não têm Desfazer.
+- Exportar negócios passou a usar o filtro do motor (`?filtro=` no
+  `/api/deals/exportar` e no relatório em PDF); `busca/dono/visao` antigos
+  só valem sem `?filtro=` (links antigos).
+- Ações em massa só na lista de negócios (o quadro não tem seleção).
+
 - Caixa por linha, "selecionar esta página", "selecionar todos os N".
 - Contatos: atribuir proprietário, adicionar/remover etiqueta, adicionar a sequência, exportar, apagar (com confirmação e contagem).
 - Negócios: atribuir proprietário, mover de etapa, marcar ganho/perdido (com motivo), exportar, arquivar.
