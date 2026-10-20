@@ -23,7 +23,7 @@ design system com a identidade da Eva.
 |---|---|---|---|
 | 1 | ✅ **(feito — ver notas abaixo)** **Regras por etapa**: campos obrigatórios ao entrar na etapa (nunca na criação), motivos de perda configuráveis por funil (lista, não texto livre), "parado" com prazo por etapa (hoje 7 dias fixos) | Só texto livre em `lostReason`; `DIAS_PARADO = 7` para tudo; nenhum campo exigido por etapa | crm-pipeline-kanban |
 | 2 | ✅ **(feito — ver notas abaixo)** **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
-| 3 | **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
+| 3 | ✅ **(feito — ver notas abaixo)** **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
 | 4 | **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
 | 5 | **Visões salvas** (fase L4) e **ações em massa por filtro** (fase L5) | Abas fixas; seleção sem ações | crm-list-views-search |
 | 6 | **Mesclar duplicados** (contato e empresa) com aviso de possível duplicado na ficha e mescla reversível | Dedupe só na criação/importação | crm-record-pages, crm-leads-import-dedupe |
@@ -117,6 +117,80 @@ design system com a identidade da Eva.
 - **Pendente:** lixeira de tarefa e nota (hoje apagam de vez); desfazer no
   painel da conversa (inbox) e na lista de negócios (não move etapa);
   "esvaziar lixeira" em lote; RLS na tabela nova junto com o item 22.
+
+### Notas do item 3 (tarefas de verdade) — feito em 20/10/2026
+
+- **Onde mora:** parte pura em `src/lib/tarefas/` (`tipos.ts`, `calendario.ts`
+  em SP, `quick-add.ts`, `agrupar.ts`, `adiar.ts`, `conclusao.ts`,
+  `meu-dia.ts`, `fila.ts`, `escopo.ts`, `formato.ts`, `tela.ts`); servidor em
+  `src/lib/server/tarefas.ts` (lista, concluir, adiar, massa, quick add),
+  `src/lib/server/meu-dia.ts` e `src/lib/server/tarefas-detalhes.ts`; telas
+  em `src/components/tarefas/` e `src/app/(app)/[contrato]/tarefas`.
+- **Tipos:** ligar, whatsapp, email, reuniao, visita, afazer (duração 10/3/5/
+  30/60/15 min; ação de 1 clique tel:, `/conversas?c=` (sem conversa: wa.me),
+  mailto:). Ids antigos valem sem migração; `outro` é aceito e gravado como
+  `afazer` (o que já está no banco aparece como "A fazer"). Tela, Builder,
+  IA de réguas (`crm_criar_tarefa` ganhou `tipo`), flow-engine e API v1
+  passam por `normalizarTipoDeTarefa`.
+- **Banco:** tabela nova `eva_studio_task_details` (1:1, PK `taskId`) —
+  `allDay`, `priority`, `durationMin`, `origin`, `outcome`, `outcomeNote`,
+  `nextStepDecision`, `nextTaskId`, `completedById`, `snoozedCount` — e um
+  índice `(orgId, assignedToId, doneAt, dueAt)` em tarefas.
+  `prisma/sql/2026-10-20-tarefas.sql` (só aditivo; não aplicado). Sem a
+  tabela tudo funciona; só não ficam guardados prioridade, duração, origem,
+  resultado e decisão. Dia todo = 23:59 de SP (deduzido da hora quando falta
+  a linha), então "vence no fim do dia" vale mesmo sem a tabela.
+- **Origem:** manual (tela), `automacao` (bloco do fluxo, follow-up do
+  perdido, API v1), `ia` (ferramenta da IA, revisão acima do teto). Rotulada
+  na lista e no Meu dia.
+- **Conclusão:** `POST /api/tasks/[id]/concluir` e `PATCH done:true` exigem
+  `resultado` e `proximo` (`agendou` com tipo/texto/data, ou `sem_proximo`);
+  sem decisão → 422 `proximo_passo_obrigatorio`. Na transação: marca feita (só
+  se aberta; outra aba → 409), cria a próxima (mesmo negócio/contato e
+  responsável) e grava **nota** "Tarefa concluída: … / Ligação · Não atendeu —
+  nota" no negócio/contato (é o que a timeline e a ficha do contato mostram).
+  Diálogo único (`useConcluirTarefa`) em tarefas, Meu dia, fila, ficha,
+  gaveta, contato, empresa e painel da conversa. Sugestão: não atendeu →
+  WhatsApp (se era ligação) no próximo dia útil; remarcou → +2 dias úteis;
+  falou → WhatsApp de retorno em 2 dias úteis; sempre 10h. Reabrir
+  (`done:false`) limpa resultado e decisão. API v1 continua concluindo com
+  `done: true` (integração).
+- **Adiar:** `POST /api/tasks/[id]/adiar` (`1h`, `amanha` 9h, `segunda` 9h,
+  `data`); `empurrarPrevisao` move `expectedClosingAt` pelos mesmos dias de
+  calendário, nunca para trás nem antes do novo prazo; exige
+  `negocios:editar` e o negócio no escopo (senão adia a tarefa e avisa).
+  Conta `snoozedCount` ("adiada 3x" na lista).
+- **Quick add:** `POST /api/tasks/rapida`; parser próprio (hoje, amanhã,
+  depois de amanhã, dias da semana — sempre a próxima —, semana que vem,
+  dd/mm[/aaaa], dia N, em N dias/horas/min, 14h, 14:30, meio-dia, "3 da
+  tarde", "às 3" = 15h, urgente/!). Pessoa com maiúscula vira vínculo se bater
+  com UM contato no escopo de contatos (+ negócio aberto mais recente dele);
+  ambíguo fica sem vínculo e avisa. Atalho `T` na tela de tarefas.
+- **Lista:** grupos por dia de SP (semana seg–dom); Minhas/Equipe/Todas com
+  teto no escopo de **negócios** do papel (tarefa não tem escopo próprio);
+  PATCH/DELETE/concluir/adiar de tarefa fora do escopo → 404. Permissões
+  agora granulares (`tarefas:ver` / `tarefas:gerenciar`, mesmos papéis de
+  antes). Massa (`POST /api/tasks/massa`): +1 dia (mantém a hora), próxima
+  segunda 9h, reatribuir (não para fora do escopo → 403), concluir (exige
+  resultado e "sem próximo passo" explícito).
+- **Meu dia** (aba principal de /tarefas, `GET /api/tasks/meu-dia`): fixos =
+  reunião/visita com hora hoje; pool = atrasadas e de hoje + "Responder"
+  (conversa com humano, última mensagem do cliente não lida, minha ou da
+  minha ficha), "Primeiro contato" (lead `novo` meu, 7 dias) e "Definir
+  próximo passo" (negócio meu parado sem tarefa aberta). Score da skill (SLA
+  cresce até 1,2 ao estourar 30 min). Capacidade = minutos até 18h − fixos −
+  15%; excedente "provavelmente amanhã" com adiar em 1 clique. Filas por tipo
+  e "Começar pela ordem" → modo registro a registro com contexto ao lado e
+  "Concluir e próximo" / "Feito, próximo" / "Pular".
+- **Para os itens 13 e 20:** `carregarMeuDia(ctx)` devolve `resumo` (texto
+  "Hoje: 3 compromissos, 12 tarefas (2 atrasadas), …") via `resumoDoDia` —
+  o digest das 8h por WhatsApp e o alerta de SLA devem reutilizar isso.
+  Expediente fixo 9h–18h e SLA fixo de 30 min por enquanto.
+- **Pendente:** detalhes da tarefa não entram na foto da lixeira (restaurar
+  traz a tarefa sem prioridade/resultado; a nota do resultado volta);
+  recorrência, agenda/calendário e Google Agenda (item 20); feriados no "dia
+  útil" da sugestão; expediente e SLA por pessoa/contrato; Início continua
+  contando as tarefas do contrato todo (o Meu dia é por pessoa).
 
 ## P1
 
