@@ -53,3 +53,20 @@ describe("agrupamento por data", () => {
     expect(grupos[1].rotulo).toBe("Amanhã");
   });
 });
+
+describe("texto do prazo", () => {
+  it("relativo, em SP, 24h", async () => {
+    const { textoDoPrazo, textoDeMinutos } = await import("./formato");
+    expect(textoDoPrazo("2026-10-20T17:00:00Z", false, AGORA)).toBe("Hoje 14:00");
+    expect(textoDoPrazo("2026-10-21T02:59:00Z", null, AGORA)).toBe("Hoje");
+    expect(textoDoPrazo("2026-10-21T12:00:00Z", false, AGORA)).toBe("Amanhã 09:00");
+    expect(textoDoPrazo("2026-10-19T12:00:00Z", false, AGORA)).toBe("Ontem 09:00");
+    expect(textoDoPrazo("2026-10-23T12:00:00Z", false, AGORA)).toBe("sex 23/10 09:00");
+    expect(textoDoPrazo("2026-12-01T12:00:00Z", true, AGORA)).toBe("01/12");
+    expect(textoDoPrazo("2027-01-05T12:00:00Z", true, AGORA)).toBe("05/01/2027");
+    expect(textoDoPrazo(null, false, AGORA)).toBe("Sem data");
+    expect(textoDeMinutos(45)).toBe("45 min");
+    expect(textoDeMinutos(90)).toBe("1h30");
+    expect(textoDeMinutos(120)).toBe("2h");
+  });
+});
