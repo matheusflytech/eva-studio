@@ -36,6 +36,23 @@ banco só aditivo e com OK.
 | F4 | **Integrações em aba própria** | Configurações → Integrações: conexão do BM/Meta, WhatsApp oficial e QR, Instagram, Messenger, Telegram, TikTok, widget, e-mail, n8n, chaves de IA, MCP — no nível do contrato, com **logos das marcas**; o agente só escolhe quais canais usa; catálogo de integrações "nativas" | crm-whatsapp-channel, crm-brazil-integrations, shadcn |
 | F5 | **E-mail automático** | Resend (gratuito até 3 mil/mês, escala) com verificação de domínio, modelos com variáveis, passo de e-mail nas réguas e no fluxo, disparo de e-mail, eventos de entrega | crm-sequences, crm-content-library, crm-broadcasts |
 | F6 | **n8n fácil** | Webhooks de saída do CRM (API-6: catálogo de eventos, HMAC, tentativas, log, reenviar); tela n8n com a logo, passo a passo e testes; webhook de entrada de verdade (substitui o falso); pacote do nó da Eva para o n8n (community node) e modelos de workflow | crm-n8n-integration, crm-api-webhooks |
-| F7 | **Cloudflare** | Documento de arquitetura escalável (Workers, Queues, KV/D1/R2, Durable Objects para sessões, custos e limites) e a primeira peça: entrada de webhooks (Meta, Telegram, TikTok) num Worker com fila, entregando ao app | crm-whatsapp-channel, crm-api-webhooks |
+| F7 | **Cloudflare** ✅ (local, sem deploy) | Documento de arquitetura escalável (Workers, Queues, KV/D1/R2, Durable Objects para sessões, custos e limites) e a primeira peça: entrada de webhooks (Meta, Telegram, TikTok) num Worker com fila, entregando ao app | crm-whatsapp-channel, crm-api-webhooks |
 
 Ordem: F1 → F2 → F3 → F4 → F5 → F6, com F7 em paralelo (pasta própria).
+
+## Notas de execução
+
+### F7 — Cloudflare (2026-10-20, local, sem deploy)
+
+- Documento: `docs/arquitetura-cloudflare.md` (alvo, fluxos, limites, custos
+  1k/100k/1M com fontes, riscos, fases com volta, por que o Baileys fica fora).
+- Peça 1: `cloudflare/webhook-ingress/` (Worker + Queue + KV, `package.json`
+  próprio, testes no workerd com `@cloudflare/vitest-plugin`). Mesmos caminhos
+  do app (`/api/webhooks/...`): ligar/desligar = trocar a URL de callback.
+- App: rota nova `src/app/api/internal/webhooks/route.ts` (HMAC
+  `INGRESS_SIGNING_SECRET`, 5 min) que chama os **handlers exportados** das
+  rotas atuais — nenhuma rota existente foi alterada.
+- Pendente do dono: conta Cloudflare (Workers Paid), domínio opcional,
+  segredos (`wrangler secret put`) e `INGRESS_SIGNING_SECRET` na Vercel.
+- Pendente técnico: dedupe no app para Telegram/TikTok (ou DO por conversa,
+  fase 3); fases 2–4 do documento.
