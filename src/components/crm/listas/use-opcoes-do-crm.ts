@@ -23,6 +23,7 @@ export interface OpcoesDoCrm {
   /** Campos personalizados da entidade da lista. */
   campos: DefinicaoDeCampo[];
   meuId: string;
+  meuNome: string;
   carregado: boolean;
 }
 
@@ -39,6 +40,7 @@ export function useOpcoesDoCrm(entidade: EntidadeCrm): OpcoesDoCrm & { recarrega
     produtos: [],
     campos: [],
     meuId: "",
+    meuNome: "",
     carregado: false,
   });
   const [versao, setVersao] = React.useState(0);
@@ -62,6 +64,7 @@ export function useOpcoesDoCrm(entidade: EntidadeCrm): OpcoesDoCrm & { recarrega
         // Negócio: os campos de negócio vêm no próprio /api/analytics/opcoes.
         campos: entidade === "contatos" ? (camposDeContato?.fields ?? []) : d.campos,
         meuId: me?.session?.userId ?? "",
+        meuNome: me?.session?.name ?? "",
         carregado: true,
       });
     });

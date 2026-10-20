@@ -23,8 +23,13 @@ export function KanbanColumn({
   weighted,
   collapsed = false,
   onCollapsedChange,
+  containerRef,
+  highlighted = false,
+  headerActions,
+  footerNote,
   children,
   className,
+  ...rest
 }: {
   title: string;
   count: number;
@@ -34,16 +39,27 @@ export function KanbanColumn({
   weighted?: number;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  /** Ref da coluna inteira (alvo de soltar do drag-and-drop da tela). */
+  containerRef?: React.Ref<HTMLElement>;
+  /** Destaque de "solte aqui" enquanto um cartão passa por cima. */
+  highlighted?: boolean;
+  /** Ações no cabeçalho, antes do recolher (ex.: "+" novo negócio). */
+  headerActions?: React.ReactNode;
+  /** Linha pequena no rodapé, abaixo dos totais (ex.: "30 de 120 carregados"). */
+  footerNote?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
-}) {
+} & Omit<React.HTMLAttributes<HTMLElement>, "title" | "children" | "className">) {
   const corpoId = React.useId();
+  const destaque = highlighted ? "border-accent-solid bg-accent-subtle" : "border-border-subtle bg-raised";
 
   if (collapsed) {
     return (
       <section
+        {...rest}
+        ref={containerRef}
         aria-label={`${title}, ${count} itens (recolhida)`}
-        className={cn("flex w-10 shrink-0 flex-col items-center rounded-lg border border-border-subtle bg-raised py-2", className)}
+        className={cn("flex w-10 shrink-0 flex-col items-center rounded-lg border py-2 transition-colors duration-120", destaque, className)}
       >
         <button
           type="button"
@@ -61,12 +77,15 @@ export function KanbanColumn({
 
   return (
     <section
+      {...rest}
+      ref={containerRef}
       aria-label={`${title}, ${count} itens`}
-      className={cn("flex w-72 shrink-0 flex-col rounded-lg border border-border-subtle bg-raised", className)}
+      className={cn("flex w-72 shrink-0 flex-col rounded-lg border transition-colors duration-120", destaque, className)}
     >
       <header className="flex h-10 items-center gap-2 border-b border-border-subtle pl-3 pr-1.5">
         <h3 className="min-w-0 flex-1 truncate text-small font-semibold text-text-primary">{title}</h3>
-        <span className="text-small tabular-nums text-text-tertiary">{count}</span>
+        <span className="text-small tabular-nums text-text-tertiary">{count.toLocaleString("pt-BR")}</span>
+        {headerActions}
         {onCollapsedChange && (
           <IconButton
             aria-label={`Recolher ${title}`}
@@ -83,7 +102,7 @@ export function KanbanColumn({
         {children}
       </div>
       {(total !== undefined || weighted !== undefined) && (
-        <footer className="grid grid-cols-2 gap-2 border-t border-border-subtle px-3 py-2 text-caption">
+        <footer className="grid grid-cols-2 gap-x-2 gap-y-1 border-t border-border-subtle px-3 py-2 text-caption">
           {total !== undefined && (
             <span className="flex flex-col">
               <span className="text-text-tertiary">Total</span>
@@ -96,6 +115,7 @@ export function KanbanColumn({
               <span className="font-medium tabular-nums text-text-primary">{formatMoney(weighted)}</span>
             </span>
           )}
+          {footerNote && <span className="col-span-2 text-text-tertiary">{footerNote}</span>}
         </footer>
       )}
     </section>

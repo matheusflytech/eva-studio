@@ -10,6 +10,9 @@ import {
   comparativoDeGanho,
   quandoCurto,
   serieDeGanhoDoMes,
+  juntarCartoes,
+  moverCartao,
+  tempoNaEtapa,
   type EtapaKanban,
   type NegocioKanban,
 } from "./modelo";
@@ -192,5 +195,45 @@ describe("serieDeGanhoDoMes", () => {
     const e = [etapa({ id: "g", type: "won", deals: [neg({ id: "a", amountCents: 100, closedAt: dia("02") }), neg({ id: "b", amountCents: 50, closedAt: dia("04") }), neg({ id: "c", amountCents: 999, closedAt: "2026-09-30T12:00:00Z" })] })];
     const s = serieDeGanhoDoMes(e, new Date("2026-10-05T12:00:00Z"));
     expect(s).toEqual([0, 100, 100, 150, 150]);
+  });
+});
+
+describe("quadro paginado", () => {
+  const agora = new Date("2026-10-20T12:00:00Z");
+  const ha = (ms: number) => new Date(agora.getTime() - ms).toISOString();
+  const MIN = 60_000;
+
+  it("tempo na etapa em minutos, horas e dias", () => {
+    expect(tempoNaEtapa(ha(20_000), agora)).toBe("agora");
+    expect(tempoNaEtapa(ha(MIN), agora)).toBe("1 minuto");
+    expect(tempoNaEtapa(ha(31 * MIN + 59_000), agora)).toBe("31 minutos");
+    expect(tempoNaEtapa(ha(60 * MIN), agora)).toBe("1 hora");
+    expect(tempoNaEtapa(ha(3 * 60 * MIN + 5 * MIN), agora)).toBe("3 horas");
+    expect(tempoNaEtapa(ha(24 * 60 * MIN), agora)).toBe("1 dia");
+    expect(tempoNaEtapa(ha(2 * 24 * 60 * MIN + 1), agora)).toBe("2 dias");
+    // Relógio da máquina atrasado não vira tempo negativo.
+    expect(tempoNaEtapa(ha(-5 * MIN), agora)).toBe("agora");
+  });
+
+  it("carregar mais junta no fim sem duplicar", () => {
+    const a = [neg({ id: "1" }), neg({ id: "2" })];
+    const r = juntarCartoes(a, [neg({ id: "2" }), neg({ id: "3" }), neg({ id: "3" })]);
+    expect(r.map((d) => d.id)).toEqual(["1", "2", "3"]);
+    expect(juntarCartoes(a, [])).toEqual(a);
+  });
+
+  it("mover acerta contagem, total e ponderado das duas colunas", () => {
+    const etapas: EtapaKanban[] = [
+      { ...etapa({ id: "a", deals: [neg({ id: "x", amountCents: 10_000, probability: 10 }), neg({ id: "y", amountCents: 500 })] }), probability: 10, count: 40, totalCents: 90_000, weightedCents: 9_000 },
+      { ...etapa({ id: "b", deals: [] }), probability: 50, count: 3, totalCents: 1_000, weightedCents: 500 },
+    ];
+    const r = moverCartao(etapas, "x", "b", agora);
+    expect(r[0]).toMatchObject({ count: 39, totalCents: 80_000, weightedCents: 8_000 });
+    expect(r[0].deals.map((d) => d.id)).toEqual(["y"]);
+    expect(r[1]).toMatchObject({ count: 4, totalCents: 11_000, weightedCents: 5_500 });
+    expect(r[1].deals[0]).toMatchObject({ id: "x", probability: 50, stageSince: agora.toISOString() });
+    // Mesma coluna ou cartão desconhecido: nada muda.
+    expect(moverCartao(etapas, "x", "a", agora)).toBe(etapas);
+    expect(moverCartao(etapas, "zz", "b", agora)).toBe(etapas);
   });
 });

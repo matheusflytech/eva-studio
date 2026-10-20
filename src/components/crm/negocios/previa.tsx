@@ -53,15 +53,15 @@ export function ConteudoDaPrevia({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-medium", cor.fundo, cor.texto)}>
+        <span className={cn("inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-caption font-medium", cor.fundo, cor.texto)}>
           <span className={cn("h-1.5 w-1.5 rounded-full", cor.ponto)} aria-hidden />
           {etapa.name}
         </span>
-        <h2 id={idDoTitulo} className="mt-2 font-display text-[17px] font-semibold leading-snug text-text-primary">
+        <h2 id={idDoTitulo} className="mt-2 text-title-sm text-text-primary">
           {comLink ? (
             <Link
               href={`/negocios/${deal.id}`}
-              className="rounded-sm underline-offset-2 outline-none hover:text-accent-400 hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              className="rounded-sm underline-offset-2 hover:text-accent-fg hover:underline"
             >
               {deal.name}
             </Link>
@@ -69,23 +69,23 @@ export function ConteudoDaPrevia({
             deal.name
           )}
         </h2>
-        {quem !== deal.name && <p className="mt-0.5 truncate text-[12.5px] text-text-secondary">{quem}</p>}
+        {quem !== deal.name && <p className="mt-0.5 truncate text-small text-text-secondary">{quem}</p>}
         <p className="mt-3 flex items-baseline gap-2">
-          <span className="font-display text-[22px] font-semibold tracking-[-0.01em] tabular-nums text-text-primary">
-            {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="font-sans text-[14px] font-normal text-text-tertiary">Sem valor</span>}
+          <span className="text-title tabular-nums text-text-primary">
+            {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="text-body font-normal text-text-tertiary">Sem valor</span>}
           </span>
-          {aberto && <span className="text-[12px] tabular-nums text-text-tertiary">{deal.probability}% de chance</span>}
+          {aberto && <span className="text-caption tabular-nums text-text-tertiary">{deal.probability}% de chance</span>}
         </p>
       </div>
 
       {temProximo && (
-        <section aria-label="Próximo passo" className="rounded-xl border border-border-subtle bg-surface-2/60 px-3 py-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-text-tertiary">Próximo passo</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px]">
+        <section aria-label="Próximo passo" className="rounded-md border border-border-subtle bg-raised px-3 py-2.5">
+          <p className="text-caption font-medium text-text-tertiary">Próximo passo</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-caption">
             <SinalDoProximoPasso deal={deal} tipoDaEtapa={etapa.type} agora={agora} />
             {deal.nextTask?.text && <span className="min-w-0 truncate text-text-secondary">{deal.nextTask.text}</span>}
             {!deal.nextTask && aberto && <span className="text-text-tertiary">Nenhuma tarefa em aberto.</span>}
-            {deal.openTasks > 1 && <span className="text-[11.5px] tabular-nums text-text-tertiary">{deal.openTasks} tarefas abertas</span>}
+            {deal.openTasks > 1 && <span className="text-caption tabular-nums text-text-tertiary">{deal.openTasks} tarefas abertas</span>}
           </div>
         </section>
       )}
@@ -95,7 +95,7 @@ export function ConteudoDaPrevia({
           {linhas.map((campo) => {
             const texto = textoDoCampo(campo, deal, ctx);
             return (
-              <div key={campo} className="flex items-baseline justify-between gap-4 py-2 text-[13px]">
+              <div key={campo} className="flex items-baseline justify-between gap-4 py-2 text-small">
                 <dt className="shrink-0 text-text-tertiary">{rotuloDoCampo(campo, rotulos)}</dt>
                 <dd className={cn("min-w-0 break-words text-right", texto ? "text-text-primary" : "text-text-tertiary")}>{texto || "—"}</dd>
               </div>
@@ -213,16 +213,16 @@ export function PreviaDoNegocio({
       aria-modal="false"
       aria-labelledby={idDoTitulo}
       tabIndex={-1}
-      className="fixed bottom-3 right-3 top-3 z-50 flex w-[380px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border border-border-default bg-surface-1 shadow-[0_24px_64px_rgba(0,0,0,0.55)] outline-none"
+      className="fixed bottom-3 right-3 top-3 z-50 flex w-[380px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-lg border border-border-default bg-overlay shadow-overlay outline-none"
     >
       <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-2.5">
-        <span className="text-[11.5px] font-medium uppercase tracking-wide text-text-tertiary">Prévia do negócio</span>
+        <span className="text-caption font-medium text-text-tertiary">Prévia do negócio</span>
         <button
           type="button"
           onClick={onFechar}
           aria-label="Fechar prévia"
           title="Fechar (Esc)"
-          className="grid h-7 w-7 place-items-center rounded-md text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+          className="grid h-7 w-7 place-items-center rounded-md text-text-tertiary hover:bg-hover hover:text-text-primary"
         >
           <X size={15} aria-hidden />
         </button>
@@ -234,19 +234,19 @@ export function PreviaDoNegocio({
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
             href={`/negocios/${deal.id}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-text-on-accent outline-none transition-colors hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-solid px-3 text-body font-medium text-text-on-accent transition-colors hover:bg-accent-solid-hover"
           >
             <Maximize2 size={13} aria-hidden /> Abrir ficha completa
           </Link>
           {deal.whatsapp && (
             <Link
               href={`/conversas?c=${deal.whatsapp.conversationId}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-default bg-surface-2 px-3 text-[13px] font-medium text-text-primary outline-none transition-colors hover:border-border-strong hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-default bg-panel px-3 text-body font-medium text-text-primary transition-colors hover:border-border-strong hover:bg-raised"
             >
-              <span className="relative inline-flex text-[#25d366]">
+              <span className="relative inline-flex text-success">
                 <MessageCircle size={14} aria-hidden />
                 {deal.whatsapp.naoLida && (
-                  <span className="absolute -right-0.5 -top-0.5 h-[7px] w-[7px] rounded-full border-2 border-surface-2 bg-[#25d366]" />
+                  <span className="absolute -right-0.5 -top-0.5 h-[7px] w-[7px] rounded-full border-2 border-panel bg-success" />
                 )}
               </span>
               WhatsApp
@@ -256,9 +256,9 @@ export function PreviaDoNegocio({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 border-t border-border-subtle bg-surface-1 px-4 py-3">
+      <div className="flex flex-col gap-2.5 border-t border-border-subtle bg-overlay px-4 py-3">
         <div className="flex items-center gap-2">
-          <label htmlFor={`${idDoTitulo}-etapa`} className="shrink-0 text-[12px] text-text-tertiary">
+          <label htmlFor={`${idDoTitulo}-etapa`} className="shrink-0 text-caption text-text-tertiary">
             Etapa
           </label>
           <Select
@@ -266,7 +266,7 @@ export function PreviaDoNegocio({
             value={etapa.id}
             disabled={!!movendo}
             onChange={(e) => mover(e.target.value)}
-            className="h-8 flex-1 text-[13px]"
+            className="h-8 flex-1"
           >
             {etapas.map((s) => (
               <option key={s.id} value={s.id}>
@@ -284,7 +284,7 @@ export function PreviaDoNegocio({
                 size="sm"
                 disabled={!!movendo}
                 onClick={() => mover(etapaGanha.id)}
-                className="text-emerald-400 hover:text-emerald-300"
+                className="text-success"
               >
                 <CheckCircle2 size={14} aria-hidden /> Ganho
               </Button>
@@ -297,7 +297,7 @@ export function PreviaDoNegocio({
           </div>
         )}
         {erro && (
-          <p role="alert" className="text-[12px] text-danger">
+          <p role="alert" className="text-caption text-danger">
             {erro}
           </p>
         )}

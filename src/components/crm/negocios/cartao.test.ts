@@ -94,7 +94,7 @@ describe("textoDoCampo", () => {
     expect(textoDoCampo("previsao", d, ctx)).toBe("28/10/2026");
     expect(textoDoCampo("previsao", d, ctx, "curto")).toBe("Fecha 28 out");
     expect(textoDoCampo("naEtapaHa", d, ctx)).toBe("3 dias");
-    expect(textoDoCampo("naEtapaHa", d, ctx, "curto")).toBe("3d na etapa");
+    expect(textoDoCampo("naEtapaHa", d, ctx, "curto")).toBe("3 dias nesta etapa");
     expect(textoDoCampo("criadoEm", d, ctx)).toBe("01/10/2026");
     expect(textoDoCampo("telefone", d, ctx)).toBe("+55 11 98765-4321");
     expect(textoDoCampo("email", d, ctx)).toBe("marina@bompao.com");

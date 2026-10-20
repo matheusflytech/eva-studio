@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { useContrato } from "@/lib/contrato/navegacao";
-import { apiDoContrato, rotaDoContrato } from "@/lib/contrato/rotas";
-import { Handshake, Plus, Loader2, X, SlidersHorizontal, Search, Columns3, Rows3, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
+import { apiDoContrato } from "@/lib/contrato/rotas";
+import { ChevronsRightLeft, ChevronsLeftRight, Columns3, Download, FileSpreadsheet, FileText, Handshake, Plus, Rows3, Settings, Upload } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -15,125 +15,140 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Input, Textarea, Label } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Modal, ModalContent } from "@/components/ui/modal";
-import { PreviaDoNegocio } from "@/components/crm/negocios/previa";
-import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { cn } from "@/lib/utils";
-import { reaisDigitados } from "@/lib/dinheiro";
-import { CamposDoFormulario, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
-import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { ViewTabs } from "@/components/ui/view-tabs";
+import { SearchInput } from "@/components/ui/search-input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Notice } from "@/components/ui/notice";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { formatMoney } from "@/components/ui/kanban-column";
+import { BarraDeFiltros } from "@/components/crm/listas/barra-de-filtros";
+import { useComAtraso, useEstadoDaLista } from "@/components/crm/listas/use-estado-da-lista";
+import { useListaSalva } from "@/components/crm/listas/use-lista-salva";
+import { opcoesDaBarra, opcoesDoEditor, opcoesExtrasDoEditor, useOpcoesDoCrm } from "@/components/crm/listas/use-opcoes-do-crm";
+import { PreviaDoNegocio, type EtapaDaPrevia } from "@/components/crm/negocios/previa";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
-import { ListView } from "@/components/crm/negocios/list-view";
+import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/lista-de-negocios";
+import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
+import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
 import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
-import {
-  CabecalhoAssinatura,
-  Comemoracao,
-  DiaDeHoje,
-  Momentos,
-  RecadoDaEva,
-  SeletorDeEstilo,
-  VozDoQuadro,
-  type EstiloDaTela,
-} from "@/components/crm/negocios/eva-topo";
-import {
-  carimbo,
-  comemoracao,
-  desdeOntem,
-  gargaloDaConversao,
-  listaDeAtencao,
-  momentos,
-  montarRecado,
-  type AcaoDoRecado,
-  type ItemDeAtencao,
-} from "@/components/crm/negocios/eva-voz";
+import { Comemoracao, DiaDeHoje, Momentos, RecadoDaEva, SeletorDeEstilo, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
+import { carimbo, comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type AcaoDoRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
-import {
-  comparativoDeGanho,
-  filtrarEtapas,
-  precisaAtencao,
-  resumoDoFunil,
-  valorCurto,
-  type EtapaKanban,
-  type FiltrosDeNegocio,
-  type NegocioKanban,
-  type VisaoSalva,
-} from "@/components/crm/negocios/modelo";
+import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
+import { juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
+import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
+import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { CAMPOS_DE_NEGOCIO } from "@/lib/filtro-crm";
+import { SEM_VALOR, diaLocal } from "@/lib/consulta";
+import { chaveDasColunas, colunasValidas } from "@/lib/listas/colunas";
+import { montarFiltro, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
+import type { FilterOption } from "@/components/ui/filter-button";
 
-interface PipelineOption {
-  id: string;
-  name: string;
-  stages: { id: string; name: string; type: string }[];
-}
+// ---------------------------------------------------------------------------
+// Negócios: quadro paginado por coluna (30 cartões, "Carregar mais" ao rolar)
+// e lista paginada no servidor, com as mesmas visões, barra de filtros e
+// filtros avançados. Arrastar entre etapas (dnd-kit) e as zonas Ganho/Perdido
+// continuam; os estilos "Eva · 1/2/3" mostram a voz da Eva no design system.
+// ---------------------------------------------------------------------------
 
-const VISOES: { id: VisaoSalva; rotulo: string }[] = [
-  { id: "todos", rotulo: "Todos" },
-  { id: "meus", rotulo: "Meus" },
-  { id: "atencao", rotulo: "Precisam de atenção" },
-  { id: "fechando", rotulo: "Fechando este mês" },
+const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
+  { campo: "contato", rotulo: "Contatos", param: "contato", tipo: "lista" },
+  { campo: "empresa", rotulo: "Empresas", param: "empresa", tipo: "lista" },
+  { campo: "responsavel", rotulo: "Proprietário", param: "dono", tipo: "lista" },
+  { campo: "equipe", rotulo: "Equipes", param: "equipe", tipo: "lista" },
+  { campo: "tarefa", rotulo: "Tarefas", param: "tarefa", tipo: "lista" },
+  { campo: "etiqueta", rotulo: "Etiquetas", param: "etiqueta", tipo: "lista" },
+  { campo: "produto", rotulo: "Produtos", param: "produto", tipo: "lista" },
+  { campo: "criadoEm", rotulo: "Criado em", param: "criado", tipo: "data" },
+  { campo: "fechadoEm", rotulo: "Fechado em", param: "fechado", tipo: "data" },
 ];
+const PADRAO = { visao: "todos", tamanho: 25 };
+const IDS_DAS_VISOES = VISOES_DE_NEGOCIO.map((v) => v.id as string);
+const POR_ETAPA = 30;
 
 const digitando = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
-export default function NegociosPage() {
+/** Grava um parâmetro na URL sem recarregar (o roteador do Next acompanha). */
+function gravarParametro(nome: string, valor: string | null) {
+  const sp = new URLSearchParams(window.location.search);
+  if (valor) sp.set(nome, valor);
+  else sp.delete(nome);
+  sp.delete("p");
+  const qs = sp.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+}
+
+interface Quadro {
+  stages: EtapaKanban[];
+  defs: DefinicaoDeCampo[];
+  layout: LayoutDoCartao;
+  avisos: string[];
+  truncado: boolean;
+}
+
+function NegociosConteudo() {
   const contrato = useContrato();
-  const [pipelines, setPipelines] = React.useState<PipelineOption[]>([]);
-  const [pipelineId, setPipelineId] = React.useState("");
-  const [stages, setStages] = React.useState<EtapaKanban[]>([]);
-  const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
-  const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
-  const [meuId, setMeuId] = React.useState("");
-  const [meuNome, setMeuNome] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
-  // Negócio aberto na prévia (clique no cartão ou na linha); o título leva à ficha.
-  const [previaId, setPreviaId] = React.useState<string | null>(null);
-  const [layout, setLayout] = React.useState<LayoutDoCartao>(LAYOUT_PADRAO);
-  const [dragging, setDragging] = React.useState<{
-    deal: NegocioKanban;
-    tipo: string;
-  } | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [filtros, setFiltros] = React.useState<FiltrosDeNegocio>({
-    visao: "todos",
-  });
-  const [visao, setVisao] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
+  const router = useRouter();
+  const sp = useSearchParams();
+  const opcoes = useOpcoesDoCrm("negocios");
+  const [estado, setEstado] = useEstadoDaLista(BARRA_DE_NEGOCIOS, PADRAO, IDS_DAS_VISOES);
+  const [pipelines, setPipelines] = React.useState<FunilDaTela[]>([]);
+  const funilDaUrl = sp.get("funil");
+  const pipelineId = pipelines.find((p) => p.id === funilDaUrl)?.id ?? pipelines[0]?.id ?? "";
+  const pipeline = pipelines.find((p) => p.id === pipelineId);
+
+  const [modo, setModo] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
   const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v3", ["classico", "v1", "v2", "v3"]);
-  // Relógio da tela: muda só quando os dados chegam (dias parados, atrasos).
+  const [quadro, setQuadro] = React.useState<Quadro | null>(null);
+  const [carregando, setCarregando] = React.useState(true);
+  const [carregandoMais, setCarregandoMais] = React.useState<Set<string>>(new Set());
+  const [erro, setErro] = React.useState<string | null>(null);
+  const [versao, setVersao] = React.useState(0);
+  const [contagens, setContagens] = React.useState<Record<string, number>>({});
+  const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
+  const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
+  const [importando, setImportando] = React.useState(false);
+  const [editandoColunas, setEditandoColunas] = React.useState(false);
+  const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia } | null>(null);
+  const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string } | null>(null);
+  // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
+  const hoje = diaLocal(agora);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     // Teclado: espaço pega, setas movem, espaço solta (Enter fica para abrir).
-    useSensor(KeyboardSensor, {
-      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
-    }),
+    useSensor(KeyboardSensor, { keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } })
   );
 
   React.useEffect(() => {
-    fetch("/api/pipelines")
-      .then((r) => r.json())
-      .then((d) => {
-        setPipelines(d.pipelines ?? []);
-        if (d.pipelines?.[0]) setPipelineId((prev) => prev || d.pipelines[0].id);
+    const lerFunis = () =>
+      fetch("/api/pipelines")
+        .then((r) => r.json())
+        .then((d) => (d.pipelines ?? []) as FunilDaTela[])
+        .catch(() => [] as FunilDaTela[]);
+    lerFunis()
+      .then(async (lista) => {
+        if (lista.length) return lista;
+        // Contrato sem funil: o GET do quadro sem funil cria o padrão.
+        await fetch("/api/deals?porEtapa=1").catch(() => null);
+        return lerFunis();
       })
-      .catch(() => setPipelines([]));
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((d) => {
-        setMeuId(d.session?.userId ?? "");
-        setMeuNome(d.session?.name ?? "");
-      })
-      .catch(() => setMeuId(""));
+      .then((lista) => {
+        setPipelines(lista);
+        if (!lista.length) setCarregando(false);
+      });
   }, []);
 
   // Atalhos: "/" busca, "n" cria. Nunca enquanto a pessoa digita.
@@ -152,165 +167,199 @@ export default function NegociosPage() {
     return () => window.removeEventListener("keydown", aoTeclar);
   }, []);
 
-  // Número da carga mais recente: trocar de funil rápido não pode deixar a
-  // resposta do funil anterior, que chegou atrasada, pintar o quadro.
-  const ultimaCarga = React.useRef(0);
-
-  const refresh = React.useCallback(async () => {
-    const carga = ++ultimaCarga.current;
-    setIsLoading(true);
-    try {
-      const q = pipelineId ? `?pipeline=${pipelineId}` : "";
-      const [res, funil] = await Promise.all([fetch(`/api/deals${q}`), fetch(`/api/deals/funil${q}`).catch(() => null)]);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
-      const dadosDoFunil = funil?.ok ? await funil.json() : null;
-      if (carga !== ultimaCarga.current) return;
-      const campos: DefinicaoDeCampo[] = data.fields ?? [];
-      setStages(data.stages ?? []);
-      setDefs(campos);
-      // O layout vem junto (padrão quando o funil não tem um salvo).
-      setLayout(
-        data.layout
-          ? normalizarLayout(
-              data.layout,
-              campos.map((c) => c.key),
-            )
-          : LAYOUT_PADRAO,
-      );
-      setConversao(dadosDoFunil?.conversao ?? []);
-      setAgora(new Date());
-    } catch (e) {
-      if (carga !== ultimaCarga.current) return;
-      setError(e instanceof Error ? e.message : "Não foi possível carregar os negócios.");
-    } finally {
-      if (carga === ultimaCarga.current) setIsLoading(false);
-    }
-  }, [pipelineId]);
-
-  function trocarDeFunil(id: string) {
-    setPreviaId(null);
-    setPipelineId(id);
-  }
-
-  React.useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const filtrosEfetivos = React.useMemo(() => ({ ...filtros, meuId }), [filtros, meuId]);
-  const visiveis = React.useMemo(() => filtrarEtapas(stages, filtrosEfetivos, agora), [stages, filtrosEfetivos, agora]);
-  const dadosDoResumo = React.useMemo(() => {
-    const r = resumoDoFunil(stages, agora);
-    const c = comparativoDeGanho(stages, agora);
-    return {
-      abertoCents: r.abertoCents,
-      abertos: r.abertos,
-      ponderadoCents: r.ponderadoCents,
-      ganhoMesCents: c.esteMesCents,
-      ganhosNoMes: r.ganhosNoMes,
-      variacaoGanho: c.variacao,
-      atencao: precisaAtencao(stages, agora),
-    };
-  }, [stages, agora]);
-  // Voz da Eva (variação 1): recado do dia, frase do cabeçalho e momentos.
-  const hoje = agora.toLocaleDateString("sv-SE", {
-    timeZone: "America/Sao_Paulo",
-  });
-  const [recadoDispensado, setRecadoDispensado] = usePreferencia<string>("eva:negocios:recado", "", [hoje]);
-  const recado = React.useMemo(
-    () => (isLoading ? null : montarRecado(stages, agora, meuNome, gargaloDaConversao(conversao))),
-    [isLoading, stages, agora, meuNome, conversao],
+  // ── Filtro: barra + avançados + visão ──
+  const { filtro, conflito } = React.useMemo(
+    () => aplicarVisao(montarFiltro(estado, BARRA_DE_NEGOCIOS, { hoje }), estado.visao, opcoes.meuId, hoje),
+    [estado, opcoes.meuId, hoje]
   );
-  const momentosDoFunil = React.useMemo(() => momentos(stages, agora), [stages, agora]);
-  const atencaoDoDia = React.useMemo(() => listaDeAtencao(stages, agora), [stages, agora]);
-  const acontecimentosDoDia = React.useMemo(() => desdeOntem(stages, agora), [stages, agora]);
-  function aoAcaoDaAtencao(item: ItemDeAtencao) {
-    // WhatsApp vai direto para a conversa; o resto abre a prévia, onde estão
-    // a próxima tarefa, a previsão e o telefone.
-    if (item.acao === "whatsapp" && item.deal.whatsapp) {
-      window.location.href = rotaDoContrato(contrato, `/conversas?c=${item.deal.whatsapp.conversationId}`);
+  const chaveDoQuadro = React.useMemo(() => JSON.stringify({ pipelineId, filtro }), [pipelineId, filtro]);
+  const chaveAtrasada = useComAtraso(chaveDoQuadro, 250);
+  const pronto = !!pipelineId && (opcoes.carregado || estado.visao !== "meus");
+
+  // ── Quadro: N primeiros cartões de cada coluna + totais agregados ──
+  const ultimaCarga = React.useRef(0);
+  React.useEffect(() => {
+    if (!pronto) return;
+    const { pipelineId: funil, filtro: f } = JSON.parse(chaveAtrasada) as { pipelineId: string; filtro: unknown };
+    const carga = ++ultimaCarga.current;
+    let vivo = true;
+    const q = new URLSearchParams({ pipeline: funil, porEtapa: String(POR_ETAPA), filtro: JSON.stringify(f) });
+    Promise.all([fetch(`/api/deals?${q}`), fetch(`/api/deals/funil?pipeline=${funil}`).catch(() => null)])
+      .then(async ([res, funilRes]) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
+        const dadosDoFunil = funilRes?.ok ? await funilRes.json().catch(() => null) : null;
+        if (!vivo || carga !== ultimaCarga.current) return;
+        const campos: DefinicaoDeCampo[] = data.fields ?? [];
+        setQuadro({
+          stages: data.stages ?? [],
+          defs: campos,
+          layout: data.layout ? normalizarLayout(data.layout, campos.map((c) => c.key)) : LAYOUT_PADRAO,
+          avisos: data.avisos ?? [],
+          truncado: !!data.truncado,
+        });
+        setConversao(dadosDoFunil?.conversao ?? []);
+        setAgora(new Date());
+        setErro(null);
+      })
+      .catch((e: Error) => vivo && carga === ultimaCarga.current && setErro(e.message))
+      .finally(() => vivo && carga === ultimaCarga.current && setCarregando(false));
+    return () => {
+      vivo = false;
+    };
+  }, [chaveAtrasada, pronto, versao]);
+
+  const stages = React.useMemo(() => quadro?.stages ?? [], [quadro]);
+  const setStages = (f: (s: EtapaKanban[]) => EtapaKanban[]) => setQuadro((q) => (q ? { ...q, stages: f(q.stages) } : q));
+
+  async function carregarMais(etapa: EtapaKanban) {
+    if (!etapa.temMais || !etapa.depois || carregandoMais.has(etapa.id)) return;
+    setCarregandoMais((s) => new Set(s).add(etapa.id));
+    const q = new URLSearchParams({ etapa: etapa.id, depois: etapa.depois, porEtapa: String(POR_ETAPA), filtro: JSON.stringify(filtro) });
+    const res = await fetch(`/api/deals?${q}`).catch(() => null);
+    const d = res?.ok ? await res.json().catch(() => null) : null;
+    setCarregandoMais((s) => {
+      const n = new Set(s);
+      n.delete(etapa.id);
+      return n;
+    });
+    if (!d) {
+      setErro(`Não foi possível carregar mais negócios de ${etapa.name}.`);
       return;
     }
-    setPreviaId(item.deal.id);
+    setStages((ss) => ss.map((s) => (s.id === etapa.id ? { ...s, deals: juntarCartoes(s.deals, d.deals ?? []), temMais: !!d.temMais, depois: d.depois ?? null } : s)));
   }
-  const fraseDoTopo = (
-    <>
-      <strong className="font-semibold text-text-primary">{valorCurto(dadosDoResumo.ganhoMesCents)}</strong> ganhos neste mês
-      {dadosDoResumo.variacaoGanho !== null && (
-        <>
-          {", "}
-          <span className={dadosDoResumo.variacaoGanho >= 0 ? "text-emerald-400" : "text-[#f2a65a]"}>
-            {dadosDoResumo.variacaoGanho >= 0 ? "acima" : "abaixo"} do mesmo ponto do mês passado
-          </span>
-        </>
-      )}
-      .{" "}
-      {dadosDoResumo.atencao > 0
-        ? `${dadosDoResumo.atencao} ${dadosDoResumo.atencao === 1 ? "negócio pede" : "negócios pedem"} atenção.`
-        : "Nada pedindo atenção agora."}
-    </>
+
+  // ── Contagens das abas (visão sozinha, sem a barra) ──
+  React.useEffect(() => {
+    if (!pipelineId || !opcoes.carregado) return;
+    let vivo = true;
+    Promise.all(
+      VISOES_DE_NEGOCIO.map((v) =>
+        fetch("/api/deals/busca", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filtro: aplicarVisao({ logica: "e", grupos: [] }, v.id, opcoes.meuId, hoje).filtro, pipeline: pipelineId, apenasTotal: true }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => [v.id, d?.total] as const)
+          .catch(() => [v.id, undefined] as const)
+      )
+    ).then((pares) => {
+      if (!vivo) return;
+      const c: Record<string, number> = {};
+      for (const [id, total] of pares) if (typeof total === "number") c[id] = total;
+      setContagens(c);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [pipelineId, opcoes.carregado, opcoes.meuId, hoje, versao]);
+
+  // ── Colunas recolhidas (por usuário e funil; visão salva na L4) ──
+  const idsDasEtapas = React.useMemo(() => stages.map((s) => s.id), [stages]);
+  const validarRecolhidas = React.useCallback((bruto: string | null) => colunasValidas(bruto, idsDasEtapas, []), [idsDasEtapas]);
+  const [recolhidas, gravarRecolhidas] = useListaSalva(`eva:recolhidas:negocios:${contrato ?? "-"}:${opcoes.meuId || "-"}:${pipelineId}`, validarRecolhidas);
+  const tudoRecolhido = stages.length > 0 && recolhidas.length === stages.length;
+
+  // ── Contatos do filtro "Contatos ▾": busca no servidor ──
+  const [contatosOpcoes, setContatosOpcoes] = React.useState<FilterOption[]>([]);
+  // Nome de quem já apareceu na busca: o escolhido continua com nome depois de outra busca.
+  const [nomesDeContato, setNomesDeContato] = React.useState<Record<string, string>>({});
+  const buscarContatos = React.useCallback((q: string) => {
+    fetch("/api/contacts/busca", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q, pageSize: 25 }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const lista: FilterOption[] = (d?.contacts ?? []).map((c: { id: string; name: string; email: string; phone: string }) => ({
+          value: c.id,
+          label: c.name || c.email || c.phone || "Sem nome",
+        }));
+        setNomesDeContato((m) => ({ ...m, ...Object.fromEntries(lista.map((o) => [o.value, o.label])) }));
+        setContatosOpcoes(lista);
+      })
+      .catch(() => undefined);
+  }, []);
+  React.useEffect(() => {
+    buscarContatos("");
+  }, [buscarContatos]);
+  const selecionadosDeContato = estado.listas.contato;
+  const opcoesDeContato = React.useMemo(() => {
+    const ja = new Set(contatosOpcoes.map((o) => o.value));
+    const extras = (selecionadosDeContato ?? []).filter((id) => !ja.has(id)).map((id) => ({ value: id, label: nomesDeContato[id] ?? "Contato escolhido" }));
+    return [...extras, ...contatosOpcoes];
+  }, [contatosOpcoes, selecionadosDeContato, nomesDeContato]);
+
+  const barraOpcoes = React.useMemo(() => ({ ...opcoesDaBarra(opcoes), contato: opcoesDeContato }), [opcoes, opcoesDeContato]);
+  const editor = React.useMemo(
+    () => ({
+      catalogo: CAMPOS_DE_NEGOCIO,
+      opcoes: opcoesDoEditor(opcoes),
+      extras: opcoesExtrasDoEditor(opcoes, opcoesDeContato.map((o) => ({ id: o.value, label: o.label }))),
+      campoInicialId: "etapa",
+      entidade: "negócios",
+    }),
+    [opcoes, opcoesDeContato]
   );
+
+  // ── Voz da Eva (sobre os cartões carregados) ──
+  const eva = estilo !== "classico";
+  const [recadoDispensado, setRecadoDispensado] = usePreferencia<string>("eva:negocios:recado", "", [hoje]);
+  const recado = React.useMemo(
+    () => (carregando || !eva ? null : montarRecado(stages, agora, opcoes.meuNome, gargaloDaConversao(conversao))),
+    [carregando, eva, stages, agora, conversao, opcoes.meuNome]
+  );
+  const momentosDoFunil = React.useMemo(() => (eva ? momentos(stages, agora) : []), [eva, stages, agora]);
+  const atencaoDoDia = React.useMemo(() => listaDeAtencao(stages, agora), [stages, agora]);
+  const acontecimentosDoDia = React.useMemo(() => desdeOntem(stages, agora), [stages, agora]);
+
+  function aoAcaoDaAtencao(item: ItemDeAtencao) {
+    // WhatsApp vai direto para a conversa; o resto abre a prévia.
+    if (item.acao === "whatsapp" && item.deal.whatsapp) {
+      router.push(`/conversas?c=${item.deal.whatsapp.conversationId}`);
+      return;
+    }
+    abrirDoQuadro(item.deal);
+  }
   function aoAcaoDoRecado(id: AcaoDoRecado) {
     if (id === "novo") return setNovoNaEtapa("");
     if (id === "gargalo") {
       const g = gargaloDaConversao(conversao);
       const coluna = g && [...document.querySelectorAll<HTMLElement>("[data-etapa]")].find((el) => el.dataset.etapa === g.de);
-      coluna?.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
+      coluna?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
       return;
     }
     // Retornos, não lidas e parados caem todos em "Precisam de atenção".
-    setFiltros((f) => ({ ...f, visao: "atencao" }));
-    document.querySelector('[aria-label="Visões"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setEstado({ ...estado, visao: "atencao", pagina: 1 });
   }
 
-  // Comemoração (variação 2): negócio que apareceu na etapa ganha desde a
-  // última carga, venha do arraste, da prévia ou de outra pessoa. A primeira
-  // carga só registra quem já estava lá.
-  const [festa, setFesta] = React.useState<{
-    titulo: string;
-    detalhe: string;
-  } | null>(null);
-  const ganhosVistos = React.useRef<{
-    quadro: string;
-    ids: Set<string>;
-  } | null>(null);
+  // Comemoração: negócio que apareceu na etapa ganha desde a última olhada
+  // (arraste, prévia ou outra pessoa) e fechou agora há pouco. Trocar de
+  // filtro ou carregar mais cartões revela ganhos antigos: esses não contam.
+  const [festa, setFesta] = React.useState<{ titulo: string; detalhe: string } | null>(null);
+  const ganhosVistos = React.useRef<{ quadro: string; ids: Set<string> } | null>(null);
   React.useEffect(() => {
-    if (isLoading) return;
-    // O quadro é identificado pelas próprias etapas carregadas: trocar de funil
-    // muda as etapas e só registra os ganhos dele, sem comemorar nada.
-    const quadro = stages.map((e) => e.id).join(",");
-    const ganhos = stages.filter((e) => e.type === "won").flatMap((e) => e.deals);
-    const ids = new Set(ganhos.map((d) => d.id));
+    if (carregando) return;
+    const chave = stages.map((e) => e.id).join(",") + chaveAtrasada;
+    const etapaGanha = stages.find((e) => e.type === "won");
+    const ids = new Set(etapaGanha?.deals.map((d) => d.id) ?? []);
     const antes = ganhosVistos.current;
-    ganhosVistos.current = { quadro, ids };
-    if (!antes || antes.quadro !== quadro || (estilo !== "v2" && estilo !== "v3")) return;
-    const novo = ganhos.find((d) => !antes.ids.has(d.id));
+    ganhosVistos.current = { quadro: chave, ids };
+    if (!antes || antes.quadro !== chave || (estilo !== "v2" && estilo !== "v3")) return;
+    const recente = (d: NegocioKanban) => !d.closedAt || Date.now() - Date.parse(d.closedAt) < 15 * 60_000;
+    const novo = etapaGanha?.deals.find((d) => !antes.ids.has(d.id) && recente(d));
     if (!novo) return;
     const titulo = novo.company?.name || novo.contacts[0]?.name || novo.name;
-    // Evento externo (a carga do quadro) dispara o aviso: não é estado derivado.
-    // No arraste o cartão chega antes do servidor carimbar o fechamento: conta ele também.
-    setFesta(comemoracao(titulo, novo.amountCents, dadosDoResumo.ganhosNoMes + (novo.closedAt ? 0 : 1)));
-  }, [isLoading, stages, estilo, dadosDoResumo.ganhosNoMes]);
+    setFesta(comemoracao(titulo, novo.amountCents, etapaGanha?.count ?? ids.size));
+  }, [carregando, stages, estilo, chaveAtrasada]);
   const fecharFesta = React.useCallback(() => setFesta(null), []);
 
-  const donos = React.useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of stages) for (const d of s.deals) if (d.owner) m.set(d.owner.id, d.owner.name || "Sem nome");
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [stages]);
-  const maiorTotalAberto = Math.max(0, ...visiveis.filter((s) => s.type === "open").map((s) => s.totalCents));
-  const filtrando = !!(filtros.busca?.trim() || filtros.dono || (filtros.visao && filtros.visao !== "todos"));
-  const totalVisivel = visiveis.reduce((s, e) => s + e.deals.length, 0);
+  // ── Arrastar ──
   const etapaGanha = stages.find((s) => s.type === "won");
   const etapaPerdida = stages.find((s) => s.type === "lost");
-  // Busca no funil inteiro (não só no filtrado): mover pela prévia não pode fechá-la.
-  const previa = previaId
-    ? (stages.flatMap((etapa) => etapa.deals.filter((d) => d.id === previaId).map((deal) => ({ deal, etapa })))[0] ?? null)
-    : null;
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
@@ -325,329 +374,254 @@ export default function NegociosPage() {
     const alvo = event.over ? String(event.over.id) : "";
     const stageId = alvo === ZONA_GANHO ? etapaGanha?.id : alvo === ZONA_PERDIDO ? etapaPerdida?.id : alvo;
     if (!stageId) return;
-
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
-
-    // Move na tela antes da resposta: esperar o servidor para ver o card mudar
-    // de coluna é o que faz kanban parecer lento.
     const deal = from.deals.find((d) => d.id === dealId)!;
-    setStages((prev) =>
-      prev.map((s) => {
-        if (s.id === from.id) return { ...s, deals: s.deals.filter((d) => d.id !== dealId) };
-        if (s.id === stageId)
-          return {
-            ...s,
-            deals: [{ ...deal, stageSince: new Date().toISOString() }, ...s.deals],
-          };
-        return s;
-      }),
-    );
-
+    // Move na tela antes da resposta: esperar o servidor deixa o quadro lento.
+    setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
     const res = await fetch(`/api/deals/${dealId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stageId }),
     }).catch(() => null);
-    if (!res?.ok) setError(`Não foi possível mover "${deal.name}". A tela voltou ao estado salvo.`);
-    // Recarrega de qualquer forma: totais, chance e ordem mudaram.
-    refresh();
+    if (!res?.ok) {
+      setErro(`Não foi possível mover "${deal.name}". A tela voltou ao estado salvo.`);
+      setVersao((v) => v + 1);
+    }
   }
 
-  // Exportar leva o funil escolhido e os filtros da tela (busca, responsável, visão).
+  // ── Prévia ──
+  const etapasDaPrevia: EtapaDaPrevia[] = stages.length
+    ? stages
+    : (pipeline?.stages ?? []).map((s) => ({ id: s.id, name: s.name, type: s.type, color: "" }));
+  function abrirDoQuadro(deal: NegocioKanban) {
+    const etapa = stages.find((s) => s.deals.some((d) => d.id === deal.id));
+    if (etapa) setPrevia({ id: deal.id, deal, etapa });
+  }
+  function abrirDaLista(linha: LinhaDeNegocio) {
+    const etapa = etapasDaPrevia.find((s) => s.id === linha.stage.id) ?? { ...linha.stage, color: "" };
+    setPrevia({ id: linha.id, deal: linha, etapa });
+  }
+  // Depois de mover pela prévia, o cartão aparece na coluna nova: usa ele.
+  const previaAtual = previa
+    ? (stages.flatMap((e) => e.deals.filter((d) => d.id === previa.id).map((deal) => ({ deal, etapa: e as EtapaDaPrevia })))[0] ?? previa)
+    : null;
+
+  // ── Topo ──
+  const abertas = stages.filter((s) => s.type === "open");
+  const qtdAbertos = abertas.reduce((s, e) => s + (e.count ?? e.deals.length), 0);
+  const totalAberto = abertas.reduce((s, e) => s + e.totalCents, 0);
+  const ponderado = abertas.reduce((s, e) => s + e.weightedCents, 0);
+  const descricao = quadro
+    ? `${qtdAbertos.toLocaleString("pt-BR")} ${qtdAbertos === 1 ? "negócio aberto" : "negócios abertos"} · ${formatMoney(totalAberto / 100)} no funil · ${formatMoney(ponderado / 100)} ponderado`
+    : undefined;
+
+  // Exportar leva o funil e o que a exportação já entende (busca, visão, um
+  // proprietário). Os demais filtros da barra ainda não (ver plano, L5).
   const consultaDeExportacao = React.useMemo(() => {
     const p = new URLSearchParams();
     if (pipelineId) p.set("pipeline", pipelineId);
-    if (filtros.busca?.trim()) p.set("busca", filtros.busca.trim());
-    if (filtros.dono) p.set("dono", filtros.dono);
-    if (filtros.visao && filtros.visao !== "todos") p.set("visao", filtros.visao);
+    if (estado.busca.trim()) p.set("busca", estado.busca.trim());
+    const donos = estado.listas.responsavel ?? [];
+    if (donos.length === 1) p.set("dono", donos[0] === SEM_VALOR ? "__sem" : donos[0]);
+    if (estado.visao !== "todos") p.set("visao", estado.visao);
     return p.toString();
-  }, [pipelineId, filtros.busca, filtros.dono, filtros.visao]);
+  }, [pipelineId, estado.busca, estado.listas.responsavel, estado.visao]);
 
-  const contagemDaVisao = (v: VisaoSalva) =>
-    v === "todos" ? null : filtrarEtapas(stages, { visao: v, meuId }, agora).reduce((s, e) => s + e.deals.length, 0);
-
-  const seletorDeFunil = (
-    <>
-      {pipelines.length > 1 && (
-        <div className="w-[180px]">
-          <label htmlFor="pipeline" className="sr-only">
-            Funil
-          </label>
-          <Select id="pipeline" value={pipelineId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-[13px]">
-            {pipelines.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
-    </>
-  );
-  const acoesDoTopo = (
-    <>
-      <Link
-        href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
-        aria-label="Personalizar o cartão, os funis e os campos"
-        title="Personalizar o cartão, os funis e os campos"
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-      >
-        <SlidersHorizontal size={14} aria-hidden /> <span className="hidden sm:inline">Personalizar</span>
-      </Link>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label="Exportar o funil"
-          title={filtrando ? "Exportar o funil com os filtros atuais" : "Exportar o funil"}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-        >
-          <Download size={14} aria-hidden /> <span className="hidden sm:inline">Exportar</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[230px]">
-          <DropdownMenuItem asChild>
-            <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`)} download>
-              <FileSpreadsheet size={15} aria-hidden /> Planilha (CSV)
-            </a>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&itens=1${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`)} download>
-              <FileSpreadsheet size={15} aria-hidden /> Planilha de produtos (CSV)
-            </a>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/negocios/relatorio?imprimir=1${consultaDeExportacao ? `&${consultaDeExportacao}` : ""}`}>
-              <FileText size={15} aria-hidden /> Relatório (PDF)
-            </Link>
-          </DropdownMenuItem>
-          {filtrando && <p className="px-3 pb-1.5 pt-1 text-[11.5px] text-text-tertiary">Sai com os filtros aplicados na tela.</p>}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Button onClick={() => setNovoNaEtapa("")} className="h-9 rounded-lg px-3.5 text-[13px]" title="Novo negócio (N)">
-        <Plus size={15} aria-hidden /> Novo negócio
-      </Button>
-    </>
-  );
+  const linkDeAcao = cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 px-0");
 
   return (
-    <div className="flex min-h-0 flex-col gap-5">
-      {estilo !== "classico" ? (
-        <>
-          <CabecalhoAssinatura
-            funil={pipelines.find((p) => p.id === pipelineId)?.name ?? "Funil"}
-            frase={fraseDoTopo}
-            seletor={seletorDeFunil}
-            acoes={
-              <>
-                <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
-                {acoesDoTopo}
-              </>
-            }
-          />
-          {recado && recadoDispensado !== hoje && (
-            <RecadoDaEva recado={recado} carimbo={carimbo(agora)} onAcao={aoAcaoDoRecado} onDispensar={() => setRecadoDispensado(hoje)} />
-          )}
-          <Momentos itens={momentosDoFunil} />
-        </>
-      ) : (
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <h1 className="font-display text-[22px] font-semibold tracking-[-0.01em] text-text-primary">Negócios</h1>
-            {seletorDeFunil}
-          </div>
-          <div className="flex items-center gap-2">
-            <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
-            {acoesDoTopo}
-          </div>
-        </header>
-      )}
+    <div className="flex min-h-0 flex-col gap-3">
+      <PageHeader
+        title="Negócios"
+        description={descricao}
+        actions={
+          <>
+            {pipelines.length > 1 && (
+              <Select aria-label="Funil" value={pipelineId} onChange={(e) => (setPrevia(null), gravarParametro("funil", e.target.value))} className="w-48">
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <SegmentedControl
+              label="Visualização"
+              value={modo}
+              onChange={setModo}
+              options={[
+                { value: "kanban", label: "Quadro", icon: <Columns3 aria-hidden="true" /> },
+                { value: "lista", label: "Lista", icon: <Rows3 aria-hidden="true" /> },
+              ]}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary">
+                  <Download size={14} aria-hidden="true" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem asChild>
+                  <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&${consultaDeExportacao}`)} download>
+                    <FileSpreadsheet aria-hidden="true" /> Planilha (CSV)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&itens=1&${consultaDeExportacao}`)} download>
+                    <FileSpreadsheet aria-hidden="true" /> Planilha de produtos (CSV)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/negocios/relatorio?imprimir=1&${consultaDeExportacao}`}>
+                    <FileText aria-hidden="true" /> Relatório (PDF)
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuLabel>Leva o funil, a busca, a visão e um proprietário.</DropdownMenuLabel>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="secondary" onClick={() => setImportando(true)} disabled={!pipeline}>
+              <Upload size={14} aria-hidden="true" />
+              Importar
+            </Button>
+            <Button variant="primary" onClick={() => setNovoNaEtapa("")} title="Criar negócio (N)">
+              <Plus size={14} aria-hidden="true" />
+              Criar negócio
+            </Button>
+          </>
+        }
+      />
 
-      {estilo === "v3" && !isLoading && (
+      {eva && recado && recadoDispensado !== hoje && (
+        <RecadoDaEva recado={recado} carimbo={carimbo(agora)} onAcao={aoAcaoDoRecado} onDispensar={() => setRecadoDispensado(hoje)} />
+      )}
+      {eva && <Momentos itens={momentosDoFunil} />}
+      {estilo === "v3" && !carregando && (
         <DiaDeHoje
           acontecimentos={acontecimentosDoDia}
           atencao={atencaoDoDia.slice(0, 4)}
           total={atencaoDoDia.length}
           onAcao={aoAcaoDaAtencao}
-          onVerTodos={() => {
-            setFiltros((f) => ({ ...f, visao: "atencao" }));
-            document.querySelector("[aria-label=Visões]")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
+          onVerTodos={() => setEstado({ ...estado, visao: "atencao", pagina: 1 })}
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border-subtle pb-2.5">
-        <nav aria-label="Visões" className="-mb-[11px] flex flex-wrap gap-0.5">
-          {VISOES.map((v) => {
-            const ativa = (filtros.visao ?? "todos") === v.id;
-            const n = contagemDaVisao(v.id);
-            return (
-              <button
-                key={v.id}
-                type="button"
-                aria-pressed={ativa}
-                onClick={() => setFiltros((f) => ({ ...f, visao: v.id }))}
-                className={cn(
-                  "relative inline-flex h-9 items-center gap-1.5 rounded-t-md px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
-                  ativa ? "text-text-primary" : "text-text-tertiary hover:text-text-primary",
-                )}
-              >
-                {v.rotulo}
-                {n !== null && n > 0 && (
-                  <span className={cn("tabular-nums text-[11.5px]", v.id === "atencao" ? "text-amber-300" : "text-text-tertiary")}>
-                    {n}
-                  </span>
-                )}
-                {ativa && <span aria-hidden className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-accent-500" />}
-              </button>
-            );
-          })}
-        </nav>
+      <ViewTabs
+        label="Visões de negócios"
+        value={estado.visao}
+        onChange={(v) => setEstado({ ...estado, visao: v, pagina: 1 })}
+        views={VISOES_DE_NEGOCIO.map((v) => ({ id: v.id, label: v.label, count: contagens[v.id] }))}
+      />
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="relative w-[260px] max-w-full">
-            <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-            <label htmlFor="busca-negocio" className="sr-only">
-              Buscar negócio
-            </label>
-            <Input
+      <BarraDeFiltros
+        rotulo="Filtros de negócios"
+        barra={BARRA_DE_NEGOCIOS}
+        estado={estado}
+        onEstado={setEstado}
+        opcoes={barraOpcoes}
+        buscaDeOpcoes={{ contato: buscarContatos }}
+        editor={editor}
+        end={
+          <>
+            <SearchInput
               ref={buscaRef}
-              id="busca-negocio"
-              value={filtros.busca ?? ""}
-              onChange={(e) => setFiltros((f) => ({ ...f, busca: e.target.value }))}
-              placeholder="Buscar negócio, empresa ou contato"
-              className="h-9 rounded-lg pl-8 pr-8 text-[13px]"
+              aria-label="Buscar negócios"
+              placeholder="Buscar por nome"
+              value={estado.busca}
+              onValueChange={(q) => setEstado({ ...estado, busca: q, pagina: 1 })}
+              className="w-56"
             />
-            <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border-default px-1.5 font-sans text-[11px] text-text-tertiary">
-              /
-            </kbd>
-          </div>
-          <div className="w-[170px]">
-            <label htmlFor="filtro-dono" className="sr-only">
-              Responsável
-            </label>
-            <Select
-              id="filtro-dono"
-              value={filtros.dono ?? ""}
-              onChange={(e) => setFiltros((f) => ({ ...f, dono: e.target.value || undefined }))}
-              className="h-9 rounded-lg text-[13px]"
+            {modo === "kanban" ? (
+              <Button variant="ghost" onClick={() => gravarRecolhidas(tudoRecolhido ? [] : idsDasEtapas)} disabled={!stages.length}>
+                {tudoRecolhido ? <ChevronsLeftRight size={14} aria-hidden="true" /> : <ChevronsRightLeft size={14} aria-hidden="true" />}
+                {tudoRecolhido ? "Expandir tudo" : "Recolher tudo"}
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => setEditandoColunas(true)}>
+                <Columns3 size={14} aria-hidden="true" />
+                Editar colunas
+              </Button>
+            )}
+            <Link
+              href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
+              aria-label="Configurar o cartão, os funis e os campos"
+              title="Configurar o cartão, os funis e os campos"
+              className={linkDeAcao}
             >
-              <option value="">Todos os responsáveis</option>
-              {donos.map(([id, nome]) => (
-                <option key={id} value={id}>
-                  {nome}
-                </option>
-              ))}
-              <option value="__sem">Sem responsável</option>
-            </Select>
-          </div>
-          <div
-            role="radiogroup"
-            aria-label="Visualização"
-            className="inline-flex shrink-0 rounded-lg border border-border-subtle bg-surface-1 p-0.5"
-          >
-            {(
-              [
-                ["kanban", "Quadro", Columns3],
-                ["lista", "Lista", Rows3],
-              ] as const
-            ).map(([v, rotulo, Icone]) => (
-              <button
-                key={v}
-                type="button"
-                role="radio"
-                aria-checked={visao === v}
-                onClick={() => setVisao(v)}
-                className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60",
-                  visao === v ? "bg-surface-3 text-text-primary" : "text-text-tertiary hover:text-text-primary",
-                )}
-              >
-                <Icone size={13} aria-hidden /> {rotulo}
-              </button>
-            ))}
-          </div>
-          <LegendaDoQuadro />
-        </div>
-      </div>
+              <Settings size={16} aria-hidden="true" />
+            </Link>
+            <LegendaDoQuadro />
+            <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
+          </>
+        }
+      />
 
-      {filtrando && (
-        <div className="-mt-2 flex items-center gap-2 text-[12px] text-text-tertiary" aria-live="polite">
-          <span>
-            {totalVisivel} {totalVisivel === 1 ? "negócio" : "negócios"}
-          </span>
-          <button
-            type="button"
-            onClick={() => setFiltros({ visao: "todos" })}
-            className="inline-flex items-center gap-1 rounded px-1 text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-          >
-            <X size={12} aria-hidden /> Limpar filtros
-          </button>
-        </div>
+      {erro && (
+        <Notice tone="danger" onDismiss={() => setErro(null)}>
+          {erro}
+        </Notice>
+      )}
+      {conflito && (
+        <Notice tone="warning">
+          “Precisam de atenção” não combina com filtros avançados em grupos “ou então”: a visão está mostrando só os abertos. Troque a combinação para “e
+          também” nos filtros avançados.
+        </Notice>
+      )}
+      {modo === "kanban" && quadro && quadro.avisos.length > 0 && <Notice tone="warning">{quadro.avisos.join(" ")}</Notice>}
+      {modo === "kanban" && quadro?.truncado && (
+        <Notice tone="warning">Um filtro por campo personalizado de número ou data olhou só os primeiros 5.000 negócios; o quadro pode estar incompleto.</Notice>
       )}
 
-      {error && (
-        <div role="alert" className="flex items-start justify-between gap-3 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            aria-label="Fechar aviso"
-            className="shrink-0 rounded p-0.5 hover:bg-danger/15"
-          >
-            <X size={14} aria-hidden />
-          </button>
-        </div>
-      )}
-
-      {isLoading && stages.length === 0 ? (
-        <div className="flex gap-2.5 overflow-hidden" aria-busy="true" aria-label="Carregando negócios">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[420px] w-[288px] shrink-0 animate-pulse rounded-xl border border-border-subtle bg-surface-1" />
+      {!pipelines.length && !carregando ? (
+        <EmptyState icon={<Handshake />} title="Nenhum funil configurado" description="Um funil padrão é criado sozinho na primeira vez que você abre esta tela." />
+      ) : modo === "lista" ? (
+        <ListaDeNegocios
+          filtro={filtro}
+          pipelineId={pipelineId}
+          estado={estado}
+          onEstado={setEstado}
+          defs={quadro?.defs ?? []}
+          agora={agora}
+          versao={versao}
+          chaveDasColunas={chaveDasColunas("negocios", contrato, opcoes.meuId)}
+          editandoColunas={editandoColunas}
+          onEditandoColunas={setEditandoColunas}
+          onAbrir={abrirDaLista}
+        />
+      ) : !quadro ? (
+        <div className="flex gap-2 overflow-hidden" aria-busy="true" aria-label="Carregando negócios">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-lg" />
           ))}
         </div>
-      ) : stages.length === 0 ? (
-        <EmptyState
-          icon={<Handshake size={36} className="text-text-tertiary" />}
-          title="Nenhum funil configurado"
-          description="Um funil padrão é criado sozinho na primeira vez que você abre esta tela."
-        />
-      ) : visao === "lista" ? (
-        <ListView etapas={visiveis} agora={agora} onAbrir={(d) => setPreviaId(d.id)} />
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-[440px] snap-x gap-2.5 overflow-x-auto pb-4 [max-height:calc(100dvh-300px)]">
-                {visiveis.map((stage, i) => (
+              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [max-height:calc(100dvh-260px)]">
+                {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
                     etapa={stage}
-                    etapaAnterior={
-                      visiveis
-                        .slice(0, i)
-                        .filter((e) => e.type === "open")
-                        .at(-1)?.name ?? null
-                    }
-                    defs={defs}
-                    layout={layout}
+                    etapaAnterior={stages.slice(0, i).filter((e) => e.type === "open").at(-1)?.name ?? null}
+                    defs={quadro.defs}
+                    layout={quadro.layout}
                     agora={agora}
-                    maiorTotalAberto={maiorTotalAberto}
                     arrastandoAlgo={!!dragging}
-                    onAbrir={(d) => setPreviaId(d.id)}
+                    recolhida={recolhidas.includes(stage.id)}
+                    carregandoMais={carregandoMais.has(stage.id)}
+                    onRecolher={(v) => gravarRecolhidas(v ? [...recolhidas, stage.id] : recolhidas.filter((id) => id !== stage.id))}
+                    onCarregarMais={() => carregarMais(stage)}
+                    onAbrir={abrirDoQuadro}
                     onNovo={(id) => setNovoNaEtapa(id)}
                   />
                 ))}
               </div>
               <ZonasDeFechamento visivel={!!dragging && dragging.tipo === "open"} temGanho={!!etapaGanha} temPerdido={!!etapaPerdida} />
             </div>
-            <DragOverlay
-              dropAnimation={{
-                duration: 180,
-                easing: "cubic-bezier(0.2, 0, 0, 1)",
-              }}
-            >
-              {dragging && (
-                <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={defs} agora={agora} layout={layout} arrastando />
-              )}
+            <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+              {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />}
             </DragOverlay>
           </DndContext>
         </VozDoQuadro.Provider>
@@ -655,31 +629,41 @@ export default function NegociosPage() {
 
       {festa && <Comemoracao titulo={festa.titulo} detalhe={festa.detalhe} onFim={fecharFesta} />}
 
-      {previa && (
+      {previaAtual && (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <PreviaDoNegocio
-            key={previa.deal.id}
-            deal={previa.deal}
-            etapa={previa.etapa}
-            etapas={stages}
-            layout={layout}
-            defs={defs}
+            key={previaAtual.deal.id}
+            deal={previaAtual.deal}
+            etapa={previaAtual.etapa}
+            etapas={etapasDaPrevia}
+            layout={quadro?.layout ?? LAYOUT_PADRAO}
+            defs={quadro?.defs ?? []}
             agora={agora}
-            onFechar={() => setPreviaId(null)}
-            onMudou={refresh}
+            onFechar={() => setPrevia(null)}
+            onMudou={() => setVersao((v) => v + 1)}
           />
         </VozDoQuadro.Provider>
       )}
 
       {novoNaEtapa !== null && (
-        <NewDealModal
+        <NovoNegocio
           pipelines={pipelines}
           pipelineId={pipelineId}
           etapaInicial={novoNaEtapa}
           onClose={() => setNovoNaEtapa(null)}
           onCreated={() => {
             setNovoNaEtapa(null);
-            refresh();
+            setVersao((v) => v + 1);
+          }}
+        />
+      )}
+      {importando && pipeline && (
+        <ImportarNegocios
+          pipeline={pipeline}
+          onClose={() => setImportando(false)}
+          onDone={() => {
+            setImportando(false);
+            setVersao((v) => v + 1);
           }}
         />
       )}
@@ -687,198 +671,11 @@ export default function NegociosPage() {
   );
 }
 
-function NewDealModal({
-  pipelines,
-  pipelineId,
-  etapaInicial,
-  onClose,
-  onCreated,
-}: {
-  pipelines: PipelineOption[];
-  pipelineId: string;
-  /** Vazio = primeira etapa; o "+" da coluna já manda a etapa dela. */
-  etapaInicial: string;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [form, setForm] = React.useState({
-    name: "",
-    amount: "",
-    stageId: etapaInicial,
-    description: "",
-  });
-  const [contactQuery, setContactQuery] = React.useState("");
-  const [contacts, setContacts] = React.useState<{ id: string; name: string; email: string }[]>([]);
-  const [contactId, setContactId] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [campos, setCampos] = React.useState<DefinicaoDeCampo[]>([]);
-  const [rascunho, setRascunho] = React.useState<Rascunho>({});
-
-  const pipeline = pipelines.find((p) => p.id === pipelineId) ?? pipelines[0];
-
-  React.useEffect(() => {
-    if (!pipeline?.id) return;
-    fetch(`/api/custom-fields?entity=deal&pipelineId=${pipeline.id}`)
-      .then((r) => r.json())
-      .then((d) => setCampos(d.fields ?? []))
-      .catch(() => setCampos([]));
-  }, [pipeline?.id]);
-
-  React.useEffect(() => {
-    if (contactQuery.trim().length < 2) {
-      setContacts([]);
-      return;
-    }
-    const timer = setTimeout(() => {
-      fetch(`/api/contacts?q=${encodeURIComponent(contactQuery)}`)
-        .then((r) => r.json())
-        .then((d) => setContacts(d.contacts ?? []))
-        .catch(() => setContacts([]));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [contactQuery]);
-
-  async function save() {
-    const amount = reaisDigitados(form.amount);
-    if (amount === null) {
-      setError("Valor inválido (máximo R$ 21 milhões).");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const res = await fetch("/api/deals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        pipelineId: pipeline?.id,
-        stageId: form.stageId || undefined,
-        amount,
-        description: form.description,
-        contactId: contactId || undefined,
-        customFields: rascunhoParaEnvio(campos, rascunho),
-      }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      setError((await res.json()).error ?? "Não foi possível criar o negócio.");
-      return;
-    }
-    onCreated();
-  }
-
+export default function NegociosPage() {
+  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página.
   return (
-    <Modal open onOpenChange={(open) => !open && onClose()}>
-      <ModalContent title="Novo negócio">
-        <div className="flex flex-col gap-4">
-          <div>
-            <Label htmlFor="deal-name">Nome</Label>
-            <Input
-              id="deal-name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Implantação para Acme"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="deal-amount">Valor</Label>
-              <Input
-                id="deal-amount"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                placeholder="1500,00"
-              />
-            </div>
-            <div>
-              <Label htmlFor="deal-stage">Etapa</Label>
-              <Select id="deal-stage" value={form.stageId} onChange={(e) => setForm({ ...form, stageId: e.target.value })}>
-                <option value="">Primeira etapa</option>
-                {(pipeline?.stages ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="deal-contact">Contato</Label>
-            <Input
-              id="deal-contact"
-              value={contactQuery}
-              onChange={(e) => {
-                setContactQuery(e.target.value);
-                setContactId("");
-              }}
-              placeholder="Buscar por nome, e-mail ou telefone"
-            />
-            {contacts.length > 0 && !contactId && (
-              <div className="mt-1.5 flex max-h-[140px] flex-col overflow-y-auto rounded-xl bg-surface-2 p-1">
-                {contacts.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setContactId(c.id);
-                      setContactQuery(c.name || c.email);
-                      setContacts([]);
-                    }}
-                    className="rounded-lg px-2.5 py-1.5 text-left text-[13px] text-text-secondary hover:bg-surface-3 hover:text-text-primary"
-                  >
-                    {c.name || "Sem nome"} <span className="text-text-tertiary">{c.email}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {contactId && (
-              <p className="mt-1.5 inline-flex items-center gap-1.5 text-[12px] text-emerald-400">
-                Contato vinculado
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContactId("");
-                    setContactQuery("");
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </p>
-            )}
-          </div>
-
-          <CamposDoFormulario
-            defs={campos}
-            rascunho={rascunho}
-            prefixo="novo"
-            colunas={2}
-            onChange={(k, v) => setRascunho((r) => ({ ...r, [k]: v }))}
-          />
-
-          <div>
-            <Label htmlFor="deal-desc">Observações</Label>
-            <Textarea
-              id="deal-desc"
-              rows={2}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-
-          {error && <p className="text-[13px] text-danger">{error}</p>}
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button onClick={save} disabled={busy || !form.name.trim()}>
-              {busy && <Loader2 size={15} className="animate-spin" />} Criar
-            </Button>
-          </div>
-        </div>
-      </ModalContent>
-    </Modal>
+    <React.Suspense fallback={<div className="flex-1" />}>
+      <NegociosConteudo />
+    </React.Suspense>
   );
 }

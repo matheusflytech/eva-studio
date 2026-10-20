@@ -185,7 +185,7 @@ Números em tabela, Stat e totais: `tabular-nums`.
 | `DataTable` | Lista de registros. Cabeçalho fixo (passe `max-h-*`), ordenação com `aria-sort`, seleção com "Selecionar página", números à direita, `loading` e `empty`. Ordem/paginação controladas por fora (servidor). |
 | `Pagination` | Abaixo da tabela: itens por página 25/50/100, "1–25 de 24.752", números com reticências. |
 | `Stat` | Número + rótulo + variação escrita com seta. `inverse` quando subir é ruim. |
-| `KanbanColumn` / `KanbanCard` | Casca do quadro: cabeçalho (nome, contagem, recolher), cartões simples, rodapé Total e Ponderado. Drag-and-drop fica na tela. |
+| `KanbanColumn` / `KanbanCard` | Casca do quadro: cabeçalho (nome, contagem, `headerActions`, recolher), cartões simples, rodapé Total e Ponderado (+ `footerNote`, ex.: "30 de 120 carregados"). Drag-and-drop fica na tela: `containerRef` recebe o alvo de soltar e `highlighted` mostra "solte aqui". |
 | `Skeleton` | Carregamento no formato do conteúdo final. |
 | `ThemeToggle` | Alternar sistema → claro → escuro. |
 
@@ -226,7 +226,7 @@ Exemplos tirados do código atual. Não copie; ao migrar a tela, troque.
    → Painel neutro + `Badge variant="warning"` ou ícone `text-warning`.
 2. **Brilho / gradiente radial.** `radial-gradient(ellipse at top left, rgba(245,247,250,0.12)...)`
    (`src/app/(app)/inicio/page.tsx:81`, `src/components/agent-studio/agent-empty-state.tsx:14`);
-   brilho que "respira" (`eva-respira` em `src/components/crm/negocios/eva-topo.tsx:43`);
+   brilho que "respira" (`eva-respira`, já removido de Negócios na L3);
    gradiente de três cores (`src/components/agent-studio/builder/conversation-mode.tsx:178`).
    → Fundo liso `bg-page`/`bg-panel`. O degradê azul → `#99ccff` do site da Eva
    não entra no produto (no máximo num único lugar de marca; hoje, nenhum).

@@ -118,7 +118,27 @@ referência de função).
 - Exportar CSV do que está filtrado (reaproveita `src/lib/exportar`); Importar continua.
 - Testes de componente/funções puras: formatação de telefone por DDI, montagem do filtro a partir da barra, persistência de colunas.
 
-### Fase L3. Negócios: quadro e lista no mesmo nível
+### Fase L3. Negócios: quadro e lista no mesmo nível — FEITA (2026-10-19, branch feat/dashboards-funil)
+
+**O que foi entregue**
+- `src/app/(app)/[contrato]/negocios/page.tsx` reescrita: PageHeader (descrição com abertos, total e ponderado agregados), seletor de funil (`?funil=` na URL), Quadro | Lista (SegmentedControl), Exportar, Importar, Criar negócio; abas de visão com contagem (Todos, Meus, Precisam de atenção, Fechando este mês — `components/crm/negocios/visoes.ts`, todas no motor; "atenção" = grupo OU parado > 7 dias / tarefa atrasada / previsão vencida, só aberto).
+- Barra igual à de contatos: Contatos (busca no servidor), Empresas, Proprietário, Equipes, Tarefas, Etiquetas, Produtos, Criado em, Fechado em + Filtros avançados (catálogo de negócio), busca, Recolher/Expandir tudo, engrenagem (configurar cartão), "Como ler", seletor de estilo.
+- Quadro paginado: `GET /api/deals?porEtapa=30&filtro=`; "Carregar mais" automático ao rolar o fim da coluna (IntersectionObserver + botão), `juntarCartoes` sem duplicar; rodapé Total/Ponderado do agregado + "N de M carregados"; recolher coluna e tudo (localStorage por usuário+contrato+funil até a L4).
+- Arrastar entre etapas e zonas Ganho/Perdido mantidos; o movimento otimista agora acerta contagem/total/ponderado (`moverCartao`) e só recarrega se o servidor recusar (preserva os "carregar mais").
+- Cartão no design system (sem borda âmbar, avatar cinza, sinal vira Badge de status, WhatsApp em `text-success`), respeitando o layout personalizável; rodapé fixo "31 minutos / 3 horas / 2 dias nesta etapa" quando o layout não tem "Tempo na etapa" (o texto do campo também passou a minutos/horas/dias).
+- Lista: `ListaDeNegocios` (DataTable, `POST /api/deals/busca`, ordenação no servidor, colunas editáveis com campos personalizados, seleção, soma do filtro, Pagination).
+- Eva · 1/2/3 mantidos e restilizados: cabeçalho com brilho e a marca "A" (MarcaEva) saíram — o topo é o PageHeader; recado em painel neutro com eyebrow; momentos em linha; "Desde ontem / Pede sua atenção" em painéis; comemoração em toast neutro. Keyframe `eva-respira` removido.
+- Importar negócios pela tela: `POST /api/deals/import` (CSV até 1.000 linhas, `negocios:criar`) reaproveitando `linhasDoCsv` + `processarLinha` da API v1 em lote (contato achado/criado por e-mail/telefone; etapa padrão escolhida na tela).
+- Prévia, legenda e zonas restilizadas; `list-view.tsx` removido; NewDealModal virou `novo-negocio.tsx`.
+- Design system: KanbanColumn ganhou `containerRef`, `highlighted`, `headerActions`, `footerNote`.
+- Testes: tempo na etapa ("31 minutos", "3 horas", "2 dias"), carregar mais sem duplicar, mover com totais, visões (fim do mês, grupo OU, conflito com avançados em OU).
+
+**Limitações / para depois**
+- A voz da Eva (recado, momentos, "desde ontem", atenção) olha só os cartões carregados (30 por coluna); para valer no funil inteiro precisa de um resumo no servidor.
+- Exportar CSV/PDF ainda usa o filtro antigo (funil, busca, visão e um proprietário); passar o filtro do motor para `/api/deals/exportar` fica para a L5 (exportar em massa).
+- "Precisam de atenção" com avançados em OU de vários grupos não dá para combinar sem mudar o sentido: a tela avisa e mostra só os abertos.
+- Recolhidas e colunas no localStorage até a L4; ações em massa da seleção na L5.
+
 - Mesma barra de filtros rápidos com os campos de negócio (Contatos, Empresas, Proprietário, Equipes*, Tarefas, Etiquetas, Produtos, Criado em, Fechado em) + Filtros avançados.
 - Quadro paginado por coluna (L1), rodapé com Total e Ponderado, recolher coluna e "Recolher tudo" (salvo na visão), tempo na etapa com minutos/horas/dias.
 - Lista paginada no servidor com as mesmas colunas editáveis e seleção.

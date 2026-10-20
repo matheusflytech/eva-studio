@@ -5,7 +5,7 @@
 import { CAMPOS_PADRAO, type CampoDoCartao, type CampoPadrao, type Densidade } from "@/lib/cartao-layout";
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import { resumoDosProdutos } from "@/lib/produtos";
-import { dataCurta, dataCurtaDoDia, diaDaPrevisao, diasParado, dinheiro, sinalDoNegocio, type NegocioKanban } from "./modelo";
+import { dataCurta, dataCurtaDoDia, diaDaPrevisao, dinheiro, sinalDoNegocio, tempoNaEtapa, type NegocioKanban } from "./modelo";
 
 const FUSO = "America/Sao_Paulo";
 
@@ -76,10 +76,11 @@ function dataCompleta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: FUSO });
 }
 
-function tempoNaEtapa(deal: NegocioKanban, agora: Date, curto: boolean): string {
-  const d = Math.max(0, diasParado(deal, agora));
-  if (curto) return d === 0 ? "Entrou hoje" : `${d}d na etapa`;
-  return d === 0 ? "Entrou hoje" : d === 1 ? "1 dia" : `${d} dias`;
+/** "31 minutos nesta etapa" no cartão; "31 minutos" na prévia. */
+function textoDoTempoNaEtapa(deal: NegocioKanban, agora: Date, curto: boolean): string {
+  const t = tempoNaEtapa(deal.stageSince, agora);
+  if (t === "agora") return curto ? "Entrou agora nesta etapa" : "Entrou agora";
+  return curto ? `${t} nesta etapa` : t;
 }
 
 /**
@@ -120,7 +121,7 @@ export function textoDoCampo(
       return curto ? `Fecha ${dataCurtaDoDia(dia)}` : dia.split("-").reverse().join("/");
     }
     case "naEtapaHa":
-      return tempoNaEtapa(deal, ctx.agora, curto);
+      return textoDoTempoNaEtapa(deal, ctx.agora, curto);
     case "criadoEm":
       return curto ? `Criado ${dataCurta(deal.createdAt)}` : dataCompleta(deal.createdAt);
     case "contato":

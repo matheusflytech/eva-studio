@@ -33,6 +33,12 @@ export interface EtapaKanban {
   totalCents: number;
   weightedCents: number;
   deals: NegocioKanban[];
+  /** Quadro paginado: quantos negócios a etapa tem no total (agregado no banco). */
+  count?: number;
+  /** Há mais cartões para carregar nesta coluna. */
+  temMais?: boolean;
+  /** Cursor do último cartão entregue (para "Carregar mais"). */
+  depois?: string | null;
 }
 
 export type VisaoSalva = "todos" | "meus" | "atencao" | "parados" | "fechando";
@@ -291,4 +297,64 @@ export function valorCurto(cents: number): string {
   if (Math.abs(reais) >= 1_000_000) return `R$ ${fmt(reais / 1_000_000)} mi`;
   if (Math.abs(reais) >= 1_000) return `R$ ${fmt(reais / 1_000)} mil`;
   return `R$ ${fmt(reais)}`;
+}
+
+// ---- quadro paginado por coluna ----
+
+/**
+ * Tempo na etapa por extenso: "agora", "1 minuto", "31 minutos", "3 horas",
+ * "2 dias". Arredonda para baixo (31 min e 59 s = "31 minutos").
+ */
+export function tempoNaEtapa(stageSince: string, agora: Date): string {
+  const ms = Math.max(0, agora.getTime() - new Date(stageSince).getTime());
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return "agora";
+  if (min < 60) return min === 1 ? "1 minuto" : `${min} minutos`;
+  const horas = Math.floor(min / 60);
+  if (horas < 24) return horas === 1 ? "1 hora" : `${horas} horas`;
+  const dias = Math.floor(horas / 24);
+  return dias === 1 ? "1 dia" : `${dias} dias`;
+}
+
+/** "Carregar mais": junta os novos no fim, sem repetir quem já está na coluna. */
+export function juntarCartoes(atuais: NegocioKanban[], novos: NegocioKanban[]): NegocioKanban[] {
+  const vistos = new Set(atuais.map((d) => d.id));
+  return [...atuais, ...novos.filter((d) => !vistos.has(d.id) && vistos.add(d.id))];
+}
+
+/**
+ * Move um cartão de coluna na tela antes da resposta do servidor: tira de
+ * uma, põe no topo da outra (com stageSince = agora) e acerta contagem,
+ * total e ponderado das duas (o ponderado usa a chance da etapa de destino,
+ * que é o que o servidor grava ao mover).
+ */
+export function moverCartao(etapas: EtapaKanban[], dealId: string, paraEtapaId: string, agora: Date): EtapaKanban[] {
+  const origem = etapas.find((e) => e.deals.some((d) => d.id === dealId));
+  const destino = etapas.find((e) => e.id === paraEtapaId);
+  if (!origem || !destino || origem.id === destino.id) return etapas;
+  const deal = origem.deals.find((d) => d.id === dealId)!;
+  const pesoAntes = Math.round((deal.amountCents * deal.probability) / 100);
+  const movido: NegocioKanban = { ...deal, probability: destino.probability, stageSince: agora.toISOString() };
+  const pesoDepois = Math.round((movido.amountCents * movido.probability) / 100);
+  return etapas.map((e) => {
+    if (e.id === origem.id) {
+      return {
+        ...e,
+        deals: e.deals.filter((d) => d.id !== dealId),
+        count: e.count !== undefined ? Math.max(0, e.count - 1) : undefined,
+        totalCents: e.totalCents - deal.amountCents,
+        weightedCents: e.weightedCents - pesoAntes,
+      };
+    }
+    if (e.id === destino.id) {
+      return {
+        ...e,
+        deals: [movido, ...e.deals],
+        count: e.count !== undefined ? e.count + 1 : undefined,
+        totalCents: e.totalCents + deal.amountCents,
+        weightedCents: e.weightedCents + pesoDepois,
+      };
+    }
+    return e;
+  });
 }

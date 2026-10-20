@@ -20,32 +20,25 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar as AvatarDS } from "@/components/ui/avatar";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { focusRing } from "@/components/ui/styles";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { LAYOUT_PADRAO, type CampoDoCartao, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { VozDoQuadro } from "./eva-topo";
 import { sinalHumano } from "./eva-voz";
-import { dinheiro, iniciais, pedeAtencao, sinalDoNegocio, type IconeDoSinal, type NegocioKanban } from "./modelo";
+import { dinheiro, sinalDoNegocio, tempoNaEtapa, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
 import { blocosDoCartao, ehPersonalizado, textoDoCampo, tituloDoCartao, type ContextoDoCampo } from "./cartao";
 
-// Tons apagados para avatares: identificam sem gritar (cor viva aleatória é o
-// que deixa kanban com cara de brinquedo). A cor sai do nome, então a mesma
-// pessoa tem sempre a mesma cor.
-const TONS = ["#2b3550", "#3a2f45", "#2d3f3a", "#45372a", "#353a40", "#2a3d47"];
-function tomDoNome(nome: string): string {
-  let h = 0;
-  for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return TONS[h % TONS.length];
-}
-
-export function Avatar({ nome, tamanho = 22, rotulo }: { nome: string; tamanho?: number; rotulo?: string }) {
+/**
+ * Avatar de pessoa no quadro (compatível com a API antiga: nome/tamanho).
+ * Iniciais em cinza do design system, nunca cor por pessoa.
+ */
+export function Avatar({ nome, tamanho = 24, rotulo }: { nome: string; tamanho?: number; rotulo?: string }) {
+  const size = tamanho <= 24 ? "sm" : tamanho <= 32 ? "md" : "lg";
   return (
-    <span
-      title={rotulo ?? nome}
-      aria-label={rotulo ?? nome}
-      className="inline-grid shrink-0 place-items-center rounded-full font-semibold text-text-primary"
-      style={{ width: tamanho, height: tamanho, fontSize: Math.round(tamanho * 0.42), background: tomDoNome(nome) }}
-    >
-      {iniciais(nome)}
+    <span title={rotulo ?? nome} className="inline-flex">
+      <AvatarDS name={nome} size={size} />
     </span>
   );
 }
@@ -71,14 +64,15 @@ const ICONE_DA_LINHA: Partial<Record<CampoDoCartao, LucideIcon>> = {
   produtos: Package,
 };
 
-export const TOM_DO_SINAL = {
-  bad: "bg-danger/12 text-danger",
-  warn: "bg-amber-400/12 text-amber-300",
-  ok: "bg-emerald-400/12 text-emerald-400",
-  neu: "bg-surface-3 text-text-secondary",
-} as const;
+/** Tom do sinal → variante do Badge (cor só em status). */
+export const TOM_DO_SINAL: Record<SinalDoNegocio["tom"], NonNullable<BadgeProps["variant"]>> = {
+  bad: "danger",
+  warn: "warning",
+  ok: "success",
+  neu: "neutral",
+};
 
-/** Chip do próximo passo (um sinal só, do mais urgente para o menos). */
+/** O próximo passo (um sinal só, do mais urgente para o menos). */
 export function SinalDoProximoPasso({ deal, tipoDaEtapa, agora }: { deal: NegocioKanban; tipoDaEtapa: string; agora: Date }) {
   const humana = React.useContext(VozDoQuadro);
   const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora);
@@ -86,10 +80,10 @@ export function SinalDoProximoPasso({ deal, tipoDaEtapa, agora }: { deal: Negoci
   const Icone = ICONE[sinal.icone];
   const texto = humana ? sinalHumano(sinal.texto, sinal.tom) : sinal.texto;
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1 rounded-md px-[7px] py-0.5", TOM_DO_SINAL[sinal.tom])} title={texto}>
-      <Icone size={12} aria-hidden className="shrink-0" />
+    <Badge variant={TOM_DO_SINAL[sinal.tom]} className="min-w-0 max-w-full" title={texto}>
+      <Icone size={12} aria-hidden="true" className="shrink-0" />
       <span className="truncate">{texto}</span>
-    </span>
+    </Badge>
   );
 }
 
@@ -102,9 +96,10 @@ const pararArraste = {
 
 /**
  * Cartão do negócio, montado pelo layout do funil: as informações escolhidas,
- * na ordem escolhida, na densidade escolhida. O que não muda: borda âmbar
- * quando pede atenção, ponto do WhatsApp não lido e o título como link da
- * ficha completa (o resto do cartão abre a prévia).
+ * na ordem escolhida, na densidade escolhida. Fixos: o título é o link da
+ * ficha (o resto do cartão abre a prévia), o ícone de WhatsApp não lido e o
+ * tempo na etapa no rodapé ("31 minutos nesta etapa", quando o layout não o
+ * põe em outro lugar). Superfície neutra; cor só no badge de status.
  */
 export function DealCard({
   deal,
@@ -126,22 +121,20 @@ export function DealCard({
 }) {
   const compacto = layout.densidade === "compacto";
   const { titulo, subtitulo } = tituloDoCartao(deal, layout.campos);
-  const atencao = pedeAtencao(deal, tipoDaEtapa, agora);
   const blocos = blocosDoCartao(layout.campos, layout.densidade);
   const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs };
   const mostraWhatsapp = layout.campos.includes("whatsapp") && !!deal.whatsapp;
-  const espaco = compacto ? "mt-1" : "mt-[9px]";
+  const espaco = compacto ? "mt-1" : "mt-2";
+  const tempo = tempoNaEtapa(deal.stageSince, agora);
+  const mostraTempo = tipoDaEtapa === "open" && !layout.campos.includes("naEtapaHa");
 
-  const classeDoTitulo = "min-w-0 truncate text-[13px] font-medium text-text-primary";
+  const classeDoTitulo = "min-w-0 truncate text-small font-medium text-text-primary";
   const elementoDoTitulo = comLink ? (
     <Link
       href={`/negocios/${deal.id}`}
       {...pararArraste}
       title="Abrir ficha completa"
-      className={cn(
-        classeDoTitulo,
-        "rounded-sm underline-offset-2 outline-none hover:text-accent-400 hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
-      )}
+      className={cn(classeDoTitulo, "rounded-sm underline-offset-2 hover:text-accent-fg hover:underline", focusRing)}
     >
       {titulo}
     </Link>
@@ -152,44 +145,44 @@ export function DealCard({
   return (
     <div
       className={cn(
-        "relative rounded-[10px] border bg-surface-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,border-color,transform] duration-150",
-        "group-hover/card:border-border-default group-hover/card:bg-surface-3 motion-reduce:transition-none",
-        compacto ? "px-2.5 py-[7px]" : "px-3 py-[11px]",
-        atencao ? "border-amber-400/35" : "border-border-subtle",
-        arrastando && "rotate-[1.5deg] border-border-strong bg-surface-3 shadow-[0_12px_32px_rgba(0,0,0,0.5)]",
-        tipoDaEtapa === "lost" && "opacity-65"
+        "relative rounded-md border border-border-subtle bg-panel transition-colors duration-120",
+        "group-hover/card:border-border-strong",
+        compacto ? "px-2.5 py-1.5" : "px-2.5 py-2",
+        arrastando && "border-border-strong shadow-overlay",
+        tipoDaEtapa === "lost" && "opacity-70"
       )}
     >
       <div className="flex items-center gap-2">
-        {!compacto && <Avatar nome={titulo} />}
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
           {elementoDoTitulo}
-          {compacto && subtitulo && <span className="min-w-0 flex-1 truncate text-[11.5px] text-text-tertiary">{subtitulo}</span>}
+          {compacto && subtitulo && <span className="min-w-0 flex-1 truncate text-caption text-text-tertiary">{subtitulo}</span>}
         </span>
         {mostraWhatsapp && deal.whatsapp && (
           <span
-            className="relative inline-flex shrink-0 text-[#25d366] transition-opacity group-hover/card:opacity-0"
+            className="relative inline-flex shrink-0 text-success transition-opacity group-hover/card:opacity-0"
             title={deal.whatsapp.naoLida ? "Mensagem não lida no WhatsApp" : "Tem conversa no WhatsApp"}
           >
-            <MessageCircle size={compacto ? 13 : 15} aria-hidden />
+            <MessageCircle size={14} aria-hidden="true" />
             {deal.whatsapp.naoLida && (
-              <span className="absolute -right-0.5 -top-0.5 h-[7px] w-[7px] rounded-full border-2 border-surface-2 bg-[#25d366]" />
+              <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-success ring-2 ring-panel">
+                <span className="sr-only">Mensagem não lida</span>
+              </span>
             )}
           </span>
         )}
-        {tipoDaEtapa === "lost" && <XCircle size={14} aria-label="Perdido" className="shrink-0 text-rose-400" />}
+        {tipoDaEtapa === "lost" && <XCircle size={14} aria-label="Perdido" className="shrink-0 text-danger" />}
       </div>
 
-      {!compacto && subtitulo && <p className="mt-1 truncate text-[12px] text-text-secondary">{subtitulo}</p>}
+      {!compacto && subtitulo && <p className="mt-0.5 truncate text-caption text-text-secondary">{subtitulo}</p>}
 
       {blocos.map((bloco, i) => {
         if (bloco.tipo === "metricas") {
-          const partes = bloco.campos.map((c) => <Metrica key={c} campo={c} deal={deal} tipoDaEtapa={tipoDaEtapa} compacto={compacto} />);
-          // Sem nada para mostrar (ex.: só chance, num negócio já fechado): não deixa linha vazia.
           if (!bloco.campos.some((c) => temMetrica(c, deal, tipoDaEtapa))) return null;
           return (
             <div key={i} className={cn(espaco, "flex items-center gap-2")}>
-              {partes}
+              {bloco.campos.map((c) => (
+                <Metrica key={c} campo={c} deal={deal} tipoDaEtapa={tipoDaEtapa} />
+              ))}
             </div>
           );
         }
@@ -199,27 +192,22 @@ export function DealCard({
             .filter((i) => i.def && i.texto && !(i.def.type === "checkbox" && deal.customFields?.[i.def.key] !== true));
           if (itens.length === 0) return null;
           return (
-            <div key={i} className={cn(compacto ? "mt-1" : "mt-2", "flex flex-wrap gap-1")}>
+            <div key={i} className={cn(espaco, "flex flex-wrap gap-1")}>
               {itens.map(({ c, def, texto }) => (
-                <span
-                  key={c}
-                  title={def!.label}
-                  className="max-w-full truncate rounded-md bg-surface-3/70 px-1.5 py-0.5 text-[11px] text-text-secondary"
-                >
+                <Badge key={c} title={def!.label} className="max-w-full truncate">
                   {def!.type === "checkbox" ? def!.label : ["select", "multiselect", "text"].includes(def!.type) ? texto : `${def!.label}: ${texto}`}
-                </span>
+                </Badge>
               ))}
             </div>
           );
         }
         if (bloco.campo === "proximoPasso") {
-          const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora);
-          if (!sinal) return null;
+          if (!sinalDoNegocio(deal, tipoDaEtapa, agora)) return null;
           return (
-            <div key={i} className={cn(espaco, "flex items-center gap-1.5 text-[11.5px]")}>
+            <div key={i} className={cn(espaco, "flex items-center gap-1.5")}>
               <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} />
               {deal.openTasks > 1 && (
-                <span className="text-[11px] tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
+                <span className="text-caption tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
                   +{deal.openTasks - 1}
                 </span>
               )}
@@ -232,8 +220,8 @@ export function DealCard({
         const def = personalizado ? defs.find((d) => d.key === bloco.campo.slice(3)) : undefined;
         const Icone = personalizado ? Tag : ICONE_DA_LINHA[bloco.campo] ?? Tag;
         return (
-          <p key={i} className={cn(compacto ? "mt-0.5" : "mt-1.5", "flex min-w-0 items-center gap-1.5 text-[11.5px] text-text-secondary")}>
-            <Icone size={12} aria-hidden className="shrink-0 text-text-tertiary" />
+          <p key={i} className={cn(compacto ? "mt-0.5" : "mt-1", "flex min-w-0 items-center gap-1.5 text-caption text-text-secondary")}>
+            <Icone size={12} aria-hidden="true" className="shrink-0 text-text-tertiary" />
             <span className="truncate">
               {def && <span className="text-text-tertiary">{def.label}: </span>}
               {texto}
@@ -241,6 +229,12 @@ export function DealCard({
           </p>
         );
       })}
+
+      {mostraTempo && (
+        <p className={cn(compacto ? "mt-0.5" : "mt-1.5", "text-caption text-text-tertiary")}>
+          {tempo === "agora" ? "Entrou agora nesta etapa" : `${tempo} nesta etapa`}
+        </p>
+      )}
     </div>
   );
 }
@@ -252,24 +246,19 @@ function temMetrica(campo: CampoDoCartao, deal: NegocioKanban, tipoDaEtapa: stri
   return false;
 }
 
-function Metrica({ campo, deal, tipoDaEtapa, compacto }: { campo: CampoDoCartao; deal: NegocioKanban; tipoDaEtapa: string; compacto: boolean }) {
+function Metrica({ campo, deal, tipoDaEtapa }: { campo: CampoDoCartao; deal: NegocioKanban; tipoDaEtapa: string }) {
   if (campo === "valor") {
     return (
-      <span className={cn("font-display font-semibold tabular-nums text-text-primary", compacto ? "text-[13px]" : "text-[14px]")}>
-        {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="font-sans text-[12px] font-normal text-text-tertiary">Sem valor</span>}
+      <span className="text-small font-medium tabular-nums text-text-primary">
+        {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="font-normal text-text-tertiary">Sem valor</span>}
       </span>
     );
   }
   if (campo === "probabilidade") {
     if (tipoDaEtapa !== "open") return null;
     return (
-      <span className="inline-flex items-center gap-2">
-        <span className="h-[3px] w-[34px] overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <span className="block h-full rounded-full bg-accent-500" style={{ width: `${deal.probability}%` }} />
-        </span>
-        <span className="text-[11px] tabular-nums text-text-tertiary" title="Chance de fechar">
-          {deal.probability}%
-        </span>
+      <span className="text-caption tabular-nums text-text-tertiary" title="Chance de fechar">
+        {deal.probability}%
       </span>
     );
   }
@@ -277,7 +266,7 @@ function Metrica({ campo, deal, tipoDaEtapa, compacto }: { campo: CampoDoCartao;
     if (!deal.owner) return null;
     return (
       <span className="ml-auto">
-        <Avatar nome={deal.owner.name || "Sem nome"} tamanho={compacto ? 16 : 18} rotulo={`Responsável: ${deal.owner.name || "sem nome"}`} />
+        <Avatar nome={deal.owner.name || "Sem nome"} rotulo={`Responsável: ${deal.owner.name || "sem nome"}`} />
       </span>
     );
   }
@@ -286,29 +275,19 @@ function Metrica({ campo, deal, tipoDaEtapa, compacto }: { campo: CampoDoCartao;
 
 /** Ações rápidas que aparecem ao passar o mouse (sem ocupar espaço em repouso). */
 export function AcoesRapidas({ deal }: { deal: NegocioKanban }) {
-  const classe =
-    "grid h-6 w-6 place-items-center rounded-md border border-border-default bg-bg-base outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-500/60";
+  const classe = cn(
+    "grid h-6 w-6 place-items-center rounded-sm border border-border-default bg-panel text-text-secondary hover:border-border-strong hover:text-text-primary",
+    focusRing
+  );
   return (
-    <div className="pointer-events-none absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity duration-150 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
+    <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 flex gap-1 opacity-0 transition-opacity duration-120 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
       {deal.whatsapp && (
-        <Link
-          href={`/conversas?c=${deal.whatsapp.conversationId}`}
-          {...pararArraste}
-          aria-label="Abrir conversa no WhatsApp"
-          title="Abrir conversa"
-          className={cn(classe, "text-[#25d366]")}
-        >
-          <MessageCircle size={13} aria-hidden />
+        <Link href={`/conversas?c=${deal.whatsapp.conversationId}`} {...pararArraste} aria-label="Abrir conversa no WhatsApp" title="Abrir conversa" className={classe}>
+          <MessageCircle size={13} aria-hidden="true" />
         </Link>
       )}
-      <Link
-        href={`/negocios/${deal.id}`}
-        {...pararArraste}
-        aria-label="Abrir ficha completa"
-        title="Abrir ficha completa"
-        className={cn(classe, "text-text-secondary hover:text-text-primary")}
-      >
-        <Maximize2 size={12} aria-hidden />
+      <Link href={`/negocios/${deal.id}`} {...pararArraste} aria-label="Abrir ficha completa" title="Abrir ficha completa" className={classe}>
+        <Maximize2 size={12} aria-hidden="true" />
       </Link>
     </div>
   );

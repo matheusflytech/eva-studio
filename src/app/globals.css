@@ -504,22 +504,6 @@ body {
   background: var(--surface-page);
 }
 
-/* Eva: o brilho do cabeçalho respira devagar e o recado entra de leve. */
-@keyframes eva-respira {
-  0%, 100% { opacity: 0.6; transform: translate3d(0, 0, 0); }
-  50% { opacity: 0.85; transform: translate3d(-8px, 4px, 0); }
-}
-@keyframes eva-entra {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes eva-comemora {
-  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
-  12% { opacity: 1; transform: none; }
-  88% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(6px); }
-}
-
 /* ---------------------------------------------------------------------------
    Impressão (relatório do funil em PDF e dashboard).
 
