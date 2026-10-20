@@ -24,7 +24,7 @@ design system com a identidade da Eva.
 | 1 | ✅ **(feito — ver notas abaixo)** **Regras por etapa**: campos obrigatórios ao entrar na etapa (nunca na criação), motivos de perda configuráveis por funil (lista, não texto livre), "parado" com prazo por etapa (hoje 7 dias fixos) | Só texto livre em `lostReason`; `DIAS_PARADO = 7` para tudo; nenhum campo exigido por etapa | crm-pipeline-kanban |
 | 2 | ✅ **(feito — ver notas abaixo)** **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
 | 3 | ✅ **(feito — ver notas abaixo)** **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
-| 4 | **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
+| 4 | ✅ **(feito — ver notas abaixo)** **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
 | 5 | **Visões salvas** (fase L4) e **ações em massa por filtro** (fase L5) | Abas fixas; seleção sem ações | crm-list-views-search |
 | 6 | **Mesclar duplicados** (contato e empresa) com aviso de possível duplicado na ficha e mescla reversível | Dedupe só na criação/importação | crm-record-pages, crm-leads-import-dedupe |
 | 7 | **CNPJ que se preenche** (BrasilAPI: razão social, fantasia, CNAE, porte, endereço, sócios opcional) e **telefone E.164** de verdade (`+55...`) | CNPJ só validado; telefone gravado como `55...` sem `+` | crm-brazil-integrations, crm-leads-import-dedupe |
@@ -191,6 +191,59 @@ design system com a identidade da Eva.
   recorrência, agenda/calendário e Google Agenda (item 20); feriados no "dia
   útil" da sugestão; expediente e SLA por pessoa/contrato; Início continua
   contando as tarefas do contrato todo (o Meu dia é por pessoa).
+
+### Notas do item 4 (busca global ⌘K / Ctrl+K) — feito em 20/10/2026
+
+- **Onde mora:** parte pura em `src/lib/busca/` (`consulta.ts` normalização,
+  `trecho.ts` destaque, `grupos.ts` ordem/permissões/contexto, `atalhos.ts`,
+  `recentes.ts`, `resultado.ts`); servidor em `src/lib/server/busca.ts` e
+  `GET /api/busca?q=&tipos=negocios,contatos,empresas,notas,mensagens`; tela
+  em `src/components/busca/` (paleta + `registro-em-foco.ts`) e
+  `src/components/ui/command.tsx`.
+- **Dependência nova:** `cmdk` (a base do Command do shadcn). O
+  `shadcn add command` gerava `import { cn } from "cn"` e puxava o pacote
+  `radix-ui` inteiro, então o Command foi escrito com os tokens da casa sobre
+  o `@radix-ui/react-dialog` que já existia.
+- **Servidor:** contrato + permissão por tipo (negocios:ver, contatos:ver,
+  empresas:ver, tarefas:ver p/ notas, conversas:ver p/ mensagens) + escopo de
+  dados (dono do negócio/contato; atendente da conversa; nota de negócio/
+  contato fora do escopo some). Só parâmetros; `Prisma.raw` só com nomes fixos
+  e o schema do pg_trgm validado por regex. Até 8 por tipo.
+- **Matching:** sem acento, cada termo no começo de alguma palavra (E entre
+  termos); negócio também pelo nome da empresa. Telefone: consulta só com
+  dígitos/máscara e **≥ 7 dígitos** (o exemplo "11 99999" tem 7) acha qualquer
+  trecho no telefone principal (legado com máscara também), nos secundários e
+  no id do canal (5511…@s.whatsapp.net). CNPJ: 8–14 dígitos com ou sem
+  pontuação, pelo começo. E-mail: com "@", principal e secundários. Notas: 1
+  ano; mensagens: WhatsApp, 90 dias; as duas com `statement_timeout` local de
+  1,5 s (estourou = aviso, não erro). Sem resultado pelo prefixo e com
+  pg_trgm: segunda volta por semelhança (`<%`, "parecido" na linha).
+- **Banco:** `prisma/sql/2026-10-20-busca.sql` (só aditivo; não aplicado):
+  unaccent + pg_trgm no schema `extensions`, função IMMUTABLE
+  `public.eva_studio_norm` e 12 índices GIN trigram (nomes, e-mails,
+  telefones, canal, CNPJ, notas, mensagens). Sem ele o app detecta e usa
+  `translate(lower())` + LIKE sem índice (mesmo resultado para os acentos do
+  português, mais lento, sem semelhança). Tempo no cabeçalho `Server-Timing`.
+- **Paleta:** 640px, topo em 20vh, campo 48px, linhas 36px; espera 150 ms e
+  cancela a anterior. Ordem: [ações do registro aberto] → Ações → Ir para →
+  Negócios → Contatos → Empresas → Notas e mensagens → Recentes (sem
+  consulta: registro → Recentes → Ações → Ir para). Ações: Criar negócio/
+  contato (`/negocios?novo=` e `/contatos?novo=`), Criar tarefa (quick add do
+  item 3), Enviar WhatsApp para… (conversa no inbox; sem conversa, wa.me),
+  Mudar etapa para… e Atribuir a… na ficha e na prévia do negócio (pelas
+  funções da tela: regras de etapa, modais e desfazer). Recentes: ficha do
+  negócio, prévia, ficha do contato e página da empresa, no localStorage por
+  contrato e pessoa.
+- **Atalhos (prioridade):** Ctrl+K/⌘K sempre (até em campo) → digitando ou
+  com diálogo modal aberto nenhuma letra solta vale → G pendente (1,5 s)
+  consome D/N/C/E/T (o N de Negócios e o T de Tarefas não disparam) → atalhos
+  das telas (N, /, T) como antes → `?` folha de atalhos. ⌘ no Mac, Ctrl no
+  resto. Botão "Buscar" no menu lateral e lupa no topo do celular.
+- **Pendente:** medir o p95 depois de aplicar o SQL (meta < 150 ms; nada foi
+  medido no banco de produção); "Atribuir a…" no contato e na empresa; ações
+  na gaveta antiga do negócio e no painel da conversa; busca em transcrições
+  de áudio; `C` criar contextual (não entrou para não brigar com digitação e
+  com o G); Recentes mais frequentes primeiro.
 
 ## P1
 
