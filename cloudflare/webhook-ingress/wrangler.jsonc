@@ -1,0 +1,35 @@
+// Worker de entrada de webhooks do Eva Studio.
+// Nada aqui é segredo: segredos entram só por `wrangler secret put` (ver README).
+// Os ids "PREENCHER_*" são criados pelo dono da conta Cloudflare no deploy.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eva-webhook-ingress",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-29",
+  "observability": { "enabled": true },
+  "vars": {
+    // Base do app na Vercel; o consumidor entrega em {APP_URL}/api/internal/webhooks.
+    "APP_URL": "https://PREENCHER.vercel.app"
+  },
+  "kv_namespaces": [
+    // Dedupe por id de evento (TTL de 7 dias, o tempo que a Meta re-tenta).
+    { "binding": "DEDUPE", "id": "PREENCHER_ID_DO_KV" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "FILA_ENTRADA", "queue": "eva-webhooks-entrada" },
+      // Usada para mandar direto à fila morta o que nunca vai dar certo (4xx do app).
+      { "binding": "FILA_MORTA", "queue": "eva-webhooks-dlq" }
+    ],
+    "consumers": [
+      {
+        "queue": "eva-webhooks-entrada",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        "max_retries": 20,
+        "max_concurrency": 10,
+        "dead_letter_queue": "eva-webhooks-dlq"
+      }
+    ]
+  }
+}
