@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
-import { registrarExclusao } from "@/lib/server/api-v1/externos";
+import { apagarPelaApi } from "@/lib/server/api-v1/lixeira";
 import {
   CAMPOS_DE_PATCH_DE_CONTATO,
   atualizarContato,
@@ -31,10 +30,9 @@ export const PATCH = rotaV1<P>({ recurso: "contacts" }, async (ctx, { id }) => {
   return NextResponse.json({ data });
 });
 
-// Apaga de verdade (como a tela) e deixa a lápide em /contacts/deleted.
+// Vai para a lixeira (30 dias; POST /contacts/{id}/restore traz de volta) e
+// deixa a lápide em /contacts/deleted. Sem a lixeira no banco, apaga de vez.
 export const DELETE = rotaV1<P>({ recurso: "contacts" }, async (ctx, { id }) => {
   await carregarContato(ctx.orgId, id);
-  await registrarExclusao(ctx.orgId, "contact", id);
-  await prisma.contact.delete({ where: { id } });
-  return NextResponse.json({ data: { id, deleted: true } });
+  return apagarPelaApi(ctx.orgId, "contact", id, "API");
 });

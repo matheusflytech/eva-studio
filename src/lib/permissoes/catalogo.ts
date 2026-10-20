@@ -26,6 +26,9 @@ export const MODULOS = [
   { id: "api", nome: "Chaves de API", acoes: ["gerenciar"] },
   { id: "membros", nome: "Membros, papéis e equipes", acoes: ["gerenciar"] },
   { id: "contrato", nome: "Dados do contrato", acoes: ["gerenciar"] },
+  // Restaurar da lixeira segue a permissão de apagar de cada registro; só o
+  // "Apagar para sempre" (que não tem volta) é separado.
+  { id: "lixeira", nome: "Lixeira", acoes: ["esvaziar"] },
 ] as const;
 
 export const ACOES_ROTULO: Record<string, string> = {
@@ -39,6 +42,7 @@ export const ACOES_ROTULO: Record<string, string> = {
   enviar: "Enviar",
   gerenciar: "Gerenciar",
   configurar: "Configurar",
+  esvaziar: "Apagar para sempre",
 };
 
 type Modulo = (typeof MODULOS)[number];
@@ -107,8 +111,17 @@ export const LEGADO_DO_PAPEL: Record<PapelDeSistema, PermissaoLegada[]> = {
   viewer: ["read"],
 };
 
+/**
+ * Granulares novas que não entram em pacote antigo (entrar num pacote faria
+ * um papel personalizado com só ela passar no `requirePermission` antigo).
+ */
+const EXTRAS_DO_PAPEL: Partial<Record<PapelDeSistema, PermissaoGranular[]>> = {
+  owner: ["lixeira:esvaziar"],
+  admin: ["lixeira:esvaziar"],
+};
+
 export function permissoesDoPapelDeSistema(papel: PapelDeSistema): PermissaoGranular[] {
-  return [...new Set(LEGADO_DO_PAPEL[papel].flatMap((l) => LEGADO_PARA_GRANULAR[l]))].sort();
+  return [...new Set([...LEGADO_DO_PAPEL[papel].flatMap((l) => LEGADO_PARA_GRANULAR[l]), ...(EXTRAS_DO_PAPEL[papel] ?? [])])].sort();
 }
 
 export const PAPEIS_DE_SISTEMA: { id: PapelDeSistema; nome: string; descricao: string }[] = [

@@ -19,12 +19,15 @@ const seq = vi.hoisted(() => ({ enrollContactByTag: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/rate-limit", () => rate);
 vi.mock("@/lib/server/sequences", () => seq);
+const lix = vi.hoisted(() => ({ apagarComLixeira: vi.fn(), lerItemPeloRegistro: vi.fn(), restaurarDaLixeira: vi.fn() }));
+vi.mock("@/lib/server/lixeira", async (original) => ({ ...(await original<object>()), ...lix }));
 
 import { GET, POST } from "./route";
 import { PUT as UPSERT } from "./upsert/route";
 import { PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
 import { PATCH, DELETE } from "./[id]/route";
 import { POST as LOTE } from "./batch/route";
+import { POST as RESTAURAR } from "./[id]/restore/route";
 
 const URL_BASE = "https://eva.test/api/v1/contacts";
 
@@ -235,14 +238,36 @@ describe("PATCH/DELETE /v1/contacts/{id}", () => {
     expect(res.status).toBe(404);
   });
 
-  it("DELETE apaga e grava a lápide com o external_id", async () => {
-    db.externalRef.findMany.mockResolvedValueOnce([{ externalId: "erp-1", source: "api" }]);
+  it("DELETE manda para a lixeira (apaga de vez só sem a lixeira no banco) e devolve a validade", async () => {
+    lix.apagarComLixeira.mockResolvedValueOnce({ lixeira: true, trashId: "tr1", expiresAt: new Date("2026-11-19T12:00:00Z"), aviso: null });
     const res = await DELETE(req("DELETE"), p({ id: "c1" }));
     expect(res.status).toBe(200);
-    expect(db.deletedRecord.create).toHaveBeenCalledWith({
-      data: { orgId: "o1", entity: "contact", entityId: "c1", externalId: "erp-1" },
+    expect(lix.apagarComLixeira).toHaveBeenCalledWith({
+      orgId: "o1",
+      entidade: "contact",
+      id: "c1",
+      quem: { id: null, nome: "API" },
+      seIndisponivel: "apagar",
     });
-    expect(db.contact.delete).toHaveBeenCalledWith({ where: { id: "c1" } });
+    expect((await res.json()).data).toEqual({ id: "c1", deleted: true, trash: { expires_at: "2026-11-19T12:00:00.000Z" } });
+  });
+
+  it("DELETE sem a lixeira no banco: apaga e avisa em warning", async () => {
+    lix.apagarComLixeira.mockResolvedValueOnce({ lixeira: false, trashId: null, expiresAt: null, aviso: "apagado de vez" });
+    const res = await DELETE(req("DELETE"), p({ id: "c1" }));
+    expect((await res.json()).data).toEqual({ id: "c1", deleted: true, trash: null, warning: "apagado de vez" });
+  });
+
+  it("POST /{id}/restore: restaura a última foto do registro; fora da lixeira, 404", async () => {
+    lix.lerItemPeloRegistro.mockResolvedValueOnce({ id: "tr1" });
+    lix.restaurarDaLixeira.mockResolvedValueOnce({ entidade: "contact", entityId: "c1", nome: "Ana", avisos: ["x"] });
+    const res = await RESTAURAR(req("POST"), p({ id: "c1" }));
+    expect(lix.lerItemPeloRegistro).toHaveBeenCalledWith("o1", "contact", "c1");
+    expect((await res.json()).data).toEqual({ id: "c1", restored: true, warnings: ["x"] });
+
+    lix.lerItemPeloRegistro.mockResolvedValueOnce(null);
+    const nao = await RESTAURAR(req("POST"), p({ id: "c-outra" }));
+    expect(nao.status).toBe(404);
   });
 });
 

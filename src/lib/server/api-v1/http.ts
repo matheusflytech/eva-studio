@@ -5,6 +5,17 @@ import { Prisma } from "@/generated/prisma/client";
 import { ErroDeCrm } from "@/lib/server/crm";
 import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { ErroDeFunil } from "@/lib/server/funis-acoes";
+import { ErroDaLixeira } from "@/lib/server/lixeira";
+
+/** Código estável (inglês) dos erros da lixeira na v1. */
+const CODIGO_DA_LIXEIRA: Record<string, string> = {
+  lixeira_indisponivel: "trash_unavailable",
+  nao_encontrado: "not_found",
+  expirado: "trash_expired",
+  ja_restaurado: "already_restored",
+  conflito: "conflict",
+  sem_etapa_aberta: "no_open_stage",
+};
 
 // ---------------------------------------------------------------------------
 // Resposta e erro padrão da API pública v1.
@@ -75,6 +86,9 @@ export function paraErroApi(e: unknown): ErroApi {
     return new ErroApi(422, "stage_requirements_missing", e.message, {
       details: { missing_fields: e.faltando.map((f) => ({ field: f.campo, label: f.rotulo, stage_id: f.etapaId, stage_name: f.etapa })) },
     });
+  }
+  if (e instanceof ErroDaLixeira) {
+    return new ErroApi(e.status, CODIGO_DA_LIXEIRA[e.codigo] ?? "conflict", e.message, e.status === 410 ? { type: "invalid_request_error" } : {});
   }
   if (e instanceof ErroDeCrm) return new ErroApi(e.status, e.status === 404 ? "not_found" : "invalid_request", e.message);
   if (e instanceof ErroDeFunil) {

@@ -38,6 +38,13 @@ describe("compatibilidade com as permissões antigas", () => {
     expect(permissoesDoPapelDeSistema("owner")).toEqual([...PERMISSOES].sort());
   });
 
+  it("apagar para sempre da lixeira: só dono e administrador", () => {
+    expect(permissoesDoPapelDeSistema("owner")).toContain("lixeira:esvaziar");
+    expect(permissoesDoPapelDeSistema("admin")).toContain("lixeira:esvaziar");
+    expect(permissoesDoPapelDeSistema("agent")).not.toContain("lixeira:esvaziar");
+    expect(permissoesDoPapelDeSistema("viewer")).not.toContain("lixeira:esvaziar");
+  });
+
   it("leitura não edita nada", () => {
     const perms = permissoesDoPapelDeSistema("viewer");
     expect(perms.every((p) => p.endsWith(":ver") || p === "negocios:exportar")).toBe(true);

@@ -72,14 +72,6 @@ export async function externosDe(
   return new Map(refs.map((r) => [r.entityId, r.externalId]));
 }
 
-/** Antes de apagar: guarda a lápide (com o id externo, que é o que o outro lado conhece) e solta os vínculos. */
-export async function registrarExclusao(orgId: string, entity: EntidadeExterna, entityId: string): Promise<void> {
-  const refs = await prisma.externalRef.findMany({ where: { orgId, entity, entityId }, select: { externalId: true, source: true } });
-  const principal = refs.find((r) => r.source === SOURCE_PADRAO) ?? refs[0];
-  await prisma.deletedRecord.create({ data: { orgId, entity, entityId, externalId: principal?.externalId ?? "" } });
-  await prisma.externalRef.deleteMany({ where: { orgId, entity, entityId } });
-}
-
 export function serializarExclusao(r: { entityId: string; externalId: string; deletedAt: Date; id: string }) {
   return { id: r.entityId, external_id: r.externalId || null, deleted_at: r.deletedAt.toISOString() };
 }

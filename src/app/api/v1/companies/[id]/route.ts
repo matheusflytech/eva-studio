@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
-import { registrarExclusao } from "@/lib/server/api-v1/externos";
+import { apagarPelaApi } from "@/lib/server/api-v1/lixeira";
 import {
   CAMPOS_DE_EMPRESA,
   atualizarEmpresa,
@@ -30,7 +29,5 @@ export const PATCH = rotaV1<P>({ recurso: "companies" }, async (ctx, { id }) => 
 // Contatos e negócios da empresa ficam (a relação é SetNull), como na tela.
 export const DELETE = rotaV1<P>({ recurso: "companies" }, async (ctx, { id }) => {
   await carregarEmpresa(ctx.orgId, id);
-  await registrarExclusao(ctx.orgId, "company", id);
-  await prisma.company.delete({ where: { id } });
-  return NextResponse.json({ data: { id, deleted: true } });
+  return apagarPelaApi(ctx.orgId, "company", id, "API");
 });

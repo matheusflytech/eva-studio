@@ -12,6 +12,7 @@ import {
 } from "@/lib/server/api-validacao";
 import { validarEmail } from "@/lib/capture-validation";
 import { serializeContact } from "@/lib/server/contact-dto";
+import { responderExclusao } from "@/lib/server/lixeira-http";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -202,7 +203,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   return NextResponse.json({ contact: updated ? serializeContact(updated) : null });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ contactId: string }> }) {
+// Vai para a lixeira (30 dias): canais, etiquetas, tarefas, notas e vínculos na foto.
+export async function DELETE(request: Request, { params }: { params: Promise<{ contactId: string }> }) {
   const ctx = await requirePermission("contatos:apagar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { contactId } = await params;
@@ -210,6 +212,5 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const contact = await prisma.contact.findFirst({ where: { id: contactId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "contatos")) } });
   if (!contact) return NextResponse.json({ error: "Contato não encontrado." }, { status: 404 });
 
-  await prisma.contact.delete({ where: { id: contact.id } });
-  return NextResponse.json({ ok: true });
+  return responderExclusao(request, ctx, "contact", contact.id);
 }

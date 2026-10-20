@@ -144,6 +144,29 @@ describe("PATCH /api/deals/[dealId] — regras da etapa", () => {
     expect(db.deal.update.mock.calls[1][0].data).toMatchObject({ stageId: "s2" });
   });
 
+  it("desfazer o ganho (corpo de corpoParaDesfazer): reabre na etapa anterior pelo moveDealStage, origem usuario", async () => {
+    db.deal.findFirst.mockResolvedValue({ ...DEAL, stageId: "sw" });
+    db.deal.findUnique.mockResolvedValue({ ...DEAL, stageId: "sw", amountCents: 1, expectedClosingAt: null, ownerId: null, companyId: "c" });
+    const res = await patch({ stageId: "s2", reabrir: true });
+    expect(res.status).toBe(200);
+    expect(db.deal.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ stageId: "s2", closedAt: null, probability: 40 }) }));
+    expect(db.dealStageEvent.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ fromStageId: "sw", toStageId: "s2", origem: "usuario" })],
+    });
+  });
+
+  it("desfazer a mudança respeita as regras: etapa anterior com campo faltando → 422", async () => {
+    const res = await patch({ stageId: "s2" });
+    expect(res.status).toBe(422);
+    expect(db.deal.update).not.toHaveBeenCalled();
+  });
+
+  it("desfazer o arquivar: archived false limpa archivedAt", async () => {
+    const res = await patch({ archived: false });
+    expect(res.status).toBe(200);
+    expect(db.deal.update).toHaveBeenCalledWith({ where: { id: "d1" }, data: { archivedAt: null } });
+  });
+
   it("negócio ganho: 409 sem reabrir", async () => {
     db.deal.findFirst.mockResolvedValue({ ...DEAL, stageId: "sw" });
     db.deal.findUnique.mockResolvedValue({ ...DEAL, stageId: "sw", amountCents: 1, expectedClosingAt: null, ownerId: null, companyId: "c" });

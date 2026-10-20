@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
 import { cnpjValido, tamanhoDaEmpresa } from "../cnpj";
+import { responderExclusao } from "@/lib/server/lixeira-http";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -186,7 +187,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ companyId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ companyId: string }> }) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { companyId } = await params;
@@ -196,7 +197,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   // Contato e negócio não são apagados junto: a relação é SetNull no schema,
   // e perder o histórico de venda por causa de uma limpeza de cadastro seria
-  // um estrago que ninguém consegue desfazer.
-  await prisma.company.delete({ where: { id: company.id } });
-  return NextResponse.json({ ok: true });
+  // um estrago que ninguém consegue desfazer. Vai para a lixeira (30 dias),
+  // que guarda quem estava ligado para religar ao restaurar.
+  return responderExclusao(request, ctx, "company", company.id);
 }

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
-import { registrarExclusao } from "@/lib/server/api-v1/externos";
+import { apagarPelaApi } from "@/lib/server/api-v1/lixeira";
 import {
   CAMPOS_DE_PATCH_DE_NEGOCIO,
   atualizarNegocio,
@@ -32,7 +31,5 @@ export const PATCH = rotaV1<P>({ recurso: "deals" }, async (ctx, { id }) => {
 
 export const DELETE = rotaV1<P>({ recurso: "deals" }, async (ctx, { id }) => {
   await carregarNegocio(ctx.orgId, id);
-  await registrarExclusao(ctx.orgId, "deal", id);
-  await prisma.deal.delete({ where: { id } });
-  return NextResponse.json({ data: { id, deleted: true } });
+  return apagarPelaApi(ctx.orgId, "deal", id, "API");
 });

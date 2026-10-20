@@ -56,6 +56,9 @@ function operacao(o: Op) {
   };
 }
 
+const DESC_APAGAR = "Vai para a lixeira por 30 dias (com tarefas, notas e vínculos) e entra em /deleted; POST /{id}/restore traz de volta com o mesmo id. Resposta: { id, deleted, trash: { expires_at } | null, warning? }. Sem a lixeira ativada no contrato, apaga de vez e avisa em warning.";
+const DESC_RESTAURAR = "Restaura da lixeira (até 30 dias depois de apagar) com o mesmo id, reatando o que ainda existe. O que não deu para reatar vem em warnings. 404 se não estiver na lixeira; 410 trash_expired; 409 already_restored.";
+
 const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   "/contacts": {
     get: {
@@ -117,8 +120,9 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       idempotency: "optional",
       body: { company_id: null, add_tag_ids: ["<tagId>"], opt_in: false },
     },
-    delete: { tag: "Contatos", summary: "Apagar (fica em /contacts/deleted)", scope: "contacts:write" },
+    delete: { tag: "Contatos", summary: "Apagar (vai para a lixeira por 30 dias)", description: DESC_APAGAR, scope: "contacts:write" },
   },
+  "/contacts/{id}/restore": { post: { tag: "Contatos", summary: "Restaurar da lixeira", description: DESC_RESTAURAR, scope: "contacts:write" } },
   "/contacts/{id}/deals": { get: { tag: "Contatos", summary: "Negócios do contato", scope: "deals:read", query: [...LISTA] } },
 
   "/companies": {
@@ -138,8 +142,9 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   "/companies/{id}": {
     get: { tag: "Empresas", summary: "Ler empresa", scope: "companies:read" },
     patch: { tag: "Empresas", summary: "Atualizar (parcial)", scope: "companies:write", idempotency: "optional", body: { city: "Campinas", uf: "SP" } },
-    delete: { tag: "Empresas", summary: "Apagar (contatos e negócios ficam)", scope: "companies:write" },
+    delete: { tag: "Empresas", summary: "Apagar (lixeira por 30 dias; contatos e negócios ficam)", description: DESC_APAGAR, scope: "companies:write" },
   },
+  "/companies/{id}/restore": { post: { tag: "Empresas", summary: "Restaurar da lixeira (religa contatos e negócios)", description: DESC_RESTAURAR, scope: "companies:write" } },
 
   "/deals": {
     get: {
@@ -177,8 +182,9 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   "/deals/{id}": {
     get: { tag: "Negócios", summary: "Ler negócio", scope: "deals:read" },
     patch: { tag: "Negócios", summary: "Atualizar (parcial; stage_id move)", scope: "deals:write", idempotency: "optional", body: { amount_cents: 200000, owner_id: null } },
-    delete: { tag: "Negócios", summary: "Apagar (fica em /deals/deleted)", scope: "deals:write" },
+    delete: { tag: "Negócios", summary: "Apagar (vai para a lixeira por 30 dias)", description: DESC_APAGAR, scope: "deals:write" },
   },
+  "/deals/{id}/restore": { post: { tag: "Negócios", summary: "Restaurar da lixeira", description: DESC_RESTAURAR, scope: "deals:write" } },
   "/deals/{id}/move": {
     post: {
       tag: "Negócios",

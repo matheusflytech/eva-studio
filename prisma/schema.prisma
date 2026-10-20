@@ -44,6 +44,8 @@ model Organization {
   customRoles      CustomRole[]
   permissionGroups PermissionGroup[]
   teams            Team[]
+  // Lixeira (2026-10-20-lixeira.sql): só relação, nenhuma coluna nova aqui.
+  trash            TrashItem[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -1502,6 +1504,37 @@ model DeletedRecord {
 
   @@index([orgId, entity, deletedAt])
   @@map("eva_studio_deleted_records")
+}
+
+// Lixeira (30 dias) por "foto": apagar continua apagando de verdade (as
+// listas, a busca, o dashboard e a API não precisam filtrar nada), mas antes
+// grava aqui o registro E tudo o que a cascata leva junto (tarefas, notas,
+// histórico de etapa, itens, vínculos, canais, etiquetas...). Restaurar recria
+// com os mesmos ids na mesma transação. Ver src/lib/server/lixeira.ts e
+// prisma/sql/2026-10-20-lixeira.sql. Sem FK para quem apagou: a pessoa sair
+// do contrato não pode apagar a lixeira.
+model TrashItem {
+  id            String   @id @default(uuid())
+  orgId         String
+  entity        String // deal | contact | company
+  entityId      String
+  name          String   @default("")
+  // Resumo do que foi junto ("3 tarefas · 2 notas"), para a lista não ler a foto.
+  detail        String   @default("")
+  // Responsável do registro na hora de apagar: escopo "só os meus/da equipe".
+  ownerId       String?
+  snapshot      Json
+  deletedById   String?
+  deletedByName String   @default("")
+  deletedAt     DateTime @default(now())
+  expiresAt     DateTime
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, deletedAt])
+  @@index([orgId, entity, entityId])
+  @@index([expiresAt])
+  @@map("eva_studio_trash")
 }
 
 // Importação/exportação em lote, processada em fatias pelo relógio

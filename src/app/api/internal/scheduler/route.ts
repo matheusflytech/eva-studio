@@ -4,6 +4,7 @@ import { processDueEnrollments, enrollBySegments, enrollByDealStage } from "@/li
 import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
 import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
 import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
+import { limparLixeiraVencida } from "@/lib/server/lixeira";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -67,10 +68,18 @@ export async function POST(request: Request) {
     return { jobs: 0, linhas: 0 };
   });
 
+  // Lixeira: o que passou dos 30 dias some de vez. Também nunca derruba a
+  // rodada (sem o SQL da lixeira a tabela não existe e a conta é 0).
+  const lixeiraLimpa = await limparLixeiraVencida().catch((e) => {
+    console.error("[scheduler] limpeza da lixeira falhou", e instanceof Error ? e.message : e);
+    return 0;
+  });
+
   return NextResponse.json({
     ok: true,
     ms: Date.now() - startedAt,
     bulkJobs: lotes,
+    lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
       ran: broadcasts.ran,

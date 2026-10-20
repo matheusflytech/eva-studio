@@ -19,6 +19,7 @@ import {
   texto,
 } from "@/lib/server/api-validacao";
 import { negocioUsaSomaDosItens } from "@/lib/server/produtos";
+import { responderExclusao } from "@/lib/server/lixeira-http";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
@@ -275,7 +276,8 @@ async function etapaParaReabrir(dealId: string, pipelineId: string, stageAtual: 
   return abertas[0]?.id ?? null;
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ dealId: string }> }) {
+// Vai para a lixeira (30 dias), com tarefas, notas, histórico e itens na foto.
+export async function DELETE(request: Request, { params }: { params: Promise<{ dealId: string }> }) {
   const ctx = await requirePermission("negocios:apagar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { dealId } = await params;
@@ -283,6 +285,5 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId: ctx.orgId, ...(await filtroDeEscopo(ctx, "negocios")) } });
   if (!deal) return NextResponse.json({ error: "Negócio não encontrado." }, { status: 404 });
 
-  await prisma.deal.delete({ where: { id: deal.id } });
-  return NextResponse.json({ ok: true });
+  return responderExclusao(request, ctx, "deal", deal.id);
 }
