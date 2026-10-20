@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { TIPOS_DE_TAREFA, statusDaReferencia } from "@/lib/server/crm";
 import { JSON_INVALIDO, conferirReferencias, dataOpcional, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
+import { tocarAtividadeDaTarefa } from "@/lib/server/atividade-do-negocio";
 
 // PATCH { done: true|false, text?, dueAt?, assignedToId? }
 export async function PATCH(request: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -37,6 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ta
       assignedToId: body.assignedToId !== undefined ? (body.assignedToId as string) || null : undefined,
     },
   });
+  // Tarefa concluída zera o relógio do "parado" do negócio.
+  if (body.done === true && !task.doneAt) await tocarAtividadeDaTarefa(updated);
 
   return NextResponse.json({ task: { id: updated.id, doneAt: updated.doneAt?.toISOString() ?? null } });
 }

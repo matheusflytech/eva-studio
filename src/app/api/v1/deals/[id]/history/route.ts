@@ -14,7 +14,13 @@ export const GET = rotaV1<{ id: string }>({ recurso: "deals" }, async (ctx, { id
     sp,
     campo: "at",
     buscar: ({ cursor, take, orderBy }) =>
-      prisma.dealStageEvent.findMany({ where: cursor ? { AND: [where, cursor] } : where, take, orderBy }),
+      // Select explícito: tolera o banco sem a coluna `ignorouObrigatorios`.
+      prisma.dealStageEvent.findMany({
+        where: cursor ? { AND: [where, cursor] } : where,
+        take,
+        orderBy,
+        select: { id: true, pipelineId: true, fromStageId: true, toStageId: true, origem: true, at: true },
+      }),
   });
   return NextResponse.json(
     corpoDeLista(

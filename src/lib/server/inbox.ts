@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { tocarAtividadeDaConversa } from "@/lib/server/atividade-do-negocio";
 
 // ---------------------------------------------------------------------------
 // Caixa de entrada: as regras num lugar só.
@@ -86,6 +87,9 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
         ...(doContato.length > 0 ? { lastContactMessageAt: doContato[doContato.length - 1].createdAt } : {}),
       },
     });
+    // Mensagem entrando ou saindo zera o relógio do "parado" dos negócios
+    // abertos do contato (nota interna não conta: fica fora de `visiveis`).
+    await tocarAtividadeDaConversa(conversationId, ultima.createdAt);
   }
 
   return criadas;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { createTask } from "@/lib/server/crm";
+import { tocarAtividadeDaTarefa } from "@/lib/server/atividade-do-negocio";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
 import { ErroApi, corpoDeLista } from "@/lib/server/api-v1/http";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
@@ -41,5 +42,6 @@ export const POST = rotaV1({ recurso: "tasks" }, async (ctx) => {
     dueAt: d.dueAt ?? null,
   });
   const final = d.done ? await prisma.task.update({ where: { id: task.id }, data: { doneAt: new Date() } }) : task;
+  if (d.done) await tocarAtividadeDaTarefa(final);
   return NextResponse.json({ data: serializarTarefa(final) }, { status: 201 });
 });

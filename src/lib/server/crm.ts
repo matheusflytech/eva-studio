@@ -4,6 +4,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { conferirReferencias } from "@/lib/server/api-validacao";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import { registrarMudancaDeEtapa, type OrigemDoMovimento } from "@/lib/server/stage-events";
+import { ErroDaMudanca, conferirMudanca, estadoDoNegocio, gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
+import { tocarAtividade, tocarAtividadeDosContatos } from "@/lib/server/atividade-do-negocio";
+import { resolverPerda, type EntradaDaPerda, type EstadoDoNegocio, type PerdaResolvida } from "@/lib/regras-de-etapa";
+
+export { ErroDaMudanca };
 
 // ---------------------------------------------------------------------------
 // Ações de CRM (§24 do CHATBOT_ENGINE.md).
@@ -204,23 +209,80 @@ export async function createDeal(input: CreateDealInput) {
   return deal;
 }
 
+export interface OpcoesDaMudanca {
+  /** Quem moveu, para o histórico. Padrão: usuario. */
+  origem?: OrigemDoMovimento;
+  /** Ação "Reabrir": só com ela um negócio ganho/perdido muda de etapa. */
+  reabrir?: boolean;
+  /**
+   * Flag explícita de importação/automação para mover sem os campos
+   * obrigatórios (e sem motivo de perda). Fica registrada no DealStageEvent.
+   */
+  ignorarObrigatorios?: boolean;
+  /** Motivo da perda (ao mover para etapa de perda). Texto solto = API antiga/fluxo. */
+  perda?: EntradaDaPerda;
+  /** Follow-up opcional ao perder: tarefa "Retomar contato" em N dias. */
+  followUpDias?: number | null;
+  /** O que a mesma ação vai gravar junto (PATCH com campos + etapa): conta na validação. */
+  pendente?: Partial<EstadoDoNegocio> & { contatosNovos?: number };
+  /** Só valida (lança ErroDaMudanca), sem gravar nada. */
+  simular?: boolean;
+}
+
 /**
- * Move um negócio de etapa. Atualiza probabilidade e, quando a etapa é de
- * fechamento, carimba `closedAt` — sem isso não existe tempo de ciclo nem
- * taxa de conversão.
+ * Move um negócio de etapa — o ÚNICO caminho (quadro, prévia, ficha, PATCH,
+ * API v1, importação, motor do fluxo). Valida as regras da etapa (negócio
+ * fechado só com "Reabrir"; campos obrigatórios da alvo e das puladas que não
+ * podem ser puladas; perdido exige motivo), atualiza probabilidade e, quando a
+ * etapa é de fechamento, carimba `closedAt` — sem isso não existe tempo de
+ * ciclo nem taxa de conversão. Faltou algo: lança ErroDaMudanca e não grava.
  */
-export async function moveDealStage(
-  dealId: string,
-  stageId: string,
-  lostReason?: string,
-  origem: OrigemDoMovimento = "usuario"
-) {
-  const antes = await prisma.deal.findUnique({ where: { id: dealId }, select: { stageId: true, orgId: true } });
+export async function moveDealStage(dealId: string, stageId: string, opcoes: OpcoesDaMudanca = {}) {
+  const origem = opcoes.origem ?? "usuario";
+  const antes = await prisma.deal.findUnique({
+    where: { id: dealId },
+    select: { id: true, stageId: true, orgId: true, pipelineId: true, amountCents: true, expectedClosingAt: true, ownerId: true, companyId: true, customFields: true },
+  });
   if (!antes) throw new ErroDeCrm("Negócio não encontrado.", 404);
   // Etapa de outra org nunca: o id pode vir do corpo da requisição ou da
   // configuração de um bloco.
   const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId, pipeline: { orgId: antes.orgId } } });
   if (!stage) throw new ErroDeCrm("Etapa não encontrada.", 404);
+  const atual = await prisma.pipelineStage.findUnique({
+    where: { id: antes.stageId },
+    select: { id: true, name: true, type: true, position: true, pipelineId: true },
+  });
+
+  // ---- regras da etapa ----
+  const conferido = await conferirMudanca({
+    orgId: antes.orgId,
+    de: atual,
+    para: { id: stage.id, name: stage.name, type: stage.type, position: stage.position, pipelineId: stage.pipelineId },
+    negocio: await estadoDoNegocio(antes, opcoes.pendente),
+    reabrir: opcoes.reabrir,
+    ignorarObrigatorios: opcoes.ignorarObrigatorios,
+  });
+  if (!conferido.ok) {
+    if (conferido.codigo === "negocio_fechado") throw new ErroDaMudanca(conferido.mensagem, 409, "negocio_fechado");
+    throw new ErroDaMudanca(conferido.mensagem, 422, "campos_obrigatorios", conferido.faltando);
+  }
+  let ignorou = conferido.ignorouObrigatorios;
+
+  let perda: PerdaResolvida | null = null;
+  if (stage.type === "lost" && atual?.id !== stage.id) {
+    const { motivos } = await lerMotivos(stage.pipelineId);
+    const r = resolverPerda(motivos, opcoes.perda ?? {});
+    if (r.ok) perda = r.perda;
+    else if (opcoes.ignorarObrigatorios) {
+      // Automação/importação sem motivo: entra como veio, e o evento registra.
+      const texto = (opcoes.perda?.motivo ?? "").trim().slice(0, 500);
+      perda = texto ? { motivoId: null, rotulo: texto, nota: "" } : null;
+      ignorou = true;
+    } else throw new ErroDaMudanca(r.erro, 422, "motivo_obrigatorio");
+  }
+
+  if (opcoes.simular) return null;
+  if (atual?.id === stage.id) return prisma.deal.findUnique({ where: { id: dealId } });
 
   const closing = stage.type === "won" || stage.type === "lost";
 
@@ -235,9 +297,14 @@ export async function moveDealStage(
       // o move e a régua de recuperação nunca dispararia.
       stageSince: new Date(),
       closedAt: closing ? new Date() : null,
-      lostReason: stage.type === "lost" ? lostReason ?? "" : "",
+      // Rótulo do motivo (não a nota): relatório, exportação e dashboard
+      // agrupam por este texto, que bate com o motivo estruturado.
+      lostReason: stage.type === "lost" ? perda?.rotulo ?? "" : "",
     },
   });
+
+  if (stage.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, perda);
+  else if (atual?.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, null);
 
   await registrarMudancaDeEtapa({
     orgId: atualizado.orgId,
@@ -246,7 +313,19 @@ export async function moveDealStage(
     fromStageId: antes.stageId,
     toStageId: stageId,
     origem,
+    ignorouObrigatorios: ignorou,
   });
+
+  if (stage.type === "lost" && opcoes.followUpDias) {
+    await createTask({
+      orgId: atualizado.orgId,
+      dealId,
+      assignedToId: atualizado.ownerId,
+      type: "ligar",
+      text: `Retomar contato (perdido: ${perda?.rotulo || "sem motivo"})`,
+      dueAt: new Date(Date.now() + opcoes.followUpDias * 86_400_000),
+    });
+  }
 
   return atualizado;
 }
@@ -295,7 +374,7 @@ export async function addNote(input: {
   dealId?: string | null;
   authorId?: string | null;
 }) {
-  return prisma.note.create({
+  const nota = await prisma.note.create({
     data: {
       orgId: input.orgId,
       text: input.text,
@@ -304,6 +383,11 @@ export async function addNote(input: {
       authorId: input.authorId ?? null,
     },
   });
+  // Nota zera o relógio do "parado": a do negócio nele; a só do contato,
+  // nos negócios abertos dele.
+  if (nota.dealId) await tocarAtividade(nota.dealId, nota.createdAt);
+  else if (nota.contactId) await tocarAtividadeDosContatos(nota.contactId, nota.createdAt);
+  return nota;
 }
 
 /**
@@ -360,9 +444,11 @@ export async function preencherCamposDoNegocio(orgId: string, dealId: string, en
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { pipelineId: true, customFields: true } });
   if (!deal) return { aplicados: 0, erros: ["Negócio não encontrado."] };
   const defs = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
-  return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
-    prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } })
-  );
+  return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, async (valores) => {
+    await prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } });
+    // Edição de campo zera o relógio do "parado".
+    await tocarAtividade(dealId);
+  });
 }
 
 export async function preencherCamposDoContato(orgId: string, contactId: string, entrada: Record<string, unknown>) {

@@ -93,10 +93,18 @@ export async function criarImportacao(orgId: string, keyId: string, corpo: Corpo
   const dryRun = boolOpc(corpo, "dry_run") ?? false;
   const upload = boolOpc(corpo, "upload") ?? false;
   const opcoes = objetoOpc(corpo, "options") ?? {};
-  conferirCampos(opcoes, entity === "contacts" ? ["tag_ids"] : ["pipeline_id", "stage_id"]);
+  conferirCampos(opcoes, entity === "contacts" ? ["tag_ids"] : ["pipeline_id", "stage_id", "skip_stage_requirements"]);
   const options = {
     ...(entity === "contacts" ? { tag_ids: listaDeIdsOpc(opcoes, "tag_ids", 20) ?? [] } : {}),
-    ...(entity === "deals" ? { pipeline_id: idOpc(opcoes, "pipeline_id") ?? null, stage_id: idOpc(opcoes, "stage_id") ?? null } : {}),
+    ...(entity === "deals"
+      ? {
+          pipeline_id: idOpc(opcoes, "pipeline_id") ?? null,
+          stage_id: idOpc(opcoes, "stage_id") ?? null,
+          // Flag explícita: mover negócio existente sem os campos obrigatórios
+          // da etapa. Fica registrada em cada mudança de etapa (DealStageEvent).
+          skip_stage_requirements: boolOpc(opcoes, "skip_stage_requirements") ?? false,
+        }
+      : {}),
   };
   if (entity === "contacts" && options.tag_ids?.length) {
     const achadas = await prisma.tag.count({ where: { orgId, id: { in: options.tag_ids } } });

@@ -312,7 +312,23 @@ export function CrmBlockFields({
             onChange={(e) => onChange({ crmLostReason: e.target.value })}
             placeholder="Preço, prazo, sumiu..."
           />
+          <p className="mt-1 text-[11.5px] text-text-tertiary">
+            Se bater com um motivo do funil, entra como ele; senão vira “Outro” com este texto como nota.
+          </p>
         </div>
+        <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+          <Checkbox
+            checked={data.crmIgnorarObrigatorios === true}
+            onCheckedChange={(v) => onChange({ crmIgnorarObrigatorios: v === true })}
+          />
+          <span className="min-w-0">
+            <span className="block font-medium text-text-primary">Mover mesmo sem os campos obrigatórios da etapa</span>
+            <span className="block text-[11.5px] text-text-tertiary">
+              Desligado, o bloco falha quando faltar algum campo exigido pela etapa (ou o motivo da perda). Ligado, move e
+              registra no histórico que pulou os obrigatórios.
+            </span>
+          </span>
+        </label>
         <p className="text-[11.5px] text-text-tertiary">
           Age no negócio aberto mais recente do contato. Se ele não tiver negócio aberto, o bloco registra o erro
           na aba Execuções e o fluxo continua.

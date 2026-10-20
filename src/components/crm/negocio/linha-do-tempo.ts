@@ -20,6 +20,8 @@ export type ItemDaLinhaDoTempo =
       /** open | won | lost — muda o texto ("Marcado como ganho") e o ícone. */
       paraTipo: string;
       origem: OrigemDoMovimento;
+      /** Importação/automação moveu com a flag de pular os campos obrigatórios. */
+      ignorouObrigatorios?: boolean;
     })
   | (Base & { tipo: "nota"; texto: string; autor: string | null })
   | (Base & {
@@ -112,7 +114,8 @@ export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
     case "criado":
       return { titulo: item.etapa ? `Negócio criado em ${item.etapa}` : "Negócio criado" };
     case "etapa": {
-      const sufixo = ORIGENS[item.origem] ? ` · ${ORIGENS[item.origem]}` : "";
+      const sufixo =
+        (ORIGENS[item.origem] ? ` · ${ORIGENS[item.origem]}` : "") + (item.ignorouObrigatorios ? " · sem os campos obrigatórios" : "");
       if (item.paraTipo === "won") return { titulo: `Marcado como ganho (${item.para})${sufixo}` };
       if (item.paraTipo === "lost") return { titulo: `Marcado como perdido (${item.para})${sufixo}` };
       if (!item.de) return { titulo: `Entrou em ${item.para}${sufixo}` };

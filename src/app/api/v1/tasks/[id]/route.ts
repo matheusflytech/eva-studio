@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { tocarAtividadeDaTarefa } from "@/lib/server/atividade-do-negocio";
 import { ErroApi } from "@/lib/server/api-v1/http";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
 import { CAMPOS_DE_TAREFA, carregarTarefa, lerDadosDeTarefa, serializarTarefa } from "@/lib/server/api-v1/tarefas-notas";
@@ -29,6 +30,7 @@ export const PATCH = rotaV1<P>({ recurso: "tasks" }, async (ctx, { id }) => {
   if (d.done === true && !atual.doneAt) data.doneAt = new Date();
   if (d.done === false) data.doneAt = null;
   const t = Object.keys(data).length > 0 ? await prisma.task.update({ where: { id }, data }) : atual;
+  if (data.doneAt instanceof Date) await tocarAtividadeDaTarefa(t);
   return NextResponse.json({ data: serializarTarefa(t) });
 });
 

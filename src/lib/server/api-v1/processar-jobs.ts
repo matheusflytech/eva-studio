@@ -104,7 +104,7 @@ async function lerLinhas(job: BulkJob): Promise<LinhaDeEntrada[]> {
 
 async function processarImportacao(job: BulkJob, temTempo: () => boolean): Promise<number> {
   const linhas = await lerLinhas(job);
-  const options = (job.options ?? {}) as { tag_ids?: string[]; pipeline_id?: string | null; stage_id?: string | null };
+  const options = (job.options ?? {}) as { tag_ids?: string[]; pipeline_id?: string | null; stage_id?: string | null; skip_stage_requirements?: boolean };
   let cursor = Number(job.cursor || "0") || 0;
   const cont = { processed: job.processed, created: job.created, updated: job.updated, unchanged: job.unchanged, failed: job.failed };
   const erros = (Array.isArray(job.errors) ? job.errors : []) as unknown as ErroDeLinha[];
@@ -132,6 +132,7 @@ async function processarImportacao(job: BulkJob, temTempo: () => boolean): Promi
           tagIds: options.tag_ids,
           pipelineId: options.pipeline_id ?? undefined,
           stageId: options.stage_id ?? undefined,
+          ignorarObrigatorios: options.skip_stage_requirements === true,
         });
         cont[r.result] += 1;
       } catch (e) {

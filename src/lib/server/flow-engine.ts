@@ -14,6 +14,7 @@ import { decryptSecret } from "@/lib/server/crypto";
 import {
   createDeal,
   moveDealStage,
+  ErroDaMudanca,
   createTask,
   addNote,
   findOpenDealForContact,
@@ -411,7 +412,13 @@ async function runCrmTool(
       return "Não tenho permissão para mover o negócio para essa etapa. Um humano precisa fazer isso.";
     }
 
-    await moveDealStage(deal.id, stage.id, undefined, "fluxo");
+    // A IA segue as regras da etapa sem exceção: faltou campo, ela avisa.
+    try {
+      await moveDealStage(deal.id, stage.id, { origem: "fluxo" });
+    } catch (e) {
+      if (e instanceof ErroDaMudanca) return `Não movi: ${e.message}`;
+      throw e;
+    }
     return `Negócio movido para ${stage.name}.`;
   }
 
@@ -1300,13 +1307,14 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           const deal = await findOpenDealForContact(contactId);
           if (!deal) throw new Error("O contato não tem negócio aberto para mover.");
           if (!node.data.crmStageId) throw new Error("Etapa de destino não configurada no bloco.");
-          const moved = await moveDealStage(
-            deal.id,
-            node.data.crmStageId,
-            interpolate(node.data.crmLostReason ?? "", variables),
-            "fluxo"
-          );
-          output = `negócio movido (prob. ${moved.probability}%)`;
+          // Mesmas regras da tela: faltou campo obrigatório (ou motivo da
+          // perda) e o bloco não tem a flag explícita → erro do bloco.
+          const moved = await moveDealStage(deal.id, node.data.crmStageId, {
+            origem: "fluxo",
+            perda: { motivo: interpolate(node.data.crmLostReason ?? "", variables) },
+            ignorarObrigatorios: node.data.crmIgnorarObrigatorios === true,
+          });
+          output = `negócio movido (prob. ${moved?.probability ?? deal.probability}%)`;
         }
 
         if (kind === "crm-task") {

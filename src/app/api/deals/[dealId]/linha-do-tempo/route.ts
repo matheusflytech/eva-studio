@@ -7,6 +7,7 @@ import type { ConversaDoNegocio, ItemDaLinhaDoTempo, LinhaDoTempo } from "@/comp
 // mostra o mais recente primeiro: o que fica de fora é o mais antigo.
 const LIMITE = 200;
 const LIMITE_DE_CONVERSAS = 50;
+const SELECT_DO_EVENTO = { id: true, fromStageId: true, toStageId: true, origem: true, at: true } as const;
 
 /**
  * Tudo o que aconteceu com o negócio numa lista só: criação, mudanças de
@@ -33,8 +34,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
   const [eventos, notas, tarefas, conversas] = await Promise.all([
     // Histórico de etapas é complemento: se a tabela falhar (migração
     // atrasada, por exemplo), a ficha abre com o resto em vez de dar erro.
+    // Select explícito: a coluna `ignorouObrigatorios` só existe depois do SQL
+    // das regras de etapa; sem ela, lê de novo sem a coluna.
     prisma.dealStageEvent
-      .findMany({ where: { dealId, orgId }, orderBy: { at: "desc" }, take: LIMITE })
+      .findMany({ where: { dealId, orgId }, orderBy: { at: "desc" }, take: LIMITE, select: { ...SELECT_DO_EVENTO, ignorouObrigatorios: true } })
+      .catch(() =>
+        prisma.dealStageEvent
+          .findMany({ where: { dealId, orgId }, orderBy: { at: "desc" }, take: LIMITE, select: SELECT_DO_EVENTO })
+          .then((l) => l.map((e) => ({ ...e, ignorouObrigatorios: false })))
+      )
       .catch((e: unknown) => {
         console.error("[linha-do-tempo] histórico de etapas indisponível", e);
         return [];
@@ -116,6 +124,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
       para: nomeDaEtapa(e.toStageId),
       paraTipo: etapa.get(e.toStageId)?.type ?? "open",
       origem: e.origem,
+      ...(e.ignorouObrigatorios ? { ignorouObrigatorios: true } : {}),
     });
   }
 

@@ -95,6 +95,9 @@ export interface FlowNodeData {
   crmTagAction?: "add" | "remove";
   crmNoteText?: string;
   crmLostReason?: string;
+  // Bloco "Mover etapa": move mesmo sem os campos obrigatórios da etapa (e sem
+  // motivo de perda). Flag explícita, registrada no histórico de etapas.
+  crmIgnorarObrigatorios?: boolean;
   // Campos personalizados que o bloco grava: chave do campo -> valor ({variavel} ok).
   crmFieldMap?: { key: string; value: string }[];
   // Grava também as variáveis com o mesmo nome de um campo (padrão: ligado).

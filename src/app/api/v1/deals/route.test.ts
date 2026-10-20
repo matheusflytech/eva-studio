@@ -33,6 +33,7 @@ vi.mock("@/lib/server/rate-limit", () => rate);
 vi.mock("@/lib/server/crm", () => crm);
 
 import { POST, GET } from "./route";
+import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { POST as MOVER } from "./[id]/move/route";
 import { POST as GANHAR } from "./[id]/won/route";
 import { PATCH } from "./[id]/route";
@@ -119,7 +120,7 @@ describe("mover etapa", () => {
     db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
     const res = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
     expect(res.status).toBe(200);
-    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s2", "", "api");
+    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s2", expect.objectContaining({ origem: "api", reabrir: false }));
   });
 
   it("etapa de outro funil sem pipeline_id: 422; com pipeline_id: move", async () => {
@@ -131,7 +132,7 @@ describe("mover etapa", () => {
 
     const r2 = await MOVER(req("POST", { stage_id: "x1", pipeline_id: "p2" }), p({ id: "d1" }));
     expect(r2.status).toBe(200);
-    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "x1", "", "api");
+    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "x1", expect.objectContaining({ origem: "api" }));
   });
 
   it("won procura a etapa de ganho do funil do negócio", async () => {
@@ -141,7 +142,48 @@ describe("mover etapa", () => {
     const res = await GANHAR(req("POST"), p({ id: "d1" }));
     expect(res.status).toBe(200);
     expect(db.pipelineStage.findFirst.mock.calls[0][0].where).toEqual({ pipelineId: "p1", type: "won" });
-    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "sw", "", "api");
+    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "sw", expect.objectContaining({ origem: "api" }));
+  });
+
+  it("regras da etapa: faltou campo → 422 stage_requirements_missing com a lista", async () => {
+    db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
+    crm.moveDealStage.mockRejectedValueOnce(
+      new ErroDaMudanca("Para mover para Proposta, preencha: Valor.", 422, "campos_obrigatorios", [
+        { campo: "valor", rotulo: "Valor", etapaId: "s2", etapa: "Proposta" },
+      ])
+    );
+    const res = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
+    expect(res.status).toBe(422);
+    const corpo = await res.json();
+    expect(corpo.error.code).toBe("stage_requirements_missing");
+    expect(corpo.error.details.missing_fields).toEqual([{ field: "valor", label: "Valor", stage_id: "s2", stage_name: "Proposta" }]);
+  });
+
+  it("negócio fechado sem reopen → 409 deal_closed; reopen e motivo estruturado seguem para moveDealStage", async () => {
+    db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
+    crm.moveDealStage.mockRejectedValueOnce(new ErroDaMudanca("Este negócio está ganho.", 409, "negocio_fechado"));
+    const r1 = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
+    expect(r1.status).toBe(409);
+    expect((await r1.json()).error.code).toBe("deal_closed");
+
+    await MOVER(req("POST", { stage_id: "s2", reopen: true, lost_reason_id: "m1", lost_note: "x" }), p({ id: "d1" }));
+    expect(crm.moveDealStage).toHaveBeenLastCalledWith(
+      "d1",
+      "s2",
+      expect.objectContaining({ reabrir: true, perda: { motivoId: "m1", motivo: null, nota: "x" } })
+    );
+  });
+
+  it("PATCH: valida a etapa (simulando) com os campos do mesmo PATCH, grava os campos e só depois move", async () => {
+    db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
+    db.customField.findMany.mockResolvedValue([]);
+    const res = await PATCH(req("PATCH", { stage_id: "s2", amount_cents: 5000 }), p({ id: "d1" }));
+    expect(res.status).toBe(200);
+    const [simulado, real] = crm.moveDealStage.mock.calls;
+    expect(simulado[2]).toMatchObject({ simular: true, pendente: { amountCents: 5000 } });
+    expect(real[2]).toMatchObject({ pendente: { amountCents: 5000 } });
+    expect(real[2].simular).toBeFalsy();
+    expect(db.deal.update.mock.invocationCallOrder[0]).toBeLessThan(crm.moveDealStage.mock.invocationCallOrder[1]);
   });
 
   it("PATCH com campo inválido não move a etapa antes de falhar", async () => {

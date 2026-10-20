@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
-  pipelineStage: { findUnique: vi.fn(), findFirst: vi.fn() },
+  pipelineStage: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
   deal: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-  dealContact: { upsert: vi.fn(), deleteMany: vi.fn() },
-  dealStageEvent: { create: vi.fn() },
+  dealContact: { upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn(async () => 0) },
+  dealStageEvent: { createMany: vi.fn() },
+  pipelineStageRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  $executeRaw: vi.fn(),
   contact: { findFirst: vi.fn() },
   company: { findFirst: vi.fn() },
   profile: { findFirst: vi.fn() },
@@ -111,9 +113,54 @@ describe("PATCH /api/deals/[dealId]", () => {
   });
 });
 
+describe("PATCH /api/deals/[dealId] — regras da etapa", () => {
+  const ETAPAS = [
+    { id: "s1", name: "Novo", type: "open", position: 0, pipelineId: "p1", probability: 10 },
+    { id: "s2", name: "Proposta", type: "open", position: 1, pipelineId: "p1", probability: 40 },
+    { id: "sw", name: "Ganho", type: "won", position: 2, pipelineId: "p1", probability: 100 },
+  ];
+  beforeEach(() => {
+    db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1" });
+    db.pipelineStage.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ETAPAS.find((e) => e.id === where.id) ?? null);
+    db.pipelineStage.findMany.mockResolvedValue(ETAPAS);
+    db.deal.findUnique.mockResolvedValue({ ...DEAL, amountCents: 0, expectedClosingAt: null, ownerId: null, companyId: null });
+    db.pipelineStageRule.findMany.mockResolvedValue([{ stageId: "s2", requiredFields: ["valor", "empresa"], canBeSkipped: true, rottingDays: 7, guidance: "" }]);
+  });
+
+  it("faltou campo: 422 com a lista exata e nada gravado", async () => {
+    const res = await patch({ stageId: "s2" });
+    expect(res.status).toBe(422);
+    const corpo = await res.json();
+    expect(corpo.codigo).toBe("campos_obrigatorios");
+    expect(corpo.faltando.map((f: { campo: string }) => f.campo)).toEqual(["valor", "empresa"]);
+    expect(db.deal.update).not.toHaveBeenCalled();
+  });
+
+  it("modal: os campos no mesmo PATCH contam — salva e move numa ação", async () => {
+    const res = await patch({ stageId: "s2", amount: 1500, companyId: "co1" });
+    expect(res.status).toBe(200);
+    // 1º grava os campos, depois move.
+    expect(db.deal.update.mock.calls[0][0].data).toMatchObject({ amountCents: 150_000 });
+    expect(db.deal.update.mock.calls[1][0].data).toMatchObject({ stageId: "s2" });
+  });
+
+  it("negócio ganho: 409 sem reabrir", async () => {
+    db.deal.findFirst.mockResolvedValue({ ...DEAL, stageId: "sw" });
+    db.deal.findUnique.mockResolvedValue({ ...DEAL, stageId: "sw", amountCents: 1, expectedClosingAt: null, ownerId: null, companyId: "c" });
+    const res = await patch({ stageId: "s2" });
+    expect(res.status).toBe(409);
+    expect((await res.json()).codigo).toBe("negocio_fechado");
+  });
+});
+
 describe("GET /api/deals/[dealId]", () => {
   it("tarefas e notas filtradas pela org, tarefas em aberto primeiro", async () => {
-    await GET(new Request("http://x/api/deals/d1"), params);
+    db.deal.findFirst.mockResolvedValue({ ...DEAL, pipeline: { stages: [{ id: "s1", type: "open" }] } });
+    const res = await GET(new Request("http://x/api/deals/d1"), params);
+    // Sem as tabelas novas: regra padrão (7 dias) e sem perda estruturada.
+    const corpo = await res.json();
+    expect(corpo.regras.s1).toMatchObject({ diasParado: 7, camposObrigatorios: [] });
+    expect(corpo.deal.perda).toBeNull();
     const include = db.deal.findFirst.mock.calls[0][0].include;
     expect(include.tasks.where).toEqual({ orgId: "org" });
     expect(include.tasks.orderBy[0]).toEqual({ doneAt: { sort: "asc", nulls: "first" } });

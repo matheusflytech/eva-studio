@@ -113,6 +113,8 @@ export interface OpcoesDeLote {
   tagIds?: string[];
   pipelineId?: string;
   stageId?: string;
+  /** Flag explícita: negócio existente muda de etapa sem os campos obrigatórios (registrado no histórico). */
+  ignorarObrigatorios?: boolean;
 }
 
 export type ResultadoDaLinha = { result: "created" | "updated" | "unchanged"; id: string };
@@ -157,6 +159,6 @@ export async function processarLinha(orgId: string, entity: EntidadeDeLote, linh
     const contactId = achado ? achado.id : op.simular ? "" : (await criarContato(orgId, dc, { origem: "importacao" })).id;
     if (contactId) dados.contactIds = [...new Set([...(dados.contactIds ?? []), contactId])];
   }
-  const r = await upsertNegocio(orgId, dados, { modo: op.modo, simular: op.simular, origem: "importacao" });
+  const r = await upsertNegocio(orgId, dados, { modo: op.modo, simular: op.simular, origem: "importacao", ignorarObrigatorios: op.ignorarObrigatorios });
   return { result: r.result, id: r.id };
 }

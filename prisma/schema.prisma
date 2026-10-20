@@ -1044,6 +1044,7 @@ model Pipeline {
   deals        Deal[]
   customFields CustomField[]
   cardLayout   PipelineCardLayout?
+  lostReasons  PipelineLostReason[]
 
   @@index([orgId])
   @@map("eva_studio_pipelines")
@@ -1085,9 +1086,56 @@ model PipelineStage {
   pipeline  Pipeline   @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals     Deal[]
   sequences Sequence[] @relation("SequenceTriggerStage")
+  // Só relação (nenhuma coluna nova aqui): sem o SQL das regras aplicado,
+  // vale a regra padrão de src/lib/regras-de-etapa.ts.
+  rule      PipelineStageRule?
 
   @@index([pipelineId])
   @@map("eva_studio_pipeline_stages")
+}
+
+// Regras da etapa (prisma/sql/2026-10-20-regras-de-etapa.sql): campos exigidos
+// ao ENTRAR na etapa, se ela pode ser pulada, prazo de "parado" e o texto de
+// orientação. Tabela à parte em vez de colunas na etapa pelo mesmo motivo de
+// PipelineCardLayout: sem o registro (ou sem a tabela), vale o padrão.
+model PipelineStageRule {
+  stageId        String   @id
+  orgId          String
+  pipelineId     String
+  // ["valor", "previsao", "responsavel", "contato", "empresa", "produtos", "cf:<chave>"]
+  requiredFields Json     @default("[]")
+  // false = quem pula esta etapa (vai de antes dela para depois) também
+  // precisa ter os campos dela preenchidos.
+  canBeSkipped   Boolean  @default(true)
+  // Dias sem atividade para o negócio aberto ficar "parado". null = nunca.
+  rottingDays    Int?
+  // "O que fazer nesta etapa": dica no cabeçalho da coluna e na ficha.
+  guidance       String   @default("") @db.Text
+  updatedAt      DateTime @updatedAt
+
+  stage PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId])
+  @@map("eva_studio_pipeline_stage_rules")
+}
+
+// Motivos de perda do funil, em ordem. "Outro" (exigeNota) pede o detalhe.
+// Sem registro para o funil, valem os motivos padrão do código.
+model PipelineLostReason {
+  id           String    @id @default(uuid())
+  orgId        String
+  pipelineId   String
+  label        String
+  requiresNote Boolean   @default(false)
+  position     Int       @default(0)
+  // Arquivado some da escolha, mas a perda antiga continua com o rótulo.
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId, position])
+  @@map("eva_studio_pipeline_lost_reasons")
 }
 
 model Deal {
@@ -1132,6 +1180,9 @@ model Deal {
   // produtos aplicado, o resto do negócio continua funcionando.
   items         DealItem[]
   amountSetting DealAmountSetting?
+  // Regras de etapa (2026-10-20-regras-de-etapa.sql): também só relações.
+  loss          DealLoss?
+  activity      DealActivity?
 
   @@index([orgId, stageId])
   @@index([pipelineId])
@@ -1169,6 +1220,10 @@ model DealStageEvent {
   fromStageId String?
   toStageId   String
   origem      String   @default("usuario") // usuario | fluxo | api | importacao | backfill
+  // Importação/automação que moveu sem os campos obrigatórios da etapa (com a
+  // flag explícita). Coluna aditiva: quem grava tolera a ausência dela
+  // (src/lib/server/stage-events.ts) e quem lê usa select explícito.
+  ignorouObrigatorios Boolean @default(false)
   at          DateTime @default(now())
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -1176,6 +1231,39 @@ model DealStageEvent {
   @@index([orgId, pipelineId, at])
   @@index([dealId, at])
   @@map("eva_studio_deal_stage_events")
+}
+
+// Motivo estruturado da perda (um por negócio perdido). `lostReason` do
+// negócio continua com o rótulo, para relatório, exportação e API antigos.
+// Sem FK para o motivo: motivo apagado não apaga a história.
+model DealLoss {
+  dealId      String   @id
+  orgId       String
+  pipelineId  String
+  reasonId    String?
+  reasonLabel String
+  note        String   @default("") @db.Text
+  lostAt      DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, pipelineId, reasonLabel])
+  @@map("eva_studio_deal_losses")
+}
+
+// Última atividade do negócio (tarefa concluída, nota, mensagem entrando ou
+// saindo nas conversas dos contatos, edição de campo). É o relógio do
+// "parado": greatest(lastActivityAt, stageSince). Atualizado só por
+// tocarAtividade (src/lib/server/atividade-do-negocio.ts).
+model DealActivity {
+  dealId         String   @id
+  orgId          String
+  lastActivityAt DateTime
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, lastActivityAt])
+  @@map("eva_studio_deal_activity")
 }
 
 // Catálogo de produtos e serviços da organização (o "Products" do HubSpot e

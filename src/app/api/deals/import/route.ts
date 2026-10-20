@@ -27,6 +27,9 @@ export async function POST(request: Request) {
   if (!csv.trim()) return erro("Envie o arquivo CSV.");
   const pipelineId = typeof corpo.pipelineId === "string" ? corpo.pipelineId.trim() : "";
   const stageId = typeof corpo.stageId === "string" && corpo.stageId.trim() ? corpo.stageId.trim() : undefined;
+  // Flag explícita da tela: negócio já existente muda de etapa mesmo sem os
+  // campos obrigatórios dela (fica registrado no histórico de etapas).
+  const ignorarObrigatorios = corpo.ignorarObrigatorios === true;
 
   const funil = pipelineId
     ? await prisma.pipeline.findFirst({ where: { id: pipelineId, orgId: ctx.orgId }, select: { id: true, stages: { select: { id: true } } } })
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
   // Uma linha por vez: cada uma é o mesmo upsert da API (com contato).
   for (const linha of linhas) {
     try {
-      const r = await processarLinha(ctx.orgId, "deals", linha, { modo: "upsert", simular: false, pipelineId: funil.id, stageId });
+      const r = await processarLinha(ctx.orgId, "deals", linha, { modo: "upsert", simular: false, pipelineId: funil.id, stageId, ignorarObrigatorios });
       cont[r.result] += 1;
     } catch (e) {
       cont.failed += 1;

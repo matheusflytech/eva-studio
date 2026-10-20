@@ -2,7 +2,10 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { MAX_CENTAVOS, conferirReferencias, reaisParaCentavos, type Corpo } from "@/lib/server/api-validacao";
-import { createDeal, moveDealStage, resolverEtapaDeEntrada } from "@/lib/server/crm";
+import { createDeal, moveDealStage, resolverEtapaDeEntrada, type OpcoesDaMudanca } from "@/lib/server/crm";
+import { gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
+import { tocarAtividade } from "@/lib/server/atividade-do-negocio";
+import { resolverPerda } from "@/lib/regras-de-etapa";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import type { OrigemDoMovimento } from "@/lib/server/stage-events";
 import { ErroApi, iso } from "./http";
@@ -112,6 +115,10 @@ export const CAMPOS_DE_PATCH_DE_NEGOCIO = [
   "custom_fields",
   "external_id",
   "external_source",
+  // Regras de etapa: motivo estruturado da perda e "Reabrir".
+  "lost_reason_id",
+  "lost_note",
+  "reopen",
 ] as const;
 
 export interface DadosDeNegocio {
@@ -121,6 +128,9 @@ export interface DadosDeNegocio {
   pipelineId?: string | null;
   stageId?: string | null;
   lostReason?: string;
+  lostReasonId?: string;
+  lostNote?: string;
+  reopen?: boolean;
   amountCents?: number;
   currency?: string;
   probability?: number;
@@ -143,6 +153,9 @@ export async function lerDadosDeNegocio(orgId: string, corpo: Corpo): Promise<Da
   d.pipelineId = idOpc(corpo, "pipeline_id");
   d.stageId = idOpc(corpo, "stage_id");
   d.lostReason = textoOpc(corpo, "lost_reason", 500);
+  d.lostReasonId = textoOpc(corpo, "lost_reason_id", 80);
+  d.lostNote = textoOpc(corpo, "lost_note", 500);
+  d.reopen = boolOpc(corpo, "reopen");
   // Centavos é o formato canônico; `amount` em reais é o mesmo apelido da tela.
   d.amountCents = inteiroOpc(corpo, "amount_cents", 0, MAX_CENTAVOS);
   if (d.amountCents === undefined && corpo.amount !== undefined) {
@@ -208,6 +221,8 @@ async function validarCampos(
 interface Opcoes {
   simular?: boolean;
   origem?: OrigemDoMovimento;
+  /** Flag explícita (importação): move sem os campos obrigatórios da etapa, registrado no histórico. */
+  ignorarObrigatorios?: boolean;
 }
 
 export async function criarNegocio(orgId: string, d: DadosDeNegocio, op: Opcoes = {}): Promise<{ id: string }> {
@@ -244,11 +259,25 @@ export async function criarNegocio(orgId: string, d: DadosDeNegocio, op: Opcoes 
  * Move de etapa. Etapa de outro funil exige `pipeline_id` igual ao funil da
  * etapa: é a confirmação de que a troca de funil é intencional.
  */
+export interface AlvoDoMovimento {
+  stageId: string;
+  pipelineId?: string | null;
+  lostReason?: string;
+  lostReasonId?: string;
+  lostNote?: string;
+  reopen?: boolean;
+}
+
+/**
+ * Move de etapa pelas mesmas regras da tela (moveDealStage): negócio fechado
+ * só com `reopen`, campos obrigatórios da etapa (422 stage_requirements_missing
+ * com a lista), perdido com motivo. `pendente` = o que o mesmo PATCH grava.
+ */
 export async function moverNegocio(
   orgId: string,
   dealId: string,
-  alvo: { stageId: string; pipelineId?: string | null; lostReason?: string },
-  op: Opcoes = {}
+  alvo: AlvoDoMovimento,
+  op: Opcoes & { pendente?: OpcoesDaMudanca["pendente"] } = {}
 ): Promise<{ mudou: boolean; pipelineId: string }> {
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { id: true, stageId: true, pipelineId: true, lostReason: true } });
   if (!deal) throw new ErroApi(404, "not_found", "Negócio não encontrado.");
@@ -270,6 +299,16 @@ export async function moverNegocio(
   }
   if (etapa.id === deal.stageId) {
     // Mesma etapa: só registra o motivo da perda, se veio (caso "perdi e volto depois para dizer por quê").
+    if (etapa.type === "lost" && alvo.lostReasonId) {
+      const { motivos } = await lerMotivos(etapa.pipelineId);
+      const r = resolverPerda(motivos, { motivoId: alvo.lostReasonId, nota: alvo.lostNote });
+      if (!r.ok) throw new ErroApi(422, "lost_reason_required", r.erro, { param: "lost_reason_id" });
+      if (!op.simular) {
+        await prisma.deal.update({ where: { id: dealId }, data: { lostReason: r.perda.rotulo } });
+        await gravarPerda({ dealId, orgId, pipelineId: etapa.pipelineId }, r.perda);
+      }
+      return { mudou: true, pipelineId: etapa.pipelineId };
+    }
     const motivo = alvo.lostReason?.trim().slice(0, 500);
     if (etapa.type === "lost" && motivo !== undefined && motivo !== deal.lostReason) {
       if (!op.simular) await prisma.deal.update({ where: { id: dealId }, data: { lostReason: motivo } });
@@ -277,12 +316,24 @@ export async function moverNegocio(
     }
     return { mudou: false, pipelineId: etapa.pipelineId };
   }
-  if (!op.simular) await moveDealStage(dealId, etapa.id, alvo.lostReason?.trim().slice(0, 500) ?? "", op.origem ?? "api");
+  await moveDealStage(dealId, etapa.id, {
+    origem: op.origem ?? "api",
+    reabrir: alvo.reopen === true,
+    ignorarObrigatorios: op.ignorarObrigatorios,
+    perda: { motivoId: alvo.lostReasonId ?? null, motivo: alvo.lostReason ?? null, nota: alvo.lostNote ?? null },
+    pendente: op.pendente,
+    simular: op.simular,
+  });
   return { mudou: true, pipelineId: etapa.pipelineId };
 }
 
 /** Ganho/perdido: a primeira etapa desse tipo no funil atual do negócio. */
-export async function fecharNegocio(orgId: string, dealId: string, tipo: "won" | "lost", lostReason?: string) {
+export async function fecharNegocio(
+  orgId: string,
+  dealId: string,
+  tipo: "won" | "lost",
+  perda: { lostReason?: string; lostReasonId?: string; lostNote?: string } = {}
+) {
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { pipelineId: true } });
   if (!deal) throw new ErroApi(404, "not_found", "Negócio não encontrado.");
   const etapa = await prisma.pipelineStage.findFirst({
@@ -293,22 +344,24 @@ export async function fecharNegocio(orgId: string, dealId: string, tipo: "won" |
   if (!etapa) {
     throw new ErroApi(422, tipo === "won" ? "no_won_stage" : "no_lost_stage", `O funil deste negócio não tem etapa de ${tipo === "won" ? "ganho" : "perda"}.`);
   }
-  return moverNegocio(orgId, dealId, { stageId: etapa.id, lostReason }, { origem: "api" });
+  return moverNegocio(orgId, dealId, { stageId: etapa.id, ...perda }, { origem: "api" });
 }
 
 export async function atualizarNegocio(orgId: string, dealId: string, d: DadosDeNegocio, op: Opcoes = {}): Promise<{ mudou: boolean }> {
   const atual = await prisma.deal.findFirst({ where: { id: dealId, orgId } });
   if (!atual) throw new ErroApi(404, "not_found", "Negócio não encontrado.");
 
-  // Etapa primeiro (só conferida, sem gravar): os campos personalizados
-  // valem pelo funil de destino, e nada é gravado antes de tudo validar.
+  // Funil de destino primeiro: os campos personalizados valem por ele. A etapa
+  // é conferida (regras incluídas) depois, já com os campos deste PATCH, e
+  // nada é gravado antes de tudo validar.
   let pipelineFinal = atual.pipelineId;
   let moveu = false;
-  const alvo = d.stageId ? { stageId: d.stageId, pipelineId: d.pipelineId, lostReason: d.lostReason } : null;
+  const alvo: AlvoDoMovimento | null = d.stageId
+    ? { stageId: d.stageId, pipelineId: d.pipelineId, lostReason: d.lostReason, lostReasonId: d.lostReasonId, lostNote: d.lostNote, reopen: d.reopen }
+    : null;
   if (alvo) {
-    const r = await moverNegocio(orgId, dealId, alvo, { ...op, simular: true });
-    moveu = r.mudou;
-    pipelineFinal = r.pipelineId;
+    const destino = await prisma.pipelineStage.findFirst({ where: { id: alvo.stageId, pipeline: { orgId } }, select: { pipelineId: true } });
+    if (destino) pipelineFinal = destino.pipelineId;
   } else if (d.pipelineId && d.pipelineId !== atual.pipelineId) {
     throw new ErroApi(422, "stage_required", "Para trocar de funil, envie também stage_id (uma etapa do funil novo).", { param: "stage_id" });
   }
@@ -338,6 +391,20 @@ export async function atualizarNegocio(orgId: string, dealId: string, d: DadosDe
     if (JSON.stringify(valores) !== JSON.stringify(atuais)) data.customFields = valores as Prisma.InputJsonValue;
   }
 
+  // O que este PATCH grava conta nos campos obrigatórios da etapa.
+  const pendente: NonNullable<OpcoesDaMudanca["pendente"]> = {};
+  if (typeof data.amountCents === "number") pendente.amountCents = data.amountCents;
+  if (data.expectedClosingAt !== undefined) pendente.expectedClosingAt = data.expectedClosingAt as Date | null;
+  if (data.ownerId !== undefined) pendente.ownerId = data.ownerId as string | null;
+  if (data.companyId !== undefined) pendente.companyId = data.companyId as string | null;
+  if (data.customFields !== undefined) pendente.customFields = data.customFields as Record<string, unknown>;
+  if (d.contactIds?.length) pendente.contatosNovos = d.contactIds.length;
+  if (alvo) {
+    const r = await moverNegocio(orgId, dealId, alvo, { ...op, simular: true, pendente });
+    moveu = r.mudou;
+    pipelineFinal = r.pipelineId;
+  }
+
   let externoMuda = false;
   if (d.externalId !== undefined) {
     externoMuda = ((await externosDe(orgId, "deal", [dealId], d.source)).get(dealId) ?? null) !== d.externalId;
@@ -346,8 +413,13 @@ export async function atualizarNegocio(orgId: string, dealId: string, d: DadosDe
   const mudou = moveu || externoMuda || Object.keys(data).length > 0;
   if (op.simular || !mudou) return { mudou };
   if (externoMuda) await vincularExterno(orgId, "deal", dealId, d.externalId ?? null, d.source);
-  if (alvo && moveu) await moverNegocio(orgId, dealId, alvo, op);
-  if (Object.keys(data).length > 0) await prisma.deal.update({ where: { id: dealId }, data });
+  if (Object.keys(data).length > 0) {
+    await prisma.deal.update({ where: { id: dealId }, data });
+    // Edição de campo zera o relógio do "parado" (reordenar/arquivar, não).
+    if (Object.keys(data).some((k) => k !== "position" && k !== "archivedAt")) await tocarAtividade(dealId);
+  }
+  // Etapa por último: os campos que o mesmo PATCH grava já estão no banco.
+  if (alvo && moveu) await moverNegocio(orgId, dealId, alvo, { ...op, pendente });
   return { mudou };
 }
 

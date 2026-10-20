@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { ErroDeCrm } from "@/lib/server/crm";
+import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { ErroDeFunil } from "@/lib/server/funis-acoes";
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,13 @@ export function respostaDeErro(e: ErroApi, requestId: string): NextResponse {
 /** Converte qualquer erro conhecido em ErroApi; desconhecido vira 500 genérico (sem vazar detalhe). */
 export function paraErroApi(e: unknown): ErroApi {
   if (e instanceof ErroApi) return e;
+  if (e instanceof ErroDaMudanca) {
+    if (e.codigo === "negocio_fechado") return new ErroApi(409, "deal_closed", e.message, { details: { hint: "Envie reopen: true para reabrir e mover." } });
+    if (e.codigo === "motivo_obrigatorio") return new ErroApi(422, "lost_reason_required", e.message, { param: "lost_reason_id" });
+    return new ErroApi(422, "stage_requirements_missing", e.message, {
+      details: { missing_fields: e.faltando.map((f) => ({ field: f.campo, label: f.rotulo, stage_id: f.etapaId, stage_name: f.etapa })) },
+    });
+  }
   if (e instanceof ErroDeCrm) return new ErroApi(e.status, e.status === 404 ? "not_found" : "invalid_request", e.message);
   if (e instanceof ErroDeFunil) {
     return new ErroApi(e.status, e.code, e.message, e.extra.deals !== undefined ? { details: { deals: e.extra.deals } } : {});
