@@ -165,7 +165,8 @@ Números em tabela, Stat e totais: `tabular-nums`.
 | `Badge` | Status (neutral, info, success, warning, danger). Não é enfeite de rótulo. |
 | `Avatar` | Pessoa. Iniciais em cinza; nunca cor aleatória. |
 | `Tabs` | Alternar conteúdo dentro de uma página (sublinhado). |
-| `ViewTabs` | Visões salvas de uma lista, com contagem e "+". |
+| `ViewTabs` | Visões de uma lista (de sistema e salvas), com contagem, "+", ponto de "alterações não salvas" (`dirty`), dica (`hint`) e menu da aba ativa (`menu`). |
+| `BulkActionBar` | Barra flutuante embaixo, no centro, quando há linhas selecionadas: contagem, "Selecionar todos os N resultados" (ação vai pelo filtro), ações `Button size="sm" variant="ghost"` (destrutiva por último) e limpar. Lógica em `src/components/crm/listas/acoes-em-massa.tsx`. |
 | `Modal` | Decisão curta que bloqueia (confirmar, criar com 2–3 campos). |
 | `Drawer` | Detalhe de registro, formulário longo, filtros avançados. |
 | `DropdownMenu` | Ações de linha, "Mais", ordenar. `tone="danger"` no item destrutivo. |

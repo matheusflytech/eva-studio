@@ -4,8 +4,8 @@ import * as React from "react";
 
 // Lista de ids guardada no navegador (colunas escolhidas, colunas recolhidas
 // do quadro), por chave. useSyncExternalStore: sem setState em efeito e sem
-// diferença entre servidor e navegador na primeira pintura. Até a L4, quando
-// isso passa para as visões salvas no banco.
+// diferença entre servidor e navegador na primeira pintura. Vale para as
+// visões de sistema (e sem a tabela de visões); as salvas guardam no banco.
 
 const EVENTO = "eva:lista-salva";
 const memoria = new Map<string, string>();

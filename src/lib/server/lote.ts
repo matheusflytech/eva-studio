@@ -19,7 +19,6 @@ import {
   emBlocos,
   type AcaoDeContato,
   type AcaoDeNegocio,
-  type FalhaDoItem,
   type PedidoDeLote,
   type ResultadoDoLote,
 } from "@/lib/lote/lote";

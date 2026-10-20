@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
-import { ViewTabs } from "@/components/ui/view-tabs";
+import { AbasDeVisoes, CamposRemovidos, useVisoesDaLista } from "@/components/crm/listas/visoes-salvas";
+import { AcoesEmMassaDeNegocios, SELECAO_VAZIA, type Selecao } from "@/components/crm/listas/acoes-em-massa";
+import { camposRemovidos, configDoEstado, estadoDaConfig, semCamposRemovidos } from "@/lib/visoes/visoes";
 import { SearchInput } from "@/components/ui/search-input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Notice } from "@/components/ui/notice";
@@ -76,6 +78,16 @@ const PADRAO = { visao: "todos", tamanho: 25 };
 const IDS_DAS_VISOES = VISOES_DE_NEGOCIO.map((v) => v.id as string);
 const POR_ETAPA = 30;
 
+/** Lista de ids guardada no navegador, sem validar (quem usa valida contra as disponíveis). */
+function lerListaDeIds(bruto: string | null): string[] {
+  try {
+    const v = JSON.parse(bruto ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 const digitando = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
@@ -102,13 +114,25 @@ function NegociosConteudo() {
   const router = useRouter();
   const sp = useSearchParams();
   const opcoes = useOpcoesDoCrm("negocios");
-  const [estado, setEstado] = useEstadoDaLista(BARRA_DE_NEGOCIOS, PADRAO, IDS_DAS_VISOES);
   const [pipelines, setPipelines] = React.useState<FunilDaTela[]>([]);
   const funilDaUrl = sp.get("funil");
   const pipelineId = pipelines.find((p) => p.id === funilDaUrl)?.id ?? pipelines[0]?.id ?? "";
   const pipeline = pipelines.find((p) => p.id === pipelineId);
+  // Visões salvas do funil (e as de todos os funis) + a padrão da pessoa.
+  const visoes = useVisoesDaLista("negocios", VISOES_DE_NEGOCIO, PADRAO, pipelineId || undefined);
+  const padrao = React.useMemo(() => ({ ...PADRAO, visao: visoes.padrao }), [visoes.padrao]);
+  const [estado, setEstado] = useEstadoDaLista(BARRA_DE_NEGOCIOS, padrao, { visoes: IDS_DAS_VISOES, baseDaVisao: visoes.baseDaVisao });
+  const visaoSalva = visoes.salva(estado.visao);
+  const visaoBase = visoes.visaoBase(estado.visao);
 
   const [modo, setModo] = usePreferencia("eva:negocios:visao", "kanban", ["kanban", "lista"] as const);
+  // Visão salva com modo (quadro/lista) guardado: abre nele.
+  const modoDaVisao = visaoSalva?.config.modo;
+  React.useEffect(() => {
+    if (modoDaVisao) setModo(modoDaVisao);
+    // só quando a visão (ou o modo guardado nela) muda
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.visao, modoDaVisao]);
   const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v3", ["classico", "v1", "v2", "v3"]);
   const [quadro, setQuadro] = React.useState<Quadro | null>(null);
   const [carregando, setCarregando] = React.useState(true);
@@ -187,12 +211,13 @@ function NegociosConteudo() {
 
   // ── Filtro: barra + avançados + visão ──
   const { filtro, conflito } = React.useMemo(
-    () => aplicarVisao(montarFiltro(estado, BARRA_DE_NEGOCIOS, { hoje }), estado.visao, opcoes.meuId, hoje),
-    [estado, opcoes.meuId, hoje]
+    () => aplicarVisao(montarFiltro(estado, BARRA_DE_NEGOCIOS, { hoje }), visaoBase, opcoes.meuId, hoje),
+    [estado, visaoBase, opcoes.meuId, hoje]
   );
   const chaveDoQuadro = React.useMemo(() => JSON.stringify({ pipelineId, filtro }), [pipelineId, filtro]);
   const chaveAtrasada = useComAtraso(chaveDoQuadro, 250);
-  const pronto = !!pipelineId && (opcoes.carregado || estado.visao !== "meus");
+  // Espera as visões (a padrão da pessoa decide o que a URL sem ?v= mostra).
+  const pronto = !!pipelineId && visoes.carregado && (opcoes.carregado || visaoBase !== "meus");
 
   // ── Quadro: N primeiros cartões de cada coluna + totais agregados ──
   const ultimaCarga = React.useRef(0);
@@ -248,16 +273,26 @@ function NegociosConteudo() {
     setStages((ss) => ss.map((s) => (s.id === etapa.id ? { ...s, deals: juntarCartoes(s.deals, d.deals ?? []), temMais: !!d.temMais, depois: d.depois ?? null } : s)));
   }
 
-  // ── Contagens das abas (visão sozinha, sem a barra) ──
+  // ── Contagens das abas: de sistema = a visão sozinha; salva = o filtro dela ──
+  const filtrosDasAbas = React.useMemo(
+    () => [
+      ...VISOES_DE_NEGOCIO.map((v) => ({ id: v.id as string, filtro: aplicarVisao({ logica: "e", grupos: [] }, v.id, opcoes.meuId, hoje).filtro })),
+      ...visoes.visoes.map((v) => ({
+        id: v.id,
+        filtro: aplicarVisao(montarFiltro(estadoDaConfig(v.config, PADRAO, v.id), BARRA_DE_NEGOCIOS, { hoje }), v.config.visaoBase, opcoes.meuId, hoje).filtro,
+      })),
+    ],
+    [visoes.visoes, opcoes.meuId, hoje]
+  );
   React.useEffect(() => {
     if (!pipelineId || !opcoes.carregado) return;
     let vivo = true;
     Promise.all(
-      VISOES_DE_NEGOCIO.map((v) =>
+      filtrosDasAbas.map((v) =>
         fetch("/api/deals/busca", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filtro: aplicarVisao({ logica: "e", grupos: [] }, v.id, opcoes.meuId, hoje).filtro, pipeline: pipelineId, apenasTotal: true }),
+          body: JSON.stringify({ filtro: v.filtro, pipeline: pipelineId, apenasTotal: true }),
         })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => [v.id, d?.total] as const)
@@ -272,13 +307,46 @@ function NegociosConteudo() {
     return () => {
       vivo = false;
     };
-  }, [pipelineId, opcoes.carregado, opcoes.meuId, hoje, versao]);
+  }, [pipelineId, opcoes.carregado, filtrosDasAbas, versao]);
 
-  // ── Colunas recolhidas (por usuário e funil; visão salva na L4) ──
+  // ── Colunas recolhidas: as da visão salva (ou o ajuste não salvo dela, na
+  // URL); nas de sistema, as do navegador (por usuário e funil), como antes ──
   const idsDasEtapas = React.useMemo(() => stages.map((s) => s.id), [stages]);
   const validarRecolhidas = React.useCallback((bruto: string | null) => colunasValidas(bruto, idsDasEtapas, []), [idsDasEtapas]);
-  const [recolhidas, gravarRecolhidas] = useListaSalva(`eva:recolhidas:negocios:${contrato ?? "-"}:${opcoes.meuId || "-"}:${pipelineId}`, validarRecolhidas);
+  const [recolhidasDoNavegador, gravarRecolhidasDoNavegador] = useListaSalva(
+    `eva:recolhidas:negocios:${contrato ?? "-"}:${opcoes.meuId || "-"}:${pipelineId}`,
+    validarRecolhidas
+  );
+  const recolhidas = estado.recolhidas ? estado.recolhidas.filter((id) => idsDasEtapas.includes(id)) : recolhidasDoNavegador;
+  const gravarRecolhidas = (ids: string[]) => (visaoSalva ? setEstado({ ...estado, recolhidas: ids }) : gravarRecolhidasDoNavegador(ids));
   const tudoRecolhido = stages.length > 0 && recolhidas.length === stages.length;
+
+  // ── Colunas da lista: idem (a lista valida contra as colunas disponíveis) ──
+  const [colunasDoNavegador, gravarColunasDoNavegador] = useListaSalva(chaveDasColunas("negocios", contrato, opcoes.meuId), lerListaDeIds);
+  const colunasDaLista = estado.colunas ?? (colunasDoNavegador.length ? colunasDoNavegador : undefined);
+  const gravarColunasDaLista = (ids: string[]) => (visaoSalva ? setEstado({ ...estado, colunas: ids }) : gravarColunasDoNavegador(ids));
+
+  // ── Seleção e ações em massa (lista) ──
+  const [selecao, setSelecao] = React.useState<Selecao>(SELECAO_VAZIA);
+  const chaveDaSelecao = chaveDoQuadro;
+  const [filtroDaSelecao, setFiltroDaSelecao] = React.useState(chaveDaSelecao);
+  if (filtroDaSelecao !== chaveDaSelecao) {
+    setFiltroDaSelecao(chaveDaSelecao);
+    setSelecao(SELECAO_VAZIA);
+  }
+
+  // Filtro em campo que não existe mais: chip "campo removido" (o motor já ignora).
+  const removidos = React.useMemo(
+    () => (quadro && opcoes.carregado ? camposRemovidos(estado.avancado, "negocios", [...new Set([...quadro.defs, ...opcoes.campos].map((c) => c.key))]) : []),
+    [quadro, opcoes.carregado, opcoes.campos, estado.avancado]
+  );
+  const configAtual = () =>
+    configDoEstado(estado, {
+      visaoBase,
+      colunas: colunasDaLista,
+      recolhidas: estado.recolhidas ?? recolhidasDoNavegador,
+      modo,
+    });
 
   // ── Contatos do filtro "Contatos ▾": busca no servidor ──
   const [contatosOpcoes, setContatosOpcoes] = React.useState<FilterOption[]>([]);
@@ -448,17 +516,19 @@ function NegociosConteudo() {
     ? `${qtdAbertos.toLocaleString("pt-BR")} ${qtdAbertos === 1 ? "negócio aberto" : "negócios abertos"} · ${formatMoney(totalAberto / 100)} no funil · ${formatMoney(ponderado / 100)} ponderado`
     : undefined;
 
-  // Exportar leva o funil e o que a exportação já entende (busca, visão, um
-  // proprietário). Os demais filtros da barra ainda não (ver plano, L5).
+  // Exportar leva o funil e o MESMO filtro da tela (barra, avançados, visão e
+  // busca) pelo motor. Busca/um proprietário/visão de sistema vão junto só
+  // para o texto do relatório (o servidor filtra pelo `filtro`).
   const consultaDeExportacao = React.useMemo(() => {
     const p = new URLSearchParams();
     if (pipelineId) p.set("pipeline", pipelineId);
+    p.set("filtro", JSON.stringify(filtro));
     if (estado.busca.trim()) p.set("busca", estado.busca.trim());
     const donos = estado.listas.responsavel ?? [];
     if (donos.length === 1) p.set("dono", donos[0] === SEM_VALOR ? "__sem" : donos[0]);
-    if (estado.visao !== "todos") p.set("visao", estado.visao);
+    if (visaoBase !== "todos") p.set("visao", visaoBase);
     return p.toString();
-  }, [pipelineId, estado.busca, estado.listas.responsavel, estado.visao]);
+  }, [pipelineId, filtro, estado.busca, estado.listas.responsavel, visaoBase]);
 
   const linkDeAcao = cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 px-0");
 
@@ -510,7 +580,7 @@ function NegociosConteudo() {
                     <FileText aria-hidden="true" /> Relatório (PDF)
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuLabel>Leva o funil, a busca, a visão e um proprietário.</DropdownMenuLabel>
+                <DropdownMenuLabel>Leva o funil e todos os filtros da tela.</DropdownMenuLabel>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="secondary" onClick={() => setImportando(true)} disabled={!pipeline}>
@@ -539,11 +609,17 @@ function NegociosConteudo() {
         />
       )}
 
-      <ViewTabs
-        label="Visões de negócios"
-        value={estado.visao}
-        onChange={(v) => setEstado({ ...estado, visao: v, pagina: 1 })}
-        views={VISOES_DE_NEGOCIO.map((v) => ({ id: v.id, label: v.label, count: contagens[v.id] }))}
+      <AbasDeVisoes
+        rotulo="Visões de negócios"
+        sistema={VISOES_DE_NEGOCIO}
+        visoes={visoes}
+        estado={estado}
+        onEstado={setEstado}
+        barra={BARRA_DE_NEGOCIOS}
+        contagens={contagens}
+        configAtual={configAtual}
+        equipes={opcoes.equipes}
+        padraoDaLista={PADRAO}
       />
 
       <BarraDeFiltros
@@ -600,6 +676,12 @@ function NegociosConteudo() {
           também” nos filtros avançados.
         </Notice>
       )}
+      {removidos.length > 0 && (
+        <CamposRemovidos
+          removidos={removidos}
+          onTirar={() => setEstado({ ...estado, avancado: semCamposRemovidos(estado.avancado, removidos.map((r) => r.campo)), pagina: 1 })}
+        />
+      )}
       {modo === "kanban" && quadro && quadro.avisos.length > 0 && <Notice tone="warning">{quadro.avisos.join(" ")}</Notice>}
       {modo === "kanban" && quadro?.truncado && (
         <Notice tone="warning">Um filtro por campo personalizado de número ou data olhou só os primeiros 5.000 negócios; o quadro pode estar incompleto.</Notice>
@@ -616,10 +698,29 @@ function NegociosConteudo() {
           defs={quadro?.defs ?? []}
           agora={agora}
           versao={versao}
-          chaveDasColunas={chaveDasColunas("negocios", contrato, opcoes.meuId)}
+          colunasSalvas={colunasDaLista}
+          onColunas={gravarColunasDaLista}
           editandoColunas={editandoColunas}
           onEditandoColunas={setEditandoColunas}
           onAbrir={abrirDaLista}
+          selecao={selecao}
+          onSelecao={setSelecao}
+          acoesEmMassa={(total, paginaToda) => (
+            <AcoesEmMassaDeNegocios
+              selecao={selecao}
+              onSelecao={setSelecao}
+              total={total}
+              paginaToda={paginaToda}
+              filtro={filtro}
+              membros={opcoes.dash.membros}
+              pipelineId={pipelineId}
+              etapas={etapasDaPrevia}
+              onFeito={() => {
+                setSelecao(SELECAO_VAZIA);
+                setVersao((v) => v + 1);
+              }}
+            />
+          )}
         />
       ) : !quadro ? (
         <div className="flex gap-2 overflow-hidden" aria-busy="true" aria-label="Carregando negócios">

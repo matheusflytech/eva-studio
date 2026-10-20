@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ColumnPicker, type ColumnOption } from "@/components/ui/column-picker";
 import { formatMoney } from "@/components/ui/kanban-column";
 import { useComAtraso } from "@/components/crm/listas/use-estado-da-lista";
-import { useListaSalva } from "@/components/crm/listas/use-lista-salva";
+import type { Selecao } from "@/components/crm/listas/acoes-em-massa";
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { FiltroCrm } from "@/lib/filtro-crm";
 import { colunasValidas } from "@/lib/listas/colunas";
@@ -22,7 +22,8 @@ import { tempoNaEtapa, type NegocioKanban } from "./modelo";
 
 // ---------------------------------------------------------------------------
 // Negócios em lista: paginada e ordenada no servidor (POST /api/deals/busca),
-// mesmas colunas editáveis da lista de contatos, seleção e soma do filtro.
+// mesmas colunas editáveis da lista de contatos (da visão salva ou do
+// navegador), seleção com ações em massa e soma do filtro.
 // ---------------------------------------------------------------------------
 
 export interface LinhaDeNegocio extends NegocioKanban {
@@ -64,10 +65,14 @@ export function ListaDeNegocios({
   defs,
   agora,
   versao,
-  chaveDasColunas,
+  colunasSalvas,
+  onColunas,
   editandoColunas,
   onEditandoColunas,
   onAbrir,
+  selecao,
+  onSelecao,
+  acoesEmMassa,
 }: {
   filtro: FiltroCrm;
   pipelineId: string;
@@ -76,14 +81,19 @@ export function ListaDeNegocios({
   defs: DefinicaoDeCampo[];
   agora: Date;
   versao: number;
-  chaveDasColunas: string;
+  /** Colunas escolhidas (da visão salva ou do navegador); undefined = padrão. */
+  colunasSalvas?: string[];
+  onColunas: (ids: string[]) => void;
   editandoColunas: boolean;
   onEditandoColunas: (v: boolean) => void;
   onAbrir: (d: LinhaDeNegocio) => void;
+  selecao: Selecao;
+  onSelecao: (s: Selecao) => void;
+  /** Barra de ações em massa (recebe o total do filtro e se a página toda está marcada). */
+  acoesEmMassa: (total: number, paginaToda: boolean) => React.ReactNode;
 }) {
   const [dados, setDados] = React.useState<Resposta | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
-  const [selecionados, setSelecionados] = React.useState<Set<string>>(new Set());
 
   const disponiveis: (ColumnOption & { coluna: DataTableColumn<LinhaDeNegocio> })[] = React.useMemo(
     () => [
@@ -176,8 +186,11 @@ export function ListaDeNegocios({
     [defs, agora]
   );
   const ids = React.useMemo(() => disponiveis.map((d) => d.id), [disponiveis]);
-  const validar = React.useCallback((bruto: string | null) => colunasValidas(bruto, ids, COLUNAS_PADRAO_DE_NEGOCIO, FIXAS), [ids]);
-  const [escolhidas, gravarColunas] = useListaSalva(chaveDasColunas, validar);
+  // Até os campos personalizados chegarem, "cf:" salvo não é descartado.
+  const escolhidas = React.useMemo(
+    () => colunasValidas(colunasSalvas ?? null, [...ids, ...(colunasSalvas ?? []).filter((c) => c.startsWith("cf:") && !defs.length)], COLUNAS_PADRAO_DE_NEGOCIO, FIXAS),
+    [colunasSalvas, ids, defs.length]
+  );
   const porId = new Map(disponiveis.map((d) => [d.id, d.coluna]));
   const colunas = escolhidas.map((id) => porId.get(id)).filter((c): c is DataTableColumn<LinhaDeNegocio> => !!c);
 
@@ -227,17 +240,7 @@ export function ListaDeNegocios({
       )}
       {dados && dados.avisos.length > 0 && <Notice tone="warning">{dados.avisos.join(" ")}</Notice>}
       {dados?.truncado && <Notice tone="warning">Um filtro por campo personalizado de número ou data olhou só os primeiros 5.000 negócios; a lista pode estar incompleta.</Notice>}
-      {selecionados.size > 0 && (
-        <div className="flex h-9 items-center gap-3 rounded-md bg-accent-subtle px-3 text-small text-text-primary" role="status">
-          <span className="font-medium tabular-nums">
-            {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
-          </span>
-          <span className="text-text-secondary">Ações em massa chegam na próxima etapa.</span>
-          <button type="button" className="ml-auto text-accent-fg hover:underline" onClick={() => setSelecionados(new Set())}>
-            Limpar seleção
-          </button>
-        </div>
-      )}
+      {acoesEmMassa(total, (dados?.deals.length ?? 0) > 0 && dados!.deals.every((d) => selecao.ids.has(d.id)))}
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-panel">
         <DataTable
           caption="Negócios"
@@ -247,8 +250,8 @@ export function ListaDeNegocios({
           getRowLabel={(d) => d.name}
           sort={estado.ordem}
           onSortChange={(ordem) => onEstado({ ...estado, ordem, pagina: 1 })}
-          selected={selecionados}
-          onSelectedChange={setSelecionados}
+          selected={selecao.ids}
+          onSelectedChange={(ids) => onSelecao({ ids, todos: false })}
           loading={!dados}
           loadingRows={10}
           onRowClick={onAbrir}
@@ -276,7 +279,7 @@ export function ListaDeNegocios({
         value={escolhidas}
         defaultValue={COLUNAS_PADRAO_DE_NEGOCIO}
         fixed={FIXAS}
-        onChange={gravarColunas}
+        onChange={onColunas}
       />
     </div>
   );

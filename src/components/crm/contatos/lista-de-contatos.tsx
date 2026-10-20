@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Columns3, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ViewTabs } from "@/components/ui/view-tabs";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +19,10 @@ import { opcoesDaBarra, opcoesDoEditor, opcoesExtrasDoEditor, type OpcoesDoCrm }
 import { useContrato } from "@/lib/contrato/navegacao";
 import { apiDoContrato } from "@/lib/contrato/rotas";
 import { SEM_VALOR, type FiltroDeConsulta } from "@/lib/consulta";
-import { CAMPOS_DE_CONTATO } from "@/lib/filtro-crm";
+import { CAMPOS_DE_CONTATO, type FiltroCrm } from "@/lib/filtro-crm";
+import { AbasDeVisoes, CamposRemovidos, useVisoesDaLista, type VisaoDeSistema } from "@/components/crm/listas/visoes-salvas";
+import { AcoesEmMassaDeContatos, SELECAO_VAZIA, type Selecao } from "@/components/crm/listas/acoes-em-massa";
+import { camposRemovidos, configDoEstado, estadoDaConfig, semCamposRemovidos } from "@/lib/visoes/visoes";
 import { formatarValor } from "@/lib/custom-fields";
 import { chaveDasColunas, colunasValidas } from "@/lib/listas/colunas";
 import { montarFiltro, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
@@ -32,7 +34,8 @@ import { CHANNEL_LABEL, SOURCE_LABEL, nomeDoContato, type Contact } from "./tipo
 // Lista de contatos no padrão de CRM de mercado: abas de visão com contagem,
 // barra de filtros em linha, busca, Exportar/Importar, Editar colunas,
 // tabela ordenável no servidor com seleção e paginação numerada. Estado na
-// URL (link compartilhável); colunas escolhidas no navegador até a L4.
+// URL (link compartilhável); visões salvas nas abas (L4) e ações em massa na
+// seleção (L5). Colunas: da visão salva; nas de sistema, do navegador.
 // ---------------------------------------------------------------------------
 
 export const BARRA_DE_CONTATOS: FiltroDaBarra[] = [
@@ -44,12 +47,12 @@ export const BARRA_DE_CONTATOS: FiltroDaBarra[] = [
   { campo: "ultimaAtividade", rotulo: "Última atividade", param: "atividade", tipo: "data" },
 ];
 
-const VISOES = [
+const VISOES: VisaoDeSistema[] = [
   { id: "todos", label: "Todos os contatos" },
   { id: "meus", label: "Meus contatos" },
   { id: "sem-dono", label: "Sem proprietário" },
-] as const;
-const IDS_DAS_VISOES = VISOES.map((v) => v.id as string);
+];
+const IDS_DAS_VISOES = VISOES.map((v) => v.id);
 const PADRAO = { visao: "todos", tamanho: 25 };
 
 function condicoesDaVisao(visao: string, meuId: string): FiltroDeConsulta[] {
@@ -103,12 +106,18 @@ export function ListaDeContatos({
   onImportar: () => void;
 }) {
   const contrato = useContrato();
-  const [estado, setEstado] = useEstadoDaLista(BARRA_DE_CONTATOS, PADRAO, IDS_DAS_VISOES);
+  const visoes = useVisoesDaLista("contatos", VISOES, PADRAO);
+  const padrao = React.useMemo(() => ({ ...PADRAO, visao: visoes.padrao }), [visoes.padrao]);
+  const [estado, setEstado] = useEstadoDaLista(BARRA_DE_CONTATOS, padrao, { visoes: IDS_DAS_VISOES, baseDaVisao: visoes.baseDaVisao });
+  const visaoSalva = visoes.salva(estado.visao);
+  // Condições de sistema da aba ("Meus" = de quem olha), também numa visão salva.
+  const visaoBase = visoes.visaoBase(estado.visao);
   const [dados, setDados] = React.useState<Resposta | null>(null);
   const [carregando, setCarregando] = React.useState(true);
   const [erro, setErro] = React.useState<string | null>(null);
   const [contagens, setContagens] = React.useState<Record<string, number>>({});
-  const [selecionados, setSelecionados] = React.useState<Set<string>>(new Set());
+  const [selecao, setSelecao] = React.useState<Selecao>(SELECAO_VAZIA);
+  const [recarga, setRecarga] = React.useState(0);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
 
   // ── Colunas ──
@@ -235,15 +244,27 @@ export function ListaDeContatos({
     (bruto: string | null) => colunasValidas(bruto, opcoes.carregado ? idsDisponiveis : [...idsDisponiveis, ...colunasSalvasCf(bruto)], COLUNAS_PADRAO, FIXAS),
     [idsDisponiveis, opcoes.carregado]
   );
-  const [colunasEscolhidas, gravarColunas] = useListaSalva(chaveDasColunas("contatos", contrato, opcoes.meuId), validar);
+  // Colunas: as da visão salva (ou o ajuste não salvo dela, na URL); nas de
+  // sistema (e sem visões no banco), as do navegador, como antes.
+  const [colunasDoNavegador, gravarColunas] = useListaSalva(chaveDasColunas("contatos", contrato, opcoes.meuId), validar);
+  const colunasDaVisao = React.useMemo(() => (estado.colunas ? validar(JSON.stringify(estado.colunas)) : null), [estado.colunas, validar]);
+  const colunasEscolhidas = colunasDaVisao ?? colunasDoNavegador;
+  const mudarColunas = (ids: string[]) => (visaoSalva ? setEstado({ ...estado, colunas: ids }) : gravarColunas(ids));
   const porId = new Map(disponiveis.map((d) => [d.id, d.coluna]));
   const colunas = colunasEscolhidas.map((id) => porId.get(id)).filter((c): c is DataTableColumn<Contact> => !!c);
 
   // ── Busca no servidor ──
   const filtro = React.useMemo(
-    () => montarFiltro(estado, BARRA_DE_CONTATOS, { daVisao: condicoesDaVisao(estado.visao, opcoes.meuId) }),
-    [estado, opcoes.meuId]
+    () => montarFiltro(estado, BARRA_DE_CONTATOS, { daVisao: condicoesDaVisao(visaoBase, opcoes.meuId) }),
+    [estado, visaoBase, opcoes.meuId]
   );
+  // Filtro mudou: a seleção (sobretudo "todos os N") deixa de valer.
+  const chaveDoFiltro = JSON.stringify(filtro);
+  const [filtroDaSelecao, setFiltroDaSelecao] = React.useState(chaveDoFiltro);
+  if (filtroDaSelecao !== chaveDoFiltro) {
+    setFiltroDaSelecao(chaveDoFiltro);
+    setSelecao(SELECAO_VAZIA);
+  }
   const corpo = React.useMemo(
     () =>
       JSON.stringify({
@@ -256,7 +277,8 @@ export function ListaDeContatos({
   );
   // A busca digitada espera o fim da digitação; o resto vai na hora.
   const corpoAtrasado = useComAtraso(corpo, 250);
-  const pronto = opcoes.carregado || estado.visao !== "meus";
+  // Espera as visões (a padrão da pessoa decide o que a URL sem ?v= mostra).
+  const pronto = visoes.carregado && (opcoes.carregado || visaoBase !== "meus");
 
   const ultima = React.useRef(0);
   React.useEffect(() => {
@@ -279,18 +301,29 @@ export function ListaDeContatos({
     return () => {
       vivo = false;
     };
-  }, [corpoAtrasado, pronto, versao]);
+  }, [corpoAtrasado, pronto, versao, recarga]);
 
-  // Contagem de cada aba (só a condição da visão, sem a barra).
+  // Contagem de cada aba, ao vivo e pelo mesmo motor: de sistema = só a
+  // condição da visão; salva = o filtro guardado nela.
+  const filtrosDasAbas = React.useMemo(
+    () => [
+      ...VISOES.map((v) => ({ id: v.id, filtro: { logica: "e", grupos: [], rapidos: condicoesDaVisao(v.id, opcoes.meuId) } as FiltroCrm })),
+      ...visoes.visoes.map((v) => ({
+        id: v.id,
+        filtro: montarFiltro(estadoDaConfig(v.config, PADRAO, v.id), BARRA_DE_CONTATOS, { daVisao: condicoesDaVisao(v.config.visaoBase, opcoes.meuId) }),
+      })),
+    ],
+    [visoes.visoes, opcoes.meuId]
+  );
   React.useEffect(() => {
     if (!opcoes.carregado) return;
     let vivo = true;
     Promise.all(
-      VISOES.map((v) =>
+      filtrosDasAbas.map((v) =>
         fetch("/api/contacts/busca", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filtro: { rapidos: condicoesDaVisao(v.id, opcoes.meuId) }, apenasTotal: true }),
+          body: JSON.stringify({ filtro: v.filtro, apenasTotal: true }),
         })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => [v.id, d?.total] as const)
@@ -305,7 +338,7 @@ export function ListaDeContatos({
     return () => {
       vivo = false;
     };
-  }, [opcoes.carregado, opcoes.meuId, versao]);
+  }, [opcoes.carregado, filtrosDasAbas, versao, recarga]);
 
   const total = dados?.total ?? 0;
   const linhas = dados?.contacts ?? [];
@@ -332,16 +365,31 @@ export function ListaDeContatos({
     [opcoes]
   );
 
+  // Filtro em campo que não existe mais: chip "campo removido" (o motor já ignora).
+  const removidos = React.useMemo(
+    () => (opcoes.carregado ? camposRemovidos(estado.avancado, "contatos", opcoes.campos.map((c) => c.key)) : []),
+    [opcoes.carregado, opcoes.campos, estado.avancado]
+  );
+  const configAtual = () => configDoEstado(estado, { visaoBase, colunas: colunasEscolhidas });
+  const paginaToda = linhas.length > 0 && linhas.every((c) => selecao.ids.has(c.id));
+  const aoAgirEmMassa = () => {
+    setSelecao(SELECAO_VAZIA);
+    setRecarga((r) => r + 1);
+  };
+
   return (
     <div className="flex flex-col gap-3">
-      <ViewTabs
-        label="Visões de contatos"
-        value={estado.visao}
-        onChange={(v) => {
-          setSelecionados(new Set());
-          setEstado({ ...estado, visao: v, pagina: 1 });
-        }}
-        views={VISOES.map((v) => ({ id: v.id, label: v.label, count: contagens[v.id] }))}
+      <AbasDeVisoes
+        rotulo="Visões de contatos"
+        sistema={VISOES}
+        visoes={visoes}
+        estado={estado}
+        onEstado={setEstado}
+        barra={BARRA_DE_CONTATOS}
+        contagens={contagens}
+        configAtual={configAtual}
+        equipes={opcoes.equipes}
+        padraoDaLista={PADRAO}
       />
 
       <BarraDeFiltros
@@ -391,17 +439,18 @@ export function ListaDeContatos({
         <Notice tone="warning">Um filtro por campo personalizado de número ou data olhou só os primeiros 5.000 contatos; a lista pode estar incompleta.</Notice>
       )}
 
-      {selecionados.size > 0 && (
-        <div className="flex h-9 items-center gap-3 rounded-md bg-accent-subtle px-3 text-small text-text-primary" role="status">
-          <span className="font-medium tabular-nums">
-            {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
-          </span>
-          <span className="text-text-secondary">Ações em massa chegam na próxima etapa.</span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelecionados(new Set())}>
-            Limpar seleção
-          </Button>
-        </div>
-      )}
+      {removidos.length > 0 && <CamposRemovidos removidos={removidos} onTirar={() => setEstado({ ...estado, avancado: semCamposRemovidos(estado.avancado, removidos.map((r) => r.campo)), pagina: 1 })} />}
+
+      <AcoesEmMassaDeContatos
+        selecao={selecao}
+        onSelecao={setSelecao}
+        total={total}
+        paginaToda={paginaToda}
+        filtro={filtro}
+        membros={opcoes.dash.membros}
+        etiquetas={opcoes.dash.etiquetas}
+        onFeito={aoAgirEmMassa}
+      />
 
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-panel">
         <DataTable
@@ -412,8 +461,8 @@ export function ListaDeContatos({
           getRowLabel={nomeDoContato}
           sort={estado.ordem}
           onSortChange={(ordem) => setEstado({ ...estado, ordem, pagina: 1 })}
-          selected={selecionados}
-          onSelectedChange={setSelecionados}
+          selected={selecao.ids}
+          onSelectedChange={(ids) => setSelecao({ ids, todos: false })}
           loading={carregandoAgora && !dados}
           loadingRows={10}
           onRowClick={onAbrir}
@@ -454,7 +503,7 @@ export function ListaDeContatos({
         value={colunasEscolhidas}
         defaultValue={COLUNAS_PADRAO}
         fixed={FIXAS}
-        onChange={gravarColunas}
+        onChange={mudarColunas}
       />
     </div>
   );

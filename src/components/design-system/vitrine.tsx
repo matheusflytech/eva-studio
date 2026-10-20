@@ -29,6 +29,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Toolbar } from "@/components/ui/toolbar";
 import { FilterButton } from "@/components/ui/filter-button";
 import { ViewTabs } from "@/components/ui/view-tabs";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { DataTable } from "@/components/ui/data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { Stat } from "@/components/ui/stat";
@@ -172,7 +173,7 @@ export function Vitrine() {
         </div>
       </Secao>
 
-      <Secao id="lista" titulo="Componentes de lista" descricao="PageHeader, ViewTabs, Toolbar + FilterButton, DataTable, Pagination, Stat e KanbanColumn.">
+      <Secao id="lista" titulo="Componentes de lista" descricao="PageHeader, ViewTabs, Toolbar + FilterButton, BulkActionBar, DataTable, Pagination, Stat e KanbanColumn.">
         <DemoLista />
       </Secao>
 
@@ -630,6 +631,7 @@ function DemoLista() {
             views={[
               { id: "a", label: "Todos", count: 24752 },
               { id: "b", label: "Meus", count: 312 },
+              { id: "c", label: "Leads quentes", count: 87, dirty: visao === "c", hint: "Minha equipe · de Ana" },
             ]}
           />
           <Toolbar label="Filtros de exemplo" end={<Button size="sm" variant="ghost">Salvar visão</Button>}>
@@ -643,6 +645,14 @@ function DemoLista() {
             <FilterButton label="Etapa" options={[{ value: "a", label: "Lead" }, { value: "b", label: "Cliente" }]} selected={[]} onChange={() => undefined} />
           </Toolbar>
         </div>
+      </Panel>
+
+      <Panel title="BulkActionBar (fixa embaixo, no centro, ao selecionar)">
+        <BulkActionBar className="static translate-x-0" count={25} total={312} canSelectAll onSelectAll={() => undefined} onClear={() => undefined}>
+          <Button size="sm" variant="ghost">Atribuir</Button>
+          <Button size="sm" variant="ghost">Mover</Button>
+          <Button size="sm" variant="ghost" className="text-danger hover:text-danger">Apagar</Button>
+        </BulkActionBar>
       </Panel>
 
       <Panel

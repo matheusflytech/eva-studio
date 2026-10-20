@@ -86,7 +86,7 @@ function Relatorio() {
   const parametros = useSearchParams();
   const consulta = React.useMemo(() => {
     const p = new URLSearchParams();
-    for (const k of ["pipeline", "busca", "dono", "visao", "arquivados", "dias"]) {
+    for (const k of ["pipeline", "filtro", "busca", "dono", "visao", "arquivados", "dias"]) {
       const v = parametros.get(k);
       if (v) p.set(k, v);
     }
