@@ -14,6 +14,7 @@ import { ContactActivity } from "@/components/crm/contact-activity";
 import { CamposDoContato } from "@/components/crm/campos-do-contato";
 import { CHANNEL_LABEL, nomeDoContato, type Contact, type TagRow } from "./tipos";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
+import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 
 /**
  * Ficha do contato em gaveta: dados que salvam ao sair do campo, etiquetas,
@@ -48,6 +49,20 @@ export function FichaDoContato({
   const [aba, setAba] = React.useState("ficha");
   // Contador na aba: a pessoa precisa ver que há tarefa aberta sem trocar de aba.
   const [tarefasAbertas, setTarefasAbertas] = React.useState(0);
+  // Busca global (⌘K): com a ficha aberta, WhatsApp e tarefa para este contato vêm primeiro.
+  const registro = React.useMemo<RegistroEmFoco>(
+    () => ({
+      tipo: "contato",
+      id: contact.id,
+      titulo: contact.name || contact.phone || contact.email || "Contato sem nome",
+      caminho: `/contatos?abrir=${contact.id}`,
+      subtitulo: [contact.phone, contact.email].filter(Boolean).join(" · "),
+      whatsapp: { nome: contact.name || "o contato", telefone: contact.phone },
+      tarefa: { contactId: contact.id },
+    }),
+    [contact.id, contact.name, contact.phone, contact.email]
+  );
+  useRegistroEmFoco(registro);
 
   async function patch(body: Record<string, unknown>) {
     setSaving(true);

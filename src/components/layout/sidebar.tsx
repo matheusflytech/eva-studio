@@ -24,12 +24,14 @@ import {
   Handshake,
   CheckSquare,
   ChevronDown,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarcaAjuda } from "./marca-ajuda";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
+import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 
 interface NavItem {
   href: string;
@@ -91,6 +93,34 @@ const NAV_AVANCADO: NavGroup[] = [
 ];
 
 const CHAVE_MAIS = "eva_menu_mais";
+
+/** Abre a busca global; mostra o atalho da plataforma (⌘K no Mac, Ctrl K no resto). */
+function BotaoBuscar({ collapsed }: { collapsed: boolean }) {
+  const { abrir, mac } = useBuscaGlobal();
+  return (
+    <button
+      type="button"
+      onClick={abrir}
+      title={`Buscar (${mac ? "⌘K" : "Ctrl+K"})`}
+      aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
+      className={cn(
+        "mt-3 flex h-8 items-center gap-2 rounded-md border border-border-subtle px-2.5 text-small text-text-tertiary transition-colors",
+        "hover:border-border-default hover:text-text-primary",
+        collapsed && "justify-center px-0"
+      )}
+    >
+      <Search size={15} className="shrink-0" aria-hidden />
+      {collapsed ? (
+        <span className="sr-only">Buscar</span>
+      ) : (
+        <>
+          <span>Buscar</span>
+          <span className="ml-auto text-caption">{mac ? "⌘K" : "Ctrl K"}</span>
+        </>
+      )}
+    </button>
+  );
+}
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const [collapsedState, setCollapsed] = React.useState(false);
@@ -158,6 +188,8 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
       </div>
 
       <OrgSwitcher collapsed={collapsed} />
+
+      <BotaoBuscar collapsed={collapsed} />
 
       <nav className="mt-5 flex flex-1 flex-col gap-5 overflow-y-auto">
         {NAV_PRINCIPAL.map((group, i) => (

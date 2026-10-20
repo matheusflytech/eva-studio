@@ -164,13 +164,13 @@ describe("buscarTudo", () => {
       const sql = (s as Prisma.Sql).sql ?? "";
       if (sql.includes("pg_extension")) return [{ norm: false, trgm: null }];
       if (sql.includes(`FROM "eva_studio_contacts" ct`))
-        return [{ id: "c1", name: "Maria", email: "m@x.com", phone: "5511999998888", empresa: "Alfa" }];
+        return [{ id: "c1", name: "Maria", email: "m@x.com", phone: "5511999998888", empresa: "Alfa", conversaId: "cv1" }];
       return [];
     });
     const ctx = { ...ctxBase, escopo: { negocios: "todos" as const, contatos: "proprios" as const, conversas: "todos" as const } };
     const r = await buscarTudo(ctx, normalizarConsulta("mar"), ["contatos"]);
     expect(r.contatos).toEqual([
-      expect.objectContaining({ id: "c1", titulo: "Maria", caminho: "/contatos?abrir=c1", subtitulo: expect.stringContaining("m@x.com") }),
+      expect.objectContaining({ id: "c1", conversaId: "cv1", titulo: "Maria", caminho: "/contatos?abrir=c1", subtitulo: expect.stringContaining("m@x.com") }),
     ]);
     expect(r.modo).toEqual({ semAcento: "translate", similaridade: false });
     const chamada = db.$queryRaw.mock.calls.find(([s]) => ((s as Prisma.Sql).sql ?? "").includes(`FROM "eva_studio_contacts" ct`))!;

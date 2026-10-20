@@ -28,6 +28,8 @@ export interface RegistroEncontrado {
   caminho: string;
   /** Contato: telefone (dígitos) e conversa, para "Enviar WhatsApp para…". */
   telefone?: string;
+  /** Contato: conversa de WhatsApp mais recente. */
+  conversaId?: string;
   /** Achado por semelhança (erro de digitação), não pelo começo da palavra. */
   aproximado?: boolean;
 }

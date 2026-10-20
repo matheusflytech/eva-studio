@@ -27,6 +27,23 @@ function ContatosConteudo() {
   const [selected, setSelected] = React.useState<Contact | null>(null);
   const [versao, setVersao] = React.useState(0);
   const [criando, setCriando] = React.useState(false);
+  // "Criar contato" da busca global: /contatos?novo=<carimbo>, uma vez por carimbo.
+  const sp = useSearchParams();
+  const pedidoDeNovo = sp.get("novo");
+  const [pedidoAtendido, setPedidoAtendido] = React.useState<string | null>(null);
+  if (pedidoDeNovo && pedidoDeNovo !== pedidoAtendido) {
+    setPedidoAtendido(pedidoDeNovo);
+    setCriando(true);
+  }
+  const fecharNovo = React.useCallback(() => {
+    setCriando(false);
+    // Recarregar a página não reabre o formulário.
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("novo")) return;
+    q.delete("novo");
+    const qs = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, []);
   const [importando, setImportando] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -52,7 +69,7 @@ function ContatosConteudo() {
   }, [refreshTags, refreshSegments]);
 
   // Link vindo de outra tela (a caixa de entrada abre a ficha completa daqui).
-  const abrir = useSearchParams().get("abrir");
+  const abrir = sp.get("abrir");
   React.useEffect(() => {
     if (!abrir) return;
     fetch(`/api/contacts/${abrir}`)
@@ -137,9 +154,9 @@ function ContatosConteudo() {
       {criando && (
         <NovoContato
           agentId={agentId}
-          onClose={() => setCriando(false)}
+          onClose={fecharNovo}
           onCreated={() => {
-            setCriando(false);
+            fecharNovo();
             mudou();
           }}
         />

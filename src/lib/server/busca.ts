@@ -174,7 +174,11 @@ export function sqlDeContatos(p: ParametrosDaBusca, donos: string[] | null, modo
   }
   const ordem = modo === "semelhanca" ? ordemDeSemelhanca(Prisma.sql`ct."name"`, c.texto, r) : c.telefone ? Prisma.empty : comecaCom(Prisma.sql`ct."name"`, c, r);
   return Prisma.sql`
-    SELECT ct."id", ct."name", ct."email", ct."phone", co."name" AS "empresa"
+    SELECT ct."id", ct."name", ct."email", ct."phone", co."name" AS "empresa",
+           -- Conversa de WhatsApp mais recente (para "Enviar WhatsApp para…" abrir o inbox).
+           (SELECT cv."id" FROM "eva_studio_conversations" cv
+             WHERE cv."contactRecordId" = ct."id" AND cv."channel" = ANY(${CANAIS_WHATSAPP})
+             ORDER BY cv."lastMessageAt" DESC LIMIT 1) AS "conversaId"
       FROM "eva_studio_contacts" ct
       LEFT JOIN "eva_studio_companies" co ON co."id" = ct."companyId"
      WHERE ct."orgId" = ${orgId}
@@ -380,6 +384,7 @@ interface LinhaDeContato {
   email: string;
   phone: string;
   empresa: string | null;
+  conversaId?: string | null;
 }
 interface LinhaDeEmpresa {
   id: string;
@@ -427,6 +432,7 @@ export function contatoEncontrado(l: LinhaDeContato, aproximado = false): Regist
     subtitulo: subtituloDoContato({ phone: l.phone, email: l.email, empresa: l.empresa }),
     caminho: `/contatos?abrir=${encodeURIComponent(l.id)}`,
     ...(l.phone ? { telefone: l.phone } : {}),
+    ...(l.conversaId ? { conversaId: l.conversaId } : {}),
     ...(aproximado ? { aproximado } : {}),
   };
 }

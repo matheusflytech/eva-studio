@@ -118,6 +118,23 @@ function NegociosConteudo() {
   const [contagens, setContagens] = React.useState<Record<string, number>>({});
   const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
   const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
+  // "Criar negócio" da busca global: /negocios?novo=<carimbo>. Cada carimbo
+  // abre o "novo negócio" uma vez (ajuste de estado no render, sem efeito).
+  const pedidoDeNovo = sp.get("novo");
+  const [pedidoAtendido, setPedidoAtendido] = React.useState<string | null>(null);
+  if (pedidoDeNovo && pedidoDeNovo !== pedidoAtendido) {
+    setPedidoAtendido(pedidoDeNovo);
+    setNovoNaEtapa("");
+  }
+  function fecharNovo() {
+    setNovoNaEtapa(null);
+    // Recarregar a página não reabre o formulário.
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("novo")) return;
+    q.delete("novo");
+    const qs = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }
   const [importando, setImportando] = React.useState(false);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
   const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia } | null>(null);
@@ -671,9 +688,9 @@ function NegociosConteudo() {
           pipelines={pipelines}
           pipelineId={pipelineId}
           etapaInicial={novoNaEtapa}
-          onClose={() => setNovoNaEtapa(null)}
+          onClose={fecharNovo}
           onCreated={() => {
-            setNovoNaEtapa(null);
+            fecharNovo();
             setVersao((v) => v + 1);
           }}
         />

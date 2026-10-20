@@ -14,6 +14,7 @@ import { VinculosDoNegocio } from "./vinculos";
 import { ProdutosDoNegocio, useItensDoNegocio } from "./produtos";
 import { valorVemDosProdutos } from "@/lib/produtos";
 import { useMudancaDeEtapa, type EtapaDoMovimento } from "@/components/crm/negocios/mudanca-de-etapa";
+import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 
 /**
  * Ficha completa do negócio, com endereço próprio (/negocios/<id>) para
@@ -51,6 +52,32 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
     },
     [deal, defs, mudanca, carregar]
   );
+  // Busca global (⌘K): ações deste negócio primeiro, pelas mesmas funções da ficha.
+  const registro = React.useMemo<RegistroEmFoco | null>(() => {
+    if (!deal) return null;
+    const principal = deal.contacts[0]?.contact;
+    return {
+      tipo: "negocio",
+      id: deal.id,
+      titulo: deal.name || "Negócio sem nome",
+      caminho: `/negocios/${deal.id}`,
+      subtitulo: [deal.company?.name, deal.stage.name].filter(Boolean).join(" · "),
+      etapas: deal.pipeline.stages.map((s) => ({ id: s.id, nome: s.name, tipo: s.type })),
+      etapaAtualId: deal.stageId,
+      aoMudarEtapa: (id) => {
+        const s = deal.pipeline.stages.find((x) => x.id === id);
+        if (s) void moverEtapa({ id: s.id, name: s.name, type: s.type });
+      },
+      membros,
+      donoAtualId: deal.ownerId,
+      aoAtribuir: (userId) => {
+        void patch({ ownerId: userId }).then((falha) => falha && setErro(falha));
+      },
+      whatsapp: principal ? { nome: principal.name || "o contato", telefone: principal.phone } : null,
+      tarefa: { dealId: deal.id },
+    };
+  }, [deal, membros, moverEtapa, patch]);
+  useRegistroEmFoco(registro);
   const [aba, setAba] = React.useState<AbaDaAtividade>("atividade");
   const atividadeRef = React.useRef<HTMLDivElement>(null);
 

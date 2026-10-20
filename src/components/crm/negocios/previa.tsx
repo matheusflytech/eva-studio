@@ -13,6 +13,8 @@ import { rotuloDoCampo, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { SinalDoProximoPasso } from "./deal-card";
 import { rotulosPersonalizados, textoDoCampo, tituloDoCartao } from "./cartao";
 import { dinheiro, type NegocioKanban } from "./modelo";
+import { useToast } from "@/components/ui/toast";
+import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 
 export interface EtapaDaPrevia {
   id: string;
@@ -182,6 +184,8 @@ export function PreviaDoNegocio({
     };
     // Clique fora fecha sem devolver o foco: quem clicou já escolheu outro lugar.
     const aoApontar = (e: PointerEvent) => {
+      // Clique na busca global (⌘K) não é "fora": ela age sobre esta prévia.
+      if (e.target instanceof Element && e.target.closest("[data-busca-global]")) return;
       if (painel.current && e.target instanceof Node && !painel.current.contains(e.target)) {
         devolverFoco.current = false;
         fechar.current();
@@ -219,6 +223,44 @@ export function PreviaDoNegocio({
     setMovendo(null);
     if (r === "movido") onMudou();
   }
+
+  // Busca global (⌘K): com a prévia aberta, as ações deste negócio vêm primeiro.
+  // Mudar etapa passa pelo mesmo `mover` (regras, modais e desfazer da tela).
+  const moverRef = React.useRef(mover);
+  const mudouRef = React.useRef(onMudou);
+  React.useEffect(() => {
+    moverRef.current = mover;
+    mudouRef.current = onMudou;
+  });
+  const toast = useToast();
+  const registro = React.useMemo<RegistroEmFoco>(() => {
+    const principal = deal.contacts[0];
+    return {
+      tipo: "negocio",
+      id: deal.id,
+      titulo: deal.name || "Negócio sem nome",
+      caminho: `/negocios/${deal.id}`,
+      subtitulo: [deal.company?.name, etapa.name].filter(Boolean).join(" · "),
+      etapas: etapas.map((s) => ({ id: s.id, nome: s.name, tipo: s.type })),
+      etapaAtualId: etapa.id,
+      aoMudarEtapa: (id) => void moverRef.current(id),
+      donoAtualId: deal.owner?.id ?? null,
+      aoAtribuir: async (userId) => {
+        const res = await fetch(`/api/deals/${deal.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerId: userId }),
+        }).catch(() => null);
+        if (res?.ok) mudouRef.current();
+        else toast({ title: "Não foi possível trocar o responsável.", tone: "danger" });
+      },
+      whatsapp: principal
+        ? { nome: principal.name || "o contato", telefone: principal.phone, conversaId: deal.whatsapp?.conversationId }
+        : null,
+      tarefa: { dealId: deal.id },
+    };
+  }, [deal, etapa, etapas, toast]);
+  useRegistroEmFoco(registro);
 
   const aberto = etapa.type === "open";
 

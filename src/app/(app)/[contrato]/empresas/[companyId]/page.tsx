@@ -17,6 +17,8 @@ import { DealDrawer } from "@/components/crm/deal-drawer";
 import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
+import { subtituloDaEmpresa } from "@/lib/busca/resultado";
 
 interface Company {
   id: string; name: string; cnpj: string; sector: string; size: number | null;
@@ -122,6 +124,23 @@ export default function EmpresaPage() {
     });
     carregar();
   }
+
+  // Busca global (⌘K): a empresa aberta entra nos Recentes.
+  const empresa = data?.company;
+  const registro = React.useMemo<RegistroEmFoco | null>(
+    () =>
+      empresa
+        ? {
+            tipo: "empresa",
+            id: empresa.id,
+            titulo: empresa.name || "Empresa sem nome",
+            caminho: `/empresas/${empresa.id}`,
+            subtitulo: subtituloDaEmpresa(empresa),
+          }
+        : null,
+    [empresa]
+  );
+  useRegistroEmFoco(registro);
 
   const apagarComDesfazer = useApagarComDesfazer();
   // Sem confirmação: vai para a lixeira (contatos e negócios ficam, sem
