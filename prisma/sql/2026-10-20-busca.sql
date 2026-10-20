@@ -45,7 +45,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
 -- IMMUTABLE: é o padrão recomendado para indexar texto sem acento.
 -- search_path vazio = nada resolvido pelo caminho de busca de quem chama (o
 -- linter de segurança do Supabase pede isso).
-DO $$
+DO $do$
 DECLARE
   esquema text;
 BEGIN
@@ -60,7 +60,7 @@ BEGIN
     esquema, esquema || '.unaccent'
   );
 END
-$$;
+$do$;
 
 -- 3. Índices GIN trigram -------------------------------------------------------
 -- Servem ao LIKE 'termo%' e '% termo%' (começo de palavra), ao LIKE '%trecho%'
