@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DealDrawer } from "@/components/crm/deal-drawer";
+import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { cn, formatRelativeDate } from "@/lib/utils";
 
 interface Company {
@@ -112,10 +113,18 @@ export default function EmpresaPage() {
     carregar();
   }
 
+  const apagarComDesfazer = useApagarComDesfazer();
+  // Sem confirmação: vai para a lixeira (contatos e negócios ficam, sem
+  // empresa) e o toast desfaz, religando quem estava ligado.
   async function apagar() {
-    if (!confirm("Apagar esta empresa? Os contatos e negócios continuam, apenas ficam sem empresa.")) return;
-    await fetch(`/api/companies/${companyId}`, { method: "DELETE" });
-    router.push("/empresas");
+    const r = await apagarComDesfazer({
+      url: `/api/companies/${companyId}`,
+      titulo: "Empresa apagada",
+      perguntaSemLixeira: "A lixeira ainda não está ativada: apagar esta empresa não tem volta (contatos e negócios continuam, sem empresa). Apagar mesmo assim?",
+      aoRestaurar: () => router.push(`/empresas/${companyId}`),
+    });
+    if (r.ok) router.push("/empresas");
+    else if (r.erro) setErro(r.erro);
   }
 
   if (erro && !data) {

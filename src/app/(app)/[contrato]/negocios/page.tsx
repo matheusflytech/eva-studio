@@ -387,7 +387,16 @@ function NegociosConteudo() {
     if (para.type !== "lost") setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
     // Regras da etapa no servidor: faltou campo → "Complete para mover";
     // perdido → motivo; negócio fechado → aviso (só sai com Reabrir).
-    const r = await mudanca.mover({ dealId, nome: deal.name, pipelineId, para, defs: quadro.defs });
+    const r = await mudanca.mover({
+      dealId,
+      nome: deal.name,
+      pipelineId,
+      para,
+      defs: quadro.defs,
+      // Toast com "Desfazer": volta para a coluna de onde saiu.
+      de: { id: from.id, name: from.name, type: from.type },
+      aoDesfazer: () => setVersao((v) => v + 1),
+    });
     if (r === "movido") {
       setVersao((v) => v + 1);
       return;

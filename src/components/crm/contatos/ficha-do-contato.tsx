@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ContactActivity } from "@/components/crm/contact-activity";
 import { CamposDoContato } from "@/components/crm/campos-do-contato";
 import { CHANNEL_LABEL, nomeDoContato, type Contact, type TagRow } from "./tipos";
+import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 
 /**
  * Ficha do contato em gaveta: dados que salvam ao sair do campo, etiquetas,
@@ -25,12 +26,15 @@ export function FichaDoContato({
   onClose,
   onChanged,
   onDeleted,
+  onRestored,
 }: {
   contact: Contact;
   tags: TagRow[];
   onClose: () => void;
   onChanged: (c: Contact) => void;
   onDeleted: () => void;
+  /** Depois do "Desfazer" do apagar (a gaveta já fechou): recarregar a lista. */
+  onRestored?: () => void;
 }) {
   const [form, setForm] = React.useState({ name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes });
   const [base, setBase] = React.useState(contact);
@@ -68,16 +72,18 @@ export function FichaDoContato({
     patch({ [campo]: form[campo] });
   }
 
+  const apagarComDesfazer = useApagarComDesfazer();
+  // Sem confirmação: vai para a lixeira e o toast desfaz.
   async function remove() {
-    if (!window.confirm(`Apagar o contato ${nomeDoContato(contact)}? Isso não pode ser desfeito.`)) return;
     setErro(null);
-    const res = await fetch(`/api/contacts/${contact.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setErro(data.error ?? "Não foi possível apagar o contato.");
-      return;
-    }
-    onDeleted();
+    const r = await apagarComDesfazer({
+      url: `/api/contacts/${contact.id}`,
+      titulo: "Contato apagado",
+      perguntaSemLixeira: `A lixeira ainda não está ativada: apagar ${nomeDoContato(contact)} leva junto tarefas, notas e etiquetas e não tem volta. Apagar mesmo assim?`,
+      aoRestaurar: () => onRestored?.(),
+    });
+    if (r.ok) onDeleted();
+    else if (r.erro) setErro(r.erro);
   }
 
   const disponiveis = tags.filter((t) => !contact.tags.some((ct) => ct.id === t.id));

@@ -213,6 +213,8 @@ export function PreviaDoNegocio({
       para: para ?? { id: "", name: "", type: "open" },
       defs,
       extra,
+      de: { id: etapa.id, name: etapa.name, type: etapa.type },
+      aoDesfazer: onMudou,
     });
     setMovendo(null);
     if (r === "movido") onMudou();

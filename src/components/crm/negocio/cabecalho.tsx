@@ -9,11 +9,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
-import { Modal, ModalContent } from "@/components/ui/modal";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { dinheiro } from "@/components/crm/negocios/modelo";
-import { mensagemDeErro, type Membro, type NegocioDaFicha } from "./use-ficha";
+import { useToast } from "@/components/ui/toast";
+import { type Membro, type NegocioDaFicha } from "./use-ficha";
+import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
+import { MS_PARA_DESFAZER } from "@/lib/lixeira";
 import { AgendarMensagem } from "@/components/whatsapp/agendar-mensagem";
 import type { EtapaDoMovimento, ResultadoDaTentativa } from "@/components/crm/negocios/mudanca-de-etapa";
 
@@ -37,7 +39,6 @@ export function CabecalhoDoNegocio({
 }) {
   const router = useRouter();
   const [ocupado, setOcupado] = React.useState<"ganho" | "perdido" | "reabrir" | "dono" | null>(null);
-  const [confirmandoApagar, setConfirmandoApagar] = React.useState(false);
   const [copiado, setCopiado] = React.useState(false);
 
   const etapaGanha = deal.pipeline.stages.find((s) => s.type === "won");
@@ -59,6 +60,36 @@ export function CabecalhoDoNegocio({
     setOcupado(null);
     onErro(falha);
     return !falha;
+  }
+
+  const toast = useToast();
+  const apagarComDesfazer = useApagarComDesfazer();
+
+  /** Arquivar/desarquivar sem confirmação: o toast desfaz. */
+  async function alternarArquivo() {
+    const arquivar = !deal.archivedAt;
+    const falha = await patch({ archived: arquivar });
+    onErro(falha);
+    if (falha) return;
+    toast({
+      title: arquivar ? "Negócio arquivado" : "Negócio desarquivado",
+      durationMs: MS_PARA_DESFAZER,
+      action: { label: "Desfazer", onClick: async () => onErro(await patch({ archived: !arquivar })) },
+    });
+  }
+
+  /** Apagar sem confirmação: vai para a lixeira e o toast desfaz (volta para esta ficha). */
+  async function apagar() {
+    onErro(null);
+    const id = deal.id;
+    const r = await apagarComDesfazer({
+      url: `/api/deals/${id}`,
+      titulo: "Negócio apagado",
+      perguntaSemLixeira: `A lixeira ainda não está ativada: apagar "${deal.name}" leva junto as tarefas e notas e não tem volta. Apagar mesmo assim?`,
+      aoRestaurar: () => router.push(`/negocios/${id}`),
+    });
+    if (r.ok) router.push("/negocios");
+    else if (r.erro) onErro(r.erro);
   }
 
   async function copiarLink() {
@@ -161,16 +192,12 @@ export function CabecalhoDoNegocio({
               >
                 <Link2 size={15} aria-hidden /> {copiado ? "Link copiado" : "Copiar link"}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={async () => {
-                  onErro(await patch({ archived: !deal.archivedAt }));
-                }}
-              >
+              <DropdownMenuItem onSelect={() => void alternarArquivo()}>
                 {deal.archivedAt ? <ArchiveRestore size={15} aria-hidden /> : <Archive size={15} aria-hidden />}
                 {deal.archivedAt ? "Desarquivar" : "Arquivar"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setConfirmandoApagar(true)} className="text-danger data-[highlighted]:text-danger">
+              <DropdownMenuItem onSelect={() => void apagar()} className="text-danger data-[highlighted]:text-danger">
                 <Trash2 size={15} aria-hidden /> Apagar negócio
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -222,27 +249,6 @@ export function CabecalhoDoNegocio({
         </div>
       </dl>
 
-      {confirmandoApagar && (
-        <ConfirmarApagar
-          nome={deal.name}
-          onFechar={() => setConfirmandoApagar(false)}
-          onConfirmar={async () => {
-            onErro(null);
-            try {
-              const res = await fetch(`/api/deals/${deal.id}`, { method: "DELETE" });
-              if (!res.ok) {
-                onErro(await mensagemDeErro(res, "Não foi possível apagar o negócio."));
-                setConfirmandoApagar(false);
-                return;
-              }
-              router.push("/negocios");
-            } catch {
-              onErro("Sem conexão. Tente de novo.");
-              setConfirmandoApagar(false);
-            }
-          }}
-        />
-      )}
     </header>
   );
 }
@@ -292,34 +298,5 @@ function TituloEditavel({ valor, onSalvar }: { valor: string; onSalvar: (v: stri
       />
       {erro && <p role="alert" className="px-1 text-[12px] text-danger">{erro}</p>}
     </div>
-  );
-}
-
-function ConfirmarApagar({ nome, onFechar, onConfirmar }: { nome: string; onFechar: () => void; onConfirmar: () => Promise<void> }) {
-  const [apagando, setApagando] = React.useState(false);
-  return (
-    <Modal open onOpenChange={(aberto) => !aberto && onFechar()}>
-      <ModalContent title="Apagar negócio?" description={`"${nome}" some junto com as tarefas e notas dele. Não dá para desfazer.`}>
-        <p className="mb-5 text-[13px] text-text-secondary">
-          Se a ideia é só tirar do funil, arquivar guarda o histórico.
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onFechar} autoFocus>
-            Cancelar
-          </Button>
-          <Button
-            variant="danger"
-            disabled={apagando}
-            onClick={async () => {
-              setApagando(true);
-              await onConfirmar();
-              setApagando(false);
-            }}
-          >
-            {apagando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} aria-hidden />} Apagar
-          </Button>
-        </div>
-      </ModalContent>
-    </Modal>
   );
 }

@@ -130,6 +130,7 @@ function ContatosConteudo() {
             setSelected(null);
             mudou();
           }}
+          onRestored={mudou}
         />
       )}
 

@@ -43,6 +43,8 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         para: para ?? { id: "", name: "", type: "open" },
         defs,
         extra,
+        de: { id: deal.stage.id, name: deal.stage.name, type: deal.stage.type },
+        aoDesfazer: () => void carregar(),
       });
       if (r === "movido") await carregar();
       return r;

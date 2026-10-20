@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
+import { useToast } from "@/components/ui/toast";
 import { CampoEditor } from "@/components/crm/campos-personalizados";
 import { BuscaDeVinculo } from "@/components/crm/negocio/pecas";
 import { buscarContatos, buscarEmpresas } from "@/components/crm/negocio/vinculos";
@@ -21,6 +22,7 @@ import {
   type MotivoDePerda,
   type ValoresDoModal,
 } from "@/lib/regras-de-etapa";
+import { MS_PARA_DESFAZER, corpoParaDesfazer, tituloDaMudanca } from "@/lib/lixeira";
 
 // ---------------------------------------------------------------------------
 // Mudança de etapa na tela, igual em todo lugar (quadro, prévia, ficha):
@@ -28,6 +30,10 @@ import {
 // "Complete para mover" só com eles (salva e move numa ação; cancelar devolve
 // o cartão); para a etapa de perda, pede o motivo antes. As regras moram no
 // servidor (moveDealStage) — aqui só se mostra o que ele pediu.
+//
+// Com `de` (a etapa de onde sai), depois de mover aparece o toast com
+// "Desfazer": volta para `de` pelo mesmo PATCH (mesmas regras; ganho/perdido
+// reabrem na etapa anterior).
 // ---------------------------------------------------------------------------
 
 export interface EtapaDoMovimento {
@@ -45,6 +51,10 @@ export interface PedidoDeMudanca {
   defs: DefinicaoDeCampo[];
   /** Corpo extra do PATCH (ex.: { reabrir: true }). */
   extra?: Record<string, unknown>;
+  /** Etapa de onde o negócio sai: com ela, o toast oferece "Desfazer". */
+  de?: EtapaDoMovimento;
+  /** Depois de desfazer (recarregar a tela). */
+  aoDesfazer?: () => void;
 }
 
 export type ResultadoDaTentativa = "movido" | "aguardando" | "erro";
@@ -92,6 +102,7 @@ type Aberto =
  */
 export function useMudancaDeEtapa({ onErro }: { onErro: (mensagem: string) => void }) {
   const [aberto, setAberto] = React.useState<Aberto | null>(null);
+  const toast = useToast();
   const onErroRef = React.useRef(onErro);
   React.useEffect(() => {
     onErroRef.current = onErro;
@@ -107,14 +118,42 @@ export function useMudancaDeEtapa({ onErro }: { onErro: (mensagem: string) => vo
     return "erro";
   }, []);
 
-  const mover = React.useCallback(
-    (pedido: PedidoDeMudanca): Promise<ResultadoDaTentativa> => {
-      // Perdido pede o motivo antes de qualquer coisa.
-      if (pedido.para.type === "lost") return new Promise((resolver) => setAberto({ tipo: "perda", pedido, resolver }));
-      // Sem etapa (só { reabrir: true }): o servidor volta para a etapa de onde o negócio saiu.
-      return tentar(pedido, { ...(pedido.para.id ? { stageId: pedido.para.id } : {}), ...pedido.extra });
+  const oferecerDesfazer = React.useCallback(
+    (pedido: PedidoDeMudanca) => {
+      const corpo = corpoParaDesfazer(pedido.de, pedido.para);
+      if (!corpo) return;
+      toast({
+        title: tituloDaMudanca(pedido.para),
+        durationMs: MS_PARA_DESFAZER,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            const r = await enviarMudanca(pedido.dealId, corpo);
+            if (!r.ok) {
+              toast({ title: "Não deu para desfazer", description: r.erro, tone: "danger" });
+              return;
+            }
+            toast({ title: `Voltou para ${pedido.de?.name ?? "a etapa anterior"}`, tone: "success" });
+            pedido.aoDesfazer?.();
+          },
+        },
+      });
     },
-    [tentar]
+    [toast]
+  );
+
+  const mover = React.useCallback(
+    async (pedido: PedidoDeMudanca): Promise<ResultadoDaTentativa> => {
+      const r: ResultadoDaTentativa =
+        pedido.para.type === "lost"
+          ? // Perdido pede o motivo antes de qualquer coisa.
+            await new Promise((resolver) => setAberto({ tipo: "perda", pedido, resolver }))
+          : // Sem etapa (só { reabrir: true }): o servidor volta para a etapa de onde o negócio saiu.
+            await tentar(pedido, { ...(pedido.para.id ? { stageId: pedido.para.id } : {}), ...pedido.extra });
+      if (r === "movido") oferecerDesfazer(pedido);
+      return r;
+    },
+    [tentar, oferecerDesfazer]
   );
 
   const fechar = (r: ResultadoDaTentativa) => {

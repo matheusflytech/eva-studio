@@ -14,6 +14,9 @@ import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
+import { useToast } from "@/components/ui/toast";
+import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
+import { MS_PARA_DESFAZER } from "@/lib/lixeira";
 
 interface Stage { id: string; name: string; type: string; probability: number }
 
@@ -96,7 +99,7 @@ export function DealDrawer({
     return true;
   }
 
-  async function patch(body: Record<string, unknown>) {
+  async function patch(body: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
     setErro(null);
     const res = await fetch(`/api/deals/${dealId}`, {
@@ -105,9 +108,23 @@ export function DealDrawer({
       body: JSON.stringify(body),
     });
     setBusy(false);
-    await falhou(res, "Não foi possível salvar.");
+    const falha = await falhou(res, "Não foi possível salvar.");
     await carregar();
     onChanged();
+    return !falha;
+  }
+
+  const toast = useToast();
+  const apagarComDesfazer = useApagarComDesfazer();
+
+  /** Arquivar/desarquivar sem confirmação: o toast desfaz. */
+  async function alternarArquivo(arquivar: boolean) {
+    if (!(await patch({ archived: arquivar }))) return;
+    toast({
+      title: arquivar ? "Negócio arquivado" : "Negócio desarquivado",
+      durationMs: MS_PARA_DESFAZER,
+      action: { label: "Desfazer", onClick: () => void patch({ archived: !arquivar }) },
+    });
   }
 
   // Mudança de etapa pelas regras (motivo da perda, "Complete para mover",
@@ -124,6 +141,11 @@ export function DealDrawer({
       para: s,
       defs,
       extra: deal.stage.type !== "open" ? { reabrir: true } : undefined,
+      de: { id: deal.stage.id, name: deal.stage.name, type: deal.stage.type },
+      aoDesfazer: () => {
+        void carregar();
+        onChanged();
+      },
     });
     setBusy(false);
     if (r === "movido") {
@@ -141,11 +163,19 @@ export function DealDrawer({
     if (Math.round(reais * 100) !== deal?.amountCents) patch({ amount: reais });
   }
 
+  // Sem confirmação: vai para a lixeira e o toast desfaz.
   async function apagar() {
-    if (!window.confirm("Apagar este negócio? Tarefas e notas dele também somem.")) return;
     setErro(null);
-    const res = await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
-    if (await falhou(res, "Não foi possível apagar o negócio.")) return;
+    const r = await apagarComDesfazer({
+      url: `/api/deals/${dealId}`,
+      titulo: "Negócio apagado",
+      perguntaSemLixeira: "A lixeira ainda não está ativada: apagar este negócio leva junto as tarefas e notas e não tem volta. Apagar mesmo assim?",
+      aoRestaurar: () => onChanged(),
+    });
+    if (!r.ok) {
+      if (r.erro) setErro(r.erro);
+      return;
+    }
     onChanged();
     onClose();
   }
@@ -450,7 +480,7 @@ export function DealDrawer({
             <footer className="mt-auto flex items-center justify-between gap-3 border-t border-border-subtle px-6 py-4">
               <Button
                 variant="ghost"
-                onClick={() => patch({ archived: !deal.archivedAt })}
+                onClick={() => void alternarArquivo(!deal.archivedAt)}
                 disabled={busy}
               >
                 <Archive size={15} /> {deal.archivedAt ? "Desarquivar" : "Arquivar"}
