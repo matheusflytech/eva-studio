@@ -22,7 +22,7 @@ export function Toolbar({
     <div
       role="toolbar"
       aria-label={label}
-      className={cn("flex min-h-10 flex-wrap items-center gap-x-1 gap-y-2", className)}
+      className={cn("flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-2", className)}
     >
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2">{children}</div>
       {end && <div className="flex shrink-0 items-center gap-2">{end}</div>}

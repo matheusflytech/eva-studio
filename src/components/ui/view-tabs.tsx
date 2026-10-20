@@ -48,8 +48,8 @@ export function ViewTabs({
   }
 
   return (
-    <div className={cn("flex items-end gap-1 border-b border-border-subtle", className)}>
-      <div role="tablist" aria-label={label} className="flex min-w-0 items-end gap-5 overflow-x-auto">
+    <div className={cn("flex shrink-0 items-end gap-1 border-b border-border-subtle", className)}>
+      <div role="tablist" aria-label={label} className="flex min-w-0 items-end gap-5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
         {views.map((v, i) => {
           const ativo = v.id === value;
           return (
