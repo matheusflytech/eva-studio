@@ -13,6 +13,7 @@ import { AbaPapeis } from "@/components/configuracoes/aba-papeis";
 import { AbaGrupos } from "@/components/configuracoes/aba-grupos";
 import { AbaEquipes } from "@/components/configuracoes/aba-equipes";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
+import { AbaLixeira } from "@/components/configuracoes/aba-lixeira";
 
 const ABAS = [
   { id: "contrato", rotulo: "Contrato" },
@@ -21,6 +22,7 @@ const ABAS = [
   { id: "grupos", rotulo: "Grupos" },
   { id: "equipes", rotulo: "Equipes" },
   { id: "chaves", rotulo: "Chaves de API" },
+  { id: "lixeira", rotulo: "Lixeira" },
 ] as const;
 
 function IdDoContrato({ id }: { id: string }) {
@@ -199,7 +201,7 @@ function Configuracoes() {
       <div className="mx-auto flex max-w-4xl flex-col gap-5 pb-10">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Configurações</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contrato, quem participa, o que cada um pode fazer e as chaves de API.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contrato, quem participa, o que cada um pode fazer, as chaves de API e a lixeira.</p>
         </div>
 
         {/* A aba fica na URL: dá para mandar o link "aba de membros" a alguém. */}
@@ -230,6 +232,9 @@ function Configuracoes() {
           </TabsContent>
           <TabsContent value="chaves" className="mt-5">
             <ApiKeysPanel />
+          </TabsContent>
+          <TabsContent value="lixeira" className="mt-5">
+            <AbaLixeira />
           </TabsContent>
         </Tabs>
       </div>
