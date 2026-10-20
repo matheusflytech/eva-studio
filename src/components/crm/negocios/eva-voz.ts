@@ -61,7 +61,7 @@ interface Gargalo {
 const nomeDoNegocio = (n: NegocioKanban) => n.company?.name || n.contacts[0]?.name || n.name;
 
 function abertos(etapas: EtapaKanban[]) {
-  return etapas.filter((e) => e.type === "open").flatMap((e) => e.deals.map((d) => ({ d, tipo: e.type })));
+  return etapas.filter((e) => e.type === "open").flatMap((e) => e.deals.map((d) => ({ d, tipo: e.type, prazo: e.rottingDays })));
 }
 
 function retornoVencido(n: NegocioKanban, agora: Date): boolean {
@@ -84,7 +84,7 @@ export function montarRecado(
   const totalCents = lista.reduce((s, x) => s + x.d.amountCents, 0);
   const naoLidas = lista.filter((x) => x.d.whatsapp?.naoLida).map((x) => x.d);
   const retornos = lista.filter((x) => retornoVencido(x.d, agora)).map((x) => x.d);
-  const parados = lista.filter((x) => estaParado(x.d, x.tipo, agora) || fechamentoPassou(x.d, agora)).map((x) => x.d);
+  const parados = lista.filter((x) => estaParado(x.d, x.tipo, agora, x.prazo) || fechamentoPassou(x.d, agora)).map((x) => x.d);
 
   if (lista.length === 0) {
     return {
@@ -176,7 +176,8 @@ export function gargaloDaConversao(
  * de sinalDoNegocio e devolve a frase longa; o que não reconhece passa igual.
  */
 export function sinalHumano(texto: string, tom: string): string {
-  let m = texto.match(/^Parado (\d+) dias$/);
+  // "Parado há 12d" (cartão) ou "Parado 12 dias" (formato antigo).
+  let m = texto.match(/^Parado (?:há )?(\d+)(?:d| dias)$/);
   if (m) return Number(m[1]) >= 14 ? `Quieto há ${m[1]} dias. Que tal ligar?` : `Parado há ${m[1]} dias`;
   m = texto.match(/^Retorno atrasado (\d+)d$/);
   if (m) return m[1] === "1" ? "Retorno era ontem" : `Retorno atrasado há ${m[1]} dias`;
@@ -242,7 +243,7 @@ export function listaDeAtencao(etapas: EtapaKanban[], agora: Date): ItemDeAtenca
         out.push({ deal: d, etapa: e.name, motivo: `${onde} O retorno ${quando}.`, acao: "retorno", rotulo: "Ver o retorno", urgencia: 3 + Math.min(dias, 30) / 100 });
       } else if (fechamentoPassou(d, agora)) {
         out.push({ deal: d, etapa: e.name, motivo: `${onde} A previsão de fechar já passou.`, acao: "remarcar", rotulo: "Remarcar previsão", urgencia: 2 });
-      } else if (estaParado(d, e.type, agora)) {
+      } else if (estaParado(d, e.type, agora, e.rottingDays)) {
         const dias = diasParado(d, agora);
         out.push({ deal: d, etapa: e.name, motivo: `${onde} Quieto há ${dias} dias.`, acao: "ligar", rotulo: "Dar um alô", urgencia: 1 + Math.min(dias, 365) / 1000 });
       }

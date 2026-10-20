@@ -43,6 +43,7 @@ import { carimbo, comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, m
 import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
+import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
 import { juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
 import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
@@ -120,7 +121,7 @@ function NegociosConteudo() {
   const [importando, setImportando] = React.useState(false);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
   const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia } | null>(null);
-  const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string } | null>(null);
+  const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string; prazo?: number | null } | null>(null);
   // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
@@ -358,13 +359,14 @@ function NegociosConteudo() {
   const fecharFesta = React.useCallback(() => setFesta(null), []);
 
   // ── Arrastar ──
+  const mudanca = useMudancaDeEtapa({ onErro: (m) => setErro(m) });
   const etapaGanha = stages.find((s) => s.type === "won");
   const etapaPerdida = stages.find((s) => s.type === "lost");
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
       const deal = s.deals.find((d) => d.id === event.active.id);
-      if (deal) return setDragging({ deal, tipo: s.type });
+      if (deal) return setDragging({ deal, tipo: s.type, prazo: s.rottingDays });
     }
   }
 
@@ -377,17 +379,21 @@ function NegociosConteudo() {
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
     const deal = from.deals.find((d) => d.id === dealId)!;
+    const para = stages.find((s) => s.id === stageId);
+    if (!para || !quadro) return;
+    const antes = stages;
     // Move na tela antes da resposta: esperar o servidor deixa o quadro lento.
-    setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
-    const res = await fetch(`/api/deals/${dealId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stageId }),
-    }).catch(() => null);
-    if (!res?.ok) {
-      setErro(`Não foi possível mover "${deal.name}". A tela voltou ao estado salvo.`);
+    // Perdido não: o modal do motivo vem antes.
+    if (para.type !== "lost") setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+    // Regras da etapa no servidor: faltou campo → "Complete para mover";
+    // perdido → motivo; negócio fechado → aviso (só sai com Reabrir).
+    const r = await mudanca.mover({ dealId, nome: deal.name, pipelineId, para, defs: quadro.defs });
+    if (r === "movido") {
       setVersao((v) => v + 1);
+      return;
     }
+    // Cancelou ou falhou: o cartão volta para onde estava.
+    setStages(() => antes);
   }
 
   // ── Prévia ──
@@ -621,11 +627,15 @@ function NegociosConteudo() {
               <ZonasDeFechamento visivel={!!dragging && dragging.tipo === "open"} temGanho={!!etapaGanha} temPerdido={!!etapaPerdida} />
             </div>
             <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
-              {dragging && <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />}
+              {dragging && (
+                <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+              )}
             </DragOverlay>
           </DndContext>
         </VozDoQuadro.Provider>
       )}
+
+      {mudanca.elementos}
 
       {festa && <Comemoracao titulo={festa.titulo} detalhe={festa.detalhe} onFim={fecharFesta} />}
 
@@ -641,6 +651,8 @@ function NegociosConteudo() {
             agora={agora}
             onFechar={() => setPrevia(null)}
             onMudou={() => setVersao((v) => v + 1)}
+            pipelineId={pipelineId}
+            onMover={mudanca.mover}
           />
         </VozDoQuadro.Provider>
       )}

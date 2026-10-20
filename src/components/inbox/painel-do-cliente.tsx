@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { dinheiro, iniciais, type Conversa, type Contexto } from "./tipos";
 import { useSondagem } from "./use-sondagem";
+import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 
 interface Funil {
   id: string;
@@ -115,11 +116,16 @@ export function PainelDoCliente({
     await carregar();
   }
 
-  async function moverEtapa(dealId: string, stageId: string) {
-    const r = await enviar(`/api/deals/${dealId}`, "PATCH", { stageId });
-    if (!r.ok) setErro(r.json.error ?? "Não foi possível mover o negócio.");
+  // Mudança de etapa pelas regras da etapa (motivo da perda, "Complete para
+  // mover"): os mesmos modais do quadro.
+  const mudanca = useMudancaDeEtapa({ onErro: setErro });
+  async function moverEtapa(negocio: { id: string; name: string }, funil: Funil, stageId: string) {
+    const para = funil.stages.find((s) => s.id === stageId);
+    if (!para) return;
+    setErro(null);
+    const r = await mudanca.mover({ dealId: negocio.id, nome: negocio.name, pipelineId: funil.id, para, defs: [] });
     await carregar();
-    onMudou();
+    if (r === "movido") onMudou();
   }
 
   function abrirNovoNegocio() {
@@ -366,7 +372,7 @@ export function PainelDoCliente({
                         {funil ? (
                           <select
                             value={n.stage.id}
-                            onChange={(e) => moverEtapa(n.id, e.target.value)}
+                            onChange={(e) => moverEtapa(n, funil, e.target.value)}
                             aria-label={`Etapa de ${n.name}`}
                             className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2 py-1 text-[12px] text-text-secondary outline-none"
                           >
@@ -462,6 +468,7 @@ export function PainelDoCliente({
           onChanged={() => { void carregar(); onMudou(); }}
         />
       )}
+      {mudanca.elementos}
     </aside>
   );
 }

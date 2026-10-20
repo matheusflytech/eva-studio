@@ -13,6 +13,7 @@ import { AtividadeDoNegocio, type AbaDaAtividade } from "./atividade";
 import { VinculosDoNegocio } from "./vinculos";
 import { ProdutosDoNegocio, useItensDoNegocio } from "./produtos";
 import { valorVemDosProdutos } from "@/lib/produtos";
+import { useMudancaDeEtapa, type EtapaDoMovimento } from "@/components/crm/negocios/mudanca-de-etapa";
 
 /**
  * Ficha completa do negócio, com endereço próprio (/negocios/<id>) para
@@ -24,10 +25,30 @@ import { valorVemDosProdutos } from "@/lib/produtos";
  */
 export function FichaDoNegocio({ dealId }: { dealId: string }) {
   const ficha = useFicha(dealId);
-  const { estado, deal, defs, linha, linhaFalhou, membros, agora, carregar, patch } = ficha;
+  const { estado, deal, defs, regras, linha, linhaFalhou, membros, agora, carregar, patch } = ficha;
   // Itens mudam o valor do negócio: cada mudança recarrega a ficha.
   const produtos = useItensDoNegocio(dealId, carregar);
   const [erro, setErro] = React.useState<string | null>(null);
+  // Mudança de etapa com as regras (motivo da perda, "Complete para mover",
+  // Reabrir): os mesmos modais do quadro.
+  const mudanca = useMudancaDeEtapa({ onErro: setErro });
+  const moverEtapa = React.useCallback(
+    async (para: EtapaDoMovimento | null, extra?: Record<string, unknown>) => {
+      if (!deal) return "erro" as const;
+      setErro(null);
+      const r = await mudanca.mover({
+        dealId: deal.id,
+        nome: deal.name,
+        pipelineId: deal.pipelineId,
+        para: para ?? { id: "", name: "", type: "open" },
+        defs,
+        extra,
+      });
+      if (r === "movido") await carregar();
+      return r;
+    },
+    [deal, defs, mudanca, carregar]
+  );
   const [aba, setAba] = React.useState<AbaDaAtividade>("atividade");
   const atividadeRef = React.useRef<HTMLDivElement>(null);
 
@@ -75,7 +96,8 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
 
   return (
     <div className="flex flex-col gap-4 pb-6">
-      <CabecalhoDoNegocio deal={deal} membros={membros} patch={patch} onErro={setErro} />
+      <CabecalhoDoNegocio deal={deal} membros={membros} patch={patch} onErro={setErro} moverEtapa={moverEtapa} />
+      {mudanca.elementos}
 
       {erro && (
         <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-danger/25 bg-danger/10 px-4 py-2.5 text-[13px] text-danger">
@@ -91,7 +113,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         </div>
       )}
 
-      <TrilhaDeEtapas deal={deal} agora={agora} patch={patch} onErro={setErro} />
+      <TrilhaDeEtapas deal={deal} agora={agora} regras={regras} moverEtapa={moverEtapa} />
 
       {/* Áreas nomeadas: a ordem no celular (sobre, vínculos, atividade) não é
           a ordem das colunas no desktop, e grid-area resolve as duas sem

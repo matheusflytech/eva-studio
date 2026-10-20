@@ -18,7 +18,7 @@ import type { NegocioDaFicha } from "./use-ficha";
 
 type Patch = (body: Record<string, unknown>) => Promise<string | null>;
 
-async function buscarContatos(q: string): Promise<OpcaoDeBusca[]> {
+export async function buscarContatos(q: string): Promise<OpcaoDeBusca[]> {
   const res = await fetch(`/api/contacts?q=${encodeURIComponent(q)}`);
   if (!res.ok) throw new Error("busca");
   const d = await res.json();
@@ -29,7 +29,7 @@ async function buscarContatos(q: string): Promise<OpcaoDeBusca[]> {
   }));
 }
 
-async function buscarEmpresas(q: string): Promise<OpcaoDeBusca[]> {
+export async function buscarEmpresas(q: string): Promise<OpcaoDeBusca[]> {
   const res = await fetch(`/api/companies?q=${encodeURIComponent(q)}`);
   if (!res.ok) throw new Error("busca");
   const d = await res.json();

@@ -68,6 +68,8 @@ export function blocosDoCartao(campos: CampoDoCartao[], densidade: Densidade): B
 
 export interface ContextoDoCampo {
   tipoDaEtapa: string;
+  /** Prazo de parado da etapa (null = nunca; ausente = 7). */
+  prazoParado?: number | null;
   agora: Date;
   defs: DefinicaoDeCampo[];
 }
@@ -112,7 +114,7 @@ export function textoDoCampo(
     case "responsavel":
       return deal.owner?.name || "";
     case "proximoPasso":
-      return sinalDoNegocio(deal, ctx.tipoDaEtapa, ctx.agora)?.texto ?? deal.nextTask?.text.trim() ?? "";
+      return sinalDoNegocio(deal, ctx.tipoDaEtapa, ctx.agora, ctx.prazoParado)?.texto ?? deal.nextTask?.text.trim() ?? "";
     case "whatsapp":
       return deal.whatsapp ? (deal.whatsapp.naoLida ? "Mensagem não lida" : "Conversa aberta") : "";
     case "previsao": {

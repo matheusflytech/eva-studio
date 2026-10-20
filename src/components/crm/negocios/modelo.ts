@@ -1,6 +1,8 @@
 // Tipos e regras puras da tela de Negócios (kanban e lista). Sem React nem
 // rede: filtro, indicadores e formatação ficam testados à parte.
 
+import { DIAS_PARADO_PADRAO, diasSemAtividade, negocioParado } from "@/lib/regras-de-etapa";
+
 export interface NegocioKanban {
   id: string;
   name: string;
@@ -16,6 +18,8 @@ export interface NegocioKanban {
   customFields: Record<string, unknown>;
   createdAt: string;
   stageSince: string;
+  /** Última atividade (nota, tarefa concluída, mensagem, edição). Relógio do parado. */
+  lastActivityAt?: string | null;
   /** Conversa de WhatsApp do contato, se houver; naoLida = cliente falou e ninguém leu. */
   whatsapp: { conversationId: string; naoLida: boolean } | null;
   /** Próxima tarefa em aberto (a de prazo mais próximo). */
@@ -30,6 +34,10 @@ export interface EtapaKanban {
   type: string;
   color: string;
   probability: number;
+  /** Dias sem atividade para "parado" (regra da etapa); null = nunca; ausente = 7. */
+  rottingDays?: number | null;
+  /** "O que fazer nesta etapa" (regra da etapa). */
+  guidance?: string;
   totalCents: number;
   weightedCents: number;
   deals: NegocioKanban[];
@@ -53,18 +61,26 @@ export interface FiltrosDeNegocio {
   meuId?: string;
 }
 
-/** Aberto há mais disso na mesma etapa = parado. Mesmo número do dashboard. */
-export const DIAS_PARADO = 7;
+/**
+ * Prazo de parado de quem não tem regra de etapa (o de antes das regras).
+ * Cada etapa tem o seu (`EtapaKanban.rottingDays`); este é só o padrão.
+ */
+export const DIAS_PARADO = DIAS_PARADO_PADRAO;
 const DIA = 86_400_000;
 
 const normalizar = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
-export function diasParado(n: Pick<NegocioKanban, "stageSince">, agora: Date): number {
-  return Math.floor((agora.getTime() - new Date(n.stageSince).getTime()) / DIA);
+/** Dias sem atividade: agora − greatest(última atividade, entrada na etapa). */
+export function diasParado(n: Pick<NegocioKanban, "stageSince" | "lastActivityAt">, agora: Date): number {
+  return diasSemAtividade(n, agora);
 }
 
-export function estaParado(n: NegocioKanban, tipoDaEtapa: string, agora: Date): boolean {
-  return tipoDaEtapa === "open" && !n.closedAt && diasParado(n, agora) > DIAS_PARADO;
+/**
+ * Aberto E prazo da etapa não nulo E dias sem atividade > prazo (skill
+ * crm-pipeline-kanban). `prazo` ausente = 7 (tela sem regra carregada).
+ */
+export function estaParado(n: NegocioKanban, tipoDaEtapa: string, agora: Date, prazo?: number | null): boolean {
+  return negocioParado(n, tipoDaEtapa, prazo, agora);
 }
 
 // ---- datas no fuso de São Paulo (é o horário de quem vende) ----
@@ -121,13 +137,13 @@ export function fechamentoPassou(n: Pick<NegocioKanban, "expectedClosingAt">, ag
 }
 
 /** Aberto e com algo pedindo ação agora: parado, tarefa atrasada ou previsão vencida. */
-export function pedeAtencao(n: NegocioKanban, tipoDaEtapa: string, agora: Date): boolean {
+export function pedeAtencao(n: NegocioKanban, tipoDaEtapa: string, agora: Date, prazo?: number | null): boolean {
   if (tipoDaEtapa !== "open" || n.closedAt) return false;
-  return estaParado(n, tipoDaEtapa, agora) || tarefaAtrasada(n, agora) || fechamentoPassou(n, agora);
+  return estaParado(n, tipoDaEtapa, agora, prazo) || tarefaAtrasada(n, agora) || fechamentoPassou(n, agora);
 }
 
 export function precisaAtencao(etapas: EtapaKanban[], agora: Date): number {
-  return etapas.reduce((s, e) => s + e.deals.filter((n) => pedeAtencao(n, e.type, agora)).length, 0);
+  return etapas.reduce((s, e) => s + e.deals.filter((n) => pedeAtencao(n, e.type, agora, e.rottingDays)).length, 0);
 }
 
 export type IconeDoSinal = "clock" | "cal" | "hour" | "phone" | "mail" | "task" | "check";
@@ -148,7 +164,7 @@ const TAREFA: Record<string, { rotulo: string; icone: IconeDoSinal; tom: SinalDo
  * atrasado, previsão vencida, parado, próxima atividade, previsão futura.
  * Um sinal só: dois chips de alerta no mesmo cartão viram ruído.
  */
-export function sinalDoNegocio(n: NegocioKanban, tipoDaEtapa: string, agora: Date): SinalDoNegocio | null {
+export function sinalDoNegocio(n: NegocioKanban, tipoDaEtapa: string, agora: Date, prazo?: number | null): SinalDoNegocio | null {
   if (tipoDaEtapa === "won") return n.closedAt ? { tom: "ok", icone: "check", texto: `Ganho ${dataCurta(n.closedAt)}` } : null;
   if (tipoDaEtapa !== "open") return null;
 
@@ -159,7 +175,8 @@ export function sinalDoNegocio(n: NegocioKanban, tipoDaEtapa: string, agora: Dat
   if (fechamentoPassou(n, agora)) {
     return { tom: "bad", icone: "cal", texto: `Fechamento passou ${dataCurtaDoDia(diaDaPrevisao(n.expectedClosingAt!))}` };
   }
-  if (estaParado(n, tipoDaEtapa, agora)) return { tom: "warn", icone: "hour", texto: `Parado ${diasParado(n, agora)} dias` };
+  // Marca discreta com o tempo (skill: "parado há 12d"), sem pintar o cartão.
+  if (estaParado(n, tipoDaEtapa, agora, prazo)) return { tom: "warn", icone: "hour", texto: `Parado há ${diasParado(n, agora)}d` };
 
   if (n.nextTask) {
     const t = TAREFA[n.nextTask.type];
@@ -208,14 +225,14 @@ export function serieDeGanhoDoMes(etapas: EtapaKanban[], agora: Date): number[] 
   return porDia.map((v) => (soma += v));
 }
 
-function passaNaVisao(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora: Date): boolean {
+function passaNaVisao(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora: Date, prazo?: number | null): boolean {
   switch (f.visao) {
     case "meus":
       return !!f.meuId && n.owner?.id === f.meuId;
     case "atencao":
-      return pedeAtencao(n, tipo, agora);
+      return pedeAtencao(n, tipo, agora, prazo);
     case "parados":
-      return estaParado(n, tipo, agora);
+      return estaParado(n, tipo, agora, prazo);
     case "fechando":
       return tipo === "open" && !!n.expectedClosingAt && diaDaPrevisao(n.expectedClosingAt).slice(0, 7) === mesSP(agora);
     default:
@@ -223,8 +240,8 @@ function passaNaVisao(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora
   }
 }
 
-function passa(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora: Date): boolean {
-  if (!passaNaVisao(n, tipo, f, agora)) return false;
+function passa(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora: Date, prazo?: number | null): boolean {
+  if (!passaNaVisao(n, tipo, f, agora, prazo)) return false;
   if (f.busca) {
     const alvo = normalizar(f.busca);
     const onde = [n.name, n.company?.name ?? "", ...n.contacts.map((c) => c.name)].map(normalizar);
@@ -233,14 +250,14 @@ function passa(n: NegocioKanban, tipo: string, f: FiltrosDeNegocio, agora: Date)
   if (f.dono) {
     if (f.dono === "__sem" ? n.owner !== null : n.owner?.id !== f.dono) return false;
   }
-  if (f.soParados && !estaParado(n, tipo, agora)) return false;
+  if (f.soParados && !estaParado(n, tipo, agora, prazo)) return false;
   return true;
 }
 
 export function filtrarEtapas(etapas: EtapaKanban[], f: FiltrosDeNegocio, agora: Date): EtapaKanban[] {
   if (!f.busca?.trim() && !f.dono && !f.soParados && (!f.visao || f.visao === "todos")) return etapas;
   return etapas.map((e) => {
-    const deals = e.deals.filter((n) => passa(n, e.type, f, agora));
+    const deals = e.deals.filter((n) => passa(n, e.type, f, agora, e.rottingDays));
     return {
       ...e,
       deals,
@@ -268,7 +285,7 @@ export function resumoDoFunil(etapas: EtapaKanban[], agora: Date): ResumoDoFunil
         r.abertoCents += n.amountCents;
         r.abertos += 1;
         r.ponderadoCents += Math.round((n.amountCents * n.probability) / 100);
-        if (estaParado(n, e.type, agora)) r.parados += 1;
+        if (estaParado(n, e.type, agora, e.rottingDays)) r.parados += 1;
       } else if (e.type === "won" && n.closedAt && new Date(n.closedAt).getTime() >= inicioDoMes) {
         r.ganhoNoMesCents += n.amountCents;
         r.ganhosNoMes += 1;

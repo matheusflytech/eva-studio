@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Plus } from "lucide-react";
+import { CircleHelp, Loader2, Plus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ function CartaoArrastavel({
   layout,
   agora,
   onAbrir,
+  prazoParado,
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
@@ -30,6 +32,7 @@ function CartaoArrastavel({
   layout: LayoutDoCartao;
   agora: Date;
   onAbrir: () => void;
+  prazoParado?: number | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
   // Onde o ponteiro desceu: soltar depois de arrastar não pode abrir a prévia.
@@ -61,9 +64,31 @@ function CartaoArrastavel({
       }}
       className={cn("group/card relative cursor-grab rounded-md active:cursor-grabbing", focusRing, isDragging && "opacity-30")}
     >
-      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} layout={layout} comLink />
+      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} layout={layout} prazoParado={prazoParado} comLink />
       <AcoesRapidas deal={deal} />
     </div>
+  );
+}
+
+/**
+ * "O que fazer nesta etapa" (regra da etapa): ícone de ajuda no cabeçalho da
+ * coluna com o texto no tooltip. O texto também aparece na ficha, então o
+ * tooltip não é o único lugar da informação.
+ */
+export function OrientacaoDaEtapa({ etapa, texto }: { etapa: string; texto: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`O que fazer em ${etapa}: ${texto}`}
+          className={cn("inline-flex size-7 items-center justify-center rounded-md text-text-tertiary hover:bg-hover hover:text-text-primary", focusRing)}
+        >
+          <CircleHelp size={14} aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="whitespace-pre-line">{texto}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -138,15 +163,29 @@ export function StageColumn({
       className="max-h-full snap-start"
       footerNote={etapa.deals.length < total ? `${etapa.deals.length.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} carregados` : undefined}
       headerActions={
-        aberta ? (
-          <IconButton aria-label={`Novo negócio em ${etapa.name}`} tooltip size="sm" onClick={() => onNovo(etapa.id)}>
-            <Plus />
-          </IconButton>
+        aberta || etapa.guidance ? (
+          <>
+            {etapa.guidance && <OrientacaoDaEtapa etapa={etapa.name} texto={etapa.guidance} />}
+            {aberta && (
+              <IconButton aria-label={`Novo negócio em ${etapa.name}`} tooltip size="sm" onClick={() => onNovo(etapa.id)}>
+                <Plus />
+              </IconButton>
+            )}
+          </>
         ) : undefined
       }
     >
       {etapa.deals.map((deal) => (
-        <CartaoArrastavel key={deal.id} deal={deal} tipoDaEtapa={etapa.type} defs={defs} layout={layout} agora={agora} onAbrir={() => onAbrir(deal)} />
+        <CartaoArrastavel
+          key={deal.id}
+          deal={deal}
+          tipoDaEtapa={etapa.type}
+          prazoParado={etapa.rottingDays}
+          defs={defs}
+          layout={layout}
+          agora={agora}
+          onAbrir={() => onAbrir(deal)}
+        />
       ))}
       {etapa.deals.length === 0 && (
         <div

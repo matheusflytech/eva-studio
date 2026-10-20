@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { nomesDosProdutosPorNegocio } from "@/lib/server/produtos";
+import { ultimaAtividadePorNegocio } from "@/lib/server/atividade-do-negocio";
 
 // ---------------------------------------------------------------------------
 // Cartões do quadro de negócios: o que cada cartão traz, como vira JSON e a
@@ -69,7 +70,13 @@ export function serializarCartao(d: LinhaDoCartao) {
   };
 }
 
-export type Cartao = ReturnType<typeof serializarCartao> & { produtos?: string[] };
+export type Cartao = ReturnType<typeof serializarCartao> & { produtos?: string[]; lastActivityAt?: string | null };
+
+/** Junta a última atividade (relógio do "parado"). Sem a tabela, fica null e vale a entrada na etapa. */
+export async function comAtividade(cartoes: Cartao[]): Promise<Cartao[]> {
+  const mapa = await ultimaAtividadePorNegocio(cartoes.map((c) => c.id));
+  return cartoes.map((c) => ({ ...c, lastActivityAt: mapa.get(c.id)?.toISOString() ?? null }));
+}
 
 /** Junta os nomes dos produtos aos cartões (só quando o layout mostra produtos). */
 export async function comProdutos(orgId: string, cartoes: Cartao[]): Promise<Cartao[]> {

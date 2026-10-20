@@ -13,6 +13,7 @@ import { cn, formatRelativeDate } from "@/lib/utils";
 import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 
 interface Stage { id: string; name: string; type: string; probability: number }
 
@@ -107,6 +108,28 @@ export function DealDrawer({
     await falhou(res, "Não foi possível salvar.");
     await carregar();
     onChanged();
+  }
+
+  // Mudança de etapa pelas regras (motivo da perda, "Complete para mover",
+  // Reabrir quando o negócio está fechado): os mesmos modais do quadro.
+  const mudanca = useMudancaDeEtapa({ onErro: setErro });
+  async function moverEtapa(s: { id: string; name: string; type: string }) {
+    if (!deal) return;
+    setBusy(true);
+    setErro(null);
+    const r = await mudanca.mover({
+      dealId,
+      nome: deal.name,
+      pipelineId: deal.pipeline.id,
+      para: s,
+      defs,
+      extra: deal.stage.type !== "open" ? { reabrir: true } : undefined,
+    });
+    setBusy(false);
+    if (r === "movido") {
+      await carregar();
+      onChanged();
+    }
   }
 
   function salvarValor() {
@@ -249,7 +272,7 @@ export function DealDrawer({
                       key={s.id}
                       type="button"
                       disabled={busy}
-                      onClick={() => !atual && patch({ stageId: s.id })}
+                      onClick={() => !atual && moverEtapa(s)}
                       title={`${s.name} · ${s.probability}%`}
                       className={cn(
                         "h-1.5 flex-1 rounded-full transition-colors",
@@ -448,6 +471,7 @@ export function DealDrawer({
           </>
         )}
       </aside>
+      {mudanca.elementos}
     </div>,
     document.body
   );

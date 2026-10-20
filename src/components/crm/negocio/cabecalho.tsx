@@ -4,11 +4,10 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useRouter } from "@/lib/contrato/navegacao";
 import {
-  Archive, ArchiveRestore, Building2, ChevronRight, Ellipsis, Link2, Loader2, ThumbsDown, ThumbsUp, Trash2, User,
+  Archive, ArchiveRestore, Building2, ChevronRight, Ellipsis, Link2, Loader2, RotateCcw, ThumbsDown, ThumbsUp, Trash2, User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { dinheiro } from "@/components/crm/negocios/modelo";
 import { mensagemDeErro, type Membro, type NegocioDaFicha } from "./use-ficha";
 import { AgendarMensagem } from "@/components/whatsapp/agendar-mensagem";
+import type { EtapaDoMovimento, ResultadoDaTentativa } from "@/components/crm/negocios/mudanca-de-etapa";
 
 /**
  * Topo da ficha: onde estou (funil), o que é (título editável), de quem
@@ -27,15 +27,16 @@ export function CabecalhoDoNegocio({
   membros,
   patch,
   onErro,
+  moverEtapa,
 }: {
   deal: NegocioDaFicha;
   membros: Membro[];
   patch: (body: Record<string, unknown>) => Promise<string | null>;
   onErro: (msg: string | null) => void;
+  moverEtapa: (para: EtapaDoMovimento | null, extra?: Record<string, unknown>) => Promise<ResultadoDaTentativa>;
 }) {
   const router = useRouter();
-  const [ocupado, setOcupado] = React.useState<"ganho" | "perdido" | "dono" | null>(null);
-  const [pedindoMotivo, setPedindoMotivo] = React.useState(false);
+  const [ocupado, setOcupado] = React.useState<"ganho" | "perdido" | "reabrir" | "dono" | null>(null);
   const [confirmandoApagar, setConfirmandoApagar] = React.useState(false);
   const [copiado, setCopiado] = React.useState(false);
 
@@ -44,7 +45,14 @@ export function CabecalhoDoNegocio({
   const fechado = deal.stage.type !== "open";
   const contato = deal.contacts[0]?.contact;
 
-  async function agir(tipo: "ganho" | "perdido" | "dono", body: Record<string, unknown>) {
+  /** Ganho, Perdido e Reabrir passam pelas regras da etapa (modais da ficha). */
+  async function decidir(tipo: "ganho" | "perdido" | "reabrir", para: EtapaDoMovimento | null) {
+    setOcupado(tipo);
+    await moverEtapa(para, tipo === "reabrir" ? { reabrir: true } : undefined);
+    setOcupado(null);
+  }
+
+  async function agir(tipo: "dono", body: Record<string, unknown>) {
     setOcupado(tipo);
     onErro(null);
     const falha = await patch(body);
@@ -116,7 +124,7 @@ export function CabecalhoDoNegocio({
               variant="secondary"
               size="sm"
               disabled={!!ocupado}
-              onClick={() => agir("ganho", { stageId: etapaGanha.id })}
+              onClick={() => decidir("ganho", etapaGanha)}
               className="border-emerald-500/30 text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-500/10"
             >
               {ocupado === "ganho" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} aria-hidden />} Ganho
@@ -127,10 +135,15 @@ export function CabecalhoDoNegocio({
               variant="secondary"
               size="sm"
               disabled={!!ocupado}
-              onClick={() => setPedindoMotivo(true)}
+              onClick={() => decidir("perdido", etapaPerdida)}
               className="border-rose-500/30 text-rose-300 hover:border-rose-500/50 hover:bg-rose-500/10"
             >
-              <ThumbsDown size={14} aria-hidden /> Perdido
+              {ocupado === "perdido" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsDown size={14} aria-hidden />} Perdido
+            </Button>
+          )}
+          {fechado && (
+            <Button variant="secondary" size="sm" disabled={!!ocupado} loading={ocupado === "reabrir"} onClick={() => decidir("reabrir", null)}>
+              {ocupado !== "reabrir" && <RotateCcw size={14} aria-hidden />} Reabrir
             </Button>
           )}
           <DropdownMenu>
@@ -209,17 +222,6 @@ export function CabecalhoDoNegocio({
         </div>
       </dl>
 
-      {pedindoMotivo && etapaPerdida && (
-        <MotivoDaPerda
-          onFechar={() => setPedindoMotivo(false)}
-          onConfirmar={async (motivo) => {
-            const ok = await agir("perdido", { stageId: etapaPerdida.id, lostReason: motivo });
-            if (ok) setPedindoMotivo(false);
-          }}
-          ocupado={ocupado === "perdido"}
-        />
-      )}
-
       {confirmandoApagar && (
         <ConfirmarApagar
           nome={deal.name}
@@ -290,51 +292,6 @@ function TituloEditavel({ valor, onSalvar }: { valor: string; onSalvar: (v: stri
       />
       {erro && <p role="alert" className="px-1 text-[12px] text-danger">{erro}</p>}
     </div>
-  );
-}
-
-function MotivoDaPerda({
-  onFechar,
-  onConfirmar,
-  ocupado,
-}: {
-  onFechar: () => void;
-  onConfirmar: (motivo: string) => void;
-  ocupado: boolean;
-}) {
-  const [motivo, setMotivo] = React.useState("");
-  return (
-    <Modal open onOpenChange={(aberto) => !aberto && onFechar()}>
-      <ModalContent title="Marcar como perdido" description="O motivo entra no relatório de perdas e ajuda a vender melhor da próxima vez.">
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (motivo.trim()) onConfirmar(motivo.trim());
-          }}
-        >
-          <div>
-            <Label htmlFor="ficha-motivo">Motivo da perda</Label>
-            <Input
-              id="ficha-motivo"
-              autoFocus
-              value={motivo}
-              maxLength={500}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Preço, prazo, concorrente..."
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={onFechar}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="danger" disabled={!motivo.trim() || ocupado}>
-              {ocupado && <Loader2 size={15} className="animate-spin" />} Marcar como perdido
-            </Button>
-          </div>
-        </form>
-      </ModalContent>
-    </Modal>
   );
 }
 

@@ -14,10 +14,12 @@ import {
   texto,
 } from "@/lib/server/api-validacao";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
+import { lerRegras } from "@/lib/server/regras-de-etapa";
 import { resolverConjunto, whereDeNegocios } from "@/lib/server/filtro-crm";
 import {
   INCLUDE_CARTAO,
   ORDEM_DA_COLUNA,
+  comAtividade,
   comProdutos,
   decodificarCursor,
   lerPorEtapa,
@@ -78,7 +80,7 @@ export async function GET(request: Request) {
     const pagina = await paginaDaColuna(c.where, stage.id, lerPorEtapa(porEtapaBruto), cursor);
     const fields = await carregarDefinicoes(ctx.orgId, "deal", stage.pipelineId);
     const { layout } = await lerLayoutDoFunil(stage.pipelineId, fields);
-    let deals: Cartao[] = pagina.linhas.map(serializarCartao);
+    let deals: Cartao[] = await comAtividade(pagina.linhas.map(serializarCartao));
     if (mostraProdutos(layout)) deals = await comProdutos(ctx.orgId, deals);
     return NextResponse.json({ etapa: stage.id, deals, temMais: pagina.temMais, depois: pagina.depois, avisos: c.avisos, truncado: c.truncado });
   }
@@ -97,12 +99,16 @@ export async function GET(request: Request) {
   // Layout do cartão junto, para o quadro não esperar uma segunda chamada.
   // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
   const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
+  // Regras das etapas (prazo de parado e orientação). Sem a tabela: o padrão.
+  const { regras } = await lerRegras(pipeline.stages);
   const etapaBase = (stage: (typeof pipeline.stages)[number]) => ({
     id: stage.id,
     name: stage.name,
     type: stage.type,
     color: stage.color,
     probability: stage.probability,
+    rottingDays: regras.get(stage.id)?.diasParado ?? null,
+    guidance: regras.get(stage.id)?.orientacao ?? "",
   });
 
   if (porEtapaBruto !== null) {
@@ -113,6 +119,11 @@ export async function GET(request: Request) {
       Promise.all(pipeline.stages.map((s) => paginaDaColuna(c.where, s.id, n))),
     ]);
     let cartoes: Cartao[][] = paginas.map((p) => p.linhas.map(serializarCartao));
+    {
+      const todos = await comAtividade(cartoes.flat());
+      const porId = new Map(todos.map((d) => [d.id, d]));
+      cartoes = cartoes.map((l) => l.map((d) => porId.get(d.id) ?? d));
+    }
     if (mostraProdutos(layout)) {
       const todos = await comProdutos(ctx.orgId, cartoes.flat());
       const porId = new Map(todos.map((d) => [d.id, d]));
@@ -153,7 +164,7 @@ export async function GET(request: Request) {
   // Total ponderado por etapa: é o número que a pessoa olha para saber se o
   // mês fecha. Valor bruto sozinho engana, porque trata "Novo" como se
   // valesse o mesmo que "Negociação".
-  let cartoes: Cartao[] = deals.map(serializarCartao);
+  let cartoes: Cartao[] = await comAtividade(deals.map(serializarCartao));
   // Nomes dos produtos só quando o cartão ou a prévia mostram produtos (sem a
   // tabela no banco, nomesDosProdutosPorNegocio devolve vazio e nada quebra).
   if (mostraProdutos(layout)) cartoes = await comProdutos(ctx.orgId, cartoes);

@@ -3,7 +3,8 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "@/components/contrato/link";
-import { CheckCircle2, Loader2, Maximize2, MessageCircle, X, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Maximize2, MessageCircle, RotateCcw, X, XCircle } from "lucide-react";
+import type { PedidoDeMudanca, ResultadoDaTentativa } from "./mudanca-de-etapa";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -18,6 +19,9 @@ export interface EtapaDaPrevia {
   name: string;
   type: string;
   color: string;
+  /** Regra da etapa: prazo de parado (null = nunca) e orientação. */
+  rottingDays?: number | null;
+  guidance?: string;
 }
 
 /**
@@ -42,7 +46,7 @@ export function ConteudoDaPrevia({
   comLink?: boolean;
 }) {
   const cor = corDaEtapa(etapa.color, etapa.type);
-  const ctx = { tipoDaEtapa: etapa.type, agora, defs };
+  const ctx = { tipoDaEtapa: etapa.type, agora, defs, prazoParado: etapa.rottingDays };
   const rotulos = rotulosPersonalizados(defs);
   // O título da prévia é sempre o nome do negócio; quem compra vem embaixo.
   const { titulo: quem } = tituloDoCartao(deal, ["empresa"]);
@@ -70,6 +74,12 @@ export function ConteudoDaPrevia({
           )}
         </h2>
         {quem !== deal.name && <p className="mt-0.5 truncate text-small text-text-secondary">{quem}</p>}
+        {etapa.guidance && aberto && (
+          <p className="mt-2 whitespace-pre-line text-caption text-text-secondary">
+            <span className="font-medium text-text-primary">Nesta etapa: </span>
+            {etapa.guidance}
+          </p>
+        )}
         <p className="mt-3 flex items-baseline gap-2">
           <span className="text-title tabular-nums text-text-primary">
             {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="text-body font-normal text-text-tertiary">Sem valor</span>}
@@ -82,7 +92,7 @@ export function ConteudoDaPrevia({
         <section aria-label="Próximo passo" className="rounded-md border border-border-subtle bg-raised px-3 py-2.5">
           <p className="text-caption font-medium text-text-tertiary">Próximo passo</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-caption">
-            <SinalDoProximoPasso deal={deal} tipoDaEtapa={etapa.type} agora={agora} />
+            <SinalDoProximoPasso deal={deal} tipoDaEtapa={etapa.type} agora={agora} prazoParado={etapa.rottingDays} />
             {deal.nextTask?.text && <span className="min-w-0 truncate text-text-secondary">{deal.nextTask.text}</span>}
             {!deal.nextTask && aberto && <span className="text-text-tertiary">Nenhuma tarefa em aberto.</span>}
             {deal.openTasks > 1 && <span className="text-caption tabular-nums text-text-tertiary">{deal.openTasks} tarefas abertas</span>}
@@ -121,6 +131,8 @@ export function PreviaDoNegocio({
   agora,
   onFechar,
   onMudou,
+  pipelineId,
+  onMover,
 }: {
   deal: NegocioKanban;
   etapa: EtapaDaPrevia;
@@ -131,11 +143,13 @@ export function PreviaDoNegocio({
   agora: Date;
   onFechar: () => void;
   onMudou: () => void;
+  pipelineId: string;
+  /** Mudança de etapa com as regras (useMudancaDeEtapa da tela). */
+  onMover: (pedido: PedidoDeMudanca) => Promise<ResultadoDaTentativa>;
 }) {
   const painel = React.useRef<HTMLElement>(null);
   const devolverFoco = React.useRef(true);
   const [movendo, setMovendo] = React.useState<string | null>(null);
-  const [erro, setErro] = React.useState<string | null>(null);
   const idDoTitulo = React.useId();
   const fechar = React.useRef(onFechar);
   React.useEffect(() => {
@@ -186,22 +200,22 @@ export function PreviaDoNegocio({
     };
   }, [dealId]);
 
-  async function mover(stageId: string) {
-    if (!stageId || stageId === etapa.id) return;
-    setMovendo(stageId);
-    setErro(null);
-    const res = await fetch(`/api/deals/${deal.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stageId }),
-    }).catch(() => null);
+  async function mover(stageId: string, extra?: Record<string, unknown>) {
+    const para = etapas.find((s) => s.id === stageId);
+    if (!extra?.reabrir && (!para || stageId === etapa.id)) return;
+    setMovendo(stageId || "reabrir");
+    // Regras da etapa: os modais (motivo da perda, "Complete para mover") e o
+    // aviso de erro são da tela que abriu a prévia; aqui só o resultado.
+    const r = await onMover({
+      dealId: deal.id,
+      nome: deal.name,
+      pipelineId,
+      para: para ?? { id: "", name: "", type: "open" },
+      defs,
+      extra,
+    });
     setMovendo(null);
-    if (!res?.ok) {
-      const d = await res?.json().catch(() => ({}));
-      setErro((d as { error?: string } | undefined)?.error ?? "Não foi possível mover o negócio.");
-      return;
-    }
-    onMudou();
+    if (r === "movido") onMudou();
   }
 
   const aberto = etapa.type === "open";
@@ -264,7 +278,8 @@ export function PreviaDoNegocio({
           <Select
             id={`${idDoTitulo}-etapa`}
             value={etapa.id}
-            disabled={!!movendo}
+            // Ganho/perdido só sai com "Reabrir".
+            disabled={!!movendo || !aberto}
             onChange={(e) => mover(e.target.value)}
             className="h-8 flex-1"
           >
@@ -296,10 +311,10 @@ export function PreviaDoNegocio({
             )}
           </div>
         )}
-        {erro && (
-          <p role="alert" className="text-caption text-danger">
-            {erro}
-          </p>
+        {!aberto && (
+          <Button variant="secondary" size="sm" loading={movendo === "reabrir"} disabled={!!movendo} onClick={() => mover("", { reabrir: true })}>
+            <RotateCcw size={14} aria-hidden /> Reabrir negócio
+          </Button>
         )}
       </div>
     </aside>,

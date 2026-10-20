@@ -3,6 +3,7 @@
 import * as React from "react";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { LinhaDoTempo } from "./linha-do-tempo";
+import type { RegraDaEtapa } from "@/lib/regras-de-etapa";
 
 export interface EtapaDaFicha {
   id: string;
@@ -37,6 +38,10 @@ export interface NegocioDaFicha {
   contacts: { contact: { id: string; name: string; email: string; phone: string } }[];
   tasks: { id: string; type: string; text: string; dueAt: string | null; doneAt: string | null }[];
   customFields: Record<string, unknown>;
+  /** Última atividade (relógio do parado). */
+  lastActivityAt?: string | null;
+  /** Motivo estruturado da perda (null = sem registro: vale lostReason). */
+  perda?: { motivoId: string | null; rotulo: string; nota: string } | null;
 }
 
 export interface Membro {
@@ -54,7 +59,7 @@ export async function mensagemDeErro(res: Response, padrao: string): Promise<str
 }
 
 type Resultado =
-  | { tipo: "ok"; deal: NegocioDaFicha; defs: DefinicaoDeCampo[]; linha: LinhaDoTempo | null }
+  | { tipo: "ok"; deal: NegocioDaFicha; defs: DefinicaoDeCampo[]; linha: LinhaDoTempo | null; regras: Record<string, RegraDaEtapa> }
   | { tipo: "nao_encontrado" }
   | { tipo: "erro" };
 
@@ -68,7 +73,7 @@ async function buscarFicha(dealId: string): Promise<Resultado> {
     if (!rDeal.ok) return { tipo: "erro" };
     const dados = await rDeal.json();
     const linha: LinhaDoTempo | null = rLinha?.ok ? await rLinha.json().catch(() => null) : null;
-    return { tipo: "ok", deal: dados.deal, defs: dados.fields ?? [], linha };
+    return { tipo: "ok", deal: dados.deal, defs: dados.fields ?? [], linha, regras: dados.regras ?? {} };
   } catch {
     return { tipo: "erro" };
   }
@@ -85,6 +90,7 @@ export function useFicha(dealId: string) {
   const [estado, setEstado] = React.useState<EstadoDaFicha>("carregando");
   const [deal, setDeal] = React.useState<NegocioDaFicha | null>(null);
   const [defs, setDefs] = React.useState<DefinicaoDeCampo[]>([]);
+  const [regras, setRegras] = React.useState<Record<string, RegraDaEtapa>>({});
   const [linha, setLinha] = React.useState<LinhaDoTempo>({ itens: [], conversas: [] });
   const [linhaFalhou, setLinhaFalhou] = React.useState(false);
   const [membros, setMembros] = React.useState<Membro[]>([]);
@@ -101,6 +107,7 @@ export function useFicha(dealId: string) {
     if (r.tipo === "erro") return setEstado((e) => (e === "ok" ? e : "erro"));
     setDeal(r.deal);
     setDefs(r.defs);
+    setRegras(r.regras);
     // Linha do tempo é complemento: sem ela a ficha abre do mesmo jeito,
     // com o aviso no lugar da lista.
     if (r.linha) setLinha(r.linha);
@@ -147,7 +154,7 @@ export function useFicha(dealId: string) {
     [dealId, carregar]
   );
 
-  return { estado, deal, defs, linha, linhaFalhou, membros, agora, carregar, patch };
+  return { estado, deal, defs, regras, linha, linhaFalhou, membros, agora, carregar, patch };
 }
 
 export type Ficha = ReturnType<typeof useFicha>;

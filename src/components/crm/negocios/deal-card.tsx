@@ -73,9 +73,20 @@ export const TOM_DO_SINAL: Record<SinalDoNegocio["tom"], NonNullable<BadgeProps[
 };
 
 /** O próximo passo (um sinal só, do mais urgente para o menos). */
-export function SinalDoProximoPasso({ deal, tipoDaEtapa, agora }: { deal: NegocioKanban; tipoDaEtapa: string; agora: Date }) {
+export function SinalDoProximoPasso({
+  deal,
+  tipoDaEtapa,
+  agora,
+  prazoParado,
+}: {
+  deal: NegocioKanban;
+  tipoDaEtapa: string;
+  agora: Date;
+  /** Prazo de parado da etapa (null = nunca; ausente = 7). */
+  prazoParado?: number | null;
+}) {
   const humana = React.useContext(VozDoQuadro);
-  const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora);
+  const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado);
   if (!sinal) return null;
   const Icone = ICONE[sinal.icone];
   const texto = humana ? sinalHumano(sinal.texto, sinal.tom) : sinal.texto;
@@ -109,9 +120,12 @@ export function DealCard({
   arrastando,
   layout = LAYOUT_PADRAO,
   comLink = false,
+  prazoParado,
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
+  /** Prazo de parado da etapa (regra da etapa; null = nunca; ausente = 7). */
+  prazoParado?: number | null;
   defs: DefinicaoDeCampo[];
   agora: Date;
   arrastando?: boolean;
@@ -122,7 +136,7 @@ export function DealCard({
   const compacto = layout.densidade === "compacto";
   const { titulo, subtitulo } = tituloDoCartao(deal, layout.campos);
   const blocos = blocosDoCartao(layout.campos, layout.densidade);
-  const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs };
+  const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs, prazoParado };
   const mostraWhatsapp = layout.campos.includes("whatsapp") && !!deal.whatsapp;
   const espaco = compacto ? "mt-1" : "mt-2";
   const tempo = tempoNaEtapa(deal.stageSince, agora);
@@ -202,10 +216,10 @@ export function DealCard({
           );
         }
         if (bloco.campo === "proximoPasso") {
-          if (!sinalDoNegocio(deal, tipoDaEtapa, agora)) return null;
+          if (!sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado)) return null;
           return (
             <div key={i} className={cn(espaco, "flex items-center gap-1.5")}>
-              <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} />
+              <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} />
               {deal.openTasks > 1 && (
                 <span className="text-caption tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
                   +{deal.openTasks - 1}

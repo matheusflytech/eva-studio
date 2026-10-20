@@ -77,6 +77,11 @@ describe("filtrarEtapas", () => {
     expect(filtrarEtapas(etapas, { soParados: true }, AGORA).flatMap((e) => e.deals.map((d) => d.id))).toEqual(["b"]);
   });
 
+  it("só parados respeita o prazo da etapa (nulo = nunca para)", () => {
+    const semRotting = etapas.map((e) => (e.type === "open" ? { ...e, rottingDays: null } : e));
+    expect(filtrarEtapas(semRotting, { soParados: true }, AGORA).flatMap((e) => e.deals.map((d) => d.id))).toEqual([]);
+  });
+
   it("recalcula total e ponderado da coluna depois do filtro", () => {
     const novo = filtrarEtapas(etapas, { busca: "acme" }, AGORA)[0];
     expect(novo.totalCents).toBe(100_000);
@@ -138,8 +143,18 @@ describe("sinalDoNegocio", () => {
   it("previsão de fechamento que já passou", () => {
     expect(sinalDoNegocio(base({ expectedClosingAt: "2026-10-18T12:00:00Z" }), "open", ag)).toEqual({ tom: "bad", icone: "cal", texto: "Fechamento passou 18 out" });
   });
-  it("parado", () => {
-    expect(sinalDoNegocio(base({ stageSince: "2026-10-08T12:00:00Z" }), "open", ag)).toEqual({ tom: "warn", icone: "hour", texto: "Parado 12 dias" });
+  it("parado (padrão de 7 dias): marca discreta com o tempo", () => {
+    expect(sinalDoNegocio(base({ stageSince: "2026-10-08T12:00:00Z" }), "open", ag)).toEqual({ tom: "warn", icone: "hour", texto: "Parado há 12d" });
+  });
+  it("parado usa o prazo da etapa e a última atividade", () => {
+    const n = base({ stageSince: "2026-10-08T12:00:00Z" });
+    // Etapa que não apodrece.
+    expect(sinalDoNegocio(n, "open", ag, null)).toBeNull();
+    // Prazo de 30 dias: 12 dias ainda não é parado.
+    expect(sinalDoNegocio(n, "open", ag, 30)).toBeNull();
+    // Prazo de 3 dias, mas teve atividade há 2: não está parado.
+    expect(sinalDoNegocio({ ...n, lastActivityAt: "2026-10-18T12:00:00Z" }, "open", ag, 3)).toBeNull();
+    expect(sinalDoNegocio({ ...n, lastActivityAt: "2026-10-15T12:00:00Z" }, "open", ag, 3)).toEqual({ tom: "warn", icone: "hour", texto: "Parado há 5d" });
   });
   it("próxima tarefa no prazo, pelo tipo", () => {
     expect(sinalDoNegocio(base({ nextTask: { type: "ligar", text: "x", dueAt: "2026-10-20T19:00:00Z" } }), "open", ag)).toEqual({ tom: "neu", icone: "phone", texto: "Ligar hoje 16h" });
