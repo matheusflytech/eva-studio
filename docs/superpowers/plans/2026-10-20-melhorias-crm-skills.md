@@ -220,7 +220,7 @@ design system com a identidade da Eva.
   pg_trgm: segunda volta por semelhança (`<%`, "parecido" na linha).
 - **Banco:** `prisma/sql/2026-10-20-busca.sql` (só aditivo; não aplicado):
   unaccent + pg_trgm no schema `extensions`, função IMMUTABLE
-  `public.eva_studio_norm` e 12 índices GIN trigram (nomes, e-mails,
+  `public.eva_studio_norm` e 11 índices GIN trigram (nomes, e-mails,
   telefones, canal, CNPJ, notas, mensagens). Sem ele o app detecta e usa
   `translate(lower())` + LIKE sem índice (mesmo resultado para os acentos do
   português, mais lento, sem semelhança). Tempo no cabeçalho `Server-Timing`.
