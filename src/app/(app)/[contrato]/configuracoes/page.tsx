@@ -14,9 +14,11 @@ import { AbaGrupos } from "@/components/configuracoes/aba-grupos";
 import { AbaEquipes } from "@/components/configuracoes/aba-equipes";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { AbaLixeira } from "@/components/configuracoes/aba-lixeira";
+import { CanvasThemeSwitch, ThemeChooser } from "@/components/ui/theme";
 
 const ABAS = [
   { id: "contrato", rotulo: "Contrato" },
+  { id: "conta", rotulo: "Sua conta" },
   { id: "membros", rotulo: "Membros" },
   { id: "papeis", rotulo: "Papéis e permissões" },
   { id: "grupos", rotulo: "Grupos" },
@@ -49,7 +51,7 @@ function IdDoContrato({ id }: { id: string }) {
             }
           }}
         >
-          {copiado ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+          {copiado ? <Check size={15} className="text-success" /> : <Copy size={15} />}
         </Button>
       </div>
       <p className="mt-1 text-[12px] text-text-tertiary">É o que aparece na URL e o que o suporte da Eva pede para achar seu contrato.</p>
@@ -58,17 +60,14 @@ function IdDoContrato({ id }: { id: string }) {
 }
 
 function AbaContrato() {
-  const router = useRouter();
-  const { session, updateOrgName, updateUserName, updateOrgLogo, logOut } = useAuth();
+  const { session, updateOrgName, updateOrgLogo } = useAuth();
   const [orgName, setOrgName] = React.useState(session?.orgName ?? "");
-  const [userName, setUserName] = React.useState(session?.name ?? "");
   const [saved, setSaved] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const podeEditar = session?.permissoes?.includes("contrato:gerenciar") ?? false;
 
   React.useEffect(() => {
     setOrgName(session?.orgName ?? "");
-    setUserName(session?.name ?? "");
   }, [session]);
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -134,6 +133,34 @@ function AbaContrato() {
         </form>
       </Card>
 
+    </div>
+  );
+}
+
+/**
+ * O que é da pessoa, não do contrato: nome, aparência e sessão. Tema e canvas
+ * ficam salvos neste navegador (como o resto das preferências de tela).
+ */
+function AbaConta() {
+  const router = useRouter();
+  const { session, updateUserName, logOut } = useAuth();
+  const [userName, setUserName] = React.useState(session?.name ?? "");
+  const [saved, setSaved] = React.useState<string | null>(null);
+  // Sessão carregou (ou o nome mudou em outra aba): o campo acompanha.
+  // Ajuste durante a renderização, sem efeito (react.dev: "You might not need an effect").
+  const [nomeDaSessao, setNomeDaSessao] = React.useState(session?.name);
+  if (session?.name !== nomeDaSessao) {
+    setNomeDaSessao(session?.name);
+    setUserName(session?.name ?? "");
+  }
+
+  function flashSaved(label: string) {
+    setSaved(label);
+    setTimeout(() => setSaved(null), 2000);
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
       <Card>
         <CardHeader>
           <CardTitle>Sua conta</CardTitle>
@@ -164,6 +191,26 @@ function AbaContrato() {
             {saved === "account" && <span className="text-[12.5px] text-text-tertiary">Salvo.</span>}
           </div>
         </form>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Aparência</CardTitle>
+          <CardDescription>Vale só neste navegador. O menu lateral continua escuro nos dois temas.</CardDescription>
+        </CardHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label>Tema</Label>
+            <ThemeChooser className="self-start" />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="canvas-sempre-escuro" className="mb-0">Canvas do builder sempre escuro</Label>
+              <p className="text-caption text-text-tertiary">Desligado, o canvas acompanha o tema.</p>
+            </div>
+            <CanvasThemeSwitch />
+          </div>
+        </div>
       </Card>
 
       <Card>
@@ -201,7 +248,7 @@ function Configuracoes() {
       <div className="mx-auto flex max-w-4xl flex-col gap-5 pb-10">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Configurações</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contrato, quem participa, o que cada um pode fazer, as chaves de API e a lixeira.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contrato, sua conta e aparência, quem participa, o que cada um pode fazer, as chaves de API e a lixeira.</p>
         </div>
 
         {/* A aba fica na URL: dá para mandar o link "aba de membros" a alguém. */}
@@ -217,6 +264,9 @@ function Configuracoes() {
           </div>
           <TabsContent value="contrato" className="mt-5">
             <AbaContrato />
+          </TabsContent>
+          <TabsContent value="conta" className="mt-5">
+            <AbaConta />
           </TabsContent>
           <TabsContent value="membros" className="mt-5">
             <AbaMembros />

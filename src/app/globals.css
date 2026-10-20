@@ -101,6 +101,46 @@
 
   --overlay-backdrop: rgba(8, 13, 23, 0.4);
   --elevation-overlay: 0 1px 2px rgba(8, 13, 23, 0.06), 0 8px 24px rgba(8, 13, 23, 0.12);
+
+  /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
+     subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
+     src/lib/design-system/tokens.ts (CATEGORY_THEMES). */
+  --cat-slate: #475569;
+  --cat-slate-subtle: #eef1f6;
+  --cat-slate-solid: #64748b;
+  --cat-blue: #1d5fb8;
+  --cat-blue-subtle: #e8f1fc;
+  --cat-blue-solid: #2f7de1;
+  --cat-cyan: #0b6479;
+  --cat-cyan-subtle: #e1f4f9;
+  --cat-cyan-solid: #0a8aa8;
+  --cat-teal: #0b665f;
+  --cat-teal-subtle: #e0f4f1;
+  --cat-teal-solid: #0d8f84;
+  --cat-green: #17734a;
+  --cat-green-subtle: #e7f5ee;
+  --cat-green-solid: #1e9a5c;
+  --cat-amber: #8a5300;
+  --cat-amber-subtle: #fcf2df;
+  --cat-amber-solid: #c27803;
+  --cat-orange: #a3410c;
+  --cat-orange-subtle: #fdeee4;
+  --cat-orange-solid: #dd5a10;
+  --cat-red: #c22f2f;
+  --cat-red-subtle: #fdeded;
+  --cat-red-solid: #d93636;
+  --cat-rose: #b4234f;
+  --cat-rose-subtle: #fdecf1;
+  --cat-rose-solid: #dc2f5f;
+  --cat-violet: #6a3fd1;
+  --cat-violet-subtle: #f1ecfd;
+  --cat-violet-solid: #8257e8;
+  --cat-purple: #8a2fb5;
+  --cat-purple-subtle: #f6eafb;
+  --cat-purple-solid: #a24fd0;
+  --cat-indigo: #4549c9;
+  --cat-indigo-subtle: #eceefd;
+  --cat-indigo-solid: #5f63e8;
 }
 
 /* ---- Tema escuro ---- */
@@ -145,6 +185,46 @@
 
   --overlay-backdrop: rgba(0, 0, 0, 0.6);
   --elevation-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
+     subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
+     src/lib/design-system/tokens.ts (CATEGORY_THEMES). */
+  --cat-slate: #b5c0cf;
+  --cat-slate-subtle: #1a2333;
+  --cat-slate-solid: #8c9bb0;
+  --cat-blue: #8ec2fb;
+  --cat-blue-subtle: #10243f;
+  --cat-blue-solid: #4f9cf3;
+  --cat-cyan: #74d3ec;
+  --cat-cyan-subtle: #0d2833;
+  --cat-cyan-solid: #22b8d8;
+  --cat-teal: #6fd8cb;
+  --cat-teal-subtle: #0e2a2a;
+  --cat-teal-solid: #25b5a6;
+  --cat-green: #6fd39f;
+  --cat-green-subtle: #11261b;
+  --cat-green-solid: #38b26f;
+  --cat-amber: #f0bb5c;
+  --cat-amber-subtle: #2a2010;
+  --cat-amber-solid: #e3a23a;
+  --cat-orange: #f9a26c;
+  --cat-orange-subtle: #2e1a10;
+  --cat-orange-solid: #f08240;
+  --cat-red: #f58b8b;
+  --cat-red-subtle: #2d1617;
+  --cat-red-solid: #ec6262;
+  --cat-rose: #f68fab;
+  --cat-rose-subtle: #2e1520;
+  --cat-rose-solid: #ee5f86;
+  --cat-violet: #b9a3fa;
+  --cat-violet-subtle: #1d1838;
+  --cat-violet-solid: #9c80f5;
+  --cat-purple: #d29ff5;
+  --cat-purple-subtle: #251636;
+  --cat-purple-solid: #bb7ff0;
+  --cat-indigo: #a5adfb;
+  --cat-indigo-subtle: #181d3d;
+  --cat-indigo-solid: #7d87f5;
 }
 
 /* ---- Nomes antigos -> tokens novos (compatibilidade; não use em código novo) ---- */
@@ -205,9 +285,14 @@
 
 /* Ponte temporária: telas antigas escrevem status com a paleta crua do
    Tailwind (text-emerald-400, text-amber-300...), clara demais para fundo
-   branco. No tema claro elas passam a usar os tokens de status. Remover
-   quando as telas forem migradas para text-success/text-warning/... */
-[data-theme="light"] {
+   branco. Elas passam a usar os tokens de status/categoria do tema. Vale
+   também no escuro de propósito: variável CSS herda já resolvida, então um
+   trecho data-theme="dark" (menu lateral, celular da prévia) dentro da
+   página clara herdaria a cor do claro e sumiria. Redeclarando aqui, cada
+   trecho resolve com o próprio tema. Remover quando as telas forem migradas
+   para text-success/text-warning/text-cat-... */
+[data-theme="light"],
+[data-theme="dark"] {
   --color-emerald-200: var(--success-fg);
   --color-emerald-300: var(--success-fg);
   --color-emerald-400: var(--success-fg);
@@ -219,7 +304,24 @@
   --color-rose-400: var(--danger-fg);
   --color-sky-300: var(--info-fg);
   --color-sky-400: var(--info-fg);
+  --color-blue-300: var(--info-fg);
   --color-blue-400: var(--info-fg);
+  /* Mesma ponte para as cores sem status: viram a cor de categoria
+     equivalente. Código novo usa text-cat-* direto. */
+  --color-violet-300: var(--cat-violet);
+  --color-violet-400: var(--cat-violet);
+  --color-purple-300: var(--cat-purple);
+  --color-purple-400: var(--cat-purple);
+  --color-teal-300: var(--cat-teal);
+  --color-teal-400: var(--cat-teal);
+  --color-cyan-300: var(--cat-cyan);
+  --color-cyan-400: var(--cat-cyan);
+  --color-orange-300: var(--cat-orange);
+  --color-orange-400: var(--cat-orange);
+  --color-indigo-300: var(--cat-indigo);
+  --color-indigo-400: var(--cat-indigo);
+  --color-slate-300: var(--cat-slate);
+  --color-slate-400: var(--cat-slate);
 }
 
 /* Valores fixos (não mudam com o tema). */
@@ -292,6 +394,44 @@
   --color-backdrop: var(--overlay-backdrop);
 
   --shadow-overlay: var(--elevation-overlay);
+
+  /* cores de categoria: text-cat-blue, bg-cat-blue-subtle, bg-cat-blue-solid */
+  --color-cat-slate: var(--cat-slate);
+  --color-cat-slate-subtle: var(--cat-slate-subtle);
+  --color-cat-slate-solid: var(--cat-slate-solid);
+  --color-cat-blue: var(--cat-blue);
+  --color-cat-blue-subtle: var(--cat-blue-subtle);
+  --color-cat-blue-solid: var(--cat-blue-solid);
+  --color-cat-cyan: var(--cat-cyan);
+  --color-cat-cyan-subtle: var(--cat-cyan-subtle);
+  --color-cat-cyan-solid: var(--cat-cyan-solid);
+  --color-cat-teal: var(--cat-teal);
+  --color-cat-teal-subtle: var(--cat-teal-subtle);
+  --color-cat-teal-solid: var(--cat-teal-solid);
+  --color-cat-green: var(--cat-green);
+  --color-cat-green-subtle: var(--cat-green-subtle);
+  --color-cat-green-solid: var(--cat-green-solid);
+  --color-cat-amber: var(--cat-amber);
+  --color-cat-amber-subtle: var(--cat-amber-subtle);
+  --color-cat-amber-solid: var(--cat-amber-solid);
+  --color-cat-orange: var(--cat-orange);
+  --color-cat-orange-subtle: var(--cat-orange-subtle);
+  --color-cat-orange-solid: var(--cat-orange-solid);
+  --color-cat-red: var(--cat-red);
+  --color-cat-red-subtle: var(--cat-red-subtle);
+  --color-cat-red-solid: var(--cat-red-solid);
+  --color-cat-rose: var(--cat-rose);
+  --color-cat-rose-subtle: var(--cat-rose-subtle);
+  --color-cat-rose-solid: var(--cat-rose-solid);
+  --color-cat-violet: var(--cat-violet);
+  --color-cat-violet-subtle: var(--cat-violet-subtle);
+  --color-cat-violet-solid: var(--cat-violet-solid);
+  --color-cat-purple: var(--cat-purple);
+  --color-cat-purple-subtle: var(--cat-purple-subtle);
+  --color-cat-purple-solid: var(--cat-purple-solid);
+  --color-cat-indigo: var(--cat-indigo);
+  --color-cat-indigo-subtle: var(--cat-indigo-subtle);
+  --color-cat-indigo-solid: var(--cat-indigo-solid);
 
   /* nomes antigos (compatibilidade) */
   --color-bg-base: var(--bg-base);

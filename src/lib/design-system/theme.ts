@@ -56,3 +56,20 @@ export function serializeThemeCookie(pref: ThemePreference): string {
  * todo envolto em try: localStorage pode lançar em aba anônima/bloqueada.
  */
 export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)/);p=m?m[1]:${JSON.stringify("light")}}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
+
+/*
+ * Canvas do builder. Por padrão acompanha o tema (claro no claro, escuro no
+ * escuro); quem prefere montar fluxo no escuro marca "sempre escuro" e o
+ * resto do app continua no tema escolhido. Preferência só deste navegador
+ * (localStorage), como o tema.
+ */
+export type CanvasPreference = "tema" | "escuro";
+export const CANVAS_STORAGE_KEY = "eva-canvas";
+
+export function parseCanvasPreference(valor: unknown): CanvasPreference {
+  return valor === "escuro" ? "escuro" : "tema";
+}
+
+export function resolveCanvasTheme(pref: CanvasPreference, temaDoApp: ResolvedTheme): ResolvedTheme {
+  return pref === "escuro" ? "dark" : temaDoApp;
+}

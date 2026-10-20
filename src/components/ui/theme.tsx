@@ -3,15 +3,22 @@
 import * as React from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import {
+  CANVAS_STORAGE_KEY,
+  PREFERENCIA_PADRAO,
   THEME_STORAGE_KEY,
+  parseCanvasPreference,
+  resolveCanvasTheme,
   nextThemePreference,
   parseThemePreference,
   resolveTheme,
   serializeThemeCookie,
+  type CanvasPreference,
   type ResolvedTheme,
   type ThemePreference,
 } from "@/lib/design-system/theme";
 import { IconButton } from "./icon-button";
+import { SegmentedControl } from "./segmented-control";
+import { Switch } from "./switch";
 
 /*
  * Tema no cliente. O <head> já aplicou data-theme antes da pintura (ver
@@ -26,7 +33,7 @@ function lerPreferencia(): ThemePreference {
   try {
     return parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
-    return "system";
+    return PREFERENCIA_PADRAO;
   }
 }
 
@@ -56,7 +63,7 @@ function subscribe(avisar: () => void) {
 
 // Snapshot como string: useSyncExternalStore compara por ===.
 const snapshot = () => `${lerPreferencia()}|${resolveTheme(lerPreferencia(), sistemaEscuro())}`;
-const snapshotServidor = () => "system|light";
+const snapshotServidor = () => `${PREFERENCIA_PADRAO}|light`;
 
 export function setThemePreference(pref: ThemePreference) {
   try {
@@ -105,5 +112,78 @@ export function ThemeToggle({ className }: { className?: string }) {
     >
       <Icone />
     </IconButton>
+  );
+}
+
+const OPCOES_DE_TEMA: { value: ThemePreference; label: string; icon: React.ReactNode }[] = [
+  { value: "light", label: "Claro", icon: <Sun /> },
+  { value: "dark", label: "Escuro", icon: <Moon /> },
+  { value: "system", label: "Seguir o sistema", icon: <Monitor /> },
+];
+
+/** Escolha explícita do tema (Configurações → Sua conta). */
+export function ThemeChooser({ className }: { className?: string }) {
+  const { preference, setPreference } = useTheme();
+  return (
+    <SegmentedControl
+      label="Tema"
+      options={OPCOES_DE_TEMA}
+      value={preference}
+      onChange={setPreference}
+      className={className}
+    />
+  );
+}
+
+/* ---- Canvas do builder: acompanha o tema ou fica sempre escuro ---- */
+
+const EVENTO_CANVAS = "eva-canvas-change";
+
+function lerCanvas(): CanvasPreference {
+  try {
+    return parseCanvasPreference(localStorage.getItem(CANVAS_STORAGE_KEY));
+  } catch {
+    return "tema";
+  }
+}
+
+function subscribeCanvas(avisar: () => void) {
+  window.addEventListener(EVENTO_CANVAS, avisar);
+  window.addEventListener("storage", avisar);
+  return () => {
+    window.removeEventListener(EVENTO_CANVAS, avisar);
+    window.removeEventListener("storage", avisar);
+  };
+}
+
+export function setCanvasPreference(pref: CanvasPreference) {
+  try {
+    localStorage.setItem(CANVAS_STORAGE_KEY, pref);
+  } catch {
+    // aba anônima/bloqueada: vale só até recarregar
+  }
+  window.dispatchEvent(new Event(EVENTO_CANVAS));
+}
+
+/** Tema efetivo do canvas do builder (já considera "sempre escuro"). */
+export function useCanvasTheme(): {
+  preference: CanvasPreference;
+  resolved: ResolvedTheme;
+  setPreference: (pref: CanvasPreference) => void;
+} {
+  const { resolved: temaDoApp } = useTheme();
+  const preference = React.useSyncExternalStore(subscribeCanvas, lerCanvas, () => "tema" as CanvasPreference);
+  return { preference, resolved: resolveCanvasTheme(preference, temaDoApp), setPreference: setCanvasPreference };
+}
+
+/** Liga/desliga "canvas sempre escuro". */
+export function CanvasThemeSwitch({ id = "canvas-sempre-escuro" }: { id?: string }) {
+  const { preference, setPreference } = useCanvasTheme();
+  return (
+    <Switch
+      id={id}
+      checked={preference === "escuro"}
+      onCheckedChange={(ligado) => setPreference(ligado ? "escuro" : "tema")}
+    />
   );
 }

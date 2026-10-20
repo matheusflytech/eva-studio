@@ -35,7 +35,13 @@ texto, cor quase só em status.
 ## Tema
 
 - Atributo `data-theme="light" | "dark"` no `<html>`.
-- Preferência: `system` (padrão), `light` ou `dark`. Salva em `localStorage`
+- Onde trocar: **Configurações → Sua conta → Aparência** (Claro / Escuro /
+  Seguir o sistema, com `ThemeChooser`) e o atalho `ThemeToggle` no rodapé
+  do menu lateral. Na mesma tela, "Canvas do builder sempre escuro"
+  (`useCanvasTheme`, localStorage `eva-canvas`): desligado, o canvas do
+  builder acompanha o tema; ligado, fica escuro (o React Flow recebe
+  `colorMode` e o contêiner `data-theme`).
+- Preferência: `light` (padrão), `dark` ou `system`. Salva em `localStorage`
   (`eva-theme`) **e** cookie `eva-theme` (1 ano), para o servidor poder ler um dia.
 - Sem piscar: `THEME_INIT_SCRIPT` (`src/lib/design-system/theme.ts`) roda no
   `<head>` do `src/app/layout.tsx` antes da primeira pintura, como manda
@@ -86,6 +92,26 @@ Valores (claro / escuro):
 | danger fg / subtle / solid | #c22f2f / #fdeded / #c22f2f | #f07575 / #2d1617 / #c43b3b |
 | info fg / subtle | #1f66a8 / #e8f1fa | #6cb1ef / #122338 |
 | focus-ring | #308ce8 | #99ccff |
+
+### Cores de categoria (dado, não status)
+
+Para o que precisa de cor própria e não é status: tipo de bloco do builder,
+etapa, etiqueta, método HTTP. 12 cores (slate, blue, cyan, teal, green,
+amber, orange, red, rose, violet, purple, indigo), cada uma com três papéis
+e valor próprio no claro e no escuro (`--cat-{cor}`, `--cat-{cor}-subtle`,
+`--cat-{cor}-solid` no globals.css; espelho e contraste em
+`CATEGORY_THEMES`, tokens.ts):
+
+| Papel | Classe | Uso | Contraste testado |
+|---|---|---|---|
+| fg | `text-cat-{cor}` | texto e ícone | ≥ 4,5 sobre subtle, panel e raised |
+| subtle | `bg-cat-{cor}-subtle` | fundo de chip/ícone | — |
+| solid | `bg-cat-{cor}-solid`, `border-l-cat-{cor}-solid` | ponto, alça, faixa, minimapa | ≥ 3 sobre panel |
+
+Como o Tailwind só gera classe literal, use a tabela `CATEGORY_CLASSES`
+(`src/lib/design-system/category-classes.ts`), nunca `text-cat-${cor}`.
+Violeta continua sendo da IA. Blocos do builder: `BLOCK_CATEGORY` em
+`builder/block-styles.ts`.
 
 ### Contraste (WCAG 2.x, calculado e testado)
 
@@ -212,7 +238,8 @@ Os nomes antigos continuam valendo e apontam para os tokens novos:
 | ponte shadcn (`bg-card`, `text-muted-foreground`...) | aponta para os semânticos |
 | `.glass-card` | painel com borda fina, **sem blur e sem sombra** |
 | `.app-backdrop` | cor de página lisa, sem brilho radial |
-| `text-emerald-*/amber-*/rose-*/sky-*` (tons 200–400) | **só no tema claro**, viram os tokens de status (ponte temporária para as telas antigas continuarem legíveis em fundo branco) |
+| `text-emerald-*/amber-*/rose-*/sky-*/blue-*` (tons 200–400) | viram os tokens de status do tema (ponte temporária); declarada nos dois temas para um trecho `data-theme="dark"` dentro da página clara não herdar a cor do claro |
+| `text-violet/purple/teal/cyan/orange/indigo/slate-300/400` | viram a cor de categoria equivalente (mesma ponte) |
 
 Ponto de atenção: `hover:bg-accent-400` (12 usos antigos em botão) no tema
 escuro vira azul claro com texto branco. Trocar por `Button` ou
@@ -260,7 +287,7 @@ Exemplos tirados do código atual. Não copie; ao migrar a tela, troque.
 1. Menu lateral em navy da marca nos dois temas: o wrapper do `Sidebar` tem
    `data-theme="dark"` (que agora é a escala navy) e o item ativo usa
    `bg-accent-subtle text-accent-fg`.
-2. Lugar fixo para o `ThemeToggle` (ex.: rodapé do menu ou Configurações → Aparência).
+2. ~~Lugar fixo para o `ThemeToggle`~~ feito (F1): rodapé do menu e Configurações → Sua conta.
 3. Migrar telas de lista (contatos, empresas, negócios em lista) para
    `PageHeader` + `ViewTabs` + `Toolbar`/`FilterButton` + `DataTable` +
    `Pagination`, com ordenação e paginação no servidor (`page`, `pageSize`,

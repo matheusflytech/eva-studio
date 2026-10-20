@@ -25,11 +25,11 @@ interface Doc {
 
 const METODOS = ["get", "post", "put", "patch", "delete"] as const;
 const COR: Record<string, string> = {
-  GET: "bg-blue-500/15 text-blue-400",
-  POST: "bg-emerald-500/15 text-emerald-400",
-  PUT: "bg-violet-500/15 text-violet-400",
-  PATCH: "bg-amber-500/15 text-amber-400",
-  DELETE: "bg-danger/15 text-danger",
+  GET: "bg-cat-blue-subtle text-cat-blue",
+  POST: "bg-cat-green-subtle text-cat-green",
+  PUT: "bg-cat-indigo-subtle text-cat-indigo",
+  PATCH: "bg-cat-amber-subtle text-cat-amber",
+  DELETE: "bg-cat-red-subtle text-cat-red",
 };
 
 function curl(base: string, metodo: string, caminho: string, op: Operacao): string {

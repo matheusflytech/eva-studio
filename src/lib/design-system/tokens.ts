@@ -172,3 +172,66 @@ export const MOTION = [
   { nome: "base", ms: 160, uso: "abrir menu, tooltip, recolher coluna" },
   { nome: "lento", ms: 200, uso: "modal, gaveta, toast" },
 ] as const;
+
+/* ---------------------------------------------------------------------------
+   Cores de categoria.
+
+   Para DADO que precisa de cor própria e não é status: tipo de bloco do
+   builder, etapa do funil, etiqueta. Cada cor tem três papéis por tema:
+     - fg:     texto e ícone (>= 4,5 sobre subtle, panel e raised);
+     - subtle: fundo de chip/badge e do ícone do bloco;
+     - solid:  ponto, alça de ligação, minimapa (>= 3 sobre panel: é
+               componente de interface, não texto).
+   Classes Tailwind: text-cat-{cor}, bg-cat-{cor}-subtle, bg-cat-{cor}-solid,
+   border-cat-{cor}-solid/40. Nunca usar a paleta crua do Tailwind
+   (text-violet-400...) para isso: ela some no tema claro.
+   --------------------------------------------------------------------------- */
+
+export const CATEGORY_COLORS = [
+  "slate",
+  "blue",
+  "cyan",
+  "teal",
+  "green",
+  "amber",
+  "orange",
+  "red",
+  "rose",
+  "violet",
+  "purple",
+  "indigo",
+] as const;
+
+export type CategoryColor = (typeof CATEGORY_COLORS)[number];
+export type CategoryRole = "fg" | "subtle" | "solid";
+
+export const CATEGORY_THEMES: Record<ThemeName, Record<CategoryColor, Record<CategoryRole, string>>> = {
+  light: {
+    slate: { fg: "#475569", subtle: "#eef1f6", solid: "#64748b" },
+    blue: { fg: "#1d5fb8", subtle: "#e8f1fc", solid: "#2f7de1" },
+    cyan: { fg: "#0b6479", subtle: "#e1f4f9", solid: "#0a8aa8" },
+    teal: { fg: "#0b665f", subtle: "#e0f4f1", solid: "#0d8f84" },
+    green: { fg: "#17734a", subtle: "#e7f5ee", solid: "#1e9a5c" },
+    amber: { fg: "#8a5300", subtle: "#fcf2df", solid: "#c27803" },
+    orange: { fg: "#a3410c", subtle: "#fdeee4", solid: "#dd5a10" },
+    red: { fg: "#c22f2f", subtle: "#fdeded", solid: "#d93636" },
+    rose: { fg: "#b4234f", subtle: "#fdecf1", solid: "#dc2f5f" },
+    violet: { fg: "#6a3fd1", subtle: "#f1ecfd", solid: "#8257e8" },
+    purple: { fg: "#8a2fb5", subtle: "#f6eafb", solid: "#a24fd0" },
+    indigo: { fg: "#4549c9", subtle: "#eceefd", solid: "#5f63e8" },
+  },
+  dark: {
+    slate: { fg: "#b5c0cf", subtle: "#1a2333", solid: "#8c9bb0" },
+    blue: { fg: "#8ec2fb", subtle: "#10243f", solid: "#4f9cf3" },
+    cyan: { fg: "#74d3ec", subtle: "#0d2833", solid: "#22b8d8" },
+    teal: { fg: "#6fd8cb", subtle: "#0e2a2a", solid: "#25b5a6" },
+    green: { fg: "#6fd39f", subtle: "#11261b", solid: "#38b26f" },
+    amber: { fg: "#f0bb5c", subtle: "#2a2010", solid: "#e3a23a" },
+    orange: { fg: "#f9a26c", subtle: "#2e1a10", solid: "#f08240" },
+    red: { fg: "#f58b8b", subtle: "#2d1617", solid: "#ec6262" },
+    rose: { fg: "#f68fab", subtle: "#2e1520", solid: "#ee5f86" },
+    violet: { fg: "#b9a3fa", subtle: "#1d1838", solid: "#9c80f5" },
+    purple: { fg: "#d29ff5", subtle: "#251636", solid: "#bb7ff0" },
+    indigo: { fg: "#a5adfb", subtle: "#181d3d", solid: "#7d87f5" },
+  },
+};

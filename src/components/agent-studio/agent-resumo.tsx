@@ -122,8 +122,8 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
               pausado
                 ? "bg-surface-3 text-text-secondary"
                 : faltam > 0
-                  ? "bg-amber-400/10 text-amber-300"
-                  : "bg-emerald-500/12 text-emerald-400"
+                  ? "bg-warning-subtle text-warning"
+                  : "bg-success-subtle text-success"
             )}
           >
             {pausado ? "Pausado: não responde" : faltam > 0 ? `Falta${faltam > 1 ? "m" : ""} ${faltam} passo${faltam > 1 ? "s" : ""}` : "No ar e completo"}
@@ -150,7 +150,7 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
             const corpo = (
               <div className="flex items-start gap-3 py-3">
                 {p.feito ? (
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-400" />
+                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
                 ) : (
                   <Circle size={18} className="mt-0.5 shrink-0 text-text-tertiary" />
                 )}
@@ -222,9 +222,9 @@ function Numero({
   href?: string;
 }) {
   const corpo = (
-    <div className={cn("glass-card rounded-2xl px-4 py-4", alerta && "ring-1 ring-amber-400/25")}>
+    <div className={cn("glass-card rounded-2xl px-4 py-4", alerta && "ring-1 ring-warning/30")}>
       <div className="flex items-center gap-1.5 text-[11.5px] text-text-tertiary">{icone} {rotulo}</div>
-      <div className={cn("mt-1.5 font-display text-[26px] font-semibold tabular-nums", alerta ? "text-amber-300" : valor === 0 ? "text-text-tertiary" : "text-text-primary")}>
+      <div className={cn("mt-1.5 font-display text-[26px] font-semibold tabular-nums", alerta ? "text-warning" : valor === 0 ? "text-text-tertiary" : "text-text-primary")}>
         {valor}
       </div>
     </div>

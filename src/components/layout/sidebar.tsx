@@ -31,6 +31,7 @@ import { MarcaAjuda } from "./marca-ajuda";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
+import { ThemeToggle } from "@/components/ui/theme";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 
 interface NavItem {
@@ -242,7 +243,10 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         </div>
       </nav>
 
-      <div className="mt-2 border-t border-border-subtle pt-2">
+      {/* Atalho do tema no rodapé; a escolha completa (e "canvas sempre
+          escuro") fica em Configurações → Sua conta. O menu é navy nos dois
+          temas, então o botão aparece sempre no esquema escuro. */}
+      <div className={cn("mt-2 flex gap-1 border-t border-border-subtle pt-2", collapsed ? "flex-col items-center" : "items-center")}>
         <Link
           href="/ajuda"
           title="Eva Help — tudo que dá pra fazer no app"
@@ -255,6 +259,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           <MarcaAjuda size={17} className="shrink-0" />
           {!collapsed && <span>Eva Help</span>}
         </Link>
+        <ThemeToggle className={cn(!collapsed && "ml-auto")} />
       </div>
     </aside>
   );

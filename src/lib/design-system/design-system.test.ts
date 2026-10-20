@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { contrastLevel, contrastRatio, formatRatio, hexToRgb } from "./contrast";
-import { CONTRAST_PAIRS, SEMANTIC_TOKENS, THEMES, type ThemeName } from "./tokens";
+import { CATEGORY_COLORS, CATEGORY_THEMES, CONTRAST_PAIRS, SEMANTIC_TOKENS, THEMES, type ThemeName } from "./tokens";
 import {
   THEME_INIT_SCRIPT,
   THEME_STORAGE_KEY,
   nextThemePreference,
+  parseCanvasPreference,
+  resolveCanvasTheme,
   parseThemePreference,
   readThemeCookie,
   resolveTheme,
@@ -57,6 +59,41 @@ describe("tokens: contraste AA nos dois temas", () => {
       });
     }
   }
+});
+
+describe("cores de categoria: AA nos dois temas e espelho no CSS", () => {
+  const css = readFileSync(path.resolve(__dirname, "../../app/globals.css"), "utf8");
+  for (const tema of ["light", "dark"] as ThemeName[]) {
+    for (const cor of CATEGORY_COLORS) {
+      const c = CATEGORY_THEMES[tema][cor];
+      it(`${tema}: ${cor} legível (texto >= 4,5; ponto >= 3)`, () => {
+        expect(contrastRatio(c.fg, c.subtle)).toBeGreaterThanOrEqual(4.5);
+        for (const fundo of ["surface-panel", "surface-raised"] as const) {
+          expect(contrastRatio(c.fg, THEMES[tema][fundo]), `${cor} fg sobre ${fundo}`).toBeGreaterThanOrEqual(4.5);
+        }
+        expect(contrastRatio(c.solid, THEMES[tema]["surface-panel"]), `${cor} solid`).toBeGreaterThanOrEqual(3);
+      });
+    }
+    it(`${tema}: globals.css declara as cores de categoria com o mesmo valor`, () => {
+      const seletor = tema === "light" ? '[data-theme="light"]' : '[data-theme="dark"]';
+      const inicio = css.indexOf(`${seletor} {`);
+      const corpo = css.slice(inicio, css.indexOf("}", inicio));
+      for (const cor of CATEGORY_COLORS) {
+        for (const papel of ["fg", "subtle", "solid"] as const) {
+          const nome = papel === "fg" ? `--cat-${cor}` : `--cat-${cor}-${papel}`;
+          const m = corpo.match(new RegExp(`${nome}:\\s*([^;]+);`));
+          expect(m?.[1]?.trim().toLowerCase(), `${nome} (${tema})`).toBe(CATEGORY_THEMES[tema][cor][papel]);
+        }
+      }
+    });
+  }
+  it("registra as classes do Tailwind", () => {
+    for (const cor of CATEGORY_COLORS) {
+      expect(css).toContain(`--color-cat-${cor}: var(--cat-${cor});`);
+      expect(css).toContain(`--color-cat-${cor}-subtle: var(--cat-${cor}-subtle);`);
+      expect(css).toContain(`--color-cat-${cor}-solid: var(--cat-${cor}-solid);`);
+    }
+  });
 });
 
 describe("tokens: globals.css igual ao espelho em TS", () => {
@@ -138,6 +175,15 @@ describe("tema", () => {
     expect(resolveTheme("system", false)).toBe("light");
     expect(resolveTheme("light", true)).toBe("light");
     expect(resolveTheme("dark", false)).toBe("dark");
+  });
+
+  it("canvas do builder: acompanha o tema ou fica sempre escuro", () => {
+    expect(parseCanvasPreference("escuro")).toBe("escuro");
+    expect(parseCanvasPreference(null)).toBe("tema");
+    expect(parseCanvasPreference("roxo")).toBe("tema");
+    expect(resolveCanvasTheme("tema", "light")).toBe("light");
+    expect(resolveCanvasTheme("tema", "dark")).toBe("dark");
+    expect(resolveCanvasTheme("escuro", "light")).toBe("dark");
   });
 
   it("alterna sistema → claro → escuro → sistema", () => {

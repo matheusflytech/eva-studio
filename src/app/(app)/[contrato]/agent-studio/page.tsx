@@ -106,10 +106,10 @@ export default function AgentStudioPage() {
       </div>
 
       {worker && !worker.saudavel && (
-        <div className="mb-5 flex flex-wrap items-start gap-3 rounded-2xl bg-amber-400/10 px-4 py-3.5 ring-1 ring-amber-400/25">
-          <RadioTower size={16} className="mt-0.5 shrink-0 text-amber-300" />
+        <div className="mb-5 flex flex-wrap items-start gap-3 rounded-lg bg-warning-subtle px-4 py-3.5 ring-1 ring-warning/30">
+          <RadioTower size={16} className="mt-0.5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-medium text-amber-300">
+            <p className="text-[13.5px] font-medium text-warning">
               {worker.ultimaBatida
                 ? `O relógio do produto não bate há ${formatarEspera(worker.segundosAtras)}.`
                 : "O relógio do produto nunca bateu."}
@@ -233,7 +233,7 @@ function Tile({
     <div
       className={cn(
         "glass-card rounded-2xl px-4 py-4 transition-colors",
-        alerta && "ring-1 ring-amber-400/25",
+        alerta && "ring-1 ring-warning/30",
         href && "hover:border-border-strong"
       )}
     >
@@ -241,7 +241,7 @@ function Tile({
       <div
         className={cn(
           "mt-1.5 font-display text-[26px] font-semibold tabular-nums",
-          alerta ? "text-amber-300" : valor === 0 ? "text-text-tertiary" : "text-text-primary"
+          alerta ? "text-warning" : valor === 0 ? "text-text-tertiary" : "text-text-primary"
         )}
       >
         {valor}
