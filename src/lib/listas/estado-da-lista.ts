@@ -49,6 +49,10 @@ export interface EstadoDaLista {
   ordem: SortState | null;
   pagina: number;
   tamanho: number;
+  /** Colunas da tabela, quando vêm da visão salva (ou do ajuste não salvo dela). */
+  colunas?: string[];
+  /** Colunas recolhidas do quadro, idem. */
+  recolhidas?: string[];
 }
 
 export interface PadraoDaLista {
@@ -180,72 +184,153 @@ export function limparFiltros(e: EstadoDaLista): EstadoDaLista {
 }
 
 // ── URL ────────────────────────────────────────────────────────────────────
+//
+// Com visão salva, a URL guarda o id da visão (?v=) e SÓ o que difere dela
+// (as alterações não salvas). Por isso a leitura parte de uma `base` (o
+// estado da visão) e cada parâmetro presente sobrescreve; parâmetro presente
+// e vazio ("dono=") quer dizer "a visão tinha, a pessoa tirou". Sem base, a
+// base é o estado vazio e a URL fica igual à de antes.
 
 const lista = (t: string | null) =>
   [...new Set((t ?? "").split(",").map((s) => s.trim()).filter(Boolean))].slice(0, 50);
 
-/** Lê o estado da URL. Parâmetro inválido vira o padrão (nunca lança). */
-export function lerEstadoDaUrl(sp: URLSearchParams, barra: FiltroDaBarra[], padrao: PadraoDaLista, visoes?: string[]): EstadoDaLista {
-  const e = estadoVazio(padrao);
+/** Id de visão salva (uuid). As de sistema são palavras ("todos", "meus"). */
+export const ID_DE_VISAO_SALVA = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function copiar(e: EstadoDaLista): EstadoDaLista {
+  return {
+    ...e,
+    listas: { ...e.listas },
+    datas: { ...e.datas },
+    ...(e.colunas ? { colunas: [...e.colunas] } : {}),
+    ...(e.recolhidas ? { recolhidas: [...e.recolhidas] } : {}),
+  };
+}
+
+function lerAvancado(av: string): FiltrosDeConsulta {
+  try {
+    const bruto = JSON.parse(av) as FiltrosDeConsulta;
+    if (bruto && Array.isArray(bruto.grupos)) {
+      return {
+        logica: bruto.logica === "ou" ? "ou" : "e",
+        grupos: bruto.grupos
+          .filter((g) => g && Array.isArray(g.condicoes) && g.condicoes.length > 0)
+          .slice(0, LIMITE_DE_GRUPOS)
+          .map((g) => ({ logica: g.logica === "ou" ? "ou" : "e", condicoes: g.condicoes.slice(0, LIMITE_DE_CONDICOES) })),
+      };
+    }
+  } catch {
+    // JSON quebrado: fica sem avançados.
+  }
+  return FILTROS_VAZIOS;
+}
+
+/**
+ * Lê o estado da URL. Parâmetro inválido vira o da base (nunca lança).
+ * `visoes`: ids de sistema aceitos em ?v= (id de visão salva sempre passa;
+ * se ela existe e a pessoa enxerga, quem decide é a tela).
+ */
+export function lerEstadoDaUrl(
+  sp: URLSearchParams,
+  barra: FiltroDaBarra[],
+  padrao: PadraoDaLista,
+  visoes?: string[],
+  base?: EstadoDaLista
+): EstadoDaLista {
+  const e = copiar(base ?? estadoVazio(padrao));
+  e.pagina = 1;
   const v = sp.get("v")?.trim();
-  if (v && (!visoes || visoes.includes(v))) e.visao = v;
-  e.busca = (sp.get("q") ?? "").slice(0, 120);
+  if (v && (!visoes || visoes.includes(v) || ID_DE_VISAO_SALVA.test(v))) e.visao = v;
+  else if (!base) e.visao = padrao.visao;
+  if (sp.has("q")) e.busca = (sp.get("q") ?? "").slice(0, 120);
   for (const f of barra) {
+    if (!sp.has(f.param)) continue;
     const bruto = sp.get(f.param);
     if (f.tipo === "lista") {
       const valores = lista(bruto);
       if (valores.length) e.listas[f.campo] = valores;
+      else if (!bruto?.trim()) delete e.listas[f.campo];
     } else {
       const p = lerPeriodo(bruto);
       if (p) e.datas[f.campo] = p;
+      else if (!bruto?.trim()) delete e.datas[f.campo];
     }
   }
   // Avançados: só a estrutura (grupos com condições). O servidor saneia cada
   // condição com o catálogo da entidade; aqui guardamos o que veio, para a
   // tela mostrar e editar.
   const av = sp.get("av");
-  if (av) {
-    try {
-      const bruto = JSON.parse(av) as FiltrosDeConsulta;
-      if (bruto && Array.isArray(bruto.grupos)) {
-        e.avancado = {
-          logica: bruto.logica === "ou" ? "ou" : "e",
-          grupos: bruto.grupos
-            .filter((g) => g && Array.isArray(g.condicoes) && g.condicoes.length > 0)
-            .slice(0, LIMITE_DE_GRUPOS)
-            .map((g) => ({ logica: g.logica === "ou" ? "ou" : "e", condicoes: g.condicoes.slice(0, LIMITE_DE_CONDICOES) })),
-        };
-      }
-    } catch {
-      // JSON quebrado: fica sem avançados.
-    }
+  if (av !== null) e.avancado = av.trim() ? lerAvancado(av) : FILTROS_VAZIOS;
+  if (sp.has("ordem")) {
+    const ordem = /^([A-Za-z]+):(asc|desc)$/.exec(sp.get("ordem") ?? "");
+    if (ordem) e.ordem = { key: ordem[1], direction: ordem[2] as "asc" | "desc" };
+    else if (!sp.get("ordem")?.trim()) e.ordem = null;
   }
-  const ordem = /^([A-Za-z]+):(asc|desc)$/.exec(sp.get("ordem") ?? "");
-  if (ordem) e.ordem = { key: ordem[1], direction: ordem[2] as "asc" | "desc" };
   const p = Math.floor(Number(sp.get("p")));
   if (Number.isFinite(p) && p > 1) e.pagina = Math.min(p, 100_000);
   const pp = Number(sp.get("pp"));
   if ([25, 50, 100].includes(pp)) e.tamanho = pp;
+  if (sp.has("cols")) {
+    const c = lista(sp.get("cols"));
+    if (c.length) e.colunas = c;
+  }
+  if (sp.has("rec")) e.recolhidas = lista(sp.get("rec"));
   return e;
 }
 
-/** Estado → query string, sem o que é padrão (link curto). */
-export function estadoParaUrl(e: EstadoDaLista, barra: FiltroDaBarra[], padrao: PadraoDaLista): URLSearchParams {
+const mesmoConjunto = (a: readonly string[] = [], b: readonly string[] = []) =>
+  a.length === b.length && [...a].sort().join("\u0000") === [...b].sort().join("\u0000");
+const mesmaOrdem = (a: readonly string[] = [], b: readonly string[] = []) => a.join("\u0000") === b.join("\u0000");
+const textoDoAvancado = (f: FiltrosDeConsulta) => (f.grupos.length ? JSON.stringify(f) : "");
+const textoDaOrdem = (o: SortState | null) => (o ? `${o.key}:${o.direction}` : "");
+const textoDoPeriodo = (p: Periodo | undefined) => (p ? periodoParaTexto(p) : "");
+
+/**
+ * Estado → query string com só o que difere da base (sem base: do estado
+ * vazio, ou seja, só o que não é padrão — link curto). `v` sai quando a visão
+ * não é a padrão.
+ */
+export function estadoParaUrl(e: EstadoDaLista, barra: FiltroDaBarra[], padrao: PadraoDaLista, base?: EstadoDaLista): URLSearchParams {
+  const b = base ?? estadoVazio(padrao);
   const sp = new URLSearchParams();
   if (e.visao !== padrao.visao) sp.set("v", e.visao);
-  if (e.busca.trim()) sp.set("q", e.busca);
+  if (e.busca.trim() !== b.busca.trim()) sp.set("q", e.busca);
   for (const f of barra) {
     if (f.tipo === "lista") {
       const valores = e.listas[f.campo] ?? [];
-      if (valores.length) sp.set(f.param, valores.join(","));
+      if (!mesmoConjunto(valores, b.listas[f.campo])) sp.set(f.param, valores.join(","));
     } else {
-      const p = e.datas[f.campo];
-      if (p) sp.set(f.param, periodoParaTexto(p));
+      const t = textoDoPeriodo(e.datas[f.campo]);
+      if (t !== textoDoPeriodo(b.datas[f.campo])) sp.set(f.param, t);
     }
   }
-  if (totalAvancado(e) > 0) sp.set("av", JSON.stringify(e.avancado));
-  if (e.ordem) sp.set("ordem", `${e.ordem.key}:${e.ordem.direction}`);
+  if (textoDoAvancado(e.avancado) !== textoDoAvancado(b.avancado)) sp.set("av", textoDoAvancado(e.avancado));
+  if (textoDaOrdem(e.ordem) !== textoDaOrdem(b.ordem)) sp.set("ordem", textoDaOrdem(e.ordem));
   if (e.pagina > 1) sp.set("p", String(e.pagina));
-  if (e.tamanho !== padrao.tamanho) sp.set("pp", String(e.tamanho));
+  if (e.tamanho !== b.tamanho) sp.set("pp", String(e.tamanho));
+  if (e.colunas && !mesmaOrdem(e.colunas, b.colunas)) sp.set("cols", e.colunas.join(","));
+  if (e.recolhidas && !mesmoConjunto(e.recolhidas, b.recolhidas)) sp.set("rec", e.recolhidas.join(","));
   return sp;
+}
+
+/**
+ * O que difere da base (as "alterações não salvas" de uma visão), em
+ * palavras, para o marcador. Página não conta (navegar não é alterar).
+ */
+export function diferencasDaBase(e: EstadoDaLista, base: EstadoDaLista, barra: FiltroDaBarra[]): string[] {
+  const out: string[] = [];
+  if (e.busca.trim() !== base.busca.trim()) out.push("busca");
+  for (const f of barra) {
+    const igual =
+      f.tipo === "lista"
+        ? mesmoConjunto(e.listas[f.campo] ?? [], base.listas[f.campo])
+        : textoDoPeriodo(e.datas[f.campo]) === textoDoPeriodo(base.datas[f.campo]);
+    if (!igual) out.push(f.rotulo);
+  }
+  if (textoDoAvancado(e.avancado) !== textoDoAvancado(base.avancado)) out.push("filtros avançados");
+  if (textoDaOrdem(e.ordem) !== textoDaOrdem(base.ordem)) out.push("ordem");
+  if (e.tamanho !== base.tamanho) out.push("itens por página");
+  if (e.colunas && !mesmaOrdem(e.colunas, base.colunas)) out.push("colunas");
+  if (e.recolhidas && !mesmoConjunto(e.recolhidas, base.recolhidas)) out.push("colunas recolhidas");
+  return out;
 }
