@@ -26,7 +26,7 @@ import { tempoNaEtapa, type NegocioKanban } from "./modelo";
 // ---------------------------------------------------------------------------
 
 export interface LinhaDeNegocio extends NegocioKanban {
-  stage: { id: string; name: string; type: string; position: number };
+  stage: { id: string; name: string; type: string; position: number; rottingDays?: number | null };
 }
 
 interface Resposta {
@@ -148,7 +148,7 @@ export function ListaDeNegocios({
         id: "proximoPasso",
         label: "Próximo passo",
         group: "Negócio",
-        coluna: { key: "proximoPasso", header: "Próximo passo", width: "200px", cell: (d) => <SinalDoProximoPasso deal={d} tipoDaEtapa={d.stage.type} agora={agora} /> },
+        coluna: { key: "proximoPasso", header: "Próximo passo", width: "200px", cell: (d) => <SinalDoProximoPasso deal={d} tipoDaEtapa={d.stage.type} prazoParado={d.stage.rottingDays} agora={agora} /> },
       },
       { id: "previsao", label: "Previsão de fechamento", group: "Datas", coluna: { key: "previsao", header: "Previsão", sortable: true, width: "110px", cell: (d) => diaSemFuso(d.expectedClosingAt) ?? vazio } },
       {

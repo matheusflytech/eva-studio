@@ -1,6 +1,5 @@
 import { somarDias, type FiltroDeConsulta, type GrupoDeFiltros } from "@/lib/consulta";
 import type { FiltroCrm } from "@/lib/filtro-crm";
-import { DIAS_PARADO } from "./modelo";
 
 // ---------------------------------------------------------------------------
 // Visões fixas de Negócios (Todos, Meus, Precisam de atenção, Fechando este
@@ -26,7 +25,7 @@ export function fimDoMes(dia: string): string {
 
 /**
  * O que a visão acrescenta: condições em E (`rapidos`) e, em "Precisam de
- * atenção", um grupo OU (parado há mais de 7 dias, tarefa atrasada ou
+ * atenção", um grupo OU (parado pelo prazo da etapa, tarefa atrasada ou
  * previsão vencida — a mesma regra do cartão).
  */
 export function condicoesDaVisao(visao: string, meuId: string, hoje: string): { rapidos: FiltroDeConsulta[]; grupo?: GrupoDeFiltros } {
@@ -42,7 +41,8 @@ export function condicoesDaVisao(visao: string, meuId: string, hoje: string): { 
         grupo: {
           logica: "ou",
           condicoes: [
-            { campo: "diasNaEtapa", op: "gt", valor: String(DIAS_PARADO) },
+            // Parado pelo prazo de cada etapa e pela última atividade (o mesmo do cartão).
+            { campo: "parado", op: "eq", valor: "true" },
             { campo: "tarefa", op: "qualquer", valores: ["atrasada"] },
             { campo: "previsao", op: "antes", valor: hoje },
           ],

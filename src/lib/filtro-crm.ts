@@ -59,6 +59,8 @@ export const CAMPOS_DE_NEGOCIO: CampoCrm[] = [
   { id: "contato", rotulo: "Contato", tipo: "lista", grupo: "Contato", opcoes: "contatos" },
   { id: "produto", rotulo: "Produto", tipo: "lista", grupo: "Negócio", opcoes: "produtos" },
   { id: "tarefa", rotulo: "Tarefas", tipo: "lista", grupo: "Negócio", semVazio: true, opcoes: "tarefas" },
+  // Aberto e sem atividade há mais que o prazo da etapa (regra da etapa; padrão 7 dias).
+  { id: "parado", rotulo: "Parado (prazo da etapa)", tipo: "sim_nao", grupo: "Negócio", semVazio: true },
 ];
 
 export function camposDaEntidade(entidade: EntidadeCrm): CampoCrm[] {

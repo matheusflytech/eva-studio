@@ -6,6 +6,8 @@ import { lerOrdenacao, lerPagina, lerTamanhoDePagina } from "@/lib/filtro-crm";
 import { orderByDe, resolverConjunto, whereDeContatos, whereDeNegocios } from "@/lib/server/filtro-crm";
 import { serializeContact } from "@/lib/server/contact-dto";
 import { INCLUDE_CARTAO, serializarCartao } from "@/lib/server/quadro-negocios";
+import { lerRegras } from "@/lib/server/regras-de-etapa";
+import { ultimaAtividadePorNegocio } from "@/lib/server/atividade-do-negocio";
 import type { SessionContext } from "@/lib/server/permissions";
 
 // ---------------------------------------------------------------------------
@@ -114,11 +116,22 @@ export async function listarNegocios(ctx: Ctx, e: EntradaDaLista) {
     prisma.deal.aggregate({ where: r.where, _sum: { amountCents: true } }),
     e.apenasTotal ? [] : prisma.deal.findMany({ where: r.where, include: INCLUDE_LINHA_DE_NEGOCIO, orderBy, skip, take: pageSize }),
   ]);
+  // Parado pela regra da etapa e pela última atividade (o mesmo do quadro).
+  const [{ regras }, atividade] = await Promise.all([
+    lerRegras([...new Map(linhas.map((d) => [d.stage.id, d.stage])).values()]),
+    ultimaAtividadePorNegocio(linhas.map((d) => d.id)),
+  ]);
   return {
     total,
     page,
     pageSize,
-    deals: linhas.map((d) => ({ ...serializarCartao(d), stage: d.stage, pipeline: d.pipeline, ownerId: d.ownerId })),
+    deals: linhas.map((d) => ({
+      ...serializarCartao(d),
+      lastActivityAt: atividade.get(d.id)?.toISOString() ?? null,
+      stage: { ...d.stage, rottingDays: regras.get(d.stage.id)?.diasParado ?? null },
+      pipeline: d.pipeline,
+      ownerId: d.ownerId,
+    })),
     somaCents: soma._sum.amountCents ?? 0,
     avisos: aviso ? [...w.avisos, aviso] : w.avisos,
     truncado: r.truncado,

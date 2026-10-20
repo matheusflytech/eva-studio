@@ -12,12 +12,15 @@ import {
   type EventoF,
   type LinhaDeConversao,
 } from "@/lib/funil-metricas";
+import { lerRegras } from "@/lib/server/regras-de-etapa";
+import { ultimaAtividadePorNegocio } from "@/lib/server/atividade-do-negocio";
 
 // Busca o que as fontes do funil precisam e chama as contas puras de
 // src/lib/funil-metricas.ts. Separado de analytics.ts para ser testado sem
 // simular as dez outras consultas do dashboard.
 
 const LIMITE = 5000;
+// Prazo de parado de etapa sem regra conhecida (o de antes das regras de etapa).
 const PARADO_DIAS = 7;
 
 export interface LinhaParada {
@@ -115,7 +118,22 @@ export async function coletarFunil(
       .catch(() => null),
   ]);
 
-  const etapas: EtapaF[] = linhasEtapa.map((e) => ({ id: e.id, nome: e.name, posicao: e.position, tipo: e.type }));
+  // Regras de etapa: prazo de parado por etapa, última atividade dos abertos e
+  // o motivo estruturado da perda (sem as tabelas, os padrões de antes).
+  const tiposPorId = new Map(linhasEtapa.map((e) => [e.id, e.type]));
+  const [{ regras }, atividade, perdas] = await Promise.all([
+    lerRegras(linhasEtapa),
+    ultimaAtividadePorNegocio(linhasNegocio.filter((n) => !n.closedAt).map((n) => n.id)),
+    rotulosDasPerdas(linhasNegocio.filter((n) => tiposPorId.get(n.stageId) === "lost").map((n) => n.id)),
+  ]);
+
+  const etapas: EtapaF[] = linhasEtapa.map((e) => ({
+    id: e.id,
+    nome: e.name,
+    posicao: e.position,
+    tipo: e.type,
+    diasParado: regras.get(e.id)?.diasParado ?? null,
+  }));
   const todos: NegocioF[] = linhasNegocio.map((n) => ({
     id: n.id,
     nome: n.name,
@@ -124,7 +142,9 @@ export async function coletarFunil(
     fechadoEm: n.closedAt,
     naEtapaDesde: n.stageSince,
     valorCentavos: n.amountCents,
-    motivoPerda: n.lostReason,
+    // "Motivos de perda" agrupa pelo motivo estruturado; sem ele, o texto antigo.
+    motivoPerda: perdas.get(n.id) ?? n.lostReason,
+    ultimaAtividade: atividade.get(n.id) ?? null,
   }));
   const eventos: EventoF[] = linhasEvento.map((e) => ({ dealId: e.dealId, de: e.fromStageId, para: e.toStageId, em: e.at }));
 
@@ -146,7 +166,7 @@ export async function coletarFunil(
     tabelas: {
       negociosParados: negociosParados(etapas, todos, agora, PARADO_DIAS).map((p) => ({
         id: p.id,
-        quando: todos.find((n) => n.id === p.id)?.naEtapaDesde.toISOString() ?? null,
+        quando: p.desde.toISOString(),
         titulo: p.nome,
         contato: "",
         etapa: p.etapa,
@@ -158,4 +178,15 @@ export async function coletarFunil(
     historicoDesde: primeiro?.at ?? null,
     funil: { id: funil.id, name: funil.name },
   };
+}
+
+/** Rótulo do motivo estruturado de cada negócio perdido. Sem a tabela: mapa vazio. */
+async function rotulosDasPerdas(dealIds: string[]): Promise<Map<string, string>> {
+  if (dealIds.length === 0) return new Map();
+  try {
+    const linhas = await prisma.dealLoss.findMany({ where: { dealId: { in: dealIds } }, select: { dealId: true, reasonLabel: true } });
+    return new Map(linhas.map((l) => [l.dealId, l.reasonLabel]));
+  } catch {
+    return new Map();
+  }
 }

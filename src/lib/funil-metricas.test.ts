@@ -105,6 +105,22 @@ describe("negociosParados / motivos / taxa / ciclo", () => {
     expect(r.map((x) => [x.id, x.diasParado])).toEqual([["velho", 14]]);
   });
 
+  it("parados pelo prazo da etapa e pela última atividade", () => {
+    const comPrazo = etapas.map((e) => (e.tipo === "open" ? { ...e, diasParado: 3 } : e));
+    const r = negociosParados(
+      comPrazo,
+      [
+        neg({ id: "quieto", naEtapaDesde: D("10") }),
+        neg({ id: "falou", naEtapaDesde: D("01"), ultimaAtividade: D("14") }),
+      ],
+      D("15")
+    );
+    expect(r.map((x) => [x.id, x.diasParado])).toEqual([["quieto", 5]]);
+    // Prazo nulo: a etapa nunca deixa negócio parado.
+    const nunca = etapas.map((e) => (e.tipo === "open" ? { ...e, diasParado: null } : e));
+    expect(negociosParados(nunca, [neg({ id: "x", naEtapaDesde: D("01") })], D("15"))).toEqual([]);
+  });
+
   it("motivos de perda agrupados, vazio vira 'Sem motivo'", () => {
     const r = motivosDePerda([
       neg({ id: "1", etapaId: "perdido", fechadoEm: D("02"), motivoPerda: "Preço" }),

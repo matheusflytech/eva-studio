@@ -183,14 +183,29 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     post: {
       tag: "Negócios",
       summary: "Mover de etapa",
-      description: "Etapa de outro funil exige pipeline_id do funil da etapa (422 stage_in_other_pipeline).",
+      description:
+        "Mesmas regras da tela. Etapa de outro funil exige pipeline_id do funil da etapa (422 stage_in_other_pipeline). " +
+        "Campos obrigatórios da etapa (e das puladas que não podem ser puladas) faltando: 422 stage_requirements_missing com details.missing_fields. " +
+        "Negócio ganho/perdido só sai com reopen: true (409 deal_closed). Etapa de perda exige lost_reason_id (ou lost_reason em texto; " +
+        "texto que não bate com um motivo vira \"Outro\" com a nota) — 422 lost_reason_required.",
       scope: "deals:write",
       idempotency: "optional",
-      body: { stage_id: "<stageId>", lost_reason: "" },
+      body: { stage_id: "<stageId>", lost_reason_id: "<motivoId>", lost_note: "", reopen: false },
     },
   },
-  "/deals/{id}/won": { post: { tag: "Negócios", summary: "Marcar como ganho", scope: "deals:write", idempotency: "optional" } },
-  "/deals/{id}/lost": { post: { tag: "Negócios", summary: "Marcar como perdido", scope: "deals:write", idempotency: "optional", body: { lost_reason: "Preço" } } },
+  "/deals/{id}/won": {
+    post: { tag: "Negócios", summary: "Marcar como ganho", description: "Campos obrigatórios da etapa de ganho: 422 stage_requirements_missing.", scope: "deals:write", idempotency: "optional" },
+  },
+  "/deals/{id}/lost": {
+    post: {
+      tag: "Negócios",
+      summary: "Marcar como perdido",
+      description: "Motivo obrigatório: lost_reason_id (motivos do funil) ou lost_reason em texto; motivo que pede nota exige lost_note.",
+      scope: "deals:write",
+      idempotency: "optional",
+      body: { lost_reason_id: "<motivoId>", lost_note: "" },
+    },
+  },
   "/deals/{id}/history": { get: { tag: "Negócios", summary: "Histórico de etapas", scope: "deals:read", query: [...LISTA] } },
   "/deals/{id}/contacts": {
     get: { tag: "Negócios", summary: "Contatos do negócio", scope: "deals:read" },
@@ -256,7 +271,10 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     post: {
       tag: "Importação e exportação",
       summary: "Importar em lote (assíncrono)",
-      description: "records (até 5 mil), csv inline, ou upload: true para receber upload_url. Um import ativo por organização.",
+      description:
+        "records (até 5 mil), csv inline, ou upload: true para receber upload_url. Um import ativo por organização. " +
+        "Negócios: options { pipeline_id, stage_id, skip_stage_requirements } — negócio existente que muda de etapa segue os campos " +
+        "obrigatórios da etapa, a menos que skip_stage_requirements: true (fica registrado no histórico de etapas).",
       scope: "imports:write",
       idempotency: "required",
       status: 202,

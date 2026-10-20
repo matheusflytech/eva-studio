@@ -6,6 +6,8 @@ export interface EtapaF {
   nome: string;
   posicao: number;
   tipo: "open" | "won" | "lost" | string;
+  /** Prazo de parado da etapa (regra da etapa); null = nunca; ausente = o limite padrão. */
+  diasParado?: number | null;
 }
 export interface NegocioF {
   id: string;
@@ -16,6 +18,8 @@ export interface NegocioF {
   valorCentavos: number;
   motivoPerda: string;
   nome?: string;
+  /** Última atividade (nota, tarefa concluída, mensagem, edição): relógio do parado. */
+  ultimaAtividade?: Date | null;
 }
 export interface EventoF {
   dealId: string;
@@ -122,13 +126,24 @@ export function tempoPorEtapa(etapas: EtapaF[], eventos: EventoF[], agora: Date)
   });
 }
 
+/**
+ * Abertos parados pelo prazo de CADA etapa (regra da etapa; `limiteDias` para
+ * etapa sem regra conhecida; prazo nulo = nunca para), contando desde a maior
+ * entre a última atividade e a entrada na etapa.
+ */
 export function negociosParados(etapas: EtapaF[], negocios: NegocioF[], agora: Date, limiteDias = 7) {
   const mapa = porId(etapas);
   return negocios
     .filter((n) => !n.fechadoEm && mapa.get(n.etapaId)?.tipo === "open")
-    .map((n) => ({ id: n.id, nome: n.nome ?? "", etapa: mapa.get(n.etapaId)?.nome ?? "", diasParado: dias(agora.getTime() - n.naEtapaDesde.getTime()), valorCentavos: n.valorCentavos }))
-    .filter((n) => n.diasParado > limiteDias)
-    .sort((a, b) => b.diasParado - a.diasParado);
+    .map((n) => {
+      const etapa = mapa.get(n.etapaId)!;
+      const desde = Math.max(n.naEtapaDesde.getTime(), n.ultimaAtividade?.getTime() ?? 0);
+      const prazo = etapa.diasParado === undefined ? limiteDias : etapa.diasParado;
+      return { id: n.id, nome: n.nome ?? "", etapa: etapa.nome, diasParado: dias(agora.getTime() - desde), valorCentavos: n.valorCentavos, prazo, desde: new Date(desde) };
+    })
+    .filter((n) => n.prazo !== null && n.diasParado > n.prazo)
+    .sort((a, b) => b.diasParado - a.diasParado)
+    .map(({ prazo: _prazo, ...resto }) => resto);
 }
 
 export function motivosDePerda(negocios: NegocioF[], etapas: EtapaF[]) {

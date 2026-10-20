@@ -21,7 +21,7 @@ design system com a identidade da Eva.
 
 | # | Melhoria | O que falta hoje | Skill |
 |---|---|---|---|
-| 1 | **Regras por etapa**: campos obrigatórios ao entrar na etapa (nunca na criação), motivos de perda configuráveis por funil (lista, não texto livre), "parado" com prazo por etapa (hoje 7 dias fixos) | Só texto livre em `lostReason`; `DIAS_PARADO = 7` para tudo; nenhum campo exigido por etapa | crm-pipeline-kanban |
+| 1 | ✅ **(feito — ver notas abaixo)** **Regras por etapa**: campos obrigatórios ao entrar na etapa (nunca na criação), motivos de perda configuráveis por funil (lista, não texto livre), "parado" com prazo por etapa (hoje 7 dias fixos) | Só texto livre em `lostReason`; `DIAS_PARADO = 7` para tudo; nenhum campo exigido por etapa | crm-pipeline-kanban |
 | 2 | **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
 | 3 | **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
 | 4 | **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
@@ -32,6 +32,41 @@ design system com a identidade da Eva.
 | 9 | **IA que preenche o CRM com aprovação**: resumo da conversa de WhatsApp e do negócio; extração de valor, previsão, próximo passo, objeções como **sugestões** numa bandeja (aceitar com 1 toque), com evidência | IA só em filtros e rascunhos de automação | crm-ai-copilot |
 | 10 | **Metas e painel do vendedor x gestor**: metas por pessoa/equipe/período (valor ganho, quantidade, atividades) com progresso; clicar num gráfico abre a lista filtrada | Painel sem metas e sem drill-down | crm-dashboards-reports |
 | 11 | **Sinais de risco do negócio por regra**: sem próximo passo, previsão adiada 2x, só um contato, cliente sem resposta há X dias no WhatsApp | Só "parado" e "retorno atrasado" | crm-pipeline-kanban, crm-ai-copilot |
+
+### Notas do item 1 (regras por etapa) — feito em 20/10/2026
+
+- **Onde mora:** validação pura em `src/lib/regras-de-etapa.ts` (alvo, puladas
+  que não podem ser puladas, campos padrão e personalizados, ganho/perdido só
+  com Reabrir, motivos, parado, montagem do modal); carga e erro em
+  `src/lib/server/regras-de-etapa.ts`. O único chamador é `moveDealStage`
+  (`src/lib/server/crm.ts`), por onde passam quadro, prévia, ficha, gaveta,
+  painel da conversa, `PATCH /api/deals/[id]`, API v1 (move/won/lost/PATCH),
+  importação e motor do fluxo. Criação de negócio nunca valida.
+- **Resposta:** 422 `{ codigo: "campos_obrigatorios", faltando: [...] }`
+  (v1: `stage_requirements_missing` com `details.missing_fields`), 409
+  `negocio_fechado` (v1: `deal_closed`, `reopen: true`), 422
+  `motivo_obrigatorio` (v1: `lost_reason_required`). PATCH valida já
+  contando os campos do mesmo corpo (é o "salvar e mover" do modal).
+- **Pular obrigatórios:** só importação (checkbox na tela; `options.
+  skip_stage_requirements` na API) e bloco "Mover etapa" do fluxo (opção no
+  Builder), registrado em `DealStageEvent.ignorouObrigatorios`. A ferramenta
+  de IA nunca pula.
+- **Parado:** `aberto E prazo NOT NULL E agora − greatest(lastActivityAt,
+  stageSince) > prazo` no cartão, na lista, no filtro do servidor (campo
+  `parado`, usado pela visão "Precisam de atenção"), no Início, no dashboard
+  (negócios parados) e na voz da Eva. `tocarAtividade` em nota, tarefa
+  concluída (tela e v1), mensagem entrando/saindo (`registrarMensagens`) e
+  edição de campo (tela, v1, fluxo).
+- **Banco:** `prisma/sql/2026-10-20-regras-de-etapa.sql` (só aditivo; não
+  aplicado). Sem ele vale o comportamento de antes: nada obrigatório, 7 dias,
+  motivos padrão, relógio só pela entrada na etapa.
+- **Motivo da perda:** estruturado em `eva_studio_deal_losses`; `lostReason`
+  guarda o rótulo (relatório, exportação e dashboard agrupam por ele; renomear
+  o motivo atualiza as perdas ligadas). Nota do motivo fica só na perda
+  estruturada.
+- **Pendente:** gaveta antiga do negócio ainda edita `lostReason` como texto
+  livre; aprovação de etapa (crm-approvals) e automações por etapa ficam para
+  os itens 17 e 18.
 
 ## P1
 

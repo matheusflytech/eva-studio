@@ -32,7 +32,7 @@ describe("visões fixas de negócios", () => {
     const { filtro, conflito } = aplicarVisao(av, "atencao", "u1", HOJE);
     expect(conflito).toBe(false);
     expect(filtro.grupos[0].logica).toBe("ou");
-    expect(filtro.grupos[0].condicoes.map((c) => c.campo)).toEqual(["diasNaEtapa", "tarefa", "previsao"]);
+    expect(filtro.grupos[0].condicoes.map((c) => c.campo)).toEqual(["parado", "tarefa", "previsao"]);
     expect(filtro.grupos[1]).toEqual(av.grupos[0]);
     expect(sanearFiltroCrm(filtro, "negocios").avisos).toEqual([]);
   });

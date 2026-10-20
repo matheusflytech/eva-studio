@@ -5,6 +5,8 @@ import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import type { SessionContext } from "@/lib/server/permissions";
 import { serializarDefinicao } from "@/lib/server/custom-fields";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { lerRegras } from "@/lib/server/regras-de-etapa";
+import { atividadeDisponivel } from "@/lib/server/atividade-do-negocio";
 import {
   LIMITE_DE_LINHAS,
   avaliarValor,
@@ -320,6 +322,52 @@ interface Contexto {
   defs: Defs;
   /** Segmento id → where (só os deste contrato). */
   segmentos: Map<string, W>;
+  /** Filtro "parado": prazo de cada etapa aberta e se a tabela de atividade existe. */
+  parado?: PrazosDeParado;
+}
+
+export interface PrazosDeParado {
+  /** Etapas abertas com prazo (as de prazo nulo nunca ficam paradas e ficam de fora). */
+  etapas: { id: string; dias: number }[];
+  /** A tabela de última atividade respondeu (sem ela, o relógio é só a entrada na etapa). */
+  comAtividade: boolean;
+}
+
+/**
+ * "Parado" exato no banco, com o prazo de cada etapa: aberto E
+ * greatest(última atividade, entrada na etapa) ≤ agora − (prazo+1) dias
+ * (dias inteiros > prazo, igual ao cartão).
+ */
+export function whereDeParado(f: FiltroDeConsulta, p: PrazosDeParado, agora: Date): W | null {
+  const porEtapa: W[] = p.etapas.map((e) => {
+    const corte = new Date(agora.getTime() - (e.dias + 1) * DIA_MS);
+    return {
+      stageId: e.id,
+      closedAt: null,
+      stageSince: { lte: corte },
+      ...(p.comAtividade ? { OR: [{ activity: { is: null } }, { activity: { is: { lastActivityAt: { lte: corte } } } }] } : {}),
+    };
+  });
+  const parado: W = porEtapa.length === 0 ? NADA : porEtapa.length === 1 ? porEtapa[0] : { OR: porEtapa };
+  return f.valor === "true" ? parado : { NOT: parado };
+}
+
+/** `where` dos negócios parados do contrato (Início, contagens): o mesmo do filtro "parado". */
+export async function whereDeParadosDoContrato(orgId: string, agora = new Date()): Promise<Prisma.DealWhereInput> {
+  return (whereDeParado({ campo: "parado", op: "eq", valor: "true" }, await prazosDeParado(orgId), agora) ?? NADA) as Prisma.DealWhereInput;
+}
+
+/** Prazos das etapas abertas do contrato (regra da etapa; padrão 7). Tolerante sem as tabelas novas. */
+async function prazosDeParado(orgId: string): Promise<PrazosDeParado> {
+  const etapas = await prisma.pipelineStage.findMany({ where: { pipeline: { orgId }, type: "open" }, select: { id: true, type: true } });
+  const [{ regras }, comAtividade] = await Promise.all([lerRegras(etapas), atividadeDisponivel()]);
+  return {
+    etapas: etapas.flatMap((e) => {
+      const dias = regras.get(e.id)?.diasParado;
+      return dias ? [{ id: e.id, dias }] : [];
+    }),
+    comAtividade,
+  };
 }
 
 function whereDeSegmento(op: string, valores: string[], segmentos: Map<string, W>): W | null {
@@ -359,6 +407,7 @@ function whereDeNegocioBase(f: FiltroDeConsulta, c: Contexto): W | null {
     case "contato": return whereDeRelacao("contacts", "contactId", f.op, valores);
     case "produto": return whereDeRelacao("items", "productId", f.op, valores);
     case "tarefa": return whereDeTarefa(f.op, valores, c.agora);
+    case "parado": return c.parado ? whereDeParado(f, c.parado, c.agora) : null;
   }
   // Os do dashboard (funil, etapa, situação, responsável, empresa, etiqueta,
   // canal, datas, motivo de perda, nome): a tradução de lá já é exata.
@@ -449,7 +498,8 @@ async function montar(
     const linhas = await prisma.segment.findMany({ where: { orgId: ctx.orgId, id: { in: ids } } });
     for (const s of linhas) segmentos.set(s.id, buildSegmentWhere(ctx.orgId, s.match, parseRules(s.rules)) as W);
   }
-  const c: Contexto = { orgId: ctx.orgId, agora, defs, segmentos };
+  const parado = entidade === "negocios" && usaCampo(todas, (x) => x === "parado") ? await prazosDeParado(ctx.orgId) : undefined;
+  const c: Contexto = { orgId: ctx.orgId, agora, defs, segmentos, parado };
 
   const traduzirOuAvisar = (f: FiltroDeConsulta): Cond | null => {
     const r = traduzir(entidade, f, c);

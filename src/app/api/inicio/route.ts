@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { lerEstadoWorker } from "@/lib/server/heartbeat";
+import { whereDeParadosDoContrato } from "@/lib/server/filtro-crm";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
@@ -19,8 +20,7 @@ import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 // ---------------------------------------------------------------------------
 
 const DIA = 24 * 60 * 60 * 1000;
-/** Depois disso, negócio parado na mesma etapa vira esquecimento. */
-const DIAS_PARADO = 7;
+// Parado = sem atividade além do prazo da etapa (regras de etapa; padrão 7 dias).
 
 export interface Pendencia {
   id: string;
@@ -38,8 +38,8 @@ export async function GET() {
   const agora = new Date();
   const fimDoDia = new Date(agora);
   fimDoDia.setHours(23, 59, 59, 999);
-  const corteParado = new Date(agora.getTime() - DIAS_PARADO * DIA);
 
+  const onde = { parados: await whereDeParadosDoContrato(ctx.orgId, agora) };
   const [esperando, atrasadas, hoje, parados, agentes, worker, conversas7d] = await Promise.all([
     prisma.conversation.count({
       where: { agent: { orgId: ctx.orgId }, status: "waiting_human" },
@@ -55,7 +55,7 @@ export async function GET() {
         orgId: ctx.orgId,
         closedAt: null,
         archivedAt: null,
-        stageSince: { lte: corteParado },
+        AND: [onde.parados],
       },
     }),
     prisma.agent.findMany({
@@ -114,8 +114,8 @@ export async function GET() {
     pendencias.push({
       id: "parados",
       tipo: "atencao",
-      titulo: `${parados} ${parados === 1 ? "negócio parado" : "negócios parados"} há mais de ${DIAS_PARADO} dias`,
-      detalhe: "Mesma etapa desde então. Ou avança, ou fecha como perdido.",
+      titulo: `${parados} ${parados === 1 ? "negócio parado" : "negócios parados"}`,
+      detalhe: "Sem atividade além do prazo da etapa. Ou avança, ou fecha como perdido.",
       href: "/negocios",
       quantidade: parados,
     });

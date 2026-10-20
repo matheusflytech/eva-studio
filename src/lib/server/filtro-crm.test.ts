@@ -397,3 +397,42 @@ describe("orderByDe", () => {
     expect(orderByDe("negocios", { campo: "etapa", direcao: "asc" })).toEqual([{ stage: { position: "asc" } }, { id: "asc" }]);
   });
 });
+
+describe("negócios: parado pelo prazo de cada etapa", () => {
+  const corte = (dias: number) => new Date(agora.getTime() - (dias + 1) * DIA);
+
+  // Primeiro sem as tabelas: a disponibilidade da atividade fica em cache depois que responde.
+  it("sem as tabelas novas: 7 dias em toda etapa aberta, só pela entrada na etapa", async () => {
+    Object.assign(db, {
+      pipelineStage: { findMany: vi.fn(async () => [{ id: "s1", type: "open" }]) },
+      pipelineStageRule: { findMany: vi.fn(async () => Promise.reject(new Error("relation does not exist"))) },
+      dealActivity: { findFirst: vi.fn(async () => Promise.reject(new Error("relation does not exist"))) },
+    });
+    const w = await wn({ campo: "parado", op: "eq", valor: "true" });
+    expect(w).toEqual({ stageId: "s1", closedAt: null, stageSince: { lte: corte(7) } });
+  });
+
+  it("cada etapa aberta com o seu prazo; prazo nulo fica de fora; última atividade conta", async () => {
+    Object.assign(db, {
+      pipelineStage: { findMany: vi.fn(async () => [{ id: "s1", type: "open" }, { id: "s2", type: "open" }, { id: "s3", type: "open" }]) },
+      pipelineStageRule: {
+        findMany: vi.fn(async () => [
+          { stageId: "s1", requiredFields: [], canBeSkipped: true, rottingDays: 3, guidance: "" },
+          { stageId: "s2", requiredFields: [], canBeSkipped: true, rottingDays: null, guidance: "" },
+        ]),
+      },
+      dealActivity: { findFirst: vi.fn(async () => null) },
+    });
+    const w = await wn({ campo: "parado", op: "eq", valor: "true" });
+    const ativ = (d: number) => ({ OR: [{ activity: { is: null } }, { activity: { is: { lastActivityAt: { lte: corte(d) } } } }] });
+    expect(w).toEqual({
+      OR: [
+        { stageId: "s1", closedAt: null, stageSince: { lte: corte(3) }, ...ativ(3) },
+        // s3 sem regra gravada: o padrão de 7 dias.
+        { stageId: "s3", closedAt: null, stageSince: { lte: corte(7) }, ...ativ(7) },
+      ],
+    });
+    const nao = await wn({ campo: "parado", op: "eq", valor: "false" });
+    expect(nao).toEqual({ NOT: w });
+  });
+});

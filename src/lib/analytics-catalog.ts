@@ -41,7 +41,7 @@ export const FONTES: DefinicaoDeFonte[] = [
   { chave: "porCanalVendas", rotulo: "Vendas por canal", explicacao: "Por qual canal chegou quem comprou.", tipo: "quebra", filtros: "todos", grupo: "Funil" },
   { chave: "funilConversao", rotulo: "Conversão do funil", explicacao: "Dos negócios criados no período, quantos chegaram em cada etapa.", tipo: "funil", filtros: "um-funil", grupo: "Funil" },
   { chave: "tempoPorEtapa", rotulo: "Dias em cada etapa", explicacao: "Mediana de dias que um negócio fica em cada etapa do funil.", tipo: "quebra", filtros: "um-funil", grupo: "Funil" },
-  { chave: "negociosParados", rotulo: "Negócios parados", explicacao: "Abertos e sem mudar de etapa há mais de 7 dias.", tipo: "tabela", filtros: "um-funil", grupo: "Funil" },
+  { chave: "negociosParados", rotulo: "Negócios parados", explicacao: "Abertos e sem atividade (nota, tarefa concluída, mensagem, edição) há mais que o prazo de parado da etapa (padrão 7 dias).", tipo: "tabela", filtros: "um-funil", grupo: "Funil" },
   { chave: "motivosDePerda", rotulo: "Motivos de perda", explicacao: "Por que os negócios perdidos no período foram perdidos.", tipo: "quebra", filtros: "um-funil", grupo: "Funil" },
   { chave: "taxaDeGanho", rotulo: "Taxa de ganho", explicacao: "Dos negócios fechados no período, quantos foram ganhos.", tipo: "numero", formato: "porcento", filtros: "um-funil", grupo: "Funil" },
   { chave: "cicloDeVenda", rotulo: "Ciclo de venda", explicacao: "Mediana de dias entre criar o negócio e ganhar.", tipo: "numero", formato: "dias", filtros: "um-funil", grupo: "Funil" },
