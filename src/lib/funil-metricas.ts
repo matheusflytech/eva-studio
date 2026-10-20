@@ -143,7 +143,7 @@ export function negociosParados(etapas: EtapaF[], negocios: NegocioF[], agora: D
     })
     .filter((n) => n.prazo !== null && n.diasParado > n.prazo)
     .sort((a, b) => b.diasParado - a.diasParado)
-    .map(({ prazo: _prazo, ...resto }) => resto);
+    .map((n) => ({ id: n.id, nome: n.nome, etapa: n.etapa, diasParado: n.diasParado, valorCentavos: n.valorCentavos, desde: n.desde }));
 }
 
 export function motivosDePerda(negocios: NegocioF[], etapas: EtapaF[]) {
