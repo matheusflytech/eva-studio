@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { Stat } from "@/components/ui/stat";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Resultado {
   created: number;
@@ -31,6 +32,7 @@ export function ImportarNegocios({
 }) {
   const [csv, setCsv] = React.useState("");
   const [stageId, setStageId] = React.useState("");
+  const [ignorarObrigatorios, setIgnorarObrigatorios] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
   const [res, setRes] = React.useState<Resultado | null>(null);
@@ -41,7 +43,7 @@ export function ImportarNegocios({
     const r = await fetch("/api/deals/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ csv, pipelineId: pipeline.id, stageId: stageId || undefined }),
+      body: JSON.stringify({ csv, pipelineId: pipeline.id, stageId: stageId || undefined, ignorarObrigatorios }),
     }).catch(() => null);
     const d = await r?.json().catch(() => ({}));
     setBusy(false);
@@ -122,6 +124,16 @@ export function ImportarNegocios({
                 ))}
               </Select>
             </Field>
+            <label className="flex cursor-pointer items-start gap-2 text-small text-text-primary">
+              <Checkbox checked={ignorarObrigatorios} onCheckedChange={(v) => setIgnorarObrigatorios(v === true)} className="mt-0.5" />
+              <span>
+                Mover negócios existentes mesmo sem os campos obrigatórios da etapa
+                <span className="block text-caption text-text-tertiary">
+                  Desligado, a linha que muda um negócio de etapa sem os campos exigidos dá erro. Ligado, move e registra no
+                  histórico que pulou os obrigatórios. Negócio novo nunca é barrado.
+                </span>
+              </span>
+            </label>
             {csv && <p className="text-caption text-text-tertiary">{linhas} linha(s) prontas para importar.</p>}
           </div>
         )}

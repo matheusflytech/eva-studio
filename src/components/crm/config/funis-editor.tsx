@@ -1,7 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, Star, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Star, Check, ListChecks } from "lucide-react";
+import { Notice } from "@/components/ui/notice";
+import { MotivosDePerdaEditor, RegrasDaEtapaEditor, resumoDaRegra } from "@/components/crm/config/regras-da-etapa";
+import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import type { MotivoDePerda, RegraDaEtapa } from "@/lib/regras-de-etapa";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,14 @@ interface Funil {
   isDefault: boolean;
   dealCount: number;
   stages: Etapa[];
+}
+
+/** GET /api/pipelines/[id]/regras. */
+interface RegrasDoFunil {
+  disponivel: boolean;
+  regras: Record<string, RegraDaEtapa>;
+  motivos: MotivoDePerda[];
+  motivosSalvos: boolean;
 }
 
 const TIPOS = [
@@ -65,6 +77,28 @@ export function FunisEditor() {
   React.useEffect(() => { carregar(); }, [carregar]);
 
   const funil = funis.find((f) => f.id === selecionado);
+
+  // Regras por etapa e motivos de perda do funil escolhido (+ campos
+  // personalizados dele, para escolher os obrigatórios).
+  const [regras, setRegras] = React.useState<{ funilId: string; dados: RegrasDoFunil; defs: DefinicaoDeCampo[] } | null>(null);
+  const [versaoDasRegras, setVersaoDasRegras] = React.useState(0);
+  React.useEffect(() => {
+    if (!selecionado) return;
+    let vivo = true;
+    Promise.all([
+      fetch(`/api/pipelines/${selecionado}/regras`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/custom-fields?entity=deal&pipelineId=${selecionado}`).then((r) => (r.ok ? r.json() : { fields: [] })),
+    ])
+      .then(([dados, campos]) => {
+        if (vivo && dados) setRegras({ funilId: selecionado, dados, defs: campos?.fields ?? [] });
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [selecionado, versaoDasRegras]);
+  const regrasDoFunil = regras?.funilId === selecionado ? regras : null;
+  const recarregarRegras = () => setVersaoDasRegras((v) => v + 1);
 
   async function executar(p: Promise<{ ok: boolean; erro: string | null }>) {
     setErro(null);
@@ -151,15 +185,51 @@ export function FunisEditor() {
                   etapa={etapa}
                   alca={alca}
                   podeExcluir={funil.stages.length > 1}
-                  aoMudar={(corpo) => executar(chamar(`/api/pipelines/${funil.id}/stages/${etapa.id}`, "PATCH", corpo))}
+                  aoMudar={(corpo) => executar(chamar(`/api/pipelines/${funil.id}/stages/${etapa.id}`, "PATCH", corpo)).then(recarregarRegras)}
                   aoExcluir={() => setExcluindoEtapa(etapa)}
+                  resumoDasRegras={resumoDaRegra(regrasDoFunil?.dados.regras[etapa.id], etapa.type)}
+                  editorDeRegras={
+                    regrasDoFunil?.dados.regras[etapa.id] ? (
+                      <RegrasDaEtapaEditor
+                        key={`${etapa.id}-${etapa.type}`}
+                        funilId={funil.id}
+                        etapa={etapa}
+                        regra={regrasDoFunil.dados.regras[etapa.id]}
+                        defs={regrasDoFunil.defs}
+                        onSalvo={recarregarRegras}
+                      />
+                    ) : null
+                  }
                 />
               )}
             </ListaOrdenavel>
             <NovaEtapa
               desabilitado={funil.stages.length >= 20}
-              aoCriar={(nome) => executar(chamar(`/api/pipelines/${funil.id}/stages`, "POST", { name: nome }))}
+              aoCriar={(nome) => executar(chamar(`/api/pipelines/${funil.id}/stages`, "POST", { name: nome })).then(recarregarRegras)}
             />
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-[13px] font-medium text-text-secondary">Motivos de perda</h3>
+            <p className="mb-3 mt-0.5 text-[12.5px] text-text-tertiary">
+              A lista que aparece ao marcar um negócio deste funil como perdido, nesta ordem. &quot;Pede nota&quot; obriga a explicar (ex.: Outro).
+            </p>
+            {regrasDoFunil && !regrasDoFunil.dados.disponivel && (
+              <Notice tone="warning" className="mb-3">
+                As regras de etapa e os motivos de perda ainda não foram ativados no banco. Por enquanto valem os padrões (nada
+                obrigatório, parado em 7 dias, motivos padrão).
+              </Notice>
+            )}
+            {regrasDoFunil ? (
+              <MotivosDePerdaEditor
+                key={`${funil.id}-${versaoDasRegras}`}
+                funilId={funil.id}
+                motivos={regrasDoFunil.dados.motivos}
+                onSalvo={recarregarRegras}
+              />
+            ) : (
+              <p className="text-[13px] text-text-tertiary">Carregando...</p>
+            )}
           </div>
         </section>
       )}
@@ -237,14 +307,21 @@ function LinhaDeEtapa({
   podeExcluir,
   aoMudar,
   aoExcluir,
+  resumoDasRegras,
+  editorDeRegras,
 }: {
   etapa: Etapa;
   alca: React.ReactNode;
   podeExcluir: boolean;
   aoMudar: (corpo: Record<string, unknown>) => void;
   aoExcluir: () => void;
+  /** "2 obrigatórios · parado em 7 dias". */
+  resumoDasRegras: string;
+  /** Formulário das regras da etapa (aparece ao abrir "Regras"). */
+  editorDeRegras: React.ReactNode;
 }) {
   const [corAberta, setCorAberta] = React.useState(false);
+  const [regrasAbertas, setRegrasAbertas] = React.useState(false);
   const cor = corDaEtapa(etapa.color, etapa.type);
   const fechada = etapa.type !== "open";
 
@@ -296,6 +373,16 @@ function LinhaDeEtapa({
           %
         </label>
         <span className="w-[54px] text-right text-[11.5px] text-text-tertiary">{etapa.dealCount} neg.</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={regrasAbertas}
+          disabled={!editorDeRegras}
+          onClick={() => setRegrasAbertas((v) => !v)}
+          title={resumoDasRegras || "Campos obrigatórios, parado e orientação da etapa"}
+        >
+          <ListChecks size={14} aria-hidden="true" /> Regras
+        </Button>
         <button
           type="button"
           onClick={aoExcluir}
@@ -324,6 +411,8 @@ function LinhaDeEtapa({
           </button>
         </div>
       )}
+      {resumoDasRegras && !regrasAbertas && <p className="mt-1 pl-8 text-caption text-text-tertiary">{resumoDasRegras}</p>}
+      {regrasAbertas && editorDeRegras}
     </div>
   );
 }

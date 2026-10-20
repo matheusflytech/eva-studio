@@ -9,6 +9,7 @@ import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho }
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { CampoInline, Secao, dataLonga } from "./pecas";
 import type { Membro, NegocioDaFicha } from "./use-ficha";
+import { MarcarPerdido } from "@/components/crm/negocios/mudanca-de-etapa";
 
 const reaisParaTexto = (cents: number) =>
   cents === 0 ? "" : (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -110,15 +111,7 @@ export function SobreONegocio({
         <ApenasLeitura rotulo="Funil" valor={deal.pipeline.name} />
         <ApenasLeitura rotulo="Criado em" valor={dataLonga(deal.createdAt)} />
         {deal.closedAt && <ApenasLeitura rotulo="Fechado em" valor={dataLonga(deal.closedAt)} />}
-        {deal.stage.type === "lost" && (
-          <CampoInline
-            id="ficha-motivo-perda"
-            rotulo="Motivo da perda"
-            placeholder="Preço, prazo, concorrente..."
-            valor={deal.lostReason}
-            onSalvar={(v) => patch({ lostReason: v })}
-          />
-        )}
+        {deal.stage.type === "lost" && <MotivoDaPerda deal={deal} patch={patch} />}
         <CampoInline
           id="ficha-descricao"
           rotulo="Descrição"
@@ -131,6 +124,40 @@ export function SobreONegocio({
 
       {defs.length > 0 && <CamposDoNegocio deal={deal} defs={defs} patch={patch} />}
     </Secao>
+  );
+}
+
+/** Motivo da perda (da lista do funil) e a nota; "Trocar" abre a mesma escolha do Perdido. */
+function MotivoDaPerda({ deal, patch }: { deal: NegocioDaFicha; patch: (body: Record<string, unknown>) => Promise<string | null> }) {
+  const [trocando, setTrocando] = React.useState(false);
+  const [erro, setErro] = React.useState<string | null>(null);
+  const rotulo = deal.perda?.rotulo || deal.lostReason || "Sem motivo registrado";
+  return (
+    <div className="px-2 py-0.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] text-text-tertiary">Motivo da perda</span>
+        <Button variant="ghost" size="sm" onClick={() => setTrocando(true)}>
+          Trocar
+        </Button>
+      </div>
+      <div className="py-1 text-[13px] text-text-secondary">
+        {rotulo}
+        {deal.perda?.nota && <span className="block text-text-tertiary">{deal.perda.nota}</span>}
+      </div>
+      {erro && <p role="alert" className="text-[11.5px] text-danger">{erro}</p>}
+      {trocando && (
+        <MarcarPerdido
+          nome={deal.name}
+          pipelineId={deal.pipelineId}
+          onCancelar={() => setTrocando(false)}
+          onConfirmar={async ({ motivoId, notaDaPerda }) => {
+            const falha = await patch({ motivoId, notaDaPerda });
+            setErro(falha);
+            if (!falha) setTrocando(false);
+          }}
+        />
+      )}
+    </div>
   );
 }
 
