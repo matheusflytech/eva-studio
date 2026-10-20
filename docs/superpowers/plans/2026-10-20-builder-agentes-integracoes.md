@@ -56,3 +56,71 @@ Ordem: F1 → F2 → F3 → F4 → F5 → F6, com F7 em paralelo (pasta própria
   segredos (`wrangler secret put`) e `INGRESS_SIGNING_SECRET` na Vercel.
 - Pendente técnico: dedupe no app para Telegram/TikTok (ou DO por conversa,
   fase 3); fases 2–4 do documento.
+
+## Andamento
+
+### F1 — Tema escuro: FEITO (20/10/2026)
+
+- Troca em **Configurações → Sua conta** (aba nova; nome, Aparência, Sessão):
+  Claro / Escuro / Seguir o sistema (`ThemeChooser`) e "Canvas do builder
+  sempre escuro" (`useCanvasTheme`, localStorage `eva-canvas`, lógica pura
+  em `theme.ts` com teste). Atalho `ThemeToggle` no rodapé do menu lateral,
+  que segue navy nos dois temas.
+- **Cores de categoria** no design system: 12 cores × (fg, subtle, solid) ×
+  (claro, escuro), `--cat-*` no globals.css + `CATEGORY_THEMES` (tokens.ts) +
+  `CATEGORY_CLASSES`; teste de contraste (fg ≥ 4,5 em subtle/panel/raised,
+  solid ≥ 3) e de espelho CSS↔TS. Documentado em docs/design-system.md.
+- Migrados para tokens: block-styles (Início deixou de ser branco no claro),
+  flow-node, flow-edge, node-inspector, issues-panel, montar-com-ia,
+  executions-panel, capture-config, flow-template-gallery,
+  agent-operations-card, agent-resumo, lista de agentes, referência da API.
+  O celular da prévia (conversation-mode) ficou `data-theme="dark"` fixo.
+- Ponte de cores do globals.css: agora cobre violet/purple/teal/cyan/orange/
+  indigo/slate (→ cores de categoria) e vale nos dois temas (variável CSS
+  herda resolvida; trecho escuro dentro da página clara herdava a cor clara).
+- Fica para depois: telas fora do builder com `text-white`/hex (inbox,
+  relatório de negócios — este é de outra frente) seguem pela ponte.
+
+### F2 — Builder confiável e organizado: FEITO (20/10/2026)
+
+- **Saídas de IA/fluxo externo** (flow-engine.ts): sem ligação, a conversa
+  fica com o bloco (como antes). Com ligação, segue **na mesma rodada**,
+  logo após a resposta, quando o bloco termina: "Responder com IA" coletou
+  todos os dados pedidos ou chamou a ferramenta interna `seguir_fluxo` (só
+  oferecida quando há ligação); "Enviar para meu fluxo" respondeu
+  `{ "done": true }`. Erro nunca pula a etapa. Testado em
+  flow-engine.saidas-ia.test.ts.
+- **Saídas legíveis**: `builder/saidas.ts` é a fonte única (cartão, ligação,
+  layout, validação, bloco novo). Cada saída nomeada tem linha própria com o
+  ponto alinhado; pílula com o nome no meio da ligação; cor por tipo
+  (`saida-estilo.ts`). `useUpdateNodeInternals` ao mudar as saídas.
+- **Ligações**: bloco novo depois de Condição/menu/pergunta validada sai pela
+  primeira saída livre; menu "+" da ligação sem ferramentas, com os nomes e
+  grupos da paleta; `isValidConnection`: ferramenta só na porta de
+  ferramentas e nada além de ferramenta nela; apagar opção apaga a ligação
+  presa nela.
+- **Validação** (block-validation.ts, com `nivel` erro/aviso): condição com
+  os dois ramos, captura validada com "Respondeu", opção de menu solta
+  (aviso), saída inexistente, bloco sem caminho do Início (aviso), "Enviar
+  para meu fluxo" sem URL no agente. `/api/flows/[agentId]` valida com
+  `validarFluxo` da API v1 em modo "builder" (estrutura quebrada bloqueia,
+  bloco pela metade vira aviso — o canvas salva enquanto se monta); API v1
+  em modo "api" (erros bloqueiam, avisos voltam em `warnings`).
+- **Auto-layout** esquerda→direita com `@dagrejs/dagre` 3.1.1 (síncrono, o do
+  exemplo do React Flow; elkjs é assíncrono e ~1,4 MB): altura medida ou
+  estimada, constraints de ordem (Sim em cima, opções na ordem),
+  ferramentas embaixo do bloco de IA, determinístico. Usado no botão
+  "Organizar", na API v1 (sem position ou sobreposto), na IA (montar e
+  acrescentar) e nos modelos prontos/exemplo (menu do exemplo ganhou opções).
+- **Limpeza**: removidos agent-grid, agent-card, checkpoint-card,
+  checkpoint-rail, builder/types.ts e o "webhook de entrada" falso (texto
+  honesto no lugar). Canal principal, Habilidades e Ferramentas do n8n
+  escondidos (`MOSTRAR_CAMPOS_DECORATIVOS`), campos do banco intactos.
+
+### Pendências para a F3
+
+- Decidir o destino de Canal principal / Habilidades / Ferramentas do n8n.
+- O bloco de IA ainda ignora instruções/tom/"nunca fazer" do agente; a
+  descrição da ferramenta `seguir_fluxo` pode ir para o prompt-base quando a
+  F3 montar as instruções do agente.
+- Saída de erro/fallback do bloco de IA (hoje erro só registra e fica).

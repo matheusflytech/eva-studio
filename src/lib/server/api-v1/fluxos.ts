@@ -5,18 +5,27 @@ import { membrosDoContrato } from "@/lib/server/contratos";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
+import { organizarFluxo, precisaOrganizar } from "@/components/agent-studio/builder/auto-layout";
 import { ErroApi } from "./http";
 
 // ---------------------------------------------------------------------------
-// Fluxo do agente pela API (API-4). O Builder salva sem validar (o canvas
-// mostra as pendências); pela API não dá para "ver o canvas", então aqui o
-// fluxo só entra se o motor (flow-engine.ts) conseguir executá-lo:
+// Validação do fluxo do agente, a mesma para a API v1 (API-4) e para o
+// salvamento interno do Builder (/api/flows/[agentId]). Sempre bloqueia o que
+// quebra o desenho:
 //   - exatamente um bloco Início;
 //   - ids únicos; ligação só entre blocos que existem;
 //   - tipo de bloco conhecido pelo construtor;
-//   - nenhuma pendência de validateFlow (a mesma lista do painel do Builder);
 //   - funil, etapa, etiqueta, credencial, servidor MCP e responsável da
 //     própria organização (id de outra org nunca entra num bloco).
+// As pendências de validateFlow (a lista do painel do Builder) dependem do
+// modo:
+//   - "api": pela API não dá para "ver o canvas", então as de nível "erro"
+//     (o motor não consegue seguir) bloqueiam; as de nível "aviso" voltam na
+//     resposta. Fluxo sem posição ou com blocos sobrepostos é organizado
+//     (auto-layout esquerda→direita) antes de salvar.
+//   - "builder": o canvas salva sozinho enquanto a pessoa monta; bloco pela
+//     metade é normal, então tudo de validateFlow vira aviso (o painel de
+//     pendências mostra). Nunca bloquear a edição, só o que corrompe o fluxo.
 // ---------------------------------------------------------------------------
 
 export const TIPOS_DE_BLOCO = [
@@ -39,9 +48,18 @@ const TIPOS = new Set<string>(TIPOS_DE_BLOCO);
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const idValido = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 100;
 
-/** Confere a forma e a lógica do grafo. Devolve o fluxo limpo ou lança 422 com a lista de problemas. */
-export async function validarFluxo(orgId: string, bruto: { nodes?: unknown; edges?: unknown }) {
+export interface OpcoesDaValidacao {
+  modo?: "api" | "builder";
+  /** O agente tem URL do webhook de saída? (bloco "Enviar para meu fluxo") */
+  temUrlDoFluxo?: boolean;
+}
+
+/** Confere a forma e a lógica do grafo. Devolve o fluxo limpo (e os avisos) ou lança 422 com a lista de problemas. */
+export async function validarFluxo(orgId: string, bruto: { nodes?: unknown; edges?: unknown }, opcoes: OpcoesDaValidacao = {}) {
+  const modo = opcoes.modo ?? "api";
   const problemas: Problema[] = [];
+  const avisos: Problema[] = [];
+  let semPosicao = false;
   if (!Array.isArray(bruto.nodes) || !Array.isArray(bruto.edges)) {
     throw new ErroApi(400, "invalid_parameter", "Envie nodes e edges (listas).", { param: "nodes" });
   }
@@ -62,7 +80,9 @@ export async function validarFluxo(orgId: string, bruto: { nodes?: unknown; edge
       problemas.push({ code: "unknown_block_type", message: `Tipo de bloco desconhecido: ${String(data.iconKey)}.`, node_id: n.id });
       return;
     }
-    const pos = obj(n.position) && typeof n.position.x === "number" && typeof n.position.y === "number" ? n.position : { x: 0, y: 0 };
+    const temPosicao = obj(n.position) && typeof n.position.x === "number" && typeof n.position.y === "number";
+    if (!temPosicao) semPosicao = true;
+    const pos = temPosicao ? (n.position as { x: number; y: number }) : { x: 0, y: 0 };
     nodes.push({
       id: n.id,
       type: typeof n.type === "string" ? n.type : "flowNode",
@@ -102,14 +122,25 @@ export async function validarFluxo(orgId: string, bruto: { nodes?: unknown; edge
   });
 
   if (problemas.length === 0) {
-    for (const p of validateFlow(nodes, edges)) problemas.push({ code: "block_incomplete", message: `${p.label}: ${p.motivo}`, node_id: p.nodeId });
+    for (const p of validateFlow(nodes, edges, { temUrlDoFluxo: opcoes.temUrlDoFluxo })) {
+      const bloqueia = modo === "api" && p.nivel === "erro";
+      (bloqueia ? problemas : avisos).push({
+        code: bloqueia ? "block_incomplete" : "flow_warning",
+        message: `${p.label}: ${p.motivo}`,
+        node_id: p.nodeId,
+      });
+    }
     problemas.push(...(await conferirIdsDaOrg(orgId, nodes)));
   }
 
   if (problemas.length > 0) {
     throw new ErroApi(422, "invalid_flow", `O fluxo tem ${problemas.length} problema(s); nada foi salvo.`, { details: { issues: problemas } });
   }
-  return { nodes, edges };
+
+  // Pela API ninguém arrasta bloco: sem posição (tudo em 0,0) ou com cartões
+  // um em cima do outro, organiza com o mesmo auto-layout do botão do Builder.
+  const organizado = modo === "api" && (semPosicao || precisaOrganizar(nodes));
+  return { nodes: organizado ? organizarFluxo(nodes, edges) : nodes, edges, avisos, organizado };
 }
 
 /** Todo id de outro registro dentro dos blocos precisa ser da organização. */
@@ -144,7 +175,7 @@ async function conferirIdsDaOrg(orgId: string, nodes: Node<FlowNodeData>[]): Pro
 }
 
 export async function carregarAgente(orgId: string, agentId: string) {
-  const a = await prisma.agent.findFirst({ where: { id: agentId, orgId }, select: { id: true, name: true } });
+  const a = await prisma.agent.findFirst({ where: { id: agentId, orgId }, select: { id: true, name: true, outboundUrl: true } });
   if (!a) throw new ErroApi(404, "not_found", "Agente não encontrado.");
   return a;
 }

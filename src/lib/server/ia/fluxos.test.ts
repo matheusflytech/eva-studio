@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
 
-import { normalizarFluxo, layoutDeCimaParaBaixo, condicaoValida, nomeDeVariavel, LAYOUT, type CatalogoFluxo } from "./fluxos";
+import { normalizarFluxo, condicaoValida, nomeDeVariavel, type CatalogoFluxo } from "./fluxos";
+import { precisaOrganizar } from "@/components/agent-studio/builder/auto-layout";
 
 const cat: CatalogoFluxo = {
   pipelines: [{ id: "p-b2b", name: "B2B", stages: [{ id: "st-novo", name: "Novo lead" }, { id: "st-prop", name: "Proposta" }] }],
@@ -80,10 +81,12 @@ describe("normalizarFluxo", () => {
     for (const e of r.edges) {
       expect(ids.has(e.source) && ids.has(e.target)).toBe(true);
     }
-    // Layout de cima para baixo: o Início no topo.
+    // Layout esquerda→direita (o mesmo do botão Organizar): o Início fica na
+    // primeira coluna e nenhum cartão em cima de outro.
     const inicio = porKind("start")[0];
-    expect(inicio.position.y).toBe(0);
-    expect(Math.max(...r.nodes.map((n) => n.position.y))).toBeGreaterThan(0);
+    expect(Math.min(...r.nodes.map((n) => n.position.x))).toBe(inicio.position.x);
+    expect(Math.max(...r.nodes.map((n) => n.position.x))).toBeGreaterThan(inicio.position.x);
+    expect(precisaOrganizar(r.nodes)).toBe(false);
   });
 
   it("descarta blocos desconhecidos e os que exigem configuração manual", () => {
@@ -260,17 +263,6 @@ describe("normalizarFluxo", () => {
 });
 
 describe("utilidades", () => {
-  it("layout em camadas de cima para baixo, centrado", () => {
-    const nodes = ["a", "b", "c"].map((id) => ({ id, position: { x: 99, y: 99 }, data: {} }));
-    const out = layoutDeCimaParaBaixo(nodes, [
-      { id: "1", source: "a", target: "b" },
-      { id: "2", source: "a", target: "c" },
-    ]);
-    expect(out.find((n) => n.id === "a")!.position).toEqual({ x: 0, y: 0 });
-    expect(out.find((n) => n.id === "b")!.position).toEqual({ x: -LAYOUT.colunaX / 2, y: LAYOUT.linhaY });
-    expect(out.find((n) => n.id === "c")!.position).toEqual({ x: LAYOUT.colunaX / 2, y: LAYOUT.linhaY });
-  });
-
   it("condição e nome de variável", () => {
     expect(condicaoValida('{segmento} == "Varejo"')).toBe("segmento");
     expect(condicaoValida("{ok}")).toBe("ok");

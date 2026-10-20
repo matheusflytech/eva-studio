@@ -23,12 +23,20 @@ import { CommentAutomationsEditor } from "./comment-automations-editor";
 import { TriggersEditor } from "./triggers-editor";
 import { WidgetConnect } from "./widget-connect";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
 import { CHANNELS } from "@/lib/data/channels";
 import type { Agent, AgentVariable, KnowledgeDoc } from "@/lib/data/types";
 
 export type AbaDoAgente = "resumo" | "comportamento" | "canais" | "avancado";
+
+/*
+ * "Canal principal", "Habilidades" e "Ferramentas do n8n" ficam escondidos:
+ * hoje nada no motor usa esses campos (são decorativos). Os valores
+ * continuam no banco e vão intactos no salvar; a frente F3 (Central de IA)
+ * decide se viram algo de verdade ou se saem.
+ */
+const MOSTRAR_CAMPOS_DECORATIVOS = false;
 
 /**
  * Uma seção do formulário. Fica sempre montada e só some da tela quando não é a
@@ -160,6 +168,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
                   ))}
                 </Select>
               </div>
+              {MOSTRAR_CAMPOS_DECORATIVOS && (
               <div>
                 <Label htmlFor="agent-channel">Canal principal</Label>
                 <Select id="agent-channel" value={primaryChannel} onChange={(e) => setPrimaryChannel(e.target.value)}>
@@ -170,6 +179,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
                   ))}
                 </Select>
               </div>
+              )}
             </div>
           </div>
         </Card>
@@ -228,6 +238,8 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Secao>
       )}
 
+      {MOSTRAR_CAMPOS_DECORATIVOS && (
+      <>
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
@@ -251,6 +263,8 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
           <ToolsPicker tools={tools} onChange={setTools} />
         </Card>
       </Secao>
+      </>
+      )}
 
       <Secao id="avancado" aba={aba}>
         <Card>
@@ -269,7 +283,6 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
             <CardDescription>Opcional. Use se a resposta vem de um workflow seu em vez do Builder.</CardDescription>
           </CardHeader>
           <WebhookConfig
-            inboundUrl={buildInboundWebhookUrl(agentId)}
             outboundUrl={outboundUrl}
             onOutboundChange={setOutboundUrl}
           />

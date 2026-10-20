@@ -32,7 +32,9 @@ import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
 import { BLOCK_MINIMAP_COLOR } from "@/components/agent-studio/builder/block-styles";
-import { autoLayoutNodes } from "@/components/agent-studio/builder/auto-layout";
+import { organizarFluxo } from "@/components/agent-studio/builder/auto-layout";
+import { ehFerramenta, saidaDaLigacao, saidaParaNovoBloco, saidasDoBloco, temSaidasNomeadas } from "@/components/agent-studio/builder/saidas";
+import { useCanvasTheme } from "@/components/ui/theme";
 import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-template-gallery";
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
 import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
@@ -62,6 +64,10 @@ export default function AgentBuilderPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [flowLoaded, setFlowLoaded] = React.useState(false);
   const [saveState, setSaveState] = React.useState<SaveState>("idle");
+  const [erroAoSalvar, setErroAoSalvar] = React.useState<string | null>(null);
+  // Canvas claro no tema claro e escuro no escuro, ou sempre escuro se a
+  // pessoa marcou isso em Configurações → Sua conta.
+  const { resolved: temaDoCanvas } = useCanvasTheme();
   const [showPreview, setShowPreview] = React.useState(false);
   const [paletaRecolhida, setPaletaRecolhida] = React.useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = React.useState(false);
@@ -147,9 +153,13 @@ export default function AgentBuilderPage() {
     saveTimer.current = setTimeout(async () => {
       try {
         await saveFlow(agentId, { nodes, edges });
+        setErroAoSalvar(null);
         setSaveState("saved");
         setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2000);
-      } catch {
+      } catch (err) {
+        // O servidor recusa só o que corrompe o fluxo (ligação para bloco que
+        // não existe, sem Início...). A mensagem diz o quê.
+        setErroAoSalvar(err instanceof Error ? err.message : null);
         setSaveState("error");
       }
     }, 900);
@@ -172,7 +182,7 @@ export default function AgentBuilderPage() {
     if (nodes.length === 0) return null;
     // Ponta: alguém sem saída, que não seja ferramenta pendurada num agente.
     const pontas = nodes.filter(
-      (n) => !edges.some((e) => e.source === n.id) && !n.data.iconKey.startsWith("tool-")
+      (n) => !edges.some((e) => e.source === n.id) && !ehFerramenta(n.data.iconKey) && saidasDoBloco(n.data).length > 0
     );
     return pontas[pontas.length - 1]?.id ?? nodes[nodes.length - 1].id;
   }, [selectedId, nodes, edges]);
@@ -218,18 +228,26 @@ export default function AgentBuilderPage() {
     };
     setNodes((nds) => [...nds, novo]);
 
-    // Se o bloco âncora já continuava pra algum lugar, o novo entra no meio
-    // em vez de virar um segundo fio saindo do mesmo ponto — dois fios na
-    // mesma saída é fluxo ambíguo, e o motor segue só o primeiro.
-    const continuacao = afterNodeId
-      ? edges.find((e) => e.source === afterNodeId && !e.sourceHandle && e.targetHandle !== "tools")
-      : undefined;
-
-    if (afterNodeId) {
+    // Ferramenta e Encerrar não têm saída no fluxo: o bloco novo entra solto.
+    const ligavel = anterior && !ehFerramenta(anterior.data.iconKey) && saidasDoBloco(anterior.data).length > 0;
+    if (anterior && ligavel) {
+      // Sai pela saída certa: depois de uma Condição, o Sim (ou o Não, se o
+      // Sim já está ligado); depois de um menu, a primeira opção livre. Antes
+      // a ligação nascia sem saída e a conversa morria ali.
+      const handle = saidaParaNovoBloco(anterior.data, anterior.id, edges);
+      // Se essa saída já continuava pra algum lugar, o novo entra no meio
+      // em vez de virar um segundo fio saindo do mesmo ponto — dois fios na
+      // mesma saída é fluxo ambíguo, e o motor segue só o primeiro.
+      const continuacao = edges.find(
+        (e) => e.source === anterior.id && (e.sourceHandle ?? undefined) === handle && e.targetHandle !== "tools"
+      );
+      const saidaDoNovo = saidaParaNovoBloco(novo.data, id, []);
       setEdges((eds) => [
         ...eds.filter((e) => e.id !== continuacao?.id),
-        { id: generateId(), source: afterNodeId, target: id },
-        ...(continuacao ? [{ id: generateId(), source: id, target: continuacao.target }] : []),
+        { id: generateId(), source: anterior.id, target: id, ...(handle ? { sourceHandle: handle } : {}) },
+        ...(continuacao && saidasDoBloco(novo.data).length > 0
+          ? [{ id: generateId(), source: id, target: continuacao.target, ...(saidaDoNovo ? { sourceHandle: saidaDoNovo } : {}) }]
+          : []),
       ]);
     }
     setSelectedId(id);
@@ -237,6 +255,17 @@ export default function AgentBuilderPage() {
 
   function handleNodeDataChangeById(id: string, partial: Partial<FlowNodeData>) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...partial } } : n)));
+    // Opção de menu apagada (ou tipo de resposta trocado): a ligação que saía
+    // dela não tem mais de onde sair. Sem isto ela ficava presa num ponto que
+    // não existe e o salvamento acusava "saída que não existe".
+    if ("options" in partial || "captureField" in partial) {
+      const atual = nodes.find((n) => n.id === id);
+      if (!atual) return;
+      const novo = { ...atual.data, ...partial } as FlowNodeData;
+      setEdges((eds) =>
+        eds.filter((e) => e.source !== id || !e.sourceHandle || e.targetHandle === "tools" || !!saidaDaLigacao(novo, e.sourceHandle))
+      );
+    }
   }
 
   function handleNodeDataChange(partial: Partial<FlowNodeData>) {
@@ -266,8 +295,11 @@ export default function AgentBuilderPage() {
     setSelectedId(null);
   }
 
+  // "Organizar": esquerda→direita, com a altura que cada cartão tem na tela
+  // (node.measured), Sim em cima, opções na ordem. Mesma função que a API v1,
+  // a IA e os modelos prontos usam.
   function handleAutoLayout() {
-    setNodes((nds) => autoLayoutNodes(nds, edges));
+    setNodes((nds) => organizarFluxo(nds, edges));
   }
 
   // Botão "+" no meio de uma conexão (flow-edge.tsx) — insere o bloco escolhido
@@ -287,10 +319,14 @@ export default function AgentBuilderPage() {
       data: { iconKey, label: iconKey, ...defaults },
     };
     setNodes((nds) => [...nds, newNode]);
+    // O bloco inserido continua pela primeira saída dele (Sim, se for Condição).
+    const saidaDoNovo = saidaParaNovoBloco(newNode.data, id, []);
     setEdges((eds) => [
       ...eds.filter((e) => e.id !== edge.id),
       { id: generateId(), source: edge.source, sourceHandle: edge.sourceHandle, target: id },
-      { id: generateId(), source: id, target: edge.target, targetHandle: edge.targetHandle },
+      ...(saidasDoBloco(newNode.data).length > 0
+        ? [{ id: generateId(), source: id, target: edge.target, targetHandle: edge.targetHandle, ...(saidaDoNovo ? { sourceHandle: saidaDoNovo } : {}) }]
+        : []),
     ]);
     setSelectedId(id);
   }
@@ -306,21 +342,44 @@ export default function AgentBuilderPage() {
     setShowTemplateGallery(false);
   }
 
+  // Cada ligação ganha o nome da saída de onde parte (Sim, Não, a opção do
+  // menu...), mostrado numa pílula no meio dela.
   const edgesForCanvas = React.useMemo(
     () =>
-      edges.map((e) =>
-        e.targetHandle === "tools"
-          ? e
-          : { ...e, type: "plusEdge", data: { onInsert: (iconKey: IconKey) => handleInsertOnEdge(e, iconKey) } }
-      ),
+      edges.map((e) => {
+        if (e.targetHandle === "tools") return e;
+        const origem = nodes.find((n) => n.id === e.source);
+        const saida = origem && temSaidasNomeadas(origem.data) ? saidaDaLigacao(origem.data, e.sourceHandle) : null;
+        return {
+          ...e,
+          type: "plusEdge",
+          data: {
+            onInsert: (iconKey: IconKey) => handleInsertOnEdge(e, iconKey),
+            rotulo: saida?.rotulo ?? null,
+            tipo: saida?.tipo,
+          },
+        };
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [edges]
+    [edges, nodes]
+  );
+
+  // Ferramenta só liga na porta de ferramentas de um bloco de IA, e nada
+  // além de ferramenta liga nela.
+  const ligacaoValida = React.useCallback(
+    (c: Connection | Edge) => {
+      const origem = nodes.find((n) => n.id === c.source);
+      if (!origem) return false;
+      return ehFerramenta(origem.data.iconKey) ? c.targetHandle === "tools" : c.targetHandle !== "tools";
+    },
+    [nodes]
   );
 
   const nodeTypes = React.useMemo(
     () => ({
       flowNode: (props: NodeProps<Node<FlowNodeData>>) => (
         <FlowNode
+          id={props.id}
           data={props.data}
           selected={props.selected}
           run={mostrarExecucao ? ultimaExecucao?.porNo[props.id] : undefined}
@@ -332,7 +391,7 @@ export default function AgentBuilderPage() {
     [mostrarExecucao, ultimaExecucao]
   );
 
-  const issues = validateFlow(nodes, edges);
+  const issues = validateFlow(nodes, edges, { temUrlDoFluxo: agent ? !!agent.webhook.outboundUrl.trim() : undefined });
 
   const viewportInicial = React.useMemo(() => {
     const ZOOM = 0.85;
@@ -406,7 +465,11 @@ export default function AgentBuilderPage() {
             <span className="text-[12.5px] text-text-tertiary">
               {saveState === "pending" && "Salvando..."}
               {saveState === "saved" && "Salvo."}
-              {saveState === "error" && <span className="text-danger">Erro ao salvar.</span>}
+              {saveState === "error" && (
+                <span className="text-danger" title={erroAoSalvar ?? undefined}>
+                  {erroAoSalvar ? `Não salvou: ${erroAoSalvar}` : "Erro ao salvar."}
+                </span>
+              )}
             </span>
           )}
           {tab === "editor" && (
@@ -432,10 +495,10 @@ export default function AgentBuilderPage() {
               <button
                 type="button"
                 onClick={handleAutoLayout}
-                title="Reorganiza os blocos automaticamente"
-                className={buttonVariants({ variant: "secondary", size: "icon" })}
+                title="Organizar: arruma os blocos da esquerda para a direita"
+                className={buttonVariants({ variant: "secondary", size: "md" })}
               >
-                <LayoutGrid size={15} />
+                <LayoutGrid size={15} /> Organizar
               </button>
               {ultimaExecucao && (
                 <button
@@ -481,8 +544,10 @@ export default function AgentBuilderPage() {
             recolhida={paletaRecolhida}
             onToggle={() => setPaletaRecolhida((v) => !v)}
           />
-          <div className="glass-card relative flex-1 overflow-hidden rounded-3xl">
+          <div data-theme={temaDoCanvas} className="relative flex-1 overflow-hidden rounded-lg border border-border-subtle bg-page">
             <ReactFlow
+              colorMode={temaDoCanvas}
+              isValidConnection={ligacaoValida}
               nodes={nodes}
               edges={edgesForCanvas}
               onNodesChange={onNodesChange}
@@ -509,9 +574,8 @@ export default function AgentBuilderPage() {
                 position="bottom-right"
                 pannable
                 zoomable
-                nodeColor={(node) => BLOCK_MINIMAP_COLOR[(node.data as FlowNodeData).iconKey] ?? "#666"}
+                nodeColor={(node) => BLOCK_MINIMAP_COLOR[(node.data as FlowNodeData).iconKey] ?? "var(--border-strong)"}
                 nodeStrokeWidth={0}
-                maskColor="rgba(0,0,0,0.55)"
               />
               <Panel position="top-right">
                 <div className="flex flex-col items-end gap-3">

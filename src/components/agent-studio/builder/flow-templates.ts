@@ -1,6 +1,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "./flow-node";
 import { generateId } from "@/lib/utils";
+import { organizarFluxo } from "./auto-layout";
 
 export interface FlowTemplate {
   id: string;
@@ -19,7 +20,9 @@ function e(source: string, target: string, sourceHandle?: string): Edge {
 
 // Ids gerados a cada build() — assim dá pra aplicar o mesmo modelo mais de
 // uma vez no mesmo agente (ou reaproveitar em vários agentes) sem colidir.
-export const FLOW_TEMPLATES: FlowTemplate[] = [
+// As posições escritas abaixo são só ponto de partida: o modelo sai sempre
+// pelo auto-layout (esquerda→direita), igual ao botão "Organizar".
+const MODELOS: FlowTemplate[] = [
   {
     id: "atendimento-menu",
     name: "Atendimento com menu",
@@ -190,3 +193,11 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
     },
   },
 ];
+
+export const FLOW_TEMPLATES: FlowTemplate[] = MODELOS.map((m) => ({
+  ...m,
+  build: () => {
+    const { nodes, edges } = m.build();
+    return { nodes: organizarFluxo(nodes, edges), edges };
+  },
+}));

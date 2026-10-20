@@ -160,7 +160,7 @@ export function NodeInspector({
       <div
         className={cn(
           "flex items-start gap-2 px-4 py-2.5 text-[12px]",
-          pendencia ? "bg-amber-400/10 text-amber-300" : "bg-emerald-500/8 text-emerald-300"
+          pendencia ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success"
         )}
       >
         {pendencia ? (
@@ -233,7 +233,7 @@ export function NodeInspector({
               onChange={(e) => onChange({ conditionExpression: e.target.value })}
             />
             <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-              Conecte a saída <span className="text-emerald-400">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
+              Conecte a saída <span className="text-success">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
               Aceita <code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code> contra texto entre aspas ou número.
             </p>
           </div>

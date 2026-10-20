@@ -141,7 +141,7 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
           </div>
 
           <p className="text-[11.5px] leading-relaxed text-text-tertiary">
-            Se não acertar depois das tentativas, segue pela saída <span className="text-amber-400">Não respondeu certo</span>. Sem
+            Se não acertar depois das tentativas, segue pela saída <span className="text-warning">Não respondeu certo</span>. Sem
             ela ligada, segue pela saída normal, sem guardar nada.
           </p>
         </>

@@ -217,7 +217,7 @@ export function MontarComIa({
           <Sparkles size={15} className="shrink-0 text-accent-500" />
           <span className="text-[13px] text-text-primary">
             Rascunho da IA no canvas. O construtor salva sozinho, como em qualquer edição: revise os blocos ou desfaça para voltar ao fluxo de antes.
-            {anterior.aviso && <span className="block text-[12px] text-amber-400">{anterior.aviso}</span>}
+            {anterior.aviso && <span className="block text-[12px] text-warning">{anterior.aviso}</span>}
           </span>
           <Button variant="secondary" size="sm" onClick={desfazer}>
             <Undo2 size={14} /> Desfazer
@@ -310,8 +310,8 @@ export function MontarComIa({
                 </ol>
 
                 {rascunho.avisos.length > 0 && (
-                  <div className="flex flex-col gap-1.5 rounded-2xl border border-amber-400/25 bg-amber-400/5 px-4 py-3">
-                    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-amber-400">
+                  <div className="flex flex-col gap-1.5 rounded-lg border border-border-subtle bg-panel px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warning">
                       <AlertTriangle size={13} /> Vale conferir
                     </span>
                     {rascunho.avisos.map((a) => (

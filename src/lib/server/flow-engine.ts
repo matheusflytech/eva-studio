@@ -264,6 +264,42 @@ async function loadConversationHistory(
 }
 
 const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
+const SEGUIR_TOOL = "seguir_fluxo";
+
+// ---------------------------------------------------------------------------
+// Saída dos blocos "Responder com IA" (ai-agent) e "Enviar para meu fluxo"
+// (agent). Comportamento escolhido:
+//   - SEM ligação de saída: a conversa fica com o bloco até o fim (como
+//     sempre foi). Nada muda para quem não ligou nada.
+//   - COM ligação: o bloco responde e, quando TERMINA o trabalho, o fluxo
+//     segue pela ligação NA MESMA RODADA (a resposta sai e, logo atrás, o
+//     que vier depois: uma mensagem, um bloco de CRM, uma pergunta...).
+//     Esperar a próxima mensagem do cliente deixaria a conversa muda depois
+//     de "Perfeito, anotei!".
+//   - "Terminar" é explícito, nunca adivinhado pelo texto:
+//       ai-agent: coletou todos os dados pedidos (collectVars) ou chamou a
+//         ferramenta interna "seguir_fluxo" (só oferecida quando há ligação);
+//       agent: o webhook respondeu { "done": true } junto com a resposta.
+//   - Erro da IA (ou webhook sem resposta) nunca pula a etapa.
+// ---------------------------------------------------------------------------
+
+/** O bloco de IA terminou o trabalho e o fluxo deve seguir pela saída? */
+export function iaTerminou(opts: {
+  temSaida: boolean;
+  erro?: string;
+  pediuParaSeguir: boolean;
+  dadosPedidos: string[];
+  variables: Record<string, unknown>;
+}): boolean {
+  if (!opts.temSaida || opts.erro) return false;
+  if (opts.pediuParaSeguir) return true;
+  return opts.dadosPedidos.length > 0 && opts.dadosPedidos.every((k) => String(opts.variables[k] ?? "").trim() !== "");
+}
+
+/** Tem ligação de saída do fluxo principal (ferramentas não contam). */
+function temSaidaPrincipal(edges: Edge[], nodeId: string): boolean {
+  return edges.some((e) => e.source === nodeId && e.targetHandle !== "tools");
+}
 
 // Roda o Agente de IA nativo (bloco "ai-agent"): junta as ferramentas
 // conectadas na porta "tools" (tool-http/tool-knowledge), monta a chamada
@@ -498,10 +534,12 @@ async function runAiAgent(
   // Contexto de CRM: quem é a pessoa e em que org. Só é usado quando há um
   // bloco "Ferramenta: CRM" ligado neste agente.
   crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> }
-): Promise<{ text: string | null; error?: string }> {
+): Promise<{ text: string | null; error?: string; seguir: boolean }> {
   const provider = getProvider(node.data.aiProvider);
   const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
-  if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.` };
+  if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
+  const temSaida = temSaidaPrincipal(edges, node.id);
+  let pediuParaSeguir = false;
 
   const toolNodes = edges
     .filter((e) => e.target === node.id && e.targetHandle === "tools")
@@ -671,6 +709,17 @@ async function runAiAgent(
     });
   }
 
+  // Só existe quando o bloco tem para onde ir: é como a IA avisa que acabou
+  // a parte dela (ver iaTerminou). Sem ligação, ela nem vê a ferramenta.
+  if (temSaida) {
+    tools.push({
+      name: SEGUIR_TOOL,
+      description:
+        "Chame quando o objetivo desta etapa da conversa estiver cumprido e o atendimento deve seguir para o próximo passo do fluxo. Responda normalmente ao usuário na mesma vez.",
+      params: [],
+    });
+  }
+
   let systemPrompt = node.data.detail || "Você é um assistente útil.";
   if (collectVars.length > 0) {
     const lines = ["", "## Dados que você precisa coletar nesta conversa"];
@@ -699,6 +748,10 @@ async function runAiAgent(
       history,
       tools,
       executeTool: async (call: LlmToolCall) => {
+        if (call.name === SEGUIR_TOOL) {
+          pediuParaSeguir = true;
+          return "Ok, o atendimento segue para o próximo passo depois desta resposta.";
+        }
         if (call.name === SAVE_SLOTS_TOOL) {
           const saved: string[] = [];
           for (const v of collectVars) {
@@ -742,9 +795,11 @@ async function runAiAgent(
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     });
-    return { text: result.text, error: result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`) };
+    const error = result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`);
+    const seguir = iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
+    return { text: result.text, error, seguir };
   } catch (err) {
-    return { text: null, error: err instanceof Error ? err.message : String(err) };
+    return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false };
   }
 }
 
@@ -754,8 +809,8 @@ async function callAgentWebhook(
   conversationId: string,
   variables: Variables,
   lang?: string
-): Promise<string | null> {
-  if (!agent.outboundUrl) return null;
+): Promise<{ reply: string | null; done: boolean }> {
+  if (!agent.outboundUrl) return { reply: null, done: false };
   try {
     const knowledgeBaseContext = await getKnowledgeBaseContext(agent.id);
     // safeFetch: bloqueia SSRF (URL configurada pelo usuário não pode apontar
@@ -779,11 +834,14 @@ async function callAgentWebhook(
         knowledgeBaseContext,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { reply: null, done: false };
     const data = await res.json();
-    return typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
+    const reply = typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
+    // { "done": true } = o seu fluxo terminou a parte dele; o Builder segue
+    // pela ligação de saída do bloco, se houver.
+    return { reply, done: data?.done === true };
   } catch {
-    return null;
+    return { reply: null, done: false };
   }
 }
 
@@ -983,7 +1041,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       await syncContact(conversation.id, {}, true);
       return { messages: [], status: "active" };
     }
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
+    const { reply } = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
     await logMessages(conversation.id, input.text, messages, input);
     const inboundNoFlow = input.text !== undefined || input.optionId !== undefined;
@@ -1190,10 +1248,11 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     currentId = nextNodeId(edges, parkedNode.id, handle);
   } else if (parkedNode?.data.iconKey === "agent") {
     const conversationId = `${input.channel}:${input.contactId}`;
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
+    const { reply, done } = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
     if (reply) messages.push({ text: reply });
     pushStep(parkedNode, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" });
-    return finish();
+    if (!(reply && done && temSaidaPrincipal(edges, parkedNode.id))) return finish();
+    currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "ai-agent") {
     const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
@@ -1201,7 +1260,8 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
     if (reply.text) messages.push({ text: reply.text });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
-    return finish();
+    if (!reply.seguir) return finish();
+    currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
@@ -1452,17 +1512,25 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
       if (reply.text) messages.push({ text: reply.text });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
-      currentId = node.id; // fica "alugado" pra IA nativa até o contato parar de responder
+      if (reply.seguir) {
+        currentId = nextNodeId(edges, node.id);
+        continue;
+      }
+      currentId = node.id; // fica com a IA até ela terminar (ou para sempre, sem ligação)
       break;
     }
 
     if (kind === "agent") {
       const startedAt = Date.now();
       const conversationId = `${input.channel}:${input.contactId}`;
-      const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
+      const { reply, done } = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
       if (reply) messages.push({ text: reply });
       pushStep(node, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" }, startedAt);
-      currentId = node.id; // fica "alugado" pra IA livre até o contato parar de responder
+      if (reply && done && temSaidaPrincipal(edges, node.id)) {
+        currentId = nextNodeId(edges, node.id);
+        continue;
+      }
+      currentId = node.id; // fica com o seu fluxo até ele responder done: true
       break;
     }
 

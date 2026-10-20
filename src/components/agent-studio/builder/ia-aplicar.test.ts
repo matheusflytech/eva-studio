@@ -20,8 +20,8 @@ describe("acrescentarAoFluxo", () => {
     expect(r.ligado).toBe(true);
     expect(r.nodes.map((n) => n.id)).toEqual(["ini", "msg", "r-msg", "r-fim"]);
     expect(r.edges.some((e) => e.source === "msg" && e.target === "r-msg")).toBe(true);
-    // Abaixo do fluxo atual.
-    expect(r.nodes.find((n) => n.id === "r-msg")!.position.y).toBeGreaterThan(150);
+    // Organizado esquerda→direita: o rascunho vem depois do fluxo atual.
+    expect(r.nodes.find((n) => n.id === "r-msg")!.position.x).toBeGreaterThan(r.nodes.find((n) => n.id === "msg")!.position.x);
   });
 
   it("fluxo que termina em Encerrar: troca o último Encerrar pelo rascunho", () => {
@@ -33,6 +33,15 @@ describe("acrescentarAoFluxo", () => {
     expect(r.ligado).toBe(true);
     expect(r.nodes.some((n) => n.id === "fim")).toBe(false);
     expect(r.edges.some((e) => e.source === "msg" && e.target === "r-msg")).toBe(true);
+  });
+
+  it("pendura na saída livre certa (Não, se o Sim já está ligado)", () => {
+    const atual = {
+      nodes: [no("ini", "start"), { ...no("c", "condition", 150), data: { iconKey: "condition" as const, label: "c", conditionExpression: "{x}" } }, no("s", "end", 300)],
+      edges: [ed("ini", "c"), { ...ed("c", "s"), sourceHandle: "true" }],
+    };
+    const r = acrescentarAoFluxo(atual, rascunho);
+    expect(r.edges.find((e) => e.source === "c" && e.target === "r-msg")?.sourceHandle).toBe("false");
   });
 
   it("canvas vazio recebe o rascunho inteiro", () => {

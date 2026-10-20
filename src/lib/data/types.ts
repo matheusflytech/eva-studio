@@ -34,7 +34,6 @@ export interface KnowledgeDoc {
 }
 
 export interface WebhookConfig {
-  inboundUrl: string;
   outboundUrl: string;
 }
 

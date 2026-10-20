@@ -6,6 +6,7 @@ import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
+import { organizarFluxo } from "@/components/agent-studio/builder/auto-layout";
 import { SAIDA_INVALIDA, variavelDaCaptura } from "@/lib/capture-validation";
 import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
 
@@ -61,7 +62,6 @@ const MAX_CAMPO = 500;
 /** Esperar: até 30 dias, guardado em horas (a maior unidade do bloco). */
 const MAX_ESPERA_HORAS = 720;
 
-export const LAYOUT = { colunaX: 300, linhaY: 190 };
 
 export interface CatalogoFluxo {
   pipelines: { id: string; name: string; stages: { id: string; name: string }[] }[];
@@ -370,7 +370,8 @@ export function normalizarFluxo(raw: unknown, cat: CatalogoFluxo): NormalizacaoD
       ...(handle ? { sourceHandle: handle } : {}),
     };
   });
-  nodes = layoutDeCimaParaBaixo(nodes, edges);
+  // Mesmo auto-layout do botão "Organizar" do construtor (esquerda→direita).
+  nodes = organizarFluxo(nodes, edges);
 
   // Problemas que o próprio construtor apontaria (campo faltando, bloco que
   // não leva a lugar nenhum), menos os blocos que já ganharam aviso acima.
@@ -653,51 +654,6 @@ function mapaDeCampos(
   return saida;
 }
 
-/**
- * Camadas de cima para baixo: profundidade a partir do Início vira a linha
- * (y) e os blocos da mesma linha se espalham centrados (x). Mesma ideia do
- * auto-layout do construtor, só que na vertical, como os modelos prontos.
- */
-export function layoutDeCimaParaBaixo<T extends Record<string, unknown>>(nodes: Node<T>[], edges: Edge[]): Node<T>[] {
-  if (nodes.length === 0) return nodes;
-  const entrada = new Map<string, number>();
-  nodes.forEach((n) => entrada.set(n.id, 0));
-  edges.forEach((e) => entrada.set(e.target, (entrada.get(e.target) ?? 0) + 1));
-  const raizes = nodes.filter((n) => (entrada.get(n.id) ?? 0) === 0).map((n) => n.id);
-  if (raizes.length === 0) raizes.push(nodes[0].id);
-
-  const nivel = new Map<string, number>();
-  const ordem: string[] = [];
-  const fila = [...raizes];
-  raizes.forEach((id) => nivel.set(id, 0));
-  while (fila.length > 0) {
-    const id = fila.shift()!;
-    ordem.push(id);
-    for (const e of edges) {
-      if (e.source !== id || nivel.has(e.target)) continue;
-      nivel.set(e.target, (nivel.get(id) ?? 0) + 1);
-      fila.push(e.target);
-    }
-  }
-  const max = Math.max(0, ...nivel.values());
-  for (const n of nodes) {
-    if (!nivel.has(n.id)) {
-      nivel.set(n.id, max + 1);
-      ordem.push(n.id);
-    }
-  }
-
-  const porNivel = new Map<number, string[]>();
-  for (const id of ordem) {
-    const l = nivel.get(id)!;
-    porNivel.set(l, [...(porNivel.get(l) ?? []), id]);
-  }
-  const pos = new Map<string, { x: number; y: number }>();
-  for (const [l, ids] of porNivel) {
-    ids.forEach((id, i) => pos.set(id, { x: Math.round((i - (ids.length - 1) / 2) * LAYOUT.colunaX), y: l * LAYOUT.linhaY }));
-  }
-  return nodes.map((n) => ({ ...n, position: pos.get(n.id)! }));
-}
 
 // ---------------------------------------------------------------------------
 // Prompt

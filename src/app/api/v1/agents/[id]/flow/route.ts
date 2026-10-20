@@ -13,13 +13,15 @@ export const GET = rotaV1<P>({ recurso: "flows" }, async (ctx, { id }) => {
 });
 
 // PUT /api/v1/agents/{id}/flow — { nodes, edges } substitui o fluxo inteiro,
-// só se passar na validação (422 invalid_flow com details.issues). A versão
-// anterior fica guardada: POST /flow/restore desfaz.
+// só se passar na validação (422 invalid_flow com details.issues). Avisos
+// (ex.: opção de menu sem ligação) não bloqueiam e voltam em "warnings". Sem
+// position, ou com blocos sobrepostos, o fluxo é organizado esquerda→direita
+// antes de salvar. A versão anterior fica guardada: POST /flow/restore desfaz.
 export const PUT = rotaV1<P>({ recurso: "flows" }, async (ctx, { id }) => {
   const corpo = ctx.corpo();
   conferirCampos(corpo, ["nodes", "edges"]);
-  await carregarAgente(ctx.orgId, id);
-  const fluxo = await validarFluxo(ctx.orgId, corpo);
-  const salvo = await substituirFluxo(ctx.orgId, id, fluxo);
-  return NextResponse.json({ data: serializarFluxo(id, salvo) });
+  const agente = await carregarAgente(ctx.orgId, id);
+  const { nodes, edges, avisos } = await validarFluxo(ctx.orgId, corpo, { modo: "api", temUrlDoFluxo: !!agente.outboundUrl?.trim() });
+  const salvo = await substituirFluxo(ctx.orgId, id, { nodes, edges });
+  return NextResponse.json({ data: serializarFluxo(id, salvo), warnings: avisos });
 });

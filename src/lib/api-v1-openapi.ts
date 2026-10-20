@@ -309,14 +309,14 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     get: { tag: "Fluxos", summary: "Ler fluxo (nodes/edges)", scope: "flows:read" },
     put: {
       tag: "Fluxos",
-      summary: "Substituir fluxo (validado; 422 invalid_flow)",
+      summary: "Substituir fluxo (validado; 422 invalid_flow; avisos em warnings; sem position ou com blocos sobrepostos, organiza esquerda→direita)",
       scope: "flows:write",
       idempotency: "optional",
       body: {
         nodes: [
-          { id: "n1", type: "flowNode", position: { x: 0, y: 0 }, data: { iconKey: "start", label: "Início" } },
-          { id: "n2", type: "flowNode", position: { x: 0, y: 190 }, data: { iconKey: "message", label: "Boas-vindas", detail: "Olá!" } },
-          { id: "n3", type: "flowNode", position: { x: 0, y: 380 }, data: { iconKey: "end", label: "Fim" } },
+          { id: "n1", type: "flowNode", data: { iconKey: "start", label: "Início" } },
+          { id: "n2", type: "flowNode", data: { iconKey: "message", label: "Boas-vindas", detail: "Olá!" } },
+          { id: "n3", type: "flowNode", data: { iconKey: "end", label: "Fim" } },
         ],
         edges: [
           { id: "e1", source: "n1", target: "n2" },

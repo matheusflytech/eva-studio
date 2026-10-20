@@ -71,6 +71,69 @@ describe("validação do fluxo pela API", () => {
     expect(codes).toEqual(["invalid_reference"]);
   });
 
+  it("sem posição (tudo em 0,0): organiza esquerda→direita antes de salvar", async () => {
+    const r = await validarFluxo("o1", {
+      nodes: [no("a", "start"), no("b", "message", { detail: "Oi!" }), no("c", "end")],
+      edges: [liga("a", "b"), liga("b", "c")],
+    });
+    expect(r.organizado).toBe(true);
+    const x = (id: string) => r.nodes.find((n) => n.id === id)!.position.x;
+    expect(x("a")).toBeLessThan(x("b"));
+    expect(x("b")).toBeLessThan(x("c"));
+  });
+
+  it("posições já espaçadas ficam como vieram", async () => {
+    const pos = (id: string, x: number) => ({ ...no(id, id === "a" ? "start" : id === "b" ? "message" : "end", id === "b" ? { detail: "Oi!" } : {}), position: { x, y: 0 } });
+    const r = await validarFluxo("o1", { nodes: [pos("a", 0), pos("b", 400), pos("c", 800)], edges: [liga("a", "b"), liga("b", "c")] });
+    expect(r.organizado).toBe(false);
+    expect(r.nodes.map((n) => n.position.x)).toEqual([0, 400, 800]);
+  });
+
+  it("aviso não bloqueia (opção de menu solta) e volta na resposta", async () => {
+    const r = await validarFluxo("o1", {
+      nodes: [
+        no("a", "start"),
+        no("m", "capture", { detail: "Escolha", variableName: "op", options: [{ id: "o1", label: "Um" }, { id: "o2", label: "Dois" }] }),
+        no("c", "end"),
+      ],
+      edges: [liga("a", "m"), { ...liga("m", "c"), sourceHandle: "o1" }],
+    });
+    expect(r.avisos.map((a) => a.code)).toEqual(["flow_warning"]);
+  });
+
+  it("condição com um ramo só e saída inexistente bloqueiam pela API", async () => {
+    const codes = await problemas({
+      nodes: [no("a", "start"), no("c", "condition", { conditionExpression: "{x} > 1" }), no("f", "end")],
+      edges: [liga("a", "c"), { ...liga("c", "f"), sourceHandle: "true" }, { ...liga("c", "f", "c-f-2"), sourceHandle: "talvez" }],
+    });
+    expect(codes.filter((c) => c === "block_incomplete")).toHaveLength(2);
+  });
+
+  it("modo builder (salvamento interno): bloco incompleto vira aviso; estrutura quebrada bloqueia", async () => {
+    const r = await validarFluxo(
+      "o1",
+      { nodes: [no("a", "start"), no("b", "message", { detail: "" })], edges: [liga("a", "b")] },
+      { modo: "builder" }
+    );
+    expect(r.avisos.length).toBeGreaterThanOrEqual(2);
+    expect(r.organizado).toBe(false);
+    await expect(
+      validarFluxo("o1", { nodes: [no("a", "start")], edges: [liga("a", "fantasma")] }, { modo: "builder" })
+    ).rejects.toBeInstanceOf(ErroApi);
+  });
+
+  it("Enviar para meu fluxo sem URL no agente é recusado", async () => {
+    const codes = await (async () => {
+      try {
+        await validarFluxo("o1", { nodes: [no("a", "start"), no("g", "agent")], edges: [liga("a", "g")] }, { temUrlDoFluxo: false });
+        return [];
+      } catch (e) {
+        return ((e as ErroApi).extra.details as { issues: { code: string; message: string }[] }).issues.map((i) => i.message);
+      }
+    })();
+    expect(codes.join(" ")).toMatch(/URL/);
+  });
+
   it("substituir guarda a versão anterior", async () => {
     db.agentFlow.findUnique.mockResolvedValueOnce({ agentId: "ag1", nodes: [{ id: "velho" }], edges: [] });
     await substituirFluxo("o1", "ag1", { nodes: [], edges: [] });
