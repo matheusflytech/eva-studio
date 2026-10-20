@@ -157,6 +157,8 @@ const TAREFA: Record<string, { rotulo: string; icone: IconeDoSinal; tom: SinalDo
   ligar: { rotulo: "Ligar", icone: "phone", tom: "neu" },
   reuniao: { rotulo: "Reunião", icone: "cal", tom: "ok" },
   email: { rotulo: "E-mail", icone: "mail", tom: "neu" },
+  whatsapp: { rotulo: "WhatsApp", icone: "phone", tom: "neu" },
+  visita: { rotulo: "Visita", icone: "cal", tom: "ok" },
 };
 
 /**

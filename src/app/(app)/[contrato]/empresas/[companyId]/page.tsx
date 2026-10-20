@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DealDrawer } from "@/components/crm/deal-drawer";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { cn, formatRelativeDate } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ interface DealRow {
   stage: string; stageType: string; pipeline: string; closedAt: string | null; updatedAt: string;
 }
 interface TaskRow {
+  type: string;
   id: string; text: string; dueAt: string | null; doneAt: string | null;
   contact: { id: string; name: string } | null; deal: { id: string; name: string } | null;
 }
@@ -104,11 +106,19 @@ export default function EmpresaPage() {
     carregar();
   }
 
-  async function alternarTarefa(id: string, feita: boolean) {
-    await fetch(`/api/tasks/${id}`, {
+  // Concluir abre o diálogo (resultado + próximo passo obrigatório);
+  // desmarcar reabre direto.
+  const { abrir: abrirConclusao, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => carregar());
+
+  async function alternarTarefa(t: TaskRow, feita: boolean) {
+    if (!feita) {
+      abrirConclusao(t);
+      return;
+    }
+    await fetch(`/api/tasks/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !feita }),
+      body: JSON.stringify({ done: false }),
     });
     carregar();
   }
@@ -242,7 +252,7 @@ export default function EmpresaPage() {
                   const atrasada = !t.doneAt && !!t.dueAt && new Date(t.dueAt).getTime() < Date.now();
                   return (
                     <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-surface-2">
-                      <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t.id, !!t.doneAt)} />
+                      <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t, !!t.doneAt)} />
                       <span className="min-w-0 flex-1">
                         <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
                           {t.text}
@@ -387,6 +397,7 @@ export default function EmpresaPage() {
       {dealAberto && (
         <DealDrawer dealId={dealAberto} onClose={() => setDealAberto(null)} onChanged={carregar} />
       )}
+      {dialogoDeConclusao}
     </div>
   );
 }

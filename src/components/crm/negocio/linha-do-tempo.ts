@@ -85,9 +85,13 @@ export function rotuloDoStatus(status: string): string {
 
 const TIPOS_DE_TAREFA: Record<string, string> = {
   ligar: "Ligar",
+  whatsapp: "WhatsApp",
   email: "E-mail",
   reuniao: "Reunião",
-  outro: "Outro",
+  visita: "Visita",
+  afazer: "A fazer",
+  // Antigo: exibido como o novo "a fazer" (src/lib/tarefas/tipos.ts).
+  outro: "A fazer",
 };
 
 export function rotuloDoTipoDeTarefa(tipo: string): string {

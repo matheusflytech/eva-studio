@@ -17,6 +17,7 @@ import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { useToast } from "@/components/ui/toast";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { MS_PARA_DESFAZER } from "@/lib/lixeira";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 
 interface Stage { id: string; name: string; type: string; probability: number }
 
@@ -223,12 +224,23 @@ export function DealDrawer({
     carregar();
   }
 
-  async function alternarTarefa(id: string, feita: boolean) {
+  // Concluir passa pelo diálogo (resultado + próximo passo obrigatório);
+  // desmarcar reabre direto.
+  const { abrir: abrirConclusao, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => {
+    carregar();
+    onChanged();
+  });
+
+  async function alternarTarefa(t: { id: string; type: string; text: string }, feita: boolean) {
     setErro(null);
-    const res = await fetch(`/api/tasks/${id}`, {
+    if (!feita) {
+      abrirConclusao(t);
+      return;
+    }
+    const res = await fetch(`/api/tasks/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !feita }),
+      body: JSON.stringify({ done: false }),
     });
     await falhou(res, "Não foi possível atualizar a tarefa.");
     carregar();
@@ -241,7 +253,8 @@ export function DealDrawer({
   // Esc fecha, como todo painel por cima da tela.
   React.useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // Com um diálogo aberto por cima (concluir tarefa), o Esc é dele.
+      if (e.key === "Escape" && !document.querySelector("[role='dialog'][data-state='open']")) onClose();
     };
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
@@ -423,7 +436,7 @@ export function DealDrawer({
               <div className="mt-2 flex flex-col gap-1">
                 {deal.tasks.map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-surface-2">
-                    <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t.id, !!t.doneAt)} />
+                    <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t, !!t.doneAt)} />
                     <span className="min-w-0 flex-1">
                       <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
                         {t.text}
@@ -502,6 +515,7 @@ export function DealDrawer({
         )}
       </aside>
       {mudanca.elementos}
+      {dialogoDeConclusao}
     </div>,
     document.body
   );

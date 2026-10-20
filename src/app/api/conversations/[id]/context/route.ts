@@ -80,6 +80,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     })),
     tarefas: tarefas.map((t) => ({
       id: t.id,
+      type: t.type,
       text: t.text,
       dueAt: t.dueAt?.toISOString() ?? null,
       atrasada: !!t.dueAt && t.dueAt.getTime() < Date.now(),

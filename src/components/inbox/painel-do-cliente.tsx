@@ -6,6 +6,7 @@ import {
   Plus, X, Check, Phone, Mail, Building2, ExternalLink, Handshake, Loader2, Clock, UserRoundX, UserRound,
 } from "lucide-react";
 import { DealDrawer } from "@/components/crm/deal-drawer";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { dinheiro, iniciais, type Conversa, type Contexto } from "./tipos";
@@ -166,10 +167,10 @@ export function PainelDoCliente({
     await carregar();
   }
 
-  async function concluirTarefa(id: string) {
-    await enviar(`/api/tasks/${id}`, "PATCH", { done: true });
-    await carregar();
-  }
+  // Concluir passa pelo diálogo (resultado + próximo passo obrigatório).
+  const { abrir: concluirTarefa, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => {
+    void carregar();
+  });
 
   const funilEscolhido = funis.find((f) => f.id === formNegocio.funilId);
   const capturados = Object.entries(contato?.customFields ?? {}).filter(([k]) => !k.startsWith("__"));
@@ -412,7 +413,7 @@ export function PainelDoCliente({
               <div className="flex flex-col gap-1">
                 {(ctx?.tarefas ?? []).map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-1.5 py-1.5 hover:bg-surface-2">
-                    <Checkbox checked={false} onCheckedChange={() => concluirTarefa(t.id)} />
+                    <Checkbox checked={false} onCheckedChange={() => concluirTarefa(t)} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12.5px] text-text-primary">{t.text}</span>
                       {t.dueAt && (
@@ -469,6 +470,7 @@ export function PainelDoCliente({
         />
       )}
       {mudanca.elementos}
+      {dialogoDeConclusao}
     </aside>
   );
 }

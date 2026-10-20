@@ -24,6 +24,8 @@ import {
 } from "./linha-do-tempo";
 import { IconeDoCanal, dataLonga } from "./pecas";
 import { mensagemDeErro, type NegocioDaFicha } from "./use-ficha";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
+import { TIPOS_DE_TAREFA } from "@/lib/tarefas/tipos";
 
 export type AbaDaAtividade = "atividade" | "notas" | "tarefas";
 
@@ -324,7 +326,7 @@ function NovaNota({ dealId, onCriada, compacto }: { dealId: string; onCriada: ()
 
 // ---- tarefas ----
 
-const TIPOS = ["ligar", "email", "reuniao", "outro"] as const;
+const TIPOS = TIPOS_DE_TAREFA;
 
 function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; agora: Date; recarregar: () => Promise<void> }) {
   const [texto, setTexto] = React.useState("");
@@ -362,14 +364,25 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
     }
   }
 
-  async function alternar(id: string, feita: boolean) {
+  // Concluir abre o diálogo (resultado + próximo passo obrigatório);
+  // desmarcar reabre direto.
+  const { abrir: abrirConclusao, dialogo } = useConcluirTarefa(() => {
+    recarregar();
+  });
+
+  async function alternar(t: { id: string; type: string; text: string }, feita: boolean) {
+    if (!feita) {
+      abrirConclusao(t);
+      return;
+    }
+    const id = t.id;
     setAlternando(id);
     setErro(null);
     try {
       const res = await fetch(`/api/tasks/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ done: !feita }),
+        body: JSON.stringify({ done: false }),
       });
       if (!res.ok) setErro(await mensagemDeErro(res, "Não foi possível atualizar a tarefa."));
       await recarregar();
@@ -439,7 +452,7 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
                   id={idDoCheck}
                   checked={!!t.doneAt}
                   disabled={alternando === t.id}
-                  onCheckedChange={() => alternar(t.id, !!t.doneAt)}
+                  onCheckedChange={() => alternar(t, !!t.doneAt)}
                   aria-label={t.doneAt ? `Reabrir tarefa: ${t.text}` : `Concluir tarefa: ${t.text}`}
                   className="mt-0.5 focus-visible:ring-2 focus-visible:ring-accent-500/60"
                 />
@@ -464,6 +477,7 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
           })}
         </ul>
       )}
+      {dialogo}
     </div>
   );
 }

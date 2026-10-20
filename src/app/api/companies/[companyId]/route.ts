@@ -102,6 +102,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     })),
     tasks: tasks.map((t) => ({
       id: t.id,
+      type: t.type,
       text: t.text,
       dueAt: t.dueAt?.toISOString() ?? null,
       doneAt: t.doneAt?.toISOString() ?? null,

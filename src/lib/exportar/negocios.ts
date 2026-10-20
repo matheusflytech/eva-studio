@@ -74,9 +74,9 @@ export function situacaoDaEtapa(tipo: string): string {
   return SITUACAO[tipo] ?? "Em andamento";
 }
 
-const TIPO_DE_TAREFA: Record<string, string> = { ligar: "Ligar", email: "E-mail", reuniao: "Reunião" };
+const TIPO_DE_TAREFA: Record<string, string> = { ligar: "Ligar", whatsapp: "WhatsApp", email: "E-mail", reuniao: "Reunião", visita: "Visita" };
 
-/** "Ligar: confirmar proposta". Tarefa do tipo "outro" fica só com o texto. */
+/** "Ligar: confirmar proposta". Tarefa "a fazer" (ou o antigo "outro") fica só com o texto. */
 export function descreverTarefa(t: NegocioParaExportar["nextTask"]): string {
   if (!t) return "";
   const tipo = TIPO_DE_TAREFA[t.type];

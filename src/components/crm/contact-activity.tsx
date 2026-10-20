@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DealDrawer } from "@/components/crm/deal-drawer";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { cn, formatRelativeDate } from "@/lib/utils";
 
 interface DealRow {
@@ -102,11 +103,19 @@ export function ContactActivity({
     carregar();
   }
 
-  async function alternarTarefa(id: string, feita: boolean) {
-    await fetch(`/api/tasks/${id}`, {
+  // Concluir abre o diálogo (resultado + próximo passo obrigatório);
+  // desmarcar reabre direto.
+  const { abrir: abrirConclusao, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => carregar());
+
+  async function alternarTarefa(t: TaskRow, feita: boolean) {
+    if (!feita) {
+      abrirConclusao(t);
+      return;
+    }
+    await fetch(`/api/tasks/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !feita }),
+      body: JSON.stringify({ done: false }),
     });
     carregar();
   }
@@ -188,7 +197,7 @@ export function ContactActivity({
             const atrasada = !t.doneAt && !!t.dueAt && new Date(t.dueAt).getTime() < Date.now();
             return (
               <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-surface-2">
-                <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t.id, !!t.doneAt)} />
+                <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t, !!t.doneAt)} />
                 <span className="min-w-0 flex-1">
                   <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
                     {t.text}
@@ -301,6 +310,7 @@ export function ContactActivity({
           onChanged={carregar}
         />
       )}
+      {dialogoDeConclusao}
     </div>
   );
 }
