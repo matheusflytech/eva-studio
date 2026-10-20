@@ -22,7 +22,7 @@ design system com a identidade da Eva.
 | # | Melhoria | O que falta hoje | Skill |
 |---|---|---|---|
 | 1 | ✅ **(feito — ver notas abaixo)** **Regras por etapa**: campos obrigatórios ao entrar na etapa (nunca na criação), motivos de perda configuráveis por funil (lista, não texto livre), "parado" com prazo por etapa (hoje 7 dias fixos) | Só texto livre em `lostReason`; `DIAS_PARADO = 7` para tudo; nenhum campo exigido por etapa | crm-pipeline-kanban |
-| 2 | **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
+| 2 | ✅ **(feito — ver notas abaixo)** **Lixeira e desfazer**: exclusão vira soft delete com restauração (30 dias), "Desfazer" depois de apagar/mover/arquivar | Apagar negócio/contato apaga de vez, em cascata com tarefas e notas | crm-data-model (+ princípio 3 do blueprint) |
 | 3 | **Tarefas de verdade**: tipos WhatsApp e visita, conclusão com resultado (falou / não atendeu / remarcou) e **próximo passo obrigatório**, adiar (snooze) que também empurra a previsão do negócio, tela "Meu dia" (atrasadas, hoje, próximas) com fila "Concluir e próximo" | Tipos ligar/e-mail/reunião/outro; concluir é só marcar | crm-tasks-agenda |
 | 4 | **Busca global ⌘K / Ctrl+K**: contatos, empresas, negócios por nome, telefone (qualquer pedaço), e-mail, CNPJ; ações rápidas | Não existe | crm-list-views-search |
 | 5 | **Visões salvas** (fase L4) e **ações em massa por filtro** (fase L5) | Abas fixas; seleção sem ações | crm-list-views-search |
@@ -67,6 +67,56 @@ design system com a identidade da Eva.
 - **Pendente:** gaveta antiga do negócio ainda edita `lostReason` como texto
   livre; aprovação de etapa (crm-approvals) e automações por etapa ficam para
   os itens 17 e 18.
+
+### Notas do item 2 (lixeira e desfazer) — feito em 20/10/2026
+
+- **Decisão: lixeira por "foto" (B), não soft delete (A).** Soft delete exigiria
+  filtrar `deletedAt` em toda leitura (listas, busca, dashboard, analytics,
+  exportação, API v1, filtro-crm, flow-engine, dedupe, sequências, disparos…):
+  uma leitura esquecida vira registro "fantasma", e coluna nova em tabela
+  existente quebra o Prisma até o SQL ser aplicado. A foto é só aditiva (uma
+  tabela nova), nenhuma leitura muda e o app funciona sem o SQL.
+- **Onde mora:** parte pura (foto → plano de restauração, avisos, expiração,
+  corpo do desfazer) em `src/lib/lixeira.ts`; banco em
+  `src/lib/server/lixeira.ts` (`apagarComLixeira`, `restaurarDaLixeira`,
+  `listarLixeira`, `limparLixeiraVencida`, `apagarParaSempre`); permissão e
+  resposta das rotas em `src/lib/server/lixeira-http.ts`.
+- **Foto:** negócio = registro + contatos (`DealContact`), tarefas, notas,
+  `DealStageEvent`, itens, valor manual, perda, última atividade, ids
+  externos; contato = registro + canais, etiquetas, vínculos com negócios,
+  tarefas, notas, inscrições em sequência, conversas ligadas, ids externos;
+  empresa = registro + ids dos contatos e negócios ligados (SetNull no banco).
+  Gravada na mesma transação do DELETE, junto com a lápide de
+  `eva_studio_deleted_records` (removida ao restaurar).
+- **Restaurar:** mesmos ids, numa transação. Etapa apagada → primeira etapa
+  aberta do funil (funil apagado → de outro funil), reaberto, com evento de
+  etapa novo; empresa/responsável/contato/produto sumidos → sem vínculo;
+  canal já usado por outra ficha (a pessoa falou de novo) fica na outra;
+  conversa religada só se continua sem ficha; id externo já usado não volta.
+  Cada caso vira um aviso na resposta/toast. Vencido: 410; já restaurado: 409.
+- **Rotas:** `DELETE /api/deals|contacts|companies/[id]` → lixeira
+  (`{ lixeira: { id, expiresAt } }`); sem a tabela: 409
+  `lixeira_indisponivel`, e a tela confirma e manda `?definitivo=1`.
+  `GET /api/lixeira` (busca, tipo) e `POST /api/lixeira` (`restaurar`,
+  `apagar_para_sempre`). API v1: DELETE vai para a lixeira (sem a tabela,
+  apaga de vez com `warning`); `POST /v1/{contacts|companies|deals}/{id}/restore`
+  (no OpenAPI).
+- **Permissão:** ver/restaurar = poder apagar aquele tipo (negocios:apagar,
+  contatos:apagar, empresas:gerenciar), no escopo do papel (sempre vê o que
+  ela mesma apagou); "Apagar para sempre" = `lixeira:esvaziar` (novo; dono e
+  admin, fora dos pacotes antigos).
+- **Telas:** Configurações → Lixeira (busca, tipo, quem apagou, quando,
+  "expira em N dias", Restaurar, Apagar para sempre com confirmação
+  digitada). Toast com Desfazer (6 s): apagar negócio (ficha e gaveta),
+  contato e empresa (sem `window.confirm`); mover etapa no quadro, prévia,
+  ficha e gaveta (volta pelo mesmo PATCH/`moveDealStage`, origem
+  `usuario`, com as regras; ganho/perdido reabrem na anterior; reabrir um
+  perdido não oferece desfazer porque voltar pediria o motivo); arquivar.
+- **Relógio:** `/api/internal/scheduler` apaga as vencidas (`lixeira.expiradas`).
+- **Banco:** `prisma/sql/2026-10-20-lixeira.sql` (só aditivo; não aplicado).
+- **Pendente:** lixeira de tarefa e nota (hoje apagam de vez); desfazer no
+  painel da conversa (inbox) e na lista de negócios (não move etapa);
+  "esvaziar lixeira" em lote; RLS na tabela nova junto com o item 22.
 
 ## P1
 
