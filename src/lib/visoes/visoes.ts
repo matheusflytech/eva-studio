@@ -1,4 +1,4 @@
-import { FILTROS_VAZIOS, LIMITE_DE_CONDICOES, LIMITE_DE_GRUPOS, type FiltrosDeConsulta } from "@/lib/consulta";
+import { FILTROS_VAZIOS, LIMITE_DE_CONDICOES, LIMITE_DE_GRUPOS, type FiltroDeConsulta, type FiltrosDeConsulta, type GrupoDeFiltros } from "@/lib/consulta";
 import { campoCrm, type EntidadeCrm } from "@/lib/filtro-crm";
 import {
   estadoVazio,
@@ -91,14 +91,14 @@ function avancadoGuardado(v: unknown): FiltrosDeConsulta {
     grupos: b.grupos
       .filter((g) => g && Array.isArray(g.condicoes) && g.condicoes.length > 0)
       .slice(0, LIMITE_DE_GRUPOS)
-      .map((g) => ({
+      .map((g): GrupoDeFiltros => ({
         logica: g.logica === "ou" ? "ou" : "e",
         condicoes: g.condicoes
           .filter((c) => c && typeof c === "object" && typeof c.campo === "string" && typeof c.op === "string")
           .slice(0, LIMITE_DE_CONDICOES)
-          .map((c) => ({
+          .map((c): FiltroDeConsulta => ({
             campo: c.campo.slice(0, 44),
-            op: c.op.slice(0, 20),
+            op: c.op.slice(0, 20) as FiltroDeConsulta["op"],
             ...(typeof c.valor === "string" ? { valor: c.valor.slice(0, 200) } : {}),
             ...(typeof c.ate === "string" ? { ate: c.ate.slice(0, 200) } : {}),
             ...(Array.isArray(c.valores) ? { valores: ids(c.valores, 100) } : {}),

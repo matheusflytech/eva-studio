@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEM_VALOR } from "@/lib/consulta";
+import { SEM_VALOR, type FiltrosDeConsulta } from "@/lib/consulta";
 import { diferencasDaBase, estadoParaUrl, estadoVazio, lerEstadoDaUrl, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
 import {
   VISOES_DE_SISTEMA,
@@ -97,11 +97,11 @@ describe("URL: id da visão + só as alterações não salvas", () => {
 });
 
 describe("campo removido", () => {
-  const av = {
-    logica: "e" as const,
+  const av: FiltrosDeConsulta = {
+    logica: "e",
     grupos: [
-      { logica: "e" as const, condicoes: [{ campo: "cf:plano", op: "eq", valor: "x" }, { campo: "email", op: "vazio" }] },
-      { logica: "ou" as const, condicoes: [{ campo: "sumiu", op: "vazio" }] },
+      { logica: "e", condicoes: [{ campo: "cf:plano", op: "eq", valor: "x" }, { campo: "email", op: "vazio" }] },
+      { logica: "ou", condicoes: [{ campo: "sumiu", op: "vazio" }] },
     ],
   };
 

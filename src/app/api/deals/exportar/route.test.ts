@@ -148,3 +148,25 @@ describe("GET /api/deals/exportar", () => {
     expect(funil.coletarFunil).toHaveBeenCalledWith("org", expect.any(Date), expect.any(Date), "p1", { donos: undefined });
   });
 });
+
+describe("GET /api/deals/exportar com o filtro do motor (L5)", () => {
+  it("?filtro= vira where do motor, preso ao contrato e ao funil; filtros antigos não valem", async () => {
+    const res = await get(`pipeline=p1&filtro=${encodeURIComponent(JSON.stringify({ busca: "solar" }))}&dono=u2`);
+    expect(res.status).toBe(200);
+    const where = db.deal.findMany.mock.calls[0][0].where;
+    const texto = JSON.stringify(where);
+    expect(texto).toContain('"orgId":"org"');
+    expect(texto).toContain('"pipelineId":"p1"');
+    expect(texto).toContain("solar");
+    expect(texto).toContain('"archivedAt":null');
+    // os dois negócios do mock saem (o "dono=u2" antigo foi ignorado)
+    const csv = await res.text();
+    expect(csv).toContain("Primeiro");
+    expect(csv).toContain("Segundo");
+  });
+
+  it("?ids= exporta só a seleção", async () => {
+    await get("pipeline=p1&ids=a,b,<x>");
+    expect(JSON.stringify(db.deal.findMany.mock.calls[0][0].where)).toContain('"id":{"in":["a","b"]}');
+  });
+});

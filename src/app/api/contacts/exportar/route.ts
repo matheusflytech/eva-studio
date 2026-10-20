@@ -6,7 +6,7 @@ import { orderByDe, resolverConjunto, whereDeContatos } from "@/lib/server/filtr
 import { atalhosDeContato, comBusca } from "@/lib/server/listas-crm";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { lerOrdenacao } from "@/lib/filtro-crm";
-import { disposicaoDeAnexo, hojeSP } from "@/lib/exportar/csv";
+import { disposicaoDeAnexo, hojeSP, lerIds } from "@/lib/exportar/csv";
 import { LIMITE_DE_EXPORTACAO_DE_CONTATOS, csvDosContatos } from "@/lib/exportar/contatos";
 
 // GET /api/contacts/exportar — planilha (CSV) do que a lista de contatos está
@@ -14,6 +14,7 @@ import { LIMITE_DE_EXPORTACAO_DE_CONTATOS, csvDosContatos } from "@/lib/exportar
 // GET /api/contacts, sem paginação (até LIMITE_DE_EXPORTACAO_DE_CONTATOS).
 //   ?filtro=<JSON> &q= &tag= &segment= &company= &sort= &dir=
 //   ?contrato=<id>  download por <a href> não passa pelo fetch do app
+//   ?ids=a,b,c      só estes (ação em massa da seleção; até 500), sempre dentro do filtro/escopo
 export async function GET(request: Request) {
   const sp = new URL(request.url).searchParams;
   const ctx = await requirePermission("contatos:exportar", { contrato: sp.get("contrato") });
@@ -26,10 +27,11 @@ export async function GET(request: Request) {
     extras: atalhosDeContato({ tag: ler("tag"), segment: ler("segment"), company: ler("company") }),
   });
   const r = await resolverConjunto(w, { orderBy });
+  const ids = lerIds(sp.get("ids"));
 
   const [linhas, defs] = await Promise.all([
     prisma.contact.findMany({
-      where: r.where,
+      where: ids.length ? { AND: [r.where, { id: { in: ids } }] } : r.where,
       orderBy,
       take: LIMITE_DE_EXPORTACAO_DE_CONTATOS + 1,
       select: {

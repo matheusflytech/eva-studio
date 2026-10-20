@@ -4,6 +4,8 @@ import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { lerLayoutDoFunil } from "@/lib/server/layout-do-cartao";
 import { itensPorNegocio } from "@/lib/server/produtos";
 import { filtroDeEscopo } from "@/lib/server/escopo-dados";
+import { resolverConjunto, whereDeNegocios } from "@/lib/server/filtro-crm";
+import type { Prisma } from "@/generated/prisma/client";
 import type { EscoposDoPapel } from "@/lib/permissoes/catalogo";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
@@ -48,8 +50,13 @@ export async function carregarExportacao(
   pipelineId: string | undefined,
   filtros: FiltrosDaExportacao,
   agora = new Date(),
-  /** Traz os itens (produtos) de cada negócio — a planilha usa, o relatório não. */
-  opcoes: { itens?: boolean } = {}
+  /**
+   * itens: traz os itens (produtos) de cada negócio — a planilha usa, o relatório não.
+   * filtro: o filtro do motor (o mesmo da tela: barra, avançados, visão, busca);
+   * com ele, os filtros antigos (busca/dono/visão) são ignorados.
+   * ids: só estes negócios (exportar a seleção), sempre dentro do contrato e do escopo.
+   */
+  opcoes: { itens?: boolean; filtro?: unknown; ids?: string[] } = {}
 ): Promise<DadosDaExportacao | null> {
   // Sem funil pedido: o padrão (ou o primeiro). Só leitura; exportar não cria funil.
   const pipeline = await prisma.pipeline.findFirst({
@@ -59,14 +66,30 @@ export async function carregarExportacao(
   });
   if (!pipeline) return null;
 
-  const linhas = await prisma.deal.findMany({
-    where: {
+  // Filtro novo (motor da tela) ou seleção: where exato do motor, preso ao
+  // contrato, ao escopo e a este funil. Sem eles, o caminho antigo.
+  const doMotor = opcoes.filtro !== undefined || (opcoes.ids?.length ?? 0) > 0;
+  let where: Prisma.DealWhereInput;
+  if (doMotor) {
+    const w = await whereDeNegocios(ctx, opcoes.filtro ?? null, {
+      agora,
+      extras: [{ campo: "funil", op: "qualquer", valores: [pipeline.id] }],
+      incluirArquivados: filtros.arquivados,
+    });
+    const r = await resolverConjunto(w);
+    where = { AND: [r.where, { pipelineId: pipeline.id }, ...(opcoes.ids?.length ? [{ id: { in: opcoes.ids } }] : [])] };
+  } else {
+    where = {
       orgId: ctx.orgId,
       pipelineId: pipeline.id,
       ...(filtros.arquivados ? {} : { archivedAt: null }),
       // Exporta só o que o papel deixa ver ("só os meus" / "da equipe").
       ...(await filtroDeEscopo(ctx, "negocios")),
-    },
+    };
+  }
+
+  const linhas = await prisma.deal.findMany({
+    where,
     include: {
       company: { select: { id: true, name: true } },
       owner: { select: { id: true, name: true } },
@@ -115,7 +138,7 @@ export async function carregarExportacao(
     customFields: (d.customFields ?? {}) as Record<string, unknown>,
   }));
 
-  if (filtros.busca || filtros.dono || filtros.visao) {
+  if (!doMotor && (filtros.busca || filtros.dono || filtros.visao)) {
     negocios = aplicarFiltrosDaTela(etapas, negocios, { ...filtros, meuId: ctx.userId }, agora);
   }
 

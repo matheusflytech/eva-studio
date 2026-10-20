@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { coletarFunil } from "@/lib/server/funil-dados";
 import { carregarExportacao, lerFiltrosDaUrl } from "@/lib/exportar/dados";
-import { disposicaoDeAnexo, hojeSP, slugDoArquivo } from "@/lib/exportar/csv";
+import { disposicaoDeAnexo, hojeSP, lerIds, slugDoArquivo } from "@/lib/exportar/csv";
 import {
   LIMITE_DE_EXPORTACAO,
   csvDosItens,
@@ -17,7 +17,9 @@ const DIA = 86_400_000;
 // Exportação do funil de negócios.
 //   ?pipeline=<id>         padrão: o funil padrão da org
 //   ?formato=csv|json      csv baixa a planilha; json alimenta o relatório em PDF
-//   ?busca= &dono= &visao= os mesmos filtros da tela de Negócios (opcionais)
+//   ?filtro=<JSON>         o filtro do motor (o mesmo da tela: barra, avançados, visão, busca)
+//   ?ids=a,b,c             só estes (exportar a seleção; até 500)
+//   ?busca= &dono= &visao= filtros antigos (quando não há ?filtro=; links e relatórios antigos)
 //   ?arquivados=1          inclui arquivados
 //   ?itens=1               (csv) uma linha por item/produto do negócio
 //   ?dias=90               janela do relatório (ganho, taxa de ganho, ciclo, conversão)
@@ -32,7 +34,13 @@ export async function GET(request: Request) {
   const filtros = lerFiltrosDaUrl(url.searchParams);
   const agora = new Date();
 
-  const dados = await carregarExportacao(ctx, pipelineId, filtros, agora, { itens: formato === "csv" });
+  const filtroDoMotor = url.searchParams.get("filtro");
+  const ids = lerIds(url.searchParams.get("ids"));
+  const dados = await carregarExportacao(ctx, pipelineId, filtros, agora, {
+    itens: formato === "csv",
+    ...(filtroDoMotor !== null ? { filtro: filtroDoMotor } : {}),
+    ...(ids.length ? { ids } : {}),
+  });
   if (!dados) return NextResponse.json({ error: "Funil não encontrado." }, { status: 404 });
 
   const aviso = dados.truncado

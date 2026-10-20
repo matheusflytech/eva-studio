@@ -115,3 +115,8 @@ export function disposicaoDeAnexo(arquivo: string): string {
   const ascii = arquivo.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(arquivo)}`;
 }
+
+/** ?ids=a,b,c da exportação da seleção (ação em massa): só ids válidos, até 500. */
+export function lerIds(bruto: string | null): string[] {
+  return [...new Set((bruto ?? "").split(",").map((s) => s.trim()).filter((s) => /^[A-Za-z0-9_-]{1,64}$/.test(s)))].slice(0, 500);
+}

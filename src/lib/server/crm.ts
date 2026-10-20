@@ -232,6 +232,11 @@ export interface OpcoesDaMudanca {
   pendente?: Partial<EstadoDoNegocio> & { contatosNovos?: number };
   /** Só valida (lança ErroDaMudanca), sem gravar nada. */
   simular?: boolean;
+  /**
+   * Ação em massa: em vez de gravar o histórico de etapa na hora, entrega o
+   * evento para quem chamou gravar em lote (registrarMudancasEmLote).
+   */
+  historicoEmLote?: (evento: { orgId: string; dealId: string; pipelineId: string; fromStageId: string | null; toStageId: string }) => void;
 }
 
 /**
@@ -311,15 +316,19 @@ export async function moveDealStage(dealId: string, stageId: string, opcoes: Opc
   if (stage.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, perda);
   else if (atual?.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, null);
 
-  await registrarMudancaDeEtapa({
-    orgId: atualizado.orgId,
-    dealId,
-    pipelineId: atualizado.pipelineId,
-    fromStageId: antes.stageId,
-    toStageId: stageId,
-    origem,
-    ignorouObrigatorios: ignorou,
-  });
+  if (opcoes.historicoEmLote && !ignorou) {
+    opcoes.historicoEmLote({ orgId: atualizado.orgId, dealId, pipelineId: atualizado.pipelineId, fromStageId: antes.stageId, toStageId: stageId });
+  } else {
+    await registrarMudancaDeEtapa({
+      orgId: atualizado.orgId,
+      dealId,
+      pipelineId: atualizado.pipelineId,
+      fromStageId: antes.stageId,
+      toStageId: stageId,
+      origem,
+      ignorouObrigatorios: ignorou,
+    });
+  }
 
   if (stage.type === "lost" && opcoes.followUpDias) {
     await createTask({
