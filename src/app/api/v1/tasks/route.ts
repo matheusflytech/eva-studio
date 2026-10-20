@@ -40,6 +40,7 @@ export const POST = rotaV1({ recurso: "tasks" }, async (ctx) => {
     dealId: d.dealId ?? null,
     assignedToId: d.assignedToId ?? null,
     dueAt: d.dueAt ?? null,
+    origem: "automacao",
   });
   const final = d.done ? await prisma.task.update({ where: { id: task.id }, data: { doneAt: new Date() } }) : task;
   if (d.done) await tocarAtividadeDaTarefa(final);

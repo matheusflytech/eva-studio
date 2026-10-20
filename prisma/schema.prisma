@@ -1352,7 +1352,7 @@ model Task {
   contactId    String?
   dealId       String?
   assignedToId String?
-  type         String    @default("ligar") // ligar | email | reuniao | outro
+  type         String    @default("ligar") // ligar | whatsapp | email | reuniao | visita | afazer ("outro" antigo = afazer; src/lib/tarefas/tipos.ts)
   text         String    @db.Text
   dueAt        DateTime?
   doneAt       DateTime?
@@ -1363,9 +1363,14 @@ model Task {
   contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
   assignedTo   Profile?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // Só relação (nenhuma coluna nova em eva_studio_tasks): sem o SQL das
+  // tarefas (2026-10-20-tarefas.sql) a tarefa continua funcionando.
+  details      TaskDetail?
 
   @@index([orgId, doneAt, dueAt])
   @@index([assignedToId, doneAt])
+  // Minhas/Equipe e Meu dia (prisma/sql/2026-10-20-tarefas.sql).
+  @@index([orgId, assignedToId, doneAt, dueAt])
   @@index([contactId])
   @@index([dealId])
   @@map("eva_studio_tasks")
@@ -1692,4 +1697,33 @@ model TeamMember {
   @@id([teamId, userId])
   @@index([userId])
   @@map("eva_studio_team_members")
+}
+
+// Detalhes da tarefa (item 3 de docs/superpowers/plans/2026-10-20-melhorias-crm-skills.md):
+// dia todo, prioridade, duração, origem e o fluxo de conclusão (resultado,
+// nota e a decisão do próximo passo). Tabela à parte de propósito: coluna nova
+// em eva_studio_tasks quebraria toda leitura de tarefa até o SQL ser aplicado.
+// Sem linha = padrão (normal, manual, duração do tipo; dia todo deduzido da
+// hora 23:59 de SP). Leitura e escrita toleram a tabela ausente
+// (src/lib/server/tarefas-detalhes.ts).
+model TaskDetail {
+  taskId           String    @id
+  orgId            String
+  allDay           Boolean   @default(false)
+  priority         String    @default("normal") // normal | alta
+  durationMin      Int?
+  origin           String    @default("manual") // manual | automacao | ia
+  outcome          String? // falou | nao_atendeu | remarcou | outro
+  outcomeNote      String?   @db.Text
+  // agendou | sem_proximo — a escolha obrigatória do "Agendar próxima atividade?".
+  nextStepDecision String?
+  nextTaskId       String?
+  completedById    String?
+  snoozedCount     Int       @default(0)
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_task_details")
 }

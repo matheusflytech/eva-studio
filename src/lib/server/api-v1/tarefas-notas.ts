@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { Note, Prisma, Task } from "@/generated/prisma/client";
 import { conferirReferencias, type Corpo } from "@/lib/server/api-validacao";
 import { TIPOS_DE_TAREFA, parseRelativeDue } from "@/lib/server/crm";
+import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
 import { ErroApi, iso } from "./http";
 import { boolOpc, dataOpc, enumOpc, idOpc, textoOpc } from "./entrada";
 import { lerDataDaConsulta } from "./paginacao";
@@ -61,7 +62,9 @@ export interface DadosDeTarefa {
 export async function lerDadosDeTarefa(orgId: string, corpo: Corpo): Promise<DadosDeTarefa> {
   const d: DadosDeTarefa = {};
   d.text = textoOpc(corpo, "text", 5000);
-  d.type = enumOpc(corpo, "type", TIPOS_DE_TAREFA);
+  // ligar | whatsapp | email | reuniao | visita | afazer (o antigo "outro" é gravado como afazer).
+  const tipo = enumOpc(corpo, "type", TIPOS_DE_TAREFA);
+  d.type = tipo === undefined ? undefined : normalizarTipoDeTarefa(tipo) ?? tipo;
   d.dueAt = dataOpc(corpo, "due_at");
   const relativo = textoOpc(corpo, "due", 40);
   if (d.dueAt === undefined && relativo) {

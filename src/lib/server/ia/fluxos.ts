@@ -7,6 +7,7 @@ import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
 import { SAIDA_INVALIDA, variavelDaCaptura } from "@/lib/capture-validation";
+import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
 
 // ---------------------------------------------------------------------------
 // Rascunho de fluxo do agente (construtor de blocos) montado pela IA.
@@ -556,7 +557,7 @@ function montarBloco(
 
     case "crm-task": {
       const tipo = str(b.crmTaskType, 20);
-      data.crmTaskType = ["ligar", "email", "reuniao", "outro"].includes(tipo) ? tipo : "ligar";
+      data.crmTaskType = normalizarTipoDeTarefa(tipo) ?? "ligar";
       const txt = str(b.crmTaskText, 300);
       if (txt) data.crmTaskText = txt;
       const prazo = str(b.crmTaskDue, 30);
@@ -733,7 +734,7 @@ const CAMPOS_POR_BLOCO = `Campos por bloco:
 - end: detail opcional (despedida). Termina o fluxo, sem saída.
 - crm-deal (cria negócio e vincula o contato): crmPipelineId e crmStageId do catálogo, crmDealName (ex.: "Negócio de {nome}"), crmDealAmount opcional, crmFieldMap opcional [{ "key": key de campo de negócio do catálogo, "value": "{variavel}" }].
 - crm-stage (move o negócio aberto): crmStageId do catálogo.
-- crm-task: crmTaskType "ligar" | "email" | "reuniao" | "outro", crmTaskText, crmTaskDue (ex.: "+1 dia", "3h").
+- crm-task: crmTaskType "ligar" | "whatsapp" | "email" | "reuniao" | "visita" | "afazer", crmTaskText, crmTaskDue (ex.: "+1 dia", "3h").
 - crm-tag: crmTagId do catálogo e crmTagAction "add" | "remove".
 - crm-update: crmUpdateTarget "deal" | "contact", crmFieldMap [{ "key", "value" }].
 - crm-note: crmNoteText.

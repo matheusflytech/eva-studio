@@ -387,9 +387,10 @@ async function runCrmTool(
         orgId,
         contactId,
         dealId: deal.id,
-        type: "outro",
+        type: "afazer",
         text: `Revisar negócio "${deal.name}" criado pela IA acima do teto.`,
         dueAt: new Date(Date.now() + 86_400_000),
+        origem: "ia",
       });
       return `Negócio criado e marcado para revisão humana (valor acima do teto).`;
     }
@@ -457,7 +458,9 @@ async function runCrmTool(
       contactId,
       dealId: deal?.id ?? null,
       text: String(args.texto ?? ""),
+      type: typeof args.tipo === "string" ? args.tipo : undefined,
       dueAt: parseRelativeDue(String(args.prazo ?? "+1 dia")),
+      origem: "ia",
     });
     return "Tarefa criada.";
   }
@@ -604,6 +607,7 @@ async function runAiAgent(
             params: [
               { name: "texto", description: "O que precisa ser feito." },
               { name: "prazo", description: 'Prazo relativo, ex: "+2 dias", "3h".', required: false },
+              { name: "tipo", description: "ligar, whatsapp, email, reuniao, visita ou afazer (padrão: ligar).", required: false },
             ],
           },
         },
@@ -1327,6 +1331,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
             dealId: deal?.id ?? null,
             assignedToId: node.data.crmTaskAssigneeId || null,
             dueAt: parseRelativeDue(node.data.crmTaskDue ?? ""),
+            origem: "automacao",
           });
           output = `tarefa ${task.type}`;
         }

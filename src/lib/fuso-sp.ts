@@ -22,7 +22,7 @@ const partes = new Intl.DateTimeFormat("en-US", {
   second: "2-digit",
 });
 
-interface Partes {
+export interface Partes {
   ano: number;
   mes: number;
   dia: number;
@@ -31,7 +31,7 @@ interface Partes {
   segundo: number;
 }
 
-function partesEmSP(data: Date): Partes {
+export function partesEmSP(data: Date): Partes {
   const p: Record<string, string> = {};
   for (const { type, value } of partes.formatToParts(data)) p[type] = value;
   return {
@@ -51,7 +51,7 @@ function offsetSP(instante: Date): number {
   return comoUtc - Math.floor(instante.getTime() / 1000) * 1000;
 }
 
-function deParedeSP(ano: number, mes: number, dia: number, hora: number, minuto: number, segundo = 0): Date {
+export function deParedeSP(ano: number, mes: number, dia: number, hora: number, minuto: number, segundo = 0): Date {
   const comoUtc = Date.UTC(ano, mes - 1, dia, hora, minuto, segundo);
   // Duas passadas resolvem a borda de troca de offset.
   let t = comoUtc - offsetSP(new Date(comoUtc));

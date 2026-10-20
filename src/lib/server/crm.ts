@@ -7,6 +7,8 @@ import { registrarMudancaDeEtapa, type OrigemDoMovimento } from "@/lib/server/st
 import { ErroDaMudanca, conferirMudanca, estadoDoNegocio, gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
 import { tocarAtividade, tocarAtividadeDosContatos } from "@/lib/server/atividade-do-negocio";
 import { resolverPerda, type EntradaDaPerda, type EstadoDoNegocio, type PerdaResolvida } from "@/lib/regras-de-etapa";
+import { TIPOS_ACEITOS, normalizarTipoDeTarefa, type OrigemDaTarefa, type Prioridade } from "@/lib/tarefas/tipos";
+import { gravarDetalhes } from "@/lib/server/tarefas-detalhes";
 
 export { ErroDaMudanca };
 
@@ -90,8 +92,11 @@ export function statusDaReferencia(mensagem: string): 400 | 404 {
   return mensagem.endsWith("inválido.") ? 400 : 404;
 }
 
-/** Tipos de tarefa que as telas e o Builder oferecem. */
-export const TIPOS_DE_TAREFA = ["ligar", "email", "reuniao", "outro"] as const;
+/**
+ * Tipos de tarefa aceitos na entrada (telas, Builder, IA, API v1): os seis
+ * novos + o antigo "outro" (gravado como "afazer"). Ver src/lib/tarefas/tipos.ts.
+ */
+export const TIPOS_DE_TAREFA = TIPOS_ACEITOS;
 
 /**
  * Etapa onde um negócio novo entra, sempre dentro da org. Sem etapa, cai na
@@ -324,6 +329,7 @@ export async function moveDealStage(dealId: string, stageId: string, opcoes: Opc
       type: "ligar",
       text: `Retomar contato (perdido: ${perda?.rotulo || "sem motivo"})`,
       dueAt: new Date(Date.now() + opcoes.followUpDias * 86_400_000),
+      origem: "automacao",
     });
   }
 
@@ -351,20 +357,39 @@ export interface CreateTaskInput {
   dealId?: string | null;
   assignedToId?: string | null;
   dueAt?: Date | null;
+  /** De onde veio: manual (tela), automacao (fluxo, régua, API), ia. */
+  origem?: OrigemDaTarefa;
+  diaTodo?: boolean;
+  prioridade?: Prioridade;
+  duracaoMin?: number | null;
 }
 
 export async function createTask(input: CreateTaskInput) {
-  return prisma.task.create({
+  const task = await prisma.task.create({
     data: {
       orgId: input.orgId,
       text: input.text,
-      type: input.type ?? "ligar",
+      // Tipo antigo ou apelido vira o id novo ("outro" → "afazer"); sem tipo, ligação.
+      type: normalizarTipoDeTarefa(input.type ?? "ligar") ?? "afazer",
       contactId: input.contactId ?? null,
       dealId: input.dealId ?? null,
       assignedToId: input.assignedToId ?? null,
       dueAt: input.dueAt ?? null,
     },
   });
+  // Detalhes só quando fogem do padrão (manual, normal, duração do tipo, com
+  // hora): a maioria das tarefas não precisa de linha em eva_studio_task_details.
+  const temDetalhe =
+    (input.origem && input.origem !== "manual") || input.diaTodo || input.prioridade === "alta" || (input.duracaoMin ?? 0) > 0;
+  if (temDetalhe) {
+    await gravarDetalhes(task, {
+      origin: input.origem ?? "manual",
+      allDay: !!input.diaTodo,
+      priority: input.prioridade ?? "normal",
+      durationMin: input.duracaoMin && input.duracaoMin > 0 ? Math.min(Math.round(input.duracaoMin), 1440) : null,
+    });
+  }
+  return task;
 }
 
 export async function addNote(input: {

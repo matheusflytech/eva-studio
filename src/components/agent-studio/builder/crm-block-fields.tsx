@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X } from "lucide-react";
 import { TIPO_POR_ID, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { FlowNodeData } from "./flow-node";
+import { INFO_DO_TIPO, TIPOS_DE_TAREFA, tipoParaExibir } from "@/lib/tarefas/tipos";
 
 // ---------------------------------------------------------------------------
 // Configuração dos blocos de CRM no Inspector.
@@ -345,13 +346,14 @@ export function CrmBlockFields({
             <Label htmlFor="node-task-type">Tipo</Label>
             <Select
               id="node-task-type"
-              value={data.crmTaskType ?? "ligar"}
+              value={tipoParaExibir(data.crmTaskType ?? "ligar")}
               onChange={(e) => onChange({ crmTaskType: e.target.value })}
             >
-              <option value="ligar">Ligar</option>
-              <option value="email">E-mail</option>
-              <option value="reuniao">Reunião</option>
-              <option value="outro">Outro</option>
+              {TIPOS_DE_TAREFA.map((t) => (
+                <option key={t} value={t}>
+                  {INFO_DO_TIPO[t].rotulo}
+                </option>
+              ))}
             </Select>
           </div>
           <div>
