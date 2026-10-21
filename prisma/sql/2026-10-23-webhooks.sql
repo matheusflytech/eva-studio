@@ -63,4 +63,11 @@ CREATE TABLE IF NOT EXISTS "eva_studio_agente_entradas" (
 );
 CREATE INDEX IF NOT EXISTS "eva_studio_agente_entradas_orgId_idx" ON "eva_studio_agente_entradas"("orgId");
 
+-- RLS ligada, sem política: o anon/authenticated do Supabase (chave pública
+-- do navegador) não lê nem grava estas tabelas, que guardam segredos e
+-- tokens. O app conecta como postgres (bypassrls) e não muda nada.
+ALTER TABLE "eva_studio_webhook_endpoints" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_webhook_entregas" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_agente_entradas" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

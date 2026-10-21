@@ -259,7 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
-| `2026-10-23-webhooks.sql` | Webhooks de saída (endpoints + fila de entregas) e URL de entrada do agente | **não aplicado** (app funciona sem; nenhum evento sai) |
+| `2026-10-23-webhooks.sql` | Webhooks de saída (endpoints + fila de entregas) e URL de entrada do agente, com RLS ligada | **aplicado em 21/10** (tabelas vazias) |
 | `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão | **não aplicado** (app funciona sem; nenhum e-mail novo sai) |
 | `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | aplicado em 21/10 (migrou 1 canal: o QR do Vendedor Virtual, em qr_pending, sem credenciais). Rodado 2x para provar que não duplica. App e worker em produção ainda são os antigos (modo por agente) até o deploy |
 
@@ -398,7 +398,6 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   lá dentro). Nó de ação declarativo, gatilho que assina sozinho, credencial, 3 modelos de
   workflow em `templates/`. Não publicado no npm.
 - **Pendentes:**
-  - aplicar o SQL;
   - publicar o pacote (npm com provenance via GitHub Actions) e testar num n8n de verdade;
   - campos personalizados pelo resourceMapper e polling `GET /events` ficaram para depois.
 
