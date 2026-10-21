@@ -1,8 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { validarEmail } from "@/lib/capture-validation";
-import { resolverVariaveis, type DadosDasVariaveis } from "@/lib/email/variaveis";
-import { escaparHtml, htmlParaTexto, montarHtml, simplesParaHtml, simplesParaTexto, type ModoDoCorpo } from "@/lib/email/editor";
+import type { ModoDoCorpo } from "@/lib/email/editor";
+import { montarEmail } from "@/lib/email/montar";
 import { enviarEmail } from "./resend";
 import { criarTokenDeDescadastro, linkDaPaginaDeDescadastro, linkDoDescadastroDireto } from "./descadastro";
 
@@ -39,32 +39,6 @@ export function remetenteDe(d: { remetenteNome: string; remetenteLocal: string; 
   const nome = (d.remetenteNome || nomeDoContrato).replace(/["<>]/g, "").trim();
   const endereco = `${(d.remetenteLocal || "contato").trim()}@${d.dominio}`;
   return nome ? `${nome} <${endereco}>` : endereco;
-}
-
-/** Monta assunto, HTML e texto do e-mail. Puro: a prévia do editor usa o mesmo caminho. */
-export function montarEmail(
-  c: { assunto: string; corpo: string; modo: ModoDoCorpo },
-  dados: DadosDasVariaveis,
-  rodape: { remetente: string; linkDeDescadastro: string }
-): { assunto: string; html: string; texto: string; faltando: string[] } {
-  const assunto = resolverVariaveis(c.assunto, dados);
-  if (c.modo === "html") {
-    const corpo = resolverVariaveis(c.corpo, dados, escaparHtml);
-    return {
-      assunto: assunto.texto,
-      html: montarHtml(corpo.texto, rodape, assunto.texto),
-      texto: `${htmlParaTexto(corpo.texto)}\n\nPara não receber mais: ${rodape.linkDeDescadastro}`,
-      faltando: [...new Set([...assunto.faltando, ...corpo.faltando])],
-    };
-  }
-  // Simples: resolve antes de converter; o conversor escapa tudo (inclusive os valores).
-  const corpo = resolverVariaveis(c.corpo, dados);
-  return {
-    assunto: assunto.texto,
-    html: montarHtml(simplesParaHtml(corpo.texto), rodape, assunto.texto),
-    texto: `${simplesParaTexto(corpo.texto)}\n\nPara não receber mais: ${rodape.linkDeDescadastro}`,
-    faltando: [...new Set([...assunto.faltando, ...corpo.faltando])],
-  };
 }
 
 export async function enviarEmailDoContrato(orgId: string, p: PedidoDeEnvio): Promise<ResultadoDoEnvio> {

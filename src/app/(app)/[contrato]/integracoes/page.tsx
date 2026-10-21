@@ -5,6 +5,7 @@ import { Radio, ArrowRight } from "lucide-react";
 import { CredentialsPanel } from "@/components/integrations/credentials-panel";
 import { ConexaoIaPanel } from "@/components/integrations/conexao-ia-panel";
 import { UsoIaPanel } from "@/components/integrations/uso-ia-panel";
+import { EmailPanel } from "@/components/integrations/email-panel";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 
@@ -60,6 +61,7 @@ export default function IntegracoesPage() {
 
       <ConexaoIaPanel />
       <UsoIaPanel />
+      <EmailPanel />
 
       <CredentialsPanel />
 

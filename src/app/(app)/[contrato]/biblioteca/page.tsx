@@ -11,6 +11,9 @@ import { ICON_REGISTRY, type IconKey } from "@/components/agent-studio/builder/i
 import { BLOCK_STYLES } from "@/components/agent-studio/builder/block-styles";
 import { saveFlow } from "@/lib/data/flows";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePathname, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
+import { ModelosDeEmail } from "@/components/biblioteca/modelos-de-email";
 
 // ---------------------------------------------------------------------------
 // Biblioteca.
@@ -27,7 +30,7 @@ import { cn } from "@/lib/utils";
 // porque "usar modelo" soa como adicionar e não é.
 // ---------------------------------------------------------------------------
 
-export default function BibliotecaPage() {
+function ModelosDeFluxo() {
   const { agents, isLoaded, load } = useAgentsStore();
   const [agentId, setAgentId] = React.useState("");
   const [aplicando, setAplicando] = React.useState<string | null>(null);
@@ -72,15 +75,12 @@ export default function BibliotecaPage() {
   }
 
   return (
-    <div className="flex-1 p-8">
+    <div>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary">Biblioteca</h1>
-          <p className="mt-1 max-w-2xl text-[14px] text-text-secondary">
-            Fluxos prontos para começar um agente sem montar do zero. São os mesmos modelos que o builder
-            oferece — aqui você aplica direto no agente que quiser.
-          </p>
-        </div>
+        <p className="max-w-2xl text-[14px] text-text-secondary">
+          Fluxos prontos para começar um agente sem montar do zero. São os mesmos modelos que o builder
+          oferece — aqui você aplica direto no agente que quiser.
+        </p>
 
         {agents.length > 0 && (
           <div className="min-w-[220px]">
@@ -179,6 +179,32 @@ export default function BibliotecaPage() {
           trabalho se perde.
         </p>
       )}
+    </div>
+  );
+}
+
+// Biblioteca: modelos de fluxo (aplicar num agente) e modelos de e-mail
+// (usados no bloco de e-mail do fluxo, nas réguas e nos disparos). A aba fica
+// na URL para dar para mandar o link.
+export default function BibliotecaPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const aba = useSearchParams().get("aba") === "emails" ? "emails" : "fluxos";
+  return (
+    <div className="flex-1 p-8">
+      <h1 className="mb-4 font-display text-2xl font-semibold text-text-primary">Biblioteca</h1>
+      <Tabs value={aba} onValueChange={(v) => router.replace(`${pathname}?aba=${v}`)}>
+        <TabsList className="mb-5">
+          <TabsTrigger value="fluxos">Modelos de fluxo</TabsTrigger>
+          <TabsTrigger value="emails">Modelos de e-mail</TabsTrigger>
+        </TabsList>
+        <TabsContent value="fluxos">
+          <ModelosDeFluxo />
+        </TabsContent>
+        <TabsContent value="emails">
+          <ModelosDeEmail />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

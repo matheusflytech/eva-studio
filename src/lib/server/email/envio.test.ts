@@ -12,7 +12,8 @@ const resend = vi.hoisted(() => ({ enviarEmail: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("./resend", () => resend);
 
-import { enviarEmailDoContrato, montarEmail, remetenteDe, suprimirEmail } from "./envio";
+import { enviarEmailDoContrato, remetenteDe, suprimirEmail } from "./envio";
+import { montarEmail } from "@/lib/email/montar";
 import { criarTokenDeDescadastro, lerTokenDeDescadastro } from "./descadastro";
 import { bounceDefinitivo, proximaSituacao, situacaoDoEvento } from "./eventos";
 
