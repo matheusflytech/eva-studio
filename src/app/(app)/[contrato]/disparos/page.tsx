@@ -126,12 +126,15 @@ interface Channels {
   whatsapp_qr: boolean;
   whatsapp_meta: boolean;
   telegram: boolean;
+  /** Domínio de e-mail do contrato verificado. */
+  email?: boolean;
 }
 
 const CHANNEL_LABEL: Record<string, string> = {
   whatsapp_qr: "WhatsApp (QR)",
   whatsapp_meta: "WhatsApp (Meta)",
   telegram: "Telegram",
+  email: "E-mail",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -208,6 +211,22 @@ export default function DisparosPage() {
   }, [channels, channel]);
 
   const isMeta = channel === "whatsapp_meta";
+  const isEmail = channel === "email";
+  // Disparo de e-mail: o conteúdo é um modelo da Biblioteca (um por variante).
+  const [modelosDeEmail, setModelosDeEmail] = React.useState<{ id: string; nome: string }[] | null>(null);
+  React.useEffect(() => {
+    if (!isEmail || modelosDeEmail) return;
+    let vivo = true;
+    void fetch("/api/email/modelos")
+      .then((r) => r.json())
+      .catch(() => ({ modelos: [] }))
+      .then((d) => {
+        if (vivo) setModelosDeEmail(d.modelos ?? []);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [isEmail, modelosDeEmail]);
 
   async function handleSend() {
     if (!agentId) return;
@@ -232,8 +251,8 @@ export default function DisparosPage() {
         weight: v.weight,
       }));
     } else {
-      payload.text = text;
-      payload.templateId = isMeta ? templateId : undefined;
+      payload.text = isEmail ? "" : text;
+      payload.templateId = isMeta || isEmail ? templateId : undefined;
     }
 
     // O campo é horário de São Paulo, não o fuso do navegador.
@@ -317,9 +336,10 @@ export default function DisparosPage() {
             <div>
               <Label htmlFor="disparo-channel">Canal</Label>
               <Select id="disparo-channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
-                {(["whatsapp_qr", "whatsapp_meta", "telegram"] as const).map((c) => (
+                {(["whatsapp_qr", "whatsapp_meta", "telegram", "email"] as const).map((c) => (
                   <option key={c} value={c} disabled={channels ? !channels[c] : false}>
-                    {CHANNEL_LABEL[c]}{channels && !channels[c] ? " — não conectado" : ""}
+                    {CHANNEL_LABEL[c]}
+                    {channels && !channels[c] ? (c === "email" ? " — domínio não verificado" : " — não conectado") : ""}
                   </option>
                 ))}
               </Select>
@@ -349,12 +369,12 @@ export default function DisparosPage() {
 
           {audience === "manual" && (
             <div>
-              <Label htmlFor="disparo-recipients">Contatos (um por linha, com DDI)</Label>
+              <Label htmlFor="disparo-recipients">{isEmail ? "E-mails (um por linha)" : "Contatos (um por linha, com DDI)"}</Label>
               <Textarea
                 id="disparo-recipients"
                 rows={4}
                 className="font-mono text-[12.5px]"
-                placeholder={"5511999998888\n5511999997777"}
+                placeholder={isEmail ? "ana@empresa.com\nbeto@empresa.com" : "5511999998888\n5511999997777"}
                 value={recipients}
                 onChange={(e) => setRecipients(e.target.value)}
               />
@@ -448,6 +468,19 @@ export default function DisparosPage() {
                         setVariants(variants.map((x, j) => (j === i ? { ...x, weight: Number(e.target.value) } : x)))
                       }
                     />
+                    {isEmail && (
+                      <Select
+                        className="flex-1"
+                        aria-label={`Modelo de e-mail da variante ${v.label}`}
+                        value={v.templateId ?? ""}
+                        onChange={(e) =>
+                          setVariants(variants.map((x, j) => (j === i ? { ...x, templateId: e.target.value || null } : x)))
+                        }
+                      >
+                        <option value="">Modelo de e-mail...</option>
+                        {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                      </Select>
+                    )}
                     {isMeta && (
                       <Select
                         className="flex-1"
@@ -471,12 +504,14 @@ export default function DisparosPage() {
                       </button>
                     )}
                   </div>
-                  <Textarea
-                    rows={2}
-                    value={v.text}
-                    onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                    placeholder={`Texto da variante ${v.label}`}
-                  />
+                  {!isEmail && (
+                    <Textarea
+                      rows={2}
+                      value={v.text}
+                      onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+                      placeholder={`Texto da variante ${v.label}`}
+                    />
+                  )}
                 </div>
               ))}
               {variants.length < 4 && (
@@ -494,6 +529,18 @@ export default function DisparosPage() {
                   <Plus size={15} /> Variante
                 </Button>
               )}
+            </div>
+          ) : isEmail ? (
+            <div>
+              <Label htmlFor="disparo-email-modelo">Modelo de e-mail</Label>
+              <Select id="disparo-email-modelo" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                <option value="">Selecione um modelo...</option>
+                {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+              </Select>
+              <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+                Os modelos ficam na Biblioteca → Modelos de e-mail. Só recebe quem aceita mensagens e tem e-mail; quem se
+                descadastrou fica de fora. O disparo sai aos poucos (cerca de 40 por minuto) para não cair no spam.
+              </p>
             </div>
           ) : (
             <>

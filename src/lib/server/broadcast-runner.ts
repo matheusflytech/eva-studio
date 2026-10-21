@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { deliverToContact } from "@/lib/server/outbound";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { decidirEnvio } from "@/lib/whatsapp/janela";
+import { rodarDisparoDeEmail } from "@/lib/server/email/disparo";
 
 // ---------------------------------------------------------------------------
 // Execução de um disparo.
@@ -160,6 +161,25 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
     return result; // done | canceled
   }
 
+  // E-mail sai em lotes (ver email/disparo.ts): cada chamada manda uma parte
+  // e o relógio continua enquanto o disparo estiver "sending".
+  if (broadcast.channel === "email") {
+    const rodada = await rodarDisparoDeEmail({ ...broadcast, orgId: broadcast.agent.orgId });
+    const erro = rodada.errors[0] ?? null;
+    const terminou = rodada.faltam === 0 || rodada.parouPorContrato;
+    await prisma.broadcast.update({
+      where: { id: broadcastId },
+      data: {
+        totalCount: rodada.totalCount,
+        sentCount: { increment: rodada.sentCount },
+        failedCount: { increment: rodada.failedCount },
+        ...(erro ? { lastError: erro.slice(0, 300) } : {}),
+        ...(terminou ? { status: rodada.parouPorContrato ? "canceled" : "done" } : {}),
+      },
+    });
+    return rodada;
+  }
+
   const recipients = await resolveRecipients({ ...broadcast, orgId: broadcast.agent.orgId });
   result.totalCount = recipients.length;
 
@@ -280,7 +300,14 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
 /** Disparos agendados cuja hora chegou. Chamado pelo scheduler. */
 export async function runDueBroadcasts(limit = 10): Promise<{ ran: number; results: RunResult[] }> {
   const due = await prisma.broadcast.findMany({
-    where: { status: "scheduled", scheduledAt: { lte: new Date() } },
+    // Disparo de e-mail em andamento também entra: ele sai em lotes, uma
+    // parte por batida do relógio.
+    where: {
+      OR: [
+        { status: "scheduled", scheduledAt: { lte: new Date() } },
+        { status: "sending", channel: "email" },
+      ],
+    },
     select: { id: true },
     orderBy: { scheduledAt: "asc" },
     take: limit,

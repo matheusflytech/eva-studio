@@ -126,12 +126,13 @@ describe("agendado", () => {
     expect(deliver).not.toHaveBeenCalled();
   });
 
-  it("runDueBroadcasts busca só os agendados vencidos, do mais antigo pro mais novo", async () => {
+  it("runDueBroadcasts busca os agendados vencidos e os de e-mail em andamento (saem em lotes), do mais antigo pro mais novo", async () => {
     db.broadcast.findMany.mockResolvedValue([]);
     await runDueBroadcasts(5);
     const arg = db.broadcast.findMany.mock.calls[0][0];
-    expect(arg.where.status).toBe("scheduled");
-    expect(arg.where.scheduledAt.lte).toBeInstanceOf(Date);
+    expect(arg.where.OR[0].status).toBe("scheduled");
+    expect(arg.where.OR[0].scheduledAt.lte).toBeInstanceOf(Date);
+    expect(arg.where.OR[1]).toEqual({ status: "sending", channel: "email" });
     expect(arg.orderBy).toEqual({ scheduledAt: "asc" });
     expect(arg.take).toBe(5);
   });
