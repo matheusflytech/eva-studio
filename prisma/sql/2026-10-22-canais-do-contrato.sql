@@ -1,6 +1,8 @@
 -- Canais do contrato (F4 fase 2). Só aditivo: duas tabelas novas e cópia das
 -- conexões que já existem; nenhuma tabela atual muda. Rodar numa transação.
--- Idempotente: rodar de novo não duplica (NOT EXISTS por agente + tipo).
+-- Idempotente: rodar de novo não duplica. Cada conexão só vira canal se ainda
+-- não houver canal desse tipo no mesmo agente NEM com o mesmo número/conta no
+-- contrato (a linha antiga do QR continua no agente depois de uma troca).
 -- Plano: docs/superpowers/plans/2026-10-21-canais-do-contrato.md
 BEGIN;
 
@@ -44,29 +46,34 @@ CREATE TABLE IF NOT EXISTS "eva_studio_canais_whatsapp_qr" (
 INSERT INTO "eva_studio_canais" ("id","orgId","tipo","rotulo","externalId","status","agentId","updatedAt")
 SELECT gen_random_uuid()::text, a."orgId", 'whatsapp_meta', coalesce(c."displayPhone", c."phoneNumberId"), c."phoneNumberId", 'conectado', c."agentId", now()
 FROM "eva_studio_meta_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
-WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'whatsapp_meta');
+WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'whatsapp_meta'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = c."phoneNumberId")));
 
 INSERT INTO "eva_studio_canais" ("id","orgId","tipo","rotulo","externalId","status","agentId","updatedAt")
 SELECT gen_random_uuid()::text, a."orgId", 'instagram', coalesce('@' || c."username", c."igBusinessId"), c."igBusinessId", 'conectado', c."agentId", now()
 FROM "eva_studio_instagram_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
-WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'instagram');
+WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'instagram'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = c."igBusinessId")));
 
 INSERT INTO "eva_studio_canais" ("id","orgId","tipo","rotulo","externalId","status","agentId","updatedAt")
 SELECT gen_random_uuid()::text, a."orgId", 'messenger', coalesce(nullif(c."pageName", ''), c."pageId"), c."pageId", 'conectado', c."agentId", now()
 FROM "eva_studio_messenger_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
-WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'messenger');
+WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'messenger'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = c."pageId")));
 
 INSERT INTO "eva_studio_canais" ("id","orgId","tipo","rotulo","externalId","status","detalhe","agentId","updatedAt")
 SELECT gen_random_uuid()::text, a."orgId", 'telegram', coalesce('@' || nullif(c."botUsername", ''), 'Bot do Telegram'), nullif(c."botUsername", ''),
        CASE WHEN c."webhookSet" THEN 'conectado' ELSE 'atencao' END, c."lastError", c."agentId", now()
 FROM "eva_studio_telegram_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
-WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'telegram');
+WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'telegram'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = nullif(c."botUsername", ''))));
 
 INSERT INTO "eva_studio_canais" ("id","orgId","tipo","rotulo","externalId","status","detalhe","agentId","updatedAt")
 SELECT gen_random_uuid()::text, a."orgId", 'tiktok', coalesce(nullif(c."displayName", ''), 'Conta do TikTok'), c."businessId",
        CASE WHEN c."lastError" IS NULL THEN 'conectado' ELSE 'atencao' END, c."lastError", c."agentId", now()
 FROM "eva_studio_tiktok_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
-WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'tiktok');
+WHERE NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'tiktok'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = c."businessId")));
 
 -- WhatsApp por QR: só as que não estão desconectadas. A sessão (creds/keys)
 -- é copiada para a tabela nova, para o worker novo retomar sem pedir QR.
@@ -75,7 +82,8 @@ SELECT gen_random_uuid()::text, a."orgId", 'whatsapp_qr', coalesce(c."phoneNumbe
        CASE WHEN c."status" = 'connected' THEN 'conectado' ELSE 'pendente' END, c."agentId", now()
 FROM "eva_studio_whatsapp_connections" c JOIN "eva_studio_agents" a ON a."id" = c."agentId"
 WHERE c."status" <> 'disconnected'
-  AND NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."agentId" = c."agentId" AND x."tipo" = 'whatsapp_qr');
+  AND NOT EXISTS (SELECT 1 FROM "eva_studio_canais" x WHERE x."tipo" = 'whatsapp_qr'
+                  AND (x."agentId" = c."agentId" OR (x."orgId" = a."orgId" AND x."externalId" = c."phoneNumber")));
 
 INSERT INTO "eva_studio_canais_whatsapp_qr" ("canalId","status","qrDataUrl","phoneNumber","creds","keys","lastError","updatedAt")
 SELECT x."id", c."status", c."qrDataUrl", c."phoneNumber", c."creds", c."keys", c."lastError", now()

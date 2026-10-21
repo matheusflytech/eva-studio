@@ -227,7 +227,8 @@ canal. Assim o SQL não precisa decifrar nada.
 - [x] Tarefa 6: canal sem agente (`canais/sem-agente.ts`): aviso no canal e no Início; a
   conversa não é guardada (a conversa é sempre de um agente).
 - [x] Tarefa 7: docs.
-- [ ] Aplicar o SQL (com OK) e testar ponta a ponta só com o agente "teste".
+- [x] SQL aplicado em 21/10 com OK do Alfredo (1 canal migrado; idempotência conferida).
+- [ ] Deploy do app e do worker; testar ponta a ponta só com o agente "teste".
 
 ## Riscos
 

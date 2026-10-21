@@ -259,7 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
-| `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | **não aplicado** (app e worker funcionam sem, no modo por agente). Ordem: SQL → app → worker. Conferir `select tipo, count(*) from eva_studio_canais group by tipo` = conexões de hoje |
+| `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | aplicado em 21/10 (migrou 1 canal: o QR do Vendedor Virtual, em qr_pending, sem credenciais). Rodado 2x para provar que não duplica. App e worker em produção ainda são os antigos (modo por agente) até o deploy |
 
 Para aplicar um SQL novo: script Node com `pg` usando `DIRECT_URL`, rodando o
 arquivo, depois conferindo as tabelas e `select count(*) from pg_indexes where
@@ -369,7 +369,6 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
 - **Telegram e TikTok:** ganharam entrada por canal; as rotas antigas por agente continuam.
 - **Canal sem agente:** fica em "atenção" e o Início avisa; a conversa não é guardada.
 - **Pendentes:**
-  - aplicar o SQL;
   - testar ponta a ponta com o agente "teste" (QR no worker, Telegram, Instagram);
   - CHATBOT_ENGINE ainda descreve os canais por agente;
   - templates da Meta e automações do Instagram continuam por agente.
