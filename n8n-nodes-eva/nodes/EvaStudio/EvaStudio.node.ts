@@ -1,4 +1,5 @@
 import { NodeConnectionTypes, type INodeProperties, type INodeType, type INodeTypeDescription } from 'n8n-workflow';
+import { listas } from './listas';
 
 // ---------------------------------------------------------------------------
 // Nó de ação do Eva Studio, declarativo (só `routing`, sem código de
@@ -87,9 +88,21 @@ const camposDeContato: INodeProperties[] = [
 	},
 ];
 
+/** Seletor que busca a lista no Eva (aceita expressão com o ID também). */
+const seletor = (displayName: string, property: string, metodo: keyof typeof listas, extra: Partial<INodeProperties> = {}): INodeProperties => ({
+	displayName,
+	name: property,
+	type: 'options',
+	default: '',
+	typeOptions: { loadOptionsMethod: metodo },
+	description: 'Escolha da lista ou use uma expressão com o ID',
+	routing: { send: { type: 'body', property } },
+	...extra,
+});
+
 const camposDeNegocio: INodeProperties[] = [
-	noCorpo('ID Do Funil', 'pipeline_id'),
-	noCorpo('ID Da Etapa', 'stage_id'),
+	seletor('Funil Name or ID', 'pipeline_id', 'getPipelines'),
+	seletor('Etapa Name or ID', 'stage_id', 'getStages', { typeOptions: { loadOptionsMethod: 'getStages', loadOptionsDependsOn: ['additionalFields.pipeline_id'] } }),
 	{
 		displayName: 'Valor (Centavos)',
 		name: 'amount_cents',
@@ -186,7 +199,22 @@ const propriedades: INodeProperties[] = [
 	},
 	idNoCaminho('deal', ['get', 'update', 'move', 'won', 'lost'], 'ID Do Negócio'),
 	{ ...noCorpo('Nome', 'name', { required: true }), displayOptions: mostrar('deal', ['create']) },
-	{ ...noCorpo('ID Da Etapa', 'stage_id', { required: true }), displayOptions: mostrar('deal', ['move']) },
+	{
+		displayName: 'Funil Name or ID',
+		name: 'pipelineFilter',
+		type: 'options',
+		default: '',
+		typeOptions: { loadOptionsMethod: 'getPipelines' },
+		description: 'Só para filtrar a lista de etapas abaixo. Choose from the list, or specify an ID using an expression.',
+		displayOptions: mostrar('deal', ['move']),
+	},
+	{
+		...seletor('Etapa Name or ID', 'stage_id', 'getStages', {
+			required: true,
+			typeOptions: { loadOptionsMethod: 'getStages', loadOptionsDependsOn: ['pipelineFilter'] },
+		}),
+		displayOptions: mostrar('deal', ['move']),
+	},
 	{ ...noCorpo('Motivo Da Perda', 'lost_reason', { description: 'Texto do motivo; casa com um motivo do funil quando o rótulo bate' }), displayOptions: mostrar('deal', ['lost']) },
 	{
 		displayName: 'Campos Adicionais',
@@ -265,7 +293,7 @@ const propriedades: INodeProperties[] = [
 			},
 		],
 	},
-	{ ...noCorpo('ID Do Agente', 'agent_id', { required: true }), displayOptions: mostrar('message', ['send']) },
+	{ ...seletor('Agente Name or ID', 'agent_id', 'getAgents', { required: true }), displayOptions: mostrar('message', ['send']) },
 	{
 		...noCorpo('ID Da Conversa', 'conversation_id', {
 			placeholder: 'whatsapp_qr:5511999998888',
@@ -316,4 +344,6 @@ export class EvaStudio implements INodeType {
 		},
 		properties: propriedades,
 	};
+
+	methods = { loadOptions: listas };
 }

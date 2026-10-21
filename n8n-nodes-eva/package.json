@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copiar-icones.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test dist/test/assinatura.test.js"
+    "test": "npm run build && node --test dist/test/assinatura.test.js dist/test/listas.test.js"
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
