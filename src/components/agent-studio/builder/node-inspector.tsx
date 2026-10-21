@@ -10,6 +10,7 @@ import type { FlowNodeData } from "./flow-node";
 import { VariablePicker } from "./variable-picker";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
+import { ModeloSelect } from "./modelo-select";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
@@ -467,18 +468,12 @@ export function NodeInspector({
               value={node.data.aiCredentialId}
               onChange={(id) => onChange({ aiCredentialId: id })}
             />
-            <div>
-              <Label htmlFor="node-ai-model">Modelo</Label>
-              <Select
-                id="node-ai-model"
-                value={node.data.aiModel ?? getProvider(node.data.aiProvider).models[0].id}
-                onChange={(e) => onChange({ aiModel: e.target.value })}
-              >
-                {getProvider(node.data.aiProvider).models.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </Select>
-            </div>
+            <ModeloSelect
+              provider={node.data.aiProvider}
+              credentialId={node.data.aiCredentialId}
+              value={node.data.aiModel}
+              onChange={(id) => onChange({ aiModel: id })}
+            />
             {getProvider(node.data.aiProvider).format === "anthropic" && (
               <div>
                 <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
