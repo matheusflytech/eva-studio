@@ -1,6 +1,6 @@
 # Eva Studio: documento de passagem (handoff)
 
-Atualizado em 20/10/2026. Escrito para quem vai continuar o trabalho sem ter
+Atualizado em 21/10/2026. Escrito para quem vai continuar o trabalho sem ter
 participado das conversas. Tudo o que está aqui foi conferido no código da
 branch `feat/dashboards-funil`.
 
@@ -257,6 +257,8 @@ foi conferido depois de cada um.
 | `2026-10-20-busca.sql` | unaccent, pg_trgm, função de normalização, 11 índices GIN (criados CONCURRENTLY) | aplicado |
 | `2026-10-20-visoes-salvas.sql` | visões salvas e padrão por pessoa | aplicado |
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
+| `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
+| `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
 
 Para aplicar um SQL novo: script Node com `pg` usando `DIRECT_URL`, rodando o
 arquivo, depois conferindo as tabelas e `select count(*) from pg_indexes where
@@ -357,7 +359,11 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
   navegador** (builder do agente "teste" nos dois temas).
 
 ### Próximas frentes (`docs/superpowers/plans/2026-10-20-builder-agentes-integracoes.md`)
-- **F3 Central de IA:** o cliente conecta várias chaves de IA (OpenAI,
+- **F3 Central de IA — partes a, b e c feitas em 21/10** (prompt do agente no
+  bloco, saída "Erro", modelos pela chave, conexão única com reserva, uso e
+  limite por chave; detalhes nas notas do plano). Os dois SQLs de 21/10 não
+  foram aplicados. Falta: OAuth do OpenRouter e criação de agente em etapas.
+  Texto original da frente: o cliente conecta várias chaves de IA (OpenAI,
   Google, xAI, Anthropic, etc.) e os agentes usam **uma conexão única** com
   ordem de preferência e **reserva automática**; modelos GPT-5.6 Luna (id
   configurável), Gemini 2.0/2.5 Flash, Grok, Claude Haiku; login no provedor

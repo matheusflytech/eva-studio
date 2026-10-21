@@ -117,7 +117,55 @@ Ordem: F1 → F2 → F3 → F4 → F5 → F6, com F7 em paralelo (pasta própria
   honesto no lugar). Canal principal, Habilidades e Ferramentas do n8n
   escondidos (`MOSTRAR_CAMPOS_DECORATIVOS`), campos do banco intactos.
 
-### Pendências para a F3
+### F3 — Central de IA: partes a, b e c FEITAS (21/10/2026, local)
+
+Skills: crm-ai-flow-nodes, crm-ai-copilot. Decisões do Alfredo: dividir em
+partes; SQL escrito e não aplicado; modelos vêm da chave do cliente; campos
+escondidos (Canal principal, Habilidades, Ferramentas do n8n) continuam
+escondidos (F4 e F6 decidem).
+
+- **F3a — bloco de IA** (sem banco):
+  - prompt montado do cadastro do agente (`ia/prompt-do-agente.ts`):
+    identidade, instruções, tom, idioma, "nunca faça", regras de não
+    inventar e de tratar a mensagem do cliente como dado, e o texto do
+    bloco como "nesta etapa". O que é fixo vem primeiro (cache de prompt).
+    Agente vazio = só o texto do bloco, como antes. Chave
+    `aiUsarAgente` no bloco para desligar;
+  - saídas "Terminou" (sem id, ligações antigas valem) e "Erro"
+    (`SAIDA_ERRO`). Com "Erro" ligada, a falha segue por ela na mesma
+    rodada; sem ligação, fica no bloco. A validação avisa quando "Erro"
+    está solta. Início e visão dos agentes passaram a contar só erros
+    como "bloco incompleto";
+  - modelos listados pela chave do cliente (`ia/modelos-da-chave.ts`,
+    `GET /api/credentials/[id]/models`), filtrados para modelos de
+    conversa, com o catálogo fixo como reserva e "Outro" para digitar o id.
+- **F3b — conexão única** (`ia/conexao.ts`, `ia/reserva.ts`, tabela
+  `eva_studio_ai_connections`, SQL `2026-10-21-conexao-ia.sql` NÃO
+  aplicado): lista de chave + modelo em ordem, com tempo limite por
+  tentativa (`timeoutMs` novo em `llm.ts`). A reserva passa para a próxima
+  em falha do provedor, resposta vazia ou tempo estourado; não repete se a
+  IA já executou ferramenta, nem em recusa do modelo. Bloco: "De onde vem
+  a IA" (`fonte-da-ia.ts`): bloco antigo com credencial continua com ela;
+  sem credencial, usa a Central (antes falhava). Sem tabela ou sem nada
+  salvo, vale a escolha automática de `ia/provedor.ts`. Integrações:
+  painel Central de IA; credenciais para todos os provedores.
+- **F3c — uso e limite** (`ia/uso.ts`, tabelas `eva_studio_ai_usage` e
+  `eva_studio_ai_key_limits`, SQL `2026-10-21-uso-ia.sql` NÃO aplicado):
+  tokens informados pelo provedor em cada tentativa (bloco de IA,
+  dashboard, rascunhos por IA), mês no horário de Brasília, limite mensal
+  em tokens por chave (estourou, sai da fila; alerta a partir de 80%),
+  custo em R$ pelo preço por 1 milhão de tokens que o cliente informa.
+  Painel "Uso de IA neste mês" por chave e por agente.
+
+Achado: a chave Groq do contrato Eva Holding não lista
+`llama-3.3-70b-versatile`, que é o padrão do catálogo e de
+`MODELO_POR_PROVEDOR.groq` (reserva da plataforma). Conferir na Groq se o
+modelo saiu; se saiu, trocar o padrão.
+
+Falta da F3: login OAuth no OpenRouter (PKCE), criação de agente em etapas
+com o modelo no agente, descrição de `seguir_fluxo` no prompt-base.
+
+### Pendências para a F3 (anteriores)
 
 - Decidir o destino de Canal principal / Habilidades / Ferramentas do n8n.
 - O bloco de IA ainda ignora instruções/tom/"nunca fazer" do agente; a
