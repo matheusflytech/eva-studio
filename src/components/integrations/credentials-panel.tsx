@@ -7,6 +7,15 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { CREDENTIAL_TYPES, LLM_PROVIDERS } from "@/lib/llm-providers";
+import { Notice } from "@/components/ui/notice";
+import { useContrato, useSearchParams } from "@/lib/contrato/navegacao";
+import { apiDoContrato } from "@/lib/contrato/rotas";
+
+// Resultado da volta do "Entrar com OpenRouter" (?openrouter= na URL).
+const RESULTADO_OPENROUTER: Record<string, { tom: "info" | "danger"; texto: string }> = {
+  ok: { tom: "info", texto: "Conta do OpenRouter conectada. A chave já aparece aqui e pode entrar na Central de IA." },
+  cancelado: { tom: "danger", texto: "A conexão com o OpenRouter foi cancelada." },
+};
 
 interface CredentialRow {
   id: string;
@@ -29,6 +38,9 @@ function formatAge(iso: string): string {
 // usadas pela Central de IA, pelos blocos de IA e pelo "Enviar e-mail" do Builder — igual o jeito que o n8n deixa
 // cadastrar uma credencial uma vez e reaproveitar em vários workflows.
 export function CredentialsPanel() {
+  const contrato = useContrato();
+  const volta = useSearchParams().get("openrouter");
+  const resultado = volta ? RESULTADO_OPENROUTER[volta] ?? { tom: "danger" as const, texto: "Não deu para conectar o OpenRouter agora. Tente de novo." } : null;
   const [credentials, setCredentials] = React.useState<CredentialRow[] | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [newName, setNewName] = React.useState("");
@@ -86,15 +98,30 @@ export function CredentialsPanel() {
           Credenciais (usadas pelos blocos de IA e e-mail do Builder)
         </p>
         {!creating && (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-1 text-[12px] font-medium text-accent-400 hover:text-accent-500"
-          >
-            <Plus size={13} /> Nova credencial
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Navegação de página inteira: o servidor guarda o verificador PKCE
+                num cookie e manda para o login do OpenRouter. */}
+            <a
+              href={apiDoContrato(contrato, "/api/ia/openrouter/start")}
+              className="flex items-center gap-1 text-[12px] font-medium text-accent-400 hover:text-accent-500"
+            >
+              Entrar com OpenRouter
+            </a>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-1 text-[12px] font-medium text-accent-400 hover:text-accent-500"
+            >
+              <Plus size={13} /> Nova credencial
+            </button>
+          </div>
         )}
       </div>
+      {resultado && (
+        <Notice tone={resultado.tom} className="mb-3">
+          {resultado.texto}
+        </Notice>
+      )}
 
       <div className="glass-card rounded-2xl">
         {creating && (
