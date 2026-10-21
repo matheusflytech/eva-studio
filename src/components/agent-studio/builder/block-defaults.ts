@@ -20,11 +20,11 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
   },
   {
     key: "agent",
-    paletteLabel: "Agente de IA",
+    paletteLabel: "Enviar para o n8n",
     data: {
-      label: "Agente de IA",
-      kind: "Delega para o agente",
-      detail: "Responde livremente usando as instruções e a base de conhecimento configuradas no agente.",
+      label: "Enviar para o n8n",
+      kind: "Seu fluxo do n8n responde",
+      detail: "A mensagem vai para o workflow do n8n (URL em Avançado do agente) e a resposta dele volta para a pessoa.",
     },
   },
   {

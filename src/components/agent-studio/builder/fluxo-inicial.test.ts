@@ -48,3 +48,27 @@ describe("montarFluxoInicial", () => {
     expect(a.nodes[0].id).not.toBe(b.nodes[0].id);
   });
 });
+
+describe("modelos prontos", () => {
+  it("os modelos com IA usam a Central e já ligam a saída Erro (nenhum aviso de Erro solta)", () => {
+    for (const t of FLOW_TEMPLATES) {
+      const { nodes, edges } = t.build();
+      const avisos = validateFlow(nodes, edges).filter((i) => i.motivo.includes('"Erro"'));
+      expect(avisos, t.id).toEqual([]);
+      for (const ia of nodes.filter((n) => n.data.iconKey === "ai-agent")) expect(ia.data.aiFonte, t.id).toBe("conexao");
+    }
+  });
+
+  it("FAQ com IA: a base de conhecimento fica ligada na porta de ferramentas da IA", () => {
+    const { nodes, edges } = FLOW_TEMPLATES.find((t) => t.id === "faq-ia")!.build();
+    const ia = nodes.find((n) => n.data.iconKey === "ai-agent")!;
+    const base = nodes.find((n) => n.data.iconKey === "tool-knowledge")!;
+    expect(edges).toContainEqual(expect.objectContaining({ source: base.id, target: ia.id, targetHandle: "tools" }));
+  });
+
+  it("Atendimento pelo n8n: usa o bloco do n8n e o fluxo inicial monta ele", () => {
+    const { nodes } = montarFluxoInicial({ inicio: "atendimento-n8n", ia: { fonte: "conexao" } });
+    expect(nodes.map((n) => n.data.iconKey)).toEqual(["start", "message", "agent", "end"]);
+    expect(validateFlow(nodes, [], { temUrlDoFluxo: false }).some((i) => i.motivo.includes("URL do seu fluxo"))).toBe(true);
+  });
+});

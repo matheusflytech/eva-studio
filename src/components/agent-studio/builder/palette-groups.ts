@@ -76,7 +76,7 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
       // Os dois se chamavam "Agente de IA" e "Agente de IA (nativo)". Ninguém
       // acertava qual era qual sem abrir os dois.
       { key: "ai-agent", label: "Responder com IA", hint: "O modelo responde livremente na conversa." },
-      { key: "agent", label: "Enviar para meu fluxo", hint: "Delega a resposta ao seu webhook do n8n." },
+      { key: "agent", label: "Enviar para o n8n", hint: "Seu workflow do n8n recebe a mensagem e responde." },
       { key: "tool-knowledge", label: "Base de conhecimento", hint: "Deixa a IA buscar nos seus documentos.", tool: true },
       { key: "tool-crm", label: "Ações de CRM", hint: "Deixa a IA criar negócio e tarefa sozinha.", tool: true },
       { key: "tool-http", label: "Chamar uma API", hint: "Deixa a IA consultar um sistema seu.", tool: true },

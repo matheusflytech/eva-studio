@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { ModeloSelect } from "./builder/modelo-select";
 import { montarFluxoInicial, type IaDoAgente } from "./builder/fluxo-inicial";
-import { FLOW_TEMPLATES } from "./builder/flow-templates";
+import { FLOW_TEMPLATES, MODELOS_COM_N8N } from "./builder/flow-templates";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { saveFlow } from "@/lib/data/flows";
 import { generateId, cn } from "@/lib/utils";
@@ -101,6 +101,7 @@ export function NovoAgenteEtapas() {
   const [inicio, setInicio] = React.useState<string>("ia");
   const [boasVindas, setBoasVindas] = React.useState("Olá! Como posso te ajudar?");
   const [objetivo, setObjetivo] = React.useState("");
+  const [urlDoN8n, setUrlDoN8n] = React.useState("");
 
   const [erro, setErro] = React.useState<string | null>(null);
   const [criando, setCriando] = React.useState(false);
@@ -133,6 +134,9 @@ export function NovoAgenteEtapas() {
   function validarEtapa(i: number): string | null {
     if (i === 0 && !name.trim()) return "Dê um nome para o agente.";
     if (i === 2 && fonte === "bloco" && (!credentialId || !model)) return "Escolha a chave e o modelo, ou use a Central de IA.";
+    if (i === 3 && MODELOS_COM_N8N.has(inicio) && !/^https:\/\//.test(urlDoN8n.trim())) {
+      return "Cole a URL do webhook do n8n (começa com https://).";
+    }
     return null;
   }
 
@@ -168,7 +172,7 @@ export function NovoAgenteEtapas() {
         skills: [],
         tools: [],
         variables: [],
-        outboundUrl: "",
+        outboundUrl: MODELOS_COM_N8N.has(inicio) ? urlDoN8n.trim() : "",
       });
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não deu para criar o agente.");
@@ -368,7 +372,24 @@ export function NovoAgenteEtapas() {
             )}
             <Opcao ativa={inicio === "branco"} onClick={() => setInicio("branco")} titulo="Em branco" texto="Só o Início. Você monta tudo no builder." />
             {FLOW_TEMPLATES.map((t) => (
-              <Opcao key={t.id} ativa={inicio === t.id} onClick={() => setInicio(t.id)} titulo={t.name} texto={t.description} />
+              <React.Fragment key={t.id}>
+                <Opcao ativa={inicio === t.id} onClick={() => setInicio(t.id)} titulo={t.name} texto={t.description} />
+                {inicio === t.id && MODELOS_COM_N8N.has(t.id) && (
+                  <div className="rounded-xl bg-surface-2 p-3">
+                    <Label htmlFor="na-n8n">URL do webhook do n8n</Label>
+                    <Input
+                      id="na-n8n"
+                      placeholder="https://seu-n8n.com/webhook/..."
+                      value={urlDoN8n}
+                      onChange={(e) => setUrlDoN8n(e.target.value)}
+                    />
+                    <p className="mt-1 text-[11px] text-text-tertiary">
+                      O nó Webhook do seu workflow. A Eva manda a mensagem e espera {"{ \"reply\": \"...\" }"} de volta;
+                      com {"\"done\": true"} o atendimento segue para o Encerramento.
+                    </p>
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
         )}
