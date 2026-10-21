@@ -213,6 +213,22 @@ canal. Assim o SQL não precisa decifrar nada.
 - [ ] HANDOFF (SQL novo, ordem de deploy, volta), CHATBOT_ENGINE §canais,
   `worker/README.md`. `graphify update .`. Commit.
 
+## Andamento (21/10/2026, local, nada aplicado nem enviado)
+
+- [x] Tarefa 1: models `Canal`/`CanalWhatsAppQr` e SQL com a migração de todos os tipos.
+- [x] Tarefa 2: `canais/ativacao.ts` (cópia da ativação vem primeiro: é a mais nova, ex. token
+  renovado do TikTok) e `canais/repositorio.ts` (sem a tabela, lista antiga).
+- [x] Tarefa 3: `canais/conectar.ts` + rotas `/api/canais/conectar/[tipo]`, `/api/canais/[canalId]`
+  (+ `/qr`), `/api/agents/[agentId]/canais`; entrada por canal do Telegram e do TikTok; OAuth do
+  Instagram com `modo=contrato`.
+- [x] Tarefa 4: worker com `fonte.js` (modo canal × agente), `auth-store.js` por modo; app aceita
+  `canalId` em `/api/conversations/message`; estado do QR do agente pelo canal (`canais/qr.ts`).
+- [x] Tarefa 5: telas (Configurações → Canais só conecta; aba do agente escolhe).
+- [x] Tarefa 6: canal sem agente (`canais/sem-agente.ts`): aviso no canal e no Início; a
+  conversa não é guardada (a conversa é sempre de um agente).
+- [x] Tarefa 7: docs.
+- [ ] Aplicar o SQL (com OK) e testar ponta a ponta só com o agente "teste".
+
 ## Riscos
 
 - **Worker em produção:** a sessão QR do "Vendedor Virtual" está em

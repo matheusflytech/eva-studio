@@ -259,6 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
+| `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | **não aplicado** (app e worker funcionam sem, no modo por agente). Ordem: SQL → app → worker. Conferir `select tipo, count(*) from eva_studio_canais group by tipo` = conexões de hoje |
 
 Para aplicar um SQL novo: script Node com `pg` usando `DIRECT_URL`, rodando o
 arquivo, depois conferindo as tabelas e `select count(*) from pg_indexes where
@@ -357,6 +358,21 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 ### Conferência pendente
 - F1 e F2 passaram em testes, `tsc` e build, mas **ainda não foram vistas no
   navegador** (builder do agente "teste" nos dois temas).
+
+### Canais do contrato (F4) — feito em 21/10, local
+Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
+- **Configurações → Canais** só conecta e desconecta (vários números e contas de cada tipo).
+- **O agente escolhe o canal**, na aba Canais dele, um de cada tipo; cada canal tem um agente só.
+- **Credenciais:** a conexão fica em `eva_studio_canais`. O agente que atende recebe uma cópia na tabela de
+  sempre (`MetaConnection`...), então entrada, envios e disparos não mudaram (`src/lib/server/canais/`).
+- **Worker do QR:** abre uma sessão por canal (`worker/fonte.js`, ver `worker/README.md`).
+- **Telegram e TikTok:** ganharam entrada por canal; as rotas antigas por agente continuam.
+- **Canal sem agente:** fica em "atenção" e o Início avisa; a conversa não é guardada.
+- **Pendentes:**
+  - aplicar o SQL;
+  - testar ponta a ponta com o agente "teste" (QR no worker, Telegram, Instagram);
+  - CHATBOT_ENGINE ainda descreve os canais por agente;
+  - templates da Meta e automações do Instagram continuam por agente.
 
 ### Próximas frentes (`docs/superpowers/plans/2026-10-20-builder-agentes-integracoes.md`)
 - **F3 Central de IA — partes a, b e c feitas em 21/10** (prompt do agente no

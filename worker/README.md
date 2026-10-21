@@ -2,8 +2,20 @@
 
 Processo separado, sempre ligado — o Baileys mantém um socket aberto com o WhatsApp, o que não roda em função
 serverless da Vercel. Este worker só precisa da mesma `DATABASE_URL` do app principal; toda a comunicação entre
-o app e o worker acontece através das tabelas `eva_studio_whatsapp_connections` (o worker faz polling a cada
-4s) — não existe API própria além de um health check em `/`.
+o app e o worker acontece através do banco (o worker faz polling a cada 4s) — não existe API própria além de
+um health check em `/`.
+
+**Sessão por canal (desde o SQL `prisma/sql/2026-10-22-canais-do-contrato.sql`).** Na subida o worker vê se
+existe `eva_studio_canais_whatsapp_qr` (ver `fonte.js`):
+
+- **Existe → modo canal.** Uma sessão por canal do contrato (Configurações → Canais). O agente que atende é
+  lido em `eva_studio_canais` a cada mensagem, então trocar o agente na aba Canais não reinicia a sessão.
+  Fila de saída e esperas acham a sessão pelo canal QR do agente. Canal sem agente: a mensagem vai para o
+  app com `canalId` e só marca o aviso "recebendo mensagens sem agente".
+- **Não existe → modo agente**, como sempre foi (`eva_studio_whatsapp_connections`, uma sessão por agente).
+
+A migração do SQL copia as sessões abertas para a tabela nova; o worker novo retoma sem pedir QR. Ordem de
+deploy: SQL → app → worker. Para voltar: reverter app e worker (as tabelas antigas continuam lá).
 
 ## Deploy
 
@@ -21,7 +33,7 @@ para Railway.
 
 ## O que o worker faz
 
-- **Sessão do Baileys** por agente, com QR e reconexão (polling de 4s)
+- **Sessão do Baileys** por canal do contrato (ou por agente, sem o SQL de canais), com QR e reconexão (polling de 4s)
 - **Fila de saída**: resposta de atendente e disparo por WhatsApp via QR
 - **Esperas vencidas**: retoma conversa parada num bloco Esperar
 - **Relógio do produto** (`tickScheduler`, a cada 60s): chama `/api/internal/scheduler` no app, que entrega
