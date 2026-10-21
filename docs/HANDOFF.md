@@ -259,6 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
+| `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão | **não aplicado** (app funciona sem; nenhum e-mail novo sai) |
 | `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | aplicado em 21/10 (migrou 1 canal: o QR do Vendedor Virtual, em qr_pending, sem credenciais). Rodado 2x para provar que não duplica. App e worker em produção ainda são os antigos (modo por agente) até o deploy |
 
 Para aplicar um SQL novo: script Node com `pg` usando `DIRECT_URL`, rodando o
@@ -372,6 +373,25 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   - testar ponta a ponta com o agente "teste" (QR no worker, Telegram, Instagram);
   - CHATBOT_ENGINE ainda descreve os canais por agente;
   - templates da Meta e automações do Instagram continuam por agente.
+
+### F5 E-mail automático — feito em 22/10, local
+- **Conta:** Resend da **plataforma**. Variáveis novas na Vercel: `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`
+  (webhook em `/api/webhooks/resend`, eventos `email.*`) e, opcional, `EMAIL_DESCADASTRO_SECRET`
+  (sem ela, o link de descadastro é assinado com `INTERNAL_API_SECRET`).
+- **Integrações → E-mail:** cada contrato adiciona o domínio, cria os registros DNS que a tela mostra,
+  verifica e escolhe o remetente.
+- **Biblioteca → Modelos de e-mail:** editor simples ou HTML, variáveis com padrão, prévia e
+  "Enviar teste para mim". Variável vazia sem padrão bloqueia o envio.
+- **Envio:** todo e-mail passa por `src/lib/server/email/envio.ts`. Exige domínio verificado,
+  respeita a supressão de e-mail (separada do opt-out geral) e leva rodapé de descadastro e
+  List-Unsubscribe em um clique. Bounce permanente e reclamação de spam entram na supressão.
+- **Onde se usa:** bloco "Enviar e-mail" do fluxo (bloco antigo com credencial própria segue igual),
+  canal E-mail nas réguas (cada passo é um modelo) e canal E-mail nos disparos (saem em lotes de 40 por
+  batida do relógio).
+- **Pendentes:**
+  - aplicar o SQL;
+  - criar o webhook na Resend;
+  - conferir no navegador as telas de régua e disparo com o canal E-mail (só há teste automático).
 
 ### Também em 21/10
 - **Página completa do contato** (`/contatos/<id>`, `pagina-do-contato.tsx`): dados editáveis, história

@@ -42,6 +42,21 @@ Ordem: F1 → F2 → F3 → F4 → F5 → F6, com F7 em paralelo (pasta própria
 
 ## Notas de execução
 
+### F5 — E-mail automático: FEITO (22/10/2026, local, SQL não aplicado)
+
+Decisões do Alfredo: conta Resend da plataforma; ordem base → réguas/fluxo →
+disparo; descadastro separado do WhatsApp; editor simples + HTML.
+Skills: crm-sequences, crm-content-library, crm-broadcasts.
+- Base: `src/lib/email/` (variáveis com padrão, editor, montar), `src/lib/server/email/`
+  (resend.ts com domínios e webhook Svix, envio.ts, descadastro.ts, eventos.ts,
+  dominio.ts, disparo.ts). Tabelas `eva_studio_email_*` (SQL `2026-10-22-email.sql`).
+- Telas: Integrações → E-mail; Biblioteca → Modelos de e-mail; página
+  pública `/descadastro`.
+- Uso: bloco do fluxo (modo contrato), régua com canal email (templateId =
+  modelo), disparo com canal email em lotes.
+- Fica para depois: abrir/clicar por variante no placar do disparo, pausa
+  automática por taxa de bounce, aquecimento de domínio novo.
+
 ### F7 — Cloudflare (2026-10-20, local, sem deploy)
 
 - Documento: `docs/arquitetura-cloudflare.md` (alvo, fluxos, limites, custos
