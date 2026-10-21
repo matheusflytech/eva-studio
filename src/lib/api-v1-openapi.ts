@@ -270,6 +270,21 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       body: { url: "https://seu-n8n.com/webhook/abc", events: ["deal.stage_changed", "deal.won"], description: "n8n" },
     },
   },
+  "/messages": {
+    post: {
+      tag: "Mensagens",
+      summary: "Mandar mensagem pelo agente",
+      description:
+        "Destino: conversation_id (\"canal:contato\", o mesmo que o bloco \"Enviar para o n8n\" manda) ou channel + to. " +
+        "Nos canais da Meta, fora da janela de 24h só sai modelo aprovado (template_id + variables): 409 window_closed. " +
+        "status: sent (saiu) ou queued (WhatsApp QR, sai pelo worker).",
+      scope: "messages:write",
+      idempotency: "optional",
+      status: 201,
+      body: { agent_id: "<agentId>", conversation_id: "whatsapp_qr:5511999998888", text: "Seu pedido saiu para entrega." },
+    },
+  },
+
   "/webhooks/{id}": {
     get: { tag: "Webhooks", summary: "Ler webhook", scope: "webhooks:read" },
     delete: { tag: "Webhooks", summary: "Cancelar assinatura", scope: "webhooks:write" },

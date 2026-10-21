@@ -23,6 +23,7 @@ export const RECURSOS = [
   "imports",
   "exports",
   "webhooks",
+  "messages",
 ] as const;
 export type Recurso = (typeof RECURSOS)[number];
 export type Acao = "read" | "write";

@@ -118,7 +118,8 @@ export default function N8nPage() {
             </Passo>
             <Passo n={4} titulo="Use os endpoints">
               Crie ou atualize sem duplicar com <code className="font-mono">PUT /contacts/upsert</code>, mova negócios com{" "}
-              <code className="font-mono">POST /deals/{"{id}"}/move</code>. Tudo na{" "}
+              <code className="font-mono">POST /deals/{"{id}"}/move</code> e mande mensagem pelo agente com{" "}
+              <code className="font-mono">POST /messages</code>. Tudo na{" "}
               <Link href="/integracoes/api/referencia" className="text-accent-fg hover:underline">referência da API</Link>.
             </Passo>
           </ol>
@@ -165,7 +166,8 @@ export default function N8nPage() {
 
       <p className="mt-8 max-w-2xl text-[12px] text-text-tertiary">
         Quer que um agente chame o n8n no meio da conversa? Use o bloco &quot;Enviar para o n8n&quot; no fluxo do agente, ou o
-        modelo pronto &quot;Atendimento com n8n&quot; ao criar um agente.
+        modelo pronto &quot;Atendimento com n8n&quot; ao criar um agente. Para o seu fluxo responder depois, gere a URL de
+        entrada na aba Avançado do agente.
       </p>
     </div>
   );

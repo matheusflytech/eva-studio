@@ -2009,3 +2009,18 @@ model WebhookEntrega {
   @@index([endpointId, createdAt])
   @@map("eva_studio_webhook_entregas")
 }
+
+// URL de entrada do agente (F6): o fluxo do cliente (n8n) manda mensagem
+// pelo agente com POST /api/hooks/agentes/{agentId}/{token}. Um por agente;
+// trocar o token invalida a URL antiga. Mesmo SQL dos webhooks.
+model AgenteEntrada {
+  agentId   String   @id
+  orgId     String
+  // evh_..., cifrado com encryptSecret (a tela mostra a URL de novo).
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_agente_entradas")
+}

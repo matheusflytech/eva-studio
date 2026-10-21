@@ -192,6 +192,7 @@ export const ESCOPO_DA_CHAVE_EXIGE: Record<string, { read: PermissaoGranular; wr
   imports: { nome: "Importações", read: "contatos:ver", write: "contatos:importar" },
   exports: { nome: "Exportações", read: "negocios:exportar", write: "negocios:exportar" },
   webhooks: { nome: "Webhooks (gatilho do n8n)", read: "integracoes:gerenciar", write: "integracoes:gerenciar" },
+  messages: { nome: "Mensagens pelo agente", read: "conversas:ver", write: "conversas:responder" },
 };
 
 /** Escopos que a pessoa não pode conceder (lista vazia = pode todos). */

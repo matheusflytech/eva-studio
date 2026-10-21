@@ -279,6 +279,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
             <CardDescription>Opcional. Use se a resposta vem de um workflow seu em vez do Builder.</CardDescription>
           </CardHeader>
           <WebhookConfig
+            agentId={isEdit ? agentId : null}
             outboundUrl={outboundUrl}
             onOutboundChange={setOutboundUrl}
           />

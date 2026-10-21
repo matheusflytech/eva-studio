@@ -1,4 +1,5 @@
--- Webhooks de saída (F6): endpoints do contrato e a fila de entregas.
+-- Webhooks (F6): endpoints de saída do contrato, a fila de entregas e a URL
+-- de entrada de cada agente.
 -- Só aditivo: tabelas novas, nada existente muda. Rodar numa transação.
 -- Sem estas tabelas o app segue igual: nenhum evento é emitido e a tela de
 -- webhooks avisa que falta ativar.
@@ -50,5 +51,16 @@ DO $$ BEGIN
     FOREIGN KEY ("endpointId") REFERENCES "eva_studio_webhook_endpoints"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- URL de entrada do agente (o n8n manda mensagem pelo agente).
+CREATE TABLE IF NOT EXISTS "eva_studio_agente_entradas" (
+    "agentId" TEXT NOT NULL,
+    "orgId" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "eva_studio_agente_entradas_pkey" PRIMARY KEY ("agentId")
+);
+CREATE INDEX IF NOT EXISTS "eva_studio_agente_entradas_orgId_idx" ON "eva_studio_agente_entradas"("orgId");
 
 COMMIT;
