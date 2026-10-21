@@ -3,6 +3,7 @@
 import Link from "@/components/contrato/link";
 import { Radio, ArrowRight } from "lucide-react";
 import { CredentialsPanel } from "@/components/integrations/credentials-panel";
+import { ConexaoIaPanel } from "@/components/integrations/conexao-ia-panel";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 
@@ -55,6 +56,8 @@ export default function IntegracoesPage() {
         </div>
         <ArrowRight size={16} className="shrink-0 text-text-tertiary transition-colors group-hover:text-text-primary" />
       </Link>
+
+      <ConexaoIaPanel />
 
       <CredentialsPanel />
 

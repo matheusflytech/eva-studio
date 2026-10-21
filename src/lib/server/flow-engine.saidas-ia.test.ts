@@ -31,6 +31,8 @@ vi.mock("@/lib/server/credentials", () => ({ getCredentialSecret: vi.fn(async ()
 vi.mock("@/lib/server/llm", () => llm);
 vi.mock("@/lib/server/ssrf", () => rede);
 vi.mock("@/lib/server/knowledge-search", () => ({ searchKnowledgeBase: vi.fn(async () => []) }));
+const conexao = vi.hoisted(() => ({ passosDaConexao: vi.fn() }));
+vi.mock("@/lib/server/ia/conexao", () => conexao);
 
 import { advanceConversation } from "./flow-engine";
 
@@ -174,6 +176,44 @@ describe("Responder com IA (ai-agent)", () => {
     iaResponde("Oi!");
     await advanceConversation({ ...base, text: "olá" });
     expect(ferramentas()).not.toContain("seguir_fluxo");
+  });
+});
+
+describe("Responder com IA usando a conexão do contrato", () => {
+  const passo = (origem: string) => ({ provider: "openai", apiKey: `k-${origem}`, model: `m-${origem}`, origem });
+
+  it("bloco sem credencial usa a conexão, com o tempo limite dela", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [passo("A")], timeoutMs: 20000 });
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiCredentialId: undefined }), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Oi!");
+    const r = await advanceConversation({ ...base, text: "olá" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Oi!"]);
+    expect(conexao.passosDaConexao).toHaveBeenCalledWith("o1");
+    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0]).toMatchObject({ apiKey: "k-A", model: "m-A", timeoutMs: 20000 });
+  });
+
+  it("primeira chave falha: responde pela reserva na mesma rodada", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [passo("A"), passo("B")], timeoutMs: 20000 });
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiFonte: "conexao" }), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    llm.callLlmWithTools.mockImplementation(async (o: { apiKey: string }) =>
+      o.apiKey === "k-A" ? { text: null, error: "openai 429: limite" } : { text: "Oi pela reserva." }
+    );
+    const r = await advanceConversation({ ...base, text: "olá" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Oi pela reserva."]);
+  });
+
+  it("contrato sem nenhuma chave: erro claro (e segue pela saída Erro se ligada)", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [], timeoutMs: 25000 });
+    const f = fluxo(ia({ aiCredentialId: undefined }), false);
+    f.nodes.push({ id: "falha", position: { x: 0, y: 0 }, data: { iconKey: "message", label: "Falha", detail: "Um atendente já fala com você." } });
+    f.edges.push({ id: "e3", source: "bot", target: "falha", sourceHandle: "erro" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    const r = await advanceConversation({ ...base, text: "olá" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Um atendente já fala com você."]);
+    expect(llm.callLlmWithTools).not.toHaveBeenCalled();
   });
 });
 

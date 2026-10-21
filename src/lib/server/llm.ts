@@ -47,6 +47,8 @@ export interface CallLlmOptions {
   /** Só usado por provedores que expõem controle de esforço (Anthropic). */
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Tempo máximo de cada pedido ao provedor; estourar vira erro (e a reserva entra). Vazio = sem limite. */
+  timeoutMs?: number;
 }
 
 export interface LlmResult {
@@ -55,6 +57,8 @@ export interface LlmResult {
 }
 
 const DEFAULT_MAX_TOKENS = 2048;
+
+const sinalDeTempo = (opts: CallLlmOptions) => (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
 
 function safeJsonParse(raw: string): Record<string, string> {
   try {
@@ -101,6 +105,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${opts.apiKey}` },
       body: JSON.stringify({
         model: opts.model,
@@ -163,6 +168,7 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/messages`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: {
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
@@ -253,6 +259,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/models/${opts.model}:generateContent`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: { "Content-Type": "application/json", "x-goog-api-key": opts.apiKey },
       body: JSON.stringify({
         contents,
@@ -299,6 +306,9 @@ export async function callLlmWithTools(opts: CallLlmOptions): Promise<LlmResult>
     if (provider.format === "google") return await callGoogle(opts, provider.baseUrl);
     return await callOpenAiCompatible(opts, provider.baseUrl);
   } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return { text: null, error: `${provider.label} demorou mais de ${Math.round((opts.timeoutMs ?? 0) / 1000)} s para responder.` };
+    }
     return { text: null, error: err instanceof Error ? err.message : String(err) };
   }
 }

@@ -135,7 +135,8 @@ export async function GET() {
     }
     const nodes = (agente.flow.nodes as unknown as Node<FlowNodeData>[]) ?? [];
     const edges = (agente.flow.edges as unknown as Edge[]) ?? [];
-    const problemas = validateFlow(nodes, edges).length;
+    // Só erro trava o fluxo; aviso (opção solta, saída "Erro" da IA solta) não.
+    const problemas = validateFlow(nodes, edges).filter((i) => i.nivel === "erro").length;
     if (problemas > 0) {
       pendencias.push({
         id: `blocos-${agente.id}`,

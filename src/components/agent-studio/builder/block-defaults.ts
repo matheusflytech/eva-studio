@@ -75,9 +75,9 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     paletteLabel: "Agente de IA (nativo)",
     data: {
       label: "Agente de IA",
-      kind: "Responde com IA de verdade (Groq)",
+      kind: "Responde com a Central de IA",
       detail: "Você é um assistente útil e direto.",
-      aiModel: "llama-3.3-70b-versatile",
+      aiFonte: "conexao",
       aiMemoryWindow: 20,
       collectVars: [],
     },

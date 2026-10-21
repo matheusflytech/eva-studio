@@ -5,6 +5,7 @@ import { getProvider } from "@/lib/llm-providers";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
+import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { lerEstadoWorker } from "@/lib/server/heartbeat";
 
 // ---------------------------------------------------------------------------
@@ -162,11 +163,15 @@ export async function GET() {
       const nodes = (agent.flow.nodes as unknown as Node<FlowNodeData>[]) ?? [];
       const edges = (agent.flow.edges as unknown as Edge[]) ?? [];
       blocos = nodes.length;
-      pendencias = validateFlow(nodes, edges).length;
+      pendencias = validateFlow(nodes, edges).filter((i) => i.nivel === "erro").length;
       for (const n of nodes) {
         if (n.data?.iconKey === "ai-agent") {
-          const p = getProvider(n.data.aiProvider);
-          modelos.add(`${p.label} · ${n.data.aiModel || p.models[0].id}`);
+          if (fonteDaIa(n.data) === "conexao") {
+            modelos.add("Central de IA");
+          } else {
+            const p = getProvider(n.data.aiProvider);
+            modelos.add(`${p.label} · ${n.data.aiModel || p.models[0].id}`);
+          }
         }
       }
     }

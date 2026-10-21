@@ -73,6 +73,9 @@ export interface FlowNodeData {
   // Junta ao prompt o cadastro do agente (instruções, tom, idioma, "nunca
   // fazer"). Vazio = ligado; false = só o texto do bloco, como era antes.
   aiUsarAgente?: boolean;
+  // De onde vem a IA: "conexao" = Central de IA do contrato (ordem + reserva);
+  // "bloco" = provedor/credencial/modelo deste bloco. Vazio = ver fonte-da-ia.ts.
+  aiFonte?: "conexao" | "bloco";
   // Cada linha = uma variável que o agente tenta extrair da conversa (chave =
   // nome da variável, valor = descrição/como reconhecer) — reaproveita
   // KeyValueRow em vez de um tipo novo.
@@ -149,7 +152,7 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
     const varCount = (data.collectVars ?? []).filter((v) => v.key.trim()).length;
     return (
       <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">
-        {data.aiModel || "modelo não escolhido"}
+        {fonteDaIa(data) === "conexao" ? "Central de IA" : data.aiModel || "modelo não escolhido"}
         {varCount > 0 && ` · coleta ${varCount} dado${varCount === 1 ? "" : "s"}`}
       </p>
     );
@@ -204,6 +207,7 @@ function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: str
 
 import { validateNode } from "./block-validation";
 import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
+import { fonteDaIa } from "./fonte-da-ia";
 import { ESTILO_DA_SAIDA } from "./saida-estilo";
 
 const HANDLE_DOT = "!h-2.5 !w-2.5 !border-2 !border-panel";

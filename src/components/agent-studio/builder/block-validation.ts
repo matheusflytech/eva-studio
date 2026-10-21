@@ -1,5 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "./flow-node";
+import { fonteDaIa } from "./fonte-da-ia";
 import { SAIDA_ERRO, capturaComValidacao, ehFerramenta, saidaDaLigacao, saidasDoBloco, temSaidasNomeadas } from "./saidas";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,8 @@ export function validateNode(data: FlowNodeData): string | null {
       return null;
 
     case "ai-agent":
-      return vazio(data.aiCredentialId)
+      // Na conexão do contrato a chave vem da Central de IA, não do bloco.
+      return fonteDaIa(data) === "bloco" && vazio(data.aiCredentialId)
         ? "Escolha a credencial do provedor de IA."
         : null;
 

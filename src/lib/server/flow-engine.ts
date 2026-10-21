@@ -5,10 +5,13 @@ import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
-import { callLlmWithTools, type LlmTool, type LlmToolCall } from "@/lib/server/llm";
+import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
 import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
+import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
+import { passosDaConexao } from "@/lib/server/ia/conexao";
+import { chamarComReserva, type PassoDeIa } from "@/lib/server/ia/reserva";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
@@ -532,7 +535,7 @@ async function runCrmTool(
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
-  agente: AgenteParaPrompt & { id: string },
+  agente: AgenteParaPrompt & { id: string; orgId: string },
   userMessage: string,
   variables: Variables,
   nodes: Node<FlowNodeData>[],
@@ -542,9 +545,21 @@ async function runAiAgent(
   // bloco "Ferramenta: CRM" ligado neste agente.
   crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> }
 ): Promise<{ text: string | null; error?: string; seguir: boolean }> {
-  const provider = getProvider(node.data.aiProvider);
-  const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
-  if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
+  // De onde vem a IA: a conexão do contrato (lista com reserva automática)
+  // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
+  let passos: PassoDeIa[];
+  let timeoutMs: number | undefined;
+  if (fonteDaIa(node.data) === "bloco") {
+    const provider = getProvider(node.data.aiProvider);
+    const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
+    if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
+    passos = [{ provider: provider.id as LlmProvider, apiKey, model: node.data.aiModel || provider.models[0].id, origem: "bloco" }];
+  } else {
+    ({ passos, timeoutMs } = await passosDaConexao(agente.orgId));
+    if (passos.length === 0) {
+      return { text: null, error: "O contrato não tem nenhuma chave de IA: cadastre uma em Integrações → Central de IA.", seguir: false };
+    }
+  }
   const temSaida = temSaidaPrincipal(edges, node.id);
   let pediuParaSeguir = false;
 
@@ -745,11 +760,9 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const result = await callLlmWithTools({
-      provider: provider.id as LlmProvider,
-      apiKey,
-      model: node.data.aiModel || provider.models[0].id,
+    const result = await chamarComReserva(passos, {
       effort: node.data.aiEffort,
+      timeoutMs,
       systemPrompt,
       userMessage,
       history,
@@ -802,7 +815,11 @@ async function runAiAgent(
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     });
-    const error = result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`);
+    if (result.tentativas.length > 0 && !result.error) {
+      console.warn("[ia] respondeu pela reserva", { usado: result.usado?.origem, falharam: result.tentativas.map((t) => t.origem) });
+    }
+    const falhas = result.tentativas.map((t) => `${t.origem}: ${t.error}`);
+    const error = result.error ? [...falhas, `${result.usado?.origem ?? "IA"}: ${result.error}`].join(" · ") : undefined;
     const seguir = iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
     return { text: result.text, error, seguir };
   } catch (err) {

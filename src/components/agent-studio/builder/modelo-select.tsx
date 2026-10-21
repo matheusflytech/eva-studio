@@ -33,7 +33,11 @@ export function ModeloSelect({
   credentialId,
   value,
   onChange,
+  id = "node-ai-model",
+  label = "Modelo",
 }: {
+  id?: string;
+  label?: string;
   provider: string | undefined;
   credentialId: string | undefined;
   value: string | undefined;
@@ -71,7 +75,7 @@ export function ModeloSelect({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <Label htmlFor="node-ai-model">Modelo</Label>
+        <Label htmlFor={id}>{label}</Label>
         {credentialId && (
           <button
             type="button"
@@ -89,7 +93,7 @@ export function ModeloSelect({
       </div>
       {digitando ? (
         <Input
-          id="node-ai-model"
+          id={id}
           autoFocus
           placeholder="id do modelo, ex.: gpt-5.6-luna"
           defaultValue={atual}
@@ -104,7 +108,7 @@ export function ModeloSelect({
         />
       ) : (
         <Select
-          id="node-ai-model"
+          id={id}
           value={atual}
           onChange={(e) => (e.target.value === OUTRO ? setDigitando(true) : onChange(e.target.value))}
         >

@@ -46,6 +46,8 @@ model Organization {
   teams            Team[]
   // Lixeira (2026-10-20-lixeira.sql): só relação, nenhuma coluna nova aqui.
   trash            TrashItem[]
+  // Central de IA (2026-10-21-conexao-ia.sql): só relação, nenhuma coluna nova aqui.
+  aiConnection     AiConnection?
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -1765,4 +1767,23 @@ model SavedViewDefault {
 
   @@id([orgId, userId, entity])
   @@map("eva_studio_saved_view_defaults")
+}
+
+// Conexão de IA do contrato (Central de IA, F3): a lista em ordem de
+// preferência das chaves + modelos que os agentes usam, com reserva
+// automática (ver src/lib/server/ia/reserva.ts). Tabela à parte: sem o
+// registro (ou sem a tabela), vale a escolha automática de
+// src/lib/server/ia/provedor.ts, que é o comportamento de antes.
+model AiConnection {
+  id        String   @id @default(uuid())
+  orgId     String   @unique
+  // [{ credentialId: string, model: string }], na ordem de preferência.
+  passos    Json     @default("[]")
+  // Tempo máximo de cada tentativa antes de passar para a próxima.
+  timeoutMs Int      @default(25000)
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_ai_connections")
 }

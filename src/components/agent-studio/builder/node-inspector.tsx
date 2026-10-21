@@ -11,6 +11,7 @@ import { VariablePicker } from "./variable-picker";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
 import { ModeloSelect } from "./modelo-select";
+import { fonteDaIa } from "./fonte-da-ia";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
@@ -442,51 +443,71 @@ export function NodeInspector({
         {iconKey === "ai-agent" && (
           <div className="flex flex-col gap-3">
             <div>
-              <Label htmlFor="node-ai-provider">Provedor</Label>
+              <Label htmlFor="node-ai-fonte">De onde vem a IA</Label>
               <Select
-                id="node-ai-provider"
-                value={node.data.aiProvider ?? "groq"}
-                onChange={(e) => {
-                  // Trocar de provedor invalida modelo e credencial: o modelo
-                  // não existe no outro, e a chave é de outro serviço.
-                  const next = getProvider(e.target.value);
-                  onChange({
-                    aiProvider: next.id,
-                    aiModel: next.models[0].id,
-                    aiCredentialId: undefined,
-                  });
-                }}
+                id="node-ai-fonte"
+                value={fonteDaIa(node.data)}
+                onChange={(e) => onChange({ aiFonte: e.target.value as "conexao" | "bloco" })}
               >
-                {LLM_PROVIDERS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
+                <option value="conexao">Central de IA do contrato (com reserva automática)</option>
+                <option value="bloco">Escolher chave e modelo só para este bloco</option>
               </Select>
+              {fonteDaIa(node.data) === "conexao" && (
+                <p className="mt-1 text-[11px] text-text-tertiary">
+                  Usa a ordem de chaves e modelos de Integrações → Central de IA. Se a primeira falhar, a próxima responde.
+                </p>
+              )}
             </div>
-            <CredentialSelect
-              type={getProvider(node.data.aiProvider).credentialType}
-              label={`Credencial ${getProvider(node.data.aiProvider).label}`}
-              value={node.data.aiCredentialId}
-              onChange={(id) => onChange({ aiCredentialId: id })}
-            />
-            <ModeloSelect
-              provider={node.data.aiProvider}
-              credentialId={node.data.aiCredentialId}
-              value={node.data.aiModel}
-              onChange={(id) => onChange({ aiModel: id })}
-            />
-            {getProvider(node.data.aiProvider).format === "anthropic" && (
-              <div>
-                <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
-                <Select
-                  id="node-ai-effort"
-                  value={node.data.aiEffort ?? "low"}
-                  onChange={(e) => onChange({ aiEffort: e.target.value as "low" | "medium" | "high" })}
-                >
-                  <option value="low">Baixo — resposta rápida (recomendado para chat)</option>
-                  <option value="medium">Médio</option>
-                  <option value="high">Alto — pensa mais, demora mais</option>
-                </Select>
-              </div>
+            {fonteDaIa(node.data) === "bloco" && (
+              <>
+                <div>
+                  <Label htmlFor="node-ai-provider">Provedor</Label>
+                  <Select
+                    id="node-ai-provider"
+                    value={node.data.aiProvider ?? "groq"}
+                    onChange={(e) => {
+                      // Trocar de provedor invalida modelo e credencial: o modelo
+                      // não existe no outro, e a chave é de outro serviço.
+                      const next = getProvider(e.target.value);
+                      onChange({
+                        aiProvider: next.id,
+                        aiModel: next.models[0].id,
+                        aiCredentialId: undefined,
+                      });
+                    }}
+                  >
+                    {LLM_PROVIDERS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                <CredentialSelect
+                  type={getProvider(node.data.aiProvider).credentialType}
+                  label={`Credencial ${getProvider(node.data.aiProvider).label}`}
+                  value={node.data.aiCredentialId}
+                  onChange={(id) => onChange({ aiCredentialId: id })}
+                />
+                <ModeloSelect
+                  provider={node.data.aiProvider}
+                  credentialId={node.data.aiCredentialId}
+                  value={node.data.aiModel}
+                  onChange={(id) => onChange({ aiModel: id })}
+                />
+                {getProvider(node.data.aiProvider).format === "anthropic" && (
+                  <div>
+                    <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
+                    <Select
+                      id="node-ai-effort"
+                      value={node.data.aiEffort ?? "low"}
+                      onChange={(e) => onChange({ aiEffort: e.target.value as "low" | "medium" | "high" })}
+                    >
+                      <option value="low">Baixo — resposta rápida (recomendado para chat)</option>
+                      <option value="medium">Médio</option>
+                      <option value="high">Alto — pensa mais, demora mais</option>
+                    </Select>
+                  </div>
+                )}
+              </>
             )}
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
               <span>
