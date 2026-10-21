@@ -171,7 +171,7 @@ export function ListaDeContatos({
             ),
         },
       },
-      { id: "celular", label: "Celular", group: "Contato", coluna: { key: "celular", header: "Celular", sortable: true, width: "190px", cell: (c) => <PhoneNumber value={c.phone} className="text-text-secondary" /> } },
+      { id: "celular", label: "Celular", group: "Contato", coluna: { key: "celular", header: "Celular", sortable: true, width: "190px", cell: (c) => <PhoneNumber value={c.phone} className="text-text-secondary" whatsapp /> } },
       { id: "telefone", label: "Telefone", group: "Contato", coluna: { key: "telefone", header: "Telefone", width: "190px", cell: (c) => <PhoneNumber value={primeiroTelefone(c.phones)} className="text-text-secondary" /> } },
       { id: "empresa", label: "Empresa", group: "Contato", coluna: { key: "empresa", header: "Empresa", sortable: true, width: "180px", cell: (c) => c.company?.name ?? vazio } },
       { id: "cargo", label: "Cargo", group: "Contato", coluna: { key: "cargo", header: "Cargo", width: "160px", cell: (c) => c.jobTitle || vazio } },

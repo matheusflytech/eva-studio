@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { BANDEIRAS, formatarTelefone } from "./telefone";
+import { BANDEIRAS, formatarTelefone, linkDoWhatsAppWeb } from "./telefone";
 
 describe("formatarTelefone", () => {
   it("celular brasileiro gravado com DDI vira +55 DD 9XXXX-XXXX com bandeira", () => {
@@ -46,5 +46,20 @@ describe("formatarTelefone", () => {
     for (const iso of BANDEIRAS) {
       expect(existsSync(path.resolve(__dirname, `../../public/bandeiras/${iso}.svg`)), iso).toBe(true);
     }
+  });
+});
+
+describe("linkDoWhatsAppWeb", () => {
+  it("número completo vira link do WhatsApp Web com DDI", () => {
+    expect(linkDoWhatsAppWeb("+55 21 98171-0669")).toBe("https://web.whatsapp.com/send?phone=5521981710669");
+    expect(linkDoWhatsAppWeb("(21) 98171-0669")).toBe("https://web.whatsapp.com/send?phone=5521981710669");
+    expect(linkDoWhatsAppWeb("+351 912 345 678")).toBe("https://web.whatsapp.com/send?phone=351912345678");
+  });
+
+  it("sem número completo, sem botão", () => {
+    expect(linkDoWhatsAppWeb("")).toBeNull();
+    expect(linkDoWhatsAppWeb(null)).toBeNull();
+    expect(linkDoWhatsAppWeb("2345")).toBeNull();
+    expect(linkDoWhatsAppWeb("ramal 12")).toBeNull();
   });
 });

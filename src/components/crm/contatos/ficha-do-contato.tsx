@@ -121,7 +121,7 @@ export function FichaDoContato({
           <Avatar name={nome} size="lg" />
           <div className="min-w-0 text-small text-text-secondary">
             {contact.email && <p className="truncate">{contact.email}</p>}
-            {contact.phone && <PhoneNumber value={contact.phone} />}
+            {contact.phone && <PhoneNumber value={contact.phone} whatsapp />}
           </div>
         </div>
 

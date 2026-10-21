@@ -103,3 +103,15 @@ export function formatarTelefone(bruto: string | null | undefined): TelefoneForm
   if (!pais) return { texto: `+${emGrupos(semZeros)}`, digitos: semZeros, pais: null };
   return { texto: `+${pais.ddi} ${formatarNacional(pais, semZeros.slice(pais.ddi.length))}`, digitos: semZeros, pais };
 }
+
+/**
+ * Link para abrir a conversa no WhatsApp Web. Só com número completo (DDI +
+ * número, 10 a 15 dígitos, padrão E.164); sem isso, null e a tela não mostra o
+ * botão. Brasil sem DDI ganha o 55, como em formatarTelefone.
+ */
+export function linkDoWhatsAppWeb(bruto: string | null | undefined): string | null {
+  const t = formatarTelefone(bruto);
+  if (!t || t.digitos.length < 10 || t.digitos.length > 15) return null;
+  if (!t.pais && !(bruto ?? "").trim().startsWith("+")) return null;
+  return `https://web.whatsapp.com/send?phone=${t.digitos}`;
+}

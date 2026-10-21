@@ -161,7 +161,7 @@ function ContextoDoRegistro({ item }: { item: ItemDoDiaDaTela }) {
               <Link href={`/contatos?abrir=${contato.id}`} className="font-medium text-text-primary hover:text-accent-fg hover:underline">
                 {contato.nome || "Sem nome"}
               </Link>
-              {contato.telefone && <PhoneNumber value={contato.telefone} />}
+              {contato.telefone && <PhoneNumber value={contato.telefone} whatsapp />}
               {contato.email && <span className="truncate text-text-secondary">{contato.email}</span>}
             </dd>
           </div>
