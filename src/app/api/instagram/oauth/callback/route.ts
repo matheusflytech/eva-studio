@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { encryptSecret } from "@/lib/server/crypto";
 import { assinarEventosInstagram } from "@/lib/server/instagram-subscribe";
 import { ehIdDeContrato, rotaDoContrato } from "@/lib/contrato/rotas";
+import { MODO_CONTRATO, conectarInstagram } from "@/lib/server/canais/conectar";
 
 const STATE_COOKIE = "ig_oauth_state";
 
@@ -38,7 +39,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "state inválido (possível CSRF)." }, { status: 400 });
   }
 
-  const redirectBack = new URL(rotaDoContrato(contrato, `/agent-studio/${agentId}`), url.origin);
+  // Modo contrato (Configurações → Canais): o canal nasce sem agente.
+  const doContrato = agentId === MODO_CONTRATO;
+  const redirectBack = new URL(
+    rotaDoContrato(contrato, doContrato ? "/configuracoes" : `/agent-studio/${agentId}`),
+    url.origin
+  );
+  if (doContrato) redirectBack.searchParams.set("aba", "canais");
 
   if (errorParam || !code) {
     redirectBack.searchParams.set("instagram_error", errorParam ?? "cancelado");
@@ -48,8 +55,10 @@ export async function GET(request: Request) {
   const orgId = await requireOrgId({ contrato });
   if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
-  const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
-  if (!agent) return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
+  if (!doContrato) {
+    const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
+    if (!agent) return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
+  }
 
   const appId = process.env.INSTAGRAM_APP_ID;
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
@@ -89,6 +98,17 @@ export async function GET(request: Request) {
     const igBusinessId = String(me?.user_id ?? shortTokenData?.user_id ?? "");
     if (!igBusinessId) {
       redirectBack.searchParams.set("instagram_error", "missing_user_id");
+      return NextResponse.redirect(redirectBack);
+    }
+
+    if (doContrato) {
+      const r = await conectarInstagram(orgId, { igBusinessId, accessToken, username: me?.username ?? null });
+      if (!r.ok) {
+        redirectBack.searchParams.set("instagram_error", r.status === 409 ? "outro_contrato" : "unexpected");
+        return NextResponse.redirect(redirectBack);
+      }
+      if (!r.assinou) redirectBack.searchParams.set("instagram_warning", "subscribe_failed");
+      redirectBack.searchParams.set("instagram", "connected");
       return NextResponse.redirect(redirectBack);
     }
 

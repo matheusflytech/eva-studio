@@ -14,9 +14,10 @@ import type { TipoDeCanal } from "@/lib/canais";
 // essa cópia; desativar = apagar a cópia (o canal continua conectado).
 //
 // `segredos` do canal guarda, cifrado, exatamente os campos da linha da
-// ativação como estão no banco (tokens já cifrados continuam cifrados). Canal
-// migrado pelo SQL vem sem `segredos`: na primeira troca, a cópia atual do
-// agente vira a fonte e é guardada no canal.
+// ativação como estão no banco (tokens já cifrados continuam cifrados). A
+// cópia do agente, quando existe, é a fonte mais nova (token renovado do
+// TikTok, webhook do Telegram) e a cada troca atualiza os segredos do canal.
+// Canal migrado pelo SQL vem sem `segredos` e usa a cópia como fonte.
 //
 // WhatsApp por QR não tem cópia: a sessão é do canal e o worker acha o agente
 // pelo canal (eva_studio_canais_whatsapp_qr).
@@ -130,7 +131,9 @@ export async function ativarCanal(orgId: string, canalId: string, agentId: strin
 
     if (canal.agentId === agentId) return { ok: true as const, tipo, dados: {}, saiuDe: null };
 
-    const dados = decifrarSegredos(canal.segredos) ?? (canal.agentId ? await lerAtivacao(tx, tipo, canal.agentId) : null);
+    // A cópia do agente é a mais nova (o TikTok renova o token nela); sem
+    // agente, valem os segredos guardados no canal.
+    const dados = (canal.agentId ? await lerAtivacao(tx, tipo, canal.agentId) : null) ?? decifrarSegredos(canal.segredos);
     if (!dados) {
       return { ok: false as const, status: 409, error: "As credenciais deste canal não estão mais disponíveis. Desconecte e conecte de novo." };
     }
@@ -138,10 +141,10 @@ export async function ativarCanal(orgId: string, canalId: string, agentId: strin
     // O agente já atendia por outro canal deste tipo: esse fica sem agente.
     const anterior = await tx.canal.findFirst({ where: { orgId, agentId, tipo, NOT: { id: canalId } } });
     if (anterior) {
-      const dadosAnterior = decifrarSegredos(anterior.segredos) ?? (await lerAtivacao(tx, tipo, agentId));
+      const dadosAnterior = (await lerAtivacao(tx, tipo, agentId)) ?? decifrarSegredos(anterior.segredos);
       await tx.canal.update({
         where: { id: anterior.id },
-        data: { agentId: null, ...(anterior.segredos || !dadosAnterior ? {} : { segredos: cifrarSegredos(dadosAnterior) }) },
+        data: { agentId: null, ...(dadosAnterior ? { segredos: cifrarSegredos(dadosAnterior) } : {}) },
       });
     }
 
@@ -151,7 +154,7 @@ export async function ativarCanal(orgId: string, canalId: string, agentId: strin
     await gravarAtivacao(tx, tipo, agentId, dados);
     await tx.canal.update({
       where: { id: canalId },
-      data: { agentId, ...(canal.segredos ? {} : { segredos: cifrarSegredos(dados) }) },
+      data: { agentId, segredos: cifrarSegredos(dados) },
     });
     return { ok: true as const, tipo, dados, saiuDe };
   });
@@ -166,11 +169,11 @@ export async function desativarCanal(orgId: string, canalId: string): Promise<Re
     if (!canal.agentId) return { ok: true as const, tipo, dados: {}, saiuDe: null };
 
     const saiuDe = canal.agentId;
-    const dados = decifrarSegredos(canal.segredos) ?? (await lerAtivacao(tx, tipo, saiuDe));
+    const dados = (await lerAtivacao(tx, tipo, saiuDe)) ?? decifrarSegredos(canal.segredos);
     await apagarAtivacao(tx, tipo, saiuDe);
     await tx.canal.update({
       where: { id: canalId },
-      data: { agentId: null, ...(canal.segredos || !dados ? {} : { segredos: cifrarSegredos(dados) }) },
+      data: { agentId: null, ...(dados ? { segredos: cifrarSegredos(dados) } : {}) },
     });
     return { ok: true as const, tipo, dados: dados ?? {}, saiuDe };
   });
