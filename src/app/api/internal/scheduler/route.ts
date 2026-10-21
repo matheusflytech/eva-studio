@@ -5,6 +5,7 @@ import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
 import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
 import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
 import { limparLixeiraVencida } from "@/lib/server/lixeira";
+import { entregarPendentes } from "@/lib/server/webhooks/entrega";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -68,6 +69,13 @@ export async function POST(request: Request) {
     return { jobs: 0, linhas: 0 };
   });
 
+  // Webhooks de saída: novas tentativas vencidas (a primeira sai logo após o
+  // evento). Sem o SQL dos webhooks, não faz nada.
+  const webhooks = await entregarPendentes({ orcamentoMs: Math.min(10_000, Math.max(0, 38_000 - (Date.now() - startedAt))) }).catch((e) => {
+    console.error("[scheduler] webhooks falharam", e instanceof Error ? e.message : e);
+    return { entregues: 0, falhas: 0 };
+  });
+
   // Lixeira: o que passou dos 30 dias some de vez. Também nunca derruba a
   // rodada (sem o SQL da lixeira a tabela não existe e a conta é 0).
   const lixeiraLimpa = await limparLixeiraVencida().catch((e) => {
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
     ok: true,
     ms: Date.now() - startedAt,
     bulkJobs: lotes,
+    webhooks,
     lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {

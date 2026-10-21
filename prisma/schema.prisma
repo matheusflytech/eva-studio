@@ -1948,3 +1948,64 @@ model EmailSupressao {
   @@id([orgId, email])
   @@map("eva_studio_email_supressoes")
 }
+
+// ---------------------------------------------------------------------------
+// Webhooks de saída (F6). SQL 2026-10-23-webhooks.sql. Sem as tabelas, nada
+// é emitido e a tela avisa que falta ativar.
+// ---------------------------------------------------------------------------
+
+// Endereço que recebe os eventos do contrato (um fluxo do n8n, por exemplo).
+model WebhookEndpoint {
+  id            String    @id @default(uuid())
+  orgId         String
+  url           String
+  descricao     String    @default("")
+  // "*", "deal.*" ou tipos exatos (src/lib/webhooks/eventos.ts).
+  eventos       String[]
+  // whsec_..., cifrado com encryptSecret.
+  segredo       String
+  ativo         Boolean   @default(true)
+  // Quem criou: "tela" ou "api" (gatilho do n8n assina e desassina sozinho).
+  origem        String    @default("tela")
+  // Desligado sozinho (410 ou falha por dias seguidos): por quê.
+  desativadoPor String?
+  falhandoDesde DateTime?
+  ultimoSucesso DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  entregas WebhookEntrega[]
+
+  @@index([orgId])
+  @@map("eva_studio_webhook_endpoints")
+}
+
+// Uma entrega de um evento a um endpoint. É a própria fila (outbox): o
+// relógio pega as pendentes vencidas com FOR UPDATE SKIP LOCKED.
+model WebhookEntrega {
+  id            String    @id @default(uuid())
+  orgId         String
+  endpointId    String
+  // webhook-id: estável entre tentativas, para quem recebe descartar repetido.
+  eventoId      String
+  tipo          String
+  payload       Json
+  // pendente | entregue | falhou | cancelada
+  status        String    @default("pendente")
+  tentativas    Int       @default(0)
+  proximaEm     DateTime  @default(now())
+  ultimoStatus  Int?
+  // Corpo da resposta (até 4 KB) ou o erro de rede.
+  ultimaResposta String?
+  latenciaMs    Int?
+  entregueEm    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, proximaEm])
+  @@index([endpointId, createdAt])
+  @@map("eva_studio_webhook_entregas")
+}

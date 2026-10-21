@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { normalizarCapturados } from "@/lib/server/custom-fields";
 import { validarEmail, validarNome, normalizarTelefoneBR } from "@/lib/capture-validation";
 import { mapCaptureField, normalizePhone } from "@/lib/server/contacts";
+import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
 
 // Lead = Contact com leadStage. Todo lugar que lê ou grava lead (tela, API
 // pública, motor) passa por aqui, pra regra ser uma só.
@@ -13,10 +14,13 @@ export type LeadStage = (typeof LEAD_STAGES)[number];
 export const isLeadStage = (s: unknown): s is LeadStage => typeof s === "string" && (LEAD_STAGES as readonly string[]).includes(s);
 
 export async function marcarComoLead(contactId: string, origem: { agentId: string; channel: string }): Promise<void> {
-  await prisma.contact.updateMany({
+  const r = await prisma.contact.updateMany({
     where: { id: contactId, leadStage: null },
     data: { leadStage: "novo", leadAt: new Date(), leadAgentId: origem.agentId, leadChannel: origem.channel },
   });
+  if (r.count === 0) return;
+  const c = await prisma.contact.findUnique({ where: { id: contactId }, select: { orgId: true } });
+  if (c) await emitirEventoDeContato(c.orgId, contactId, "lead.captured");
 }
 
 interface ContatoComConversa {
@@ -244,6 +248,8 @@ export async function salvarLeadExterno(
       leadChannel: source,
     },
   });
+  await emitirEventoDeContato(orgId, criado.id, "contact.created");
+  await emitirEventoDeContato(orgId, criado.id, "lead.captured");
   return { contactId: criado.id };
 }
 

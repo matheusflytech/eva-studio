@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { emitirEventoDeTarefa } from "@/lib/server/webhooks/emitir";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
@@ -30,7 +31,10 @@ export const PATCH = rotaV1<P>({ recurso: "tasks" }, async (ctx, { id }) => {
   if (d.done === true && !atual.doneAt) data.doneAt = new Date();
   if (d.done === false) data.doneAt = null;
   const t = Object.keys(data).length > 0 ? await prisma.task.update({ where: { id }, data }) : atual;
-  if (data.doneAt instanceof Date) await tocarAtividadeDaTarefa(t);
+  if (data.doneAt instanceof Date) {
+    await tocarAtividadeDaTarefa(t);
+    await emitirEventoDeTarefa(ctx.orgId, t.id, "task.completed");
+  }
   return NextResponse.json({ data: serializarTarefa(t) });
 });
 

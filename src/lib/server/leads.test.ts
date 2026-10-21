@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
-  contact: { updateMany: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+  contact: { updateMany: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   agent: { findFirst: vi.fn() },
   conversation: { findFirst: vi.fn() },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/custom-fields", () => ({ normalizarCapturados: vi.fn(async () => undefined) }));
+const webhooks = vi.hoisted(() => ({ emitirEventoDeContato: vi.fn() }));
+vi.mock("@/lib/server/webhooks/emitir", () => webhooks);
 
 import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead, atualizarLead, removerDosLeads } from "./leads";
 
@@ -14,11 +16,20 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("marcarComoLead", () => {
   it("só marca quem ainda não é lead (não rebaixa etapa)", async () => {
+    db.contact.updateMany.mockResolvedValue({ count: 0 });
     await marcarComoLead("c1", { agentId: "a1", channel: "instagram" });
     expect(db.contact.updateMany).toHaveBeenCalledWith({
       where: { id: "c1", leadStage: null },
       data: expect.objectContaining({ leadStage: "novo", leadAgentId: "a1", leadChannel: "instagram" }),
     });
+    expect(webhooks.emitirEventoDeContato).not.toHaveBeenCalled();
+  });
+
+  it("virou lead agora: avisa os webhooks (lead.captured)", async () => {
+    db.contact.updateMany.mockResolvedValue({ count: 1 });
+    db.contact.findUnique.mockResolvedValue({ orgId: "o1" });
+    await marcarComoLead("c1", { agentId: "a1", channel: "instagram" });
+    expect(webhooks.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "lead.captured");
   });
 });
 

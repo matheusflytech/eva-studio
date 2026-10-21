@@ -6,6 +6,7 @@ import { noEscopo } from "@/lib/server/escopo-dados";
 import { conferirReferencias } from "@/lib/server/api-validacao";
 import { addNote, createTask, findOpenDealForContact } from "@/lib/server/crm";
 import { tocarAtividadeDaTarefa } from "@/lib/server/atividade-do-negocio";
+import { emitirEventoDeTarefa } from "@/lib/server/webhooks/emitir";
 import { gravarDetalhes, lerDetalhes, type DetalheDaTarefa } from "@/lib/server/tarefas-detalhes";
 import { ehDiaTodo, tarefaEstaAtrasada } from "@/lib/tarefas/agrupar";
 import { calcularAdiamento, empurrarPrevisao, type OpcaoDeAdiar } from "@/lib/tarefas/adiar";
@@ -221,6 +222,7 @@ export async function concluirTarefa(ctx: CtxDeTarefas, task: Task, pedido: Pedi
     await gravarDetalhes({ id: proximaId, orgId: ctx.orgId }, { allDay: true });
   }
   await tocarAtividadeDaTarefa(task, nota?.createdAt ?? agora);
+  await emitirEventoDeTarefa(ctx.orgId, task.id, "task.completed");
   return { tarefaId: task.id, proximaId, detalhesGravados };
 }
 
@@ -321,6 +323,7 @@ export async function aplicarEmMassa(ctx: CtxDeTarefas, ids: string[], acao: Aca
       await addNote({ orgId: ctx.orgId, text: `Tarefa concluída: ${t.text}\n${textoDoResultado(t.type, acao.resultado, acao.nota)}`, contactId: t.contactId, dealId: t.dealId, authorId: ctx.userId });
     }
     await tocarAtividadeDaTarefa(t, agora);
+    await emitirEventoDeTarefa(ctx.orgId, t.id, "task.completed");
   }
   return { alteradas: r.count, ignoradas: ignoradas + visiveis.length - abertas.length };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
 import { requirePermission } from "@/lib/server/permissions";
 import { atalhosDeContato, comBusca, listarContatos } from "@/lib/server/listas-crm";
@@ -139,6 +140,7 @@ export async function POST(request: Request) {
         company: { select: { id: true, name: true } },
       },
     });
+    await emitirEventoDeContato(ctx.orgId, contact.id, "contact.created");
     return NextResponse.json({ contact: serializeContact(contact) });
   } catch (e) {
     // P2002 = esse canal (agente + id externo) já é de outra ficha.

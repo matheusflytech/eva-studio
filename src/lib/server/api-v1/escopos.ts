@@ -22,6 +22,7 @@ export const RECURSOS = [
   "sequences",
   "imports",
   "exports",
+  "webhooks",
 ] as const;
 export type Recurso = (typeof RECURSOS)[number];
 export type Acao = "read" | "write";

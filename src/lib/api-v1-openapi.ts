@@ -246,6 +246,34 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     get: { tag: "Configuração", summary: "Campos personalizados (leitura)", scope: "custom_fields:read", query: [["entity", "deal | contact"], ["pipeline", "Id do funil"]] },
   },
   "/tags": { get: { tag: "Configuração", summary: "Etiquetas", scope: "tags:read" } },
+  "/me": {
+    get: {
+      tag: "Configuração",
+      summary: "Quem é esta chave",
+      description: "Contrato, chave e escopos. Serve para testar a credencial (o node do n8n chama aqui). Qualquer chave válida.",
+      scope: "(qualquer)",
+    },
+  },
+
+  "/webhooks": {
+    get: { tag: "Webhooks", summary: "Listar webhooks de saída", scope: "webhooks:read" },
+    post: {
+      tag: "Webhooks",
+      summary: "Assinar eventos",
+      description:
+        "Cria um endpoint que recebe os eventos escolhidos (\"*\", \"deal.*\" ou tipos exatos). O secret (whsec_...) só vem nesta resposta. " +
+        "Entrega com Standard Webhooks: headers webhook-id, webhook-timestamp e webhook-signature (v1,<base64 HMAC-SHA256 de id.timestamp.corpo>). " +
+        "Só 2xx é sucesso; novas tentativas em 5 s, 5 min, 30 min, 2 h, 5 h, 10 h e 10 h; 410 desliga o endpoint.",
+      scope: "webhooks:write",
+      idempotency: "optional",
+      status: 201,
+      body: { url: "https://seu-n8n.com/webhook/abc", events: ["deal.stage_changed", "deal.won"], description: "n8n" },
+    },
+  },
+  "/webhooks/{id}": {
+    get: { tag: "Webhooks", summary: "Ler webhook", scope: "webhooks:read" },
+    delete: { tag: "Webhooks", summary: "Cancelar assinatura", scope: "webhooks:write" },
+  },
 
   "/pipelines": {
     get: { tag: "Funis", summary: "Funis com etapas", scope: "pipelines:read" },

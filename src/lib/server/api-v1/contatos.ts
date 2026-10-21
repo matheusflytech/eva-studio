@@ -5,6 +5,7 @@ import { validarEmail } from "@/lib/capture-validation";
 import { conferirReferencias, type Corpo } from "@/lib/server/api-validacao";
 import { applyTag, filtroDeTelefone, optOutContact, removeTag, telefoneParaGravar } from "@/lib/server/contacts";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
+import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { ErroApi, iso } from "./http";
 import {
@@ -250,6 +251,7 @@ export async function criarContato(orgId: string, d: DadosDeContato, op: Opcoes 
     if (op.origem === "importacao") await prisma.contactTag.createMany({ data: [{ contactId: contato.id, tagId }], skipDuplicates: true });
     else await applyTag(contato.id, tagId);
   }
+  await emitirEventoDeContato(orgId, contato.id, "contact.created");
   return contato;
 }
 
@@ -328,6 +330,7 @@ export async function atualizarContato(orgId: string, contactId: string, d: Dado
     else await applyTag(contactId, tagId);
   }
   for (const tagId of remover) await removeTag(contactId, tagId);
+  await emitirEventoDeContato(orgId, contactId, "contact.updated");
   return { mudou: true };
 }
 

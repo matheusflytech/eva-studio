@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { tocarAtividadeDaConversa } from "@/lib/server/atividade-do-negocio";
+import { emitirEvento } from "@/lib/server/webhooks/emitir";
 
 // ---------------------------------------------------------------------------
 // Caixa de entrada: as regras num lugar só.
@@ -91,8 +92,41 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
     // abertos do contato (nota interna não conta: fica fora de `visiveis`).
     await tocarAtividadeDaConversa(conversationId, ultima.createdAt);
   }
+  if (doContato.length > 0) await emitirMensagensRecebidas(conversationId, doContato);
 
   return criadas;
+}
+
+/** Webhook de saída `message.received`: uma entrega por mensagem do contato. */
+async function emitirMensagensRecebidas(
+  conversationId: string,
+  mensagens: { id: string; text: string; mediaType: string | null; mediaMime: string | null; createdAt: Date }[]
+) {
+  if (!prisma.webhookEndpoint) return;
+  const conversa = await prisma.conversation
+    .findUnique({
+      where: { id: conversationId },
+      select: { agentId: true, channel: true, contactId: true, contactRecordId: true, agent: { select: { orgId: true } } },
+    })
+    .catch(() => null);
+  if (!conversa?.agent) return;
+  for (const m of mensagens) {
+    await emitirEvento(conversa.agent.orgId, "message.received", async () => ({
+      data: {
+        id: m.id,
+        conversation_id: conversationId,
+        agent_id: conversa.agentId,
+        channel: conversa.channel,
+        // Id do contato no canal (número, @ do Instagram) e a ficha no CRM.
+        channel_contact_id: conversa.contactId,
+        contact_id: conversa.contactRecordId,
+        text: m.text,
+        media_type: m.mediaType,
+        media_mime: m.mediaMime,
+        created_at: m.createdAt.toISOString(),
+      },
+    }));
+  }
 }
 
 // ---------------------------------------------------------------------------

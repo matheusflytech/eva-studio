@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { emitirEventoDeNegocio } from "@/lib/server/webhooks/emitir";
 
 export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill";
 
@@ -69,6 +70,35 @@ export async function registrarMudancaDeEtapa(e: {
   } catch (error) {
     console.error("[stage-events] falha ao registrar mudança de etapa", error);
   }
+  await emitirEventosDaEtapa(e);
+}
+
+/**
+ * Webhooks de saída: criação, mudança de etapa e, pelo tipo da etapa,
+ * ganho, perda e reabertura. É aqui porque toda mudança de etapa (tela,
+ * fluxo, API, importação) passa por este ponto.
+ */
+async function emitirEventosDaEtapa(e: { orgId: string; dealId: string; fromStageId: string | null; toStageId: string }) {
+  try {
+    if (!e.fromStageId) {
+      await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.created");
+      return;
+    }
+    const etapas = await prisma.pipelineStage.findMany({
+      where: { id: { in: [e.fromStageId, e.toStageId] } },
+      select: { id: true, type: true },
+    });
+    const tipo = (id: string) => etapas.find((s) => s.id === id)?.type ?? "open";
+    const de = tipo(e.fromStageId);
+    const para = tipo(e.toStageId);
+    const previous = { stage_id: e.fromStageId };
+    await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.stage_changed", previous);
+    if (para === "won") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.won", previous);
+    else if (para === "lost") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.lost", previous);
+    else if (de === "won" || de === "lost") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.reopened", previous);
+  } catch (error) {
+    console.error("[stage-events] falha ao emitir webhooks", error);
+  }
 }
 
 /**
@@ -86,4 +116,5 @@ export async function registrarMudancasEmLote(
   } catch (error) {
     console.error("[stage-events] falha ao registrar mudanças de etapa em lote", error);
   }
+  for (const e of reais) await emitirEventosDaEtapa(e);
 }

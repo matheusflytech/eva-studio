@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { normalizarCapturados } from "@/lib/server/custom-fields";
 import { normalizarTelefoneBR } from "@/lib/capture-validation";
 import type { Prisma } from "@/generated/prisma/client";
+import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
 
 // ---------------------------------------------------------------------------
 // CRM de contatos — a ficha da pessoa, no nível da organização.
@@ -227,6 +228,7 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
         },
       });
       contactId = created.id;
+      await emitirEventoDeContato(orgId, created.id, "contact.created");
     }
 
     await prisma.contactChannel.create({ data: { contactId, agentId, channel, externalId } });
