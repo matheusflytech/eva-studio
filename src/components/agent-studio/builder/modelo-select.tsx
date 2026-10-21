@@ -35,7 +35,14 @@ export function ModeloSelect({
   onChange,
   id = "node-ai-model",
   label = "Modelo",
+  trocarSeAusente = false,
 }: {
+  /**
+   * Quando a lista da chave chega e o modelo atual não está nela, troca pelo
+   * primeiro da chave. Só para escolha nova (criação de agente): em bloco já
+   * salvo, trocar sozinho mudaria um fluxo publicado sem ninguém ver.
+   */
+  trocarSeAusente?: boolean;
   id?: string;
   label?: string;
   provider: string | undefined;
@@ -65,6 +72,12 @@ export function ModeloSelect({
   const carregando = !!credentialId && !valido;
   const daChave = valido?.modelos ?? null;
   const erro = valido?.erro ?? null;
+
+  React.useEffect(() => {
+    if (!trocarSeAusente || !daChave?.length || daChave.some((m) => m.id === value)) return;
+    // Primeiro um modelo conhecido do catálogo que a chave tenha; senão o primeiro da chave.
+    onChange((daChave.find((m) => catalogo.some((c) => c.id === m.id)) ?? daChave[0]).id);
+  }, [trocarSeAusente, daChave, value, onChange, catalogo]);
 
   const opcoes = daChave ?? catalogo;
   const atual = value ?? catalogo[0]?.id ?? "";

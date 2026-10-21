@@ -2,7 +2,7 @@
 
 import Link from "@/components/contrato/link";
 import { ArrowLeft } from "lucide-react";
-import { AgentForm } from "@/components/agent-studio/agent-form";
+import { NovoAgenteEtapas } from "@/components/agent-studio/novo-agente-etapas";
 
 export default function NewAgentPage() {
   return (
@@ -16,7 +16,7 @@ export default function NewAgentPage() {
       <h1 className="mx-auto mb-6 max-w-2xl font-display text-xl font-semibold text-text-primary">
         Novo agente
       </h1>
-      <AgentForm />
+      <NovoAgenteEtapas />
     </div>
   );
 }
