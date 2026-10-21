@@ -1824,3 +1824,45 @@ model AiKeyLimit {
   @@index([orgId])
   @@map("eva_studio_ai_key_limits")
 }
+
+// Canais do contrato (F4 fase 2, SQL 2026-10-22-canais-do-contrato.sql).
+// A conexão é do contrato (Configurações → Canais); o agente que atende é
+// escolhido na aba dele (agentId, nulo = ninguém). As tabelas por agente
+// (MetaConnection, InstagramConnection...) viram a "ativação": cópia das
+// credenciais para o agente que atende, lida pela entrada e pelos envios.
+// Ver src/lib/server/canais/ e docs/superpowers/plans/2026-10-21-canais-do-contrato.md.
+model Canal {
+  id         String   @id @default(uuid())
+  orgId      String
+  // whatsapp_meta | whatsapp_qr | instagram | messenger | telegram | tiktok
+  tipo       String
+  rotulo     String   @default("")
+  // phoneNumberId | número do QR | igBusinessId | pageId | bot | businessId
+  externalId String?
+  // JSON cifrado (crypto.ts) com o que a ativação precisa (token, wabaId...).
+  // Nulo nos canais migrados: as credenciais ainda estão só na ativação.
+  segredos   String?  @db.Text
+  status     String   @default("conectado") // conectado | atencao | pendente | desconectado
+  detalhe    String?
+  agentId    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_canais")
+}
+
+// Sessão do WhatsApp por QR de um canal do contrato (o worker abre uma por
+// canal). Mesmo formato da antiga eva_studio_whatsapp_connections.
+model CanalWhatsAppQr {
+  canalId     String   @id
+  status      String   @default("disconnected") // disconnected | requesting | qr_pending | connected | logging_out
+  qrDataUrl   String?  @db.Text
+  phoneNumber String?
+  creds       Json?
+  keys        Json?
+  lastError   String?
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("eva_studio_canais_whatsapp_qr")
+}
