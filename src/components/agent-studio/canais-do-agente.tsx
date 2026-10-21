@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRightLeft, Plus, Settings2, X } from "lucide-react";
+import { Plus, Settings2, X } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -16,15 +16,18 @@ import { InstagramConnect } from "./instagram-connect";
 import { TelegramConnect } from "./telegram-connect";
 import { MessengerConnect, TikTokConnect } from "./channel-connect";
 
-interface Conexao {
+interface CanalNaTela {
+  id: string;
   tipo: TipoDeCanal;
-  agentId: string;
-  agentNome: string;
   rotulo: string;
-  situacao: "conectado" | "atencao" | "pendente";
+  status: "conectado" | "atencao" | "pendente" | "desconectado";
+  agentId: string | null;
+  agentNome: string | null;
 }
 
-function Conectar({ tipo, agentId }: { tipo: TipoDeCanal; agentId: string }) {
+// Conexão dentro do agente, como era antes dos canais do contrato. Só aparece
+// enquanto o SQL de canais não foi aplicado (disponivel = false).
+function ConectarNoAgente({ tipo, agentId }: { tipo: TipoDeCanal; agentId: string }) {
   switch (tipo) {
     case "whatsapp_meta":
       return <MetaWhatsAppConnect agentId={agentId} />;
@@ -42,15 +45,15 @@ function Conectar({ tipo, agentId }: { tipo: TipoDeCanal; agentId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Aba Canais do agente: por onde ESTE agente atende. Cada tipo mostra o canal
-// que ele já usa, ou deixa escolher um canal do contrato (que passa a ser
-// atendido por ele) ou conectar um novo. A lista completa fica em
-// Configurações → Canais.
+// Aba Canais do agente: por qual canal do contrato ESTE agente atende, um de
+// cada tipo. A conexão em si fica em Configurações → Canais. Escolher um
+// canal que outro agente usa tira dele (sempre um agente por canal).
 // ---------------------------------------------------------------------------
 export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentNome: string }) {
-  const [conexoes, setConexoes] = React.useState<Conexao[] | null>(null);
+  const [dados, setDados] = React.useState<{ disponivel: boolean; canais: CanalNaTela[] } | null>(null);
   const [versao, setVersao] = React.useState(0);
   const [aberto, setAberto] = React.useState<TipoDeCanal | null>(null);
+  const [salvando, setSalvando] = React.useState(false);
   const [mensagem, setMensagem] = React.useState<{ tom: "info" | "danger"; texto: string } | null>(null);
 
   React.useEffect(() => {
@@ -59,24 +62,29 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
       .then((r) => r.json())
       .catch(() => null)
       .then((d) => {
-        if (vivo) setConexoes(Array.isArray(d?.conexoes) ? d.conexoes : []);
+        if (vivo) setDados({ disponivel: d?.disponivel !== false, canais: Array.isArray(d?.canais) ? d.canais : [] });
       });
     return () => {
       vivo = false;
     };
   }, [versao]);
 
-  async function usar(c: Conexao) {
-    if (!confirm(`${c.rotulo} hoje é atendido por "${c.agentNome}". Passar para "${agentNome}"?`)) return;
+  async function escolher(tipo: TipoDeCanal, canalId: string) {
+    const canal = dados?.canais.find((c) => c.id === canalId);
+    if (canal?.agentId && canal.agentId !== agentId) {
+      if (!confirm(`${canal.rotulo} hoje é atendido por "${canal.agentNome}". Passar para "${agentNome}"?`)) return;
+    }
+    setSalvando(true);
     setMensagem(null);
-    const res = await fetch("/api/canais/trocar", {
+    const res = await fetch(`/api/agents/${agentId}/canais`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo: c.tipo, de: c.agentId, para: agentId }),
+      body: JSON.stringify({ tipo, canalId: canalId || null }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) setMensagem({ tom: "danger", texto: data.error ?? "Não deu para trocar." });
-    else setMensagem({ tom: "info", texto: `${c.rotulo} agora é atendido por ${agentNome}.${data.aviso ? ` ${data.aviso}` : ""}` });
+    setSalvando(false);
+    if (!res.ok) setMensagem({ tom: "danger", texto: data.error ?? "Não deu para trocar o canal." });
+    else if (canal) setMensagem({ tom: "info", texto: `${agentNome} agora atende por ${canal.rotulo}.` });
     setVersao((v) => v + 1);
   }
 
@@ -85,20 +93,26 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
       <CardHeader>
         <CardTitle>Por onde ele atende</CardTitle>
         <CardDescription>
-          Os canais ficam no contrato; aqui você escolhe quais este agente atende.{" "}
-          <Link href="/configuracoes?aba=canais" className="text-accent-fg hover:underline">Ver todos os canais</Link>
+          Escolha, em cada tipo, por qual canal do contrato este agente atende. Para conectar um número ou conta novos,
+          vá em <Link href="/configuracoes?aba=canais" className="text-accent-fg hover:underline">Configurações → Canais</Link>.
         </CardDescription>
       </CardHeader>
 
+      {dados && !dados.disponivel && (
+        <Notice tone="warning" className="mb-3">
+          Os canais do contrato ainda não foram ativados no banco deste ambiente: por enquanto a conexão é feita aqui,
+          dentro do agente.
+        </Notice>
+      )}
       {mensagem && <Notice tone={mensagem.tom} className="mb-3">{mensagem.texto}</Notice>}
 
-      {conexoes === null ? (
+      {dados === null ? (
         <p className="text-[12.5px] text-text-tertiary">Carregando...</p>
       ) : (
         <ul className="flex flex-col divide-y divide-border-subtle">
           {CANAIS.map((info) => {
-            const meu = conexoes.find((c) => c.tipo === info.tipo && c.agentId === agentId);
-            const outros = conexoes.filter((c) => c.tipo === info.tipo && c.agentId !== agentId);
+            const doTipo = dados.canais.filter((c) => c.tipo === info.tipo);
+            const meu = doTipo.find((c) => c.agentId === agentId);
             const expandido = aberto === info.tipo;
             return (
               <li key={info.tipo} className="py-3 first:pt-0 last:pb-0">
@@ -107,49 +121,46 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
                   <div className="min-w-0 flex-1">
                     <p className="text-[13.5px] font-medium text-text-primary">{info.nome}</p>
                     <p className="truncate text-[12px] text-text-tertiary">
-                      {meu ? meu.rotulo : outros.length ? `${outros.length} no contrato, com outros agentes` : "Nenhum no contrato"}
+                      {meu ? meu.rotulo : doTipo.length ? "Não atende por este tipo" : "Nenhum conectado no contrato"}
                     </p>
                   </div>
-                  {meu && (
-                    <Badge variant={meu.situacao === "conectado" ? "success" : meu.situacao === "atencao" ? "warning" : "neutral"}>
-                      {meu.situacao === "conectado" ? "Atende por aqui" : meu.situacao === "atencao" ? "Precisa de atenção" : "Conectando"}
+                  {meu && meu.status !== "conectado" && (
+                    <Badge variant={meu.status === "atencao" ? "warning" : "neutral"}>
+                      {meu.status === "atencao" ? "Precisa de atenção" : "Conectando"}
                     </Badge>
                   )}
-                  {!meu && info.trocaDireta && outros.length > 0 && (
-                    <Select
-                      aria-label={`Usar um ${info.nome} do contrato`}
-                      value=""
-                      onChange={(e) => {
-                        const c = outros.find((o) => o.agentId === e.target.value);
-                        if (c) void usar(c);
-                      }}
-                      className="w-auto"
-                    >
-                      <option value="">Usar um do contrato...</option>
-                      {outros.map((o) => (
-                        <option key={o.agentId} value={o.agentId}>
-                          {o.rotulo} (hoje: {o.agentNome})
-                        </option>
-                      ))}
-                    </Select>
-                  )}
-                  <Button type="button" variant="ghost" size="sm" onClick={() => {
-                      // Ao fechar, relê: a pessoa pode ter conectado ou desconectado lá dentro.
+
+                  {dados.disponivel ? (
+                    doTipo.length > 0 && (
+                      <Select
+                        aria-label={`${info.nome} que ${agentNome} usa`}
+                        value={meu?.id ?? ""}
+                        disabled={salvando}
+                        onChange={(e) => void escolher(info.tipo, e.target.value)}
+                        className="w-auto max-w-[260px]"
+                      >
+                        <option value="">Nenhum</option>
+                        {doTipo.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.rotulo}
+                            {c.agentId && c.agentId !== agentId ? ` (hoje: ${c.agentNome})` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    )
+                  ) : (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => {
                       if (expandido) setVersao((v) => v + 1);
                       setAberto(expandido ? null : info.tipo);
                     }}>
-                    {expandido ? <X size={14} /> : meu ? <Settings2 size={14} /> : <Plus size={14} />}
-                    {expandido ? "Fechar" : meu ? "Gerenciar" : "Conectar novo"}
-                  </Button>
+                      {expandido ? <X size={14} /> : meu ? <Settings2 size={14} /> : <Plus size={14} />}
+                      {expandido ? "Fechar" : meu ? "Gerenciar" : "Conectar"}
+                    </Button>
+                  )}
                 </div>
-                {!meu && !info.trocaDireta && outros.length > 0 && !expandido && (
-                  <p className="mt-1.5 flex items-center gap-1.5 pl-[44px] text-[11.5px] text-text-tertiary">
-                    <ArrowRightLeft size={12} aria-hidden /> Para usar um que está em outro agente, desconecte lá e conecte aqui.
-                  </p>
-                )}
-                {expandido && (
+                {!dados.disponivel && expandido && (
                   <div className="mt-3 rounded-xl bg-surface-2 p-3.5">
-                    <Conectar tipo={info.tipo} agentId={agentId} />
+                    <ConectarNoAgente tipo={info.tipo} agentId={agentId} />
                   </div>
                 )}
               </li>

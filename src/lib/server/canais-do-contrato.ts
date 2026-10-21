@@ -1,29 +1,18 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
-import { decryptSecret } from "@/lib/server/crypto";
-import { registrarWebhookDoTelegram } from "@/lib/server/telegram-webhook";
-
-// ---------------------------------------------------------------------------
-// Canais do contrato (F4, fase 1).
-//
-// As conexões continuam nas tabelas de sempre, cada uma presa ao agente que
-// atende por ela (chave = agentId). A tela do contrato junta todas num lugar
-// só e deixa trocar o agente que atende, sem mexer em nenhuma tabela: trocar
-// = a linha da conexão passa para o outro agente. Entrada, envio, disparos e
-// worker continuam lendo do mesmo jeito.
-//
-// Limites desta fase (a fase 2 tira): um agente atende no máximo uma conexão
-// de cada tipo; toda conexão tem um agente; WhatsApp por QR e TikTok trocam
-// reconectando (sessão do worker e URL cadastrada no TikTok são por agente).
-// ---------------------------------------------------------------------------
 
 import type { TipoDeCanal } from "@/lib/canais";
 export type { TipoDeCanal };
 
+// ---------------------------------------------------------------------------
+// Lista das conexões a partir das tabelas de cada agente (MetaConnection,
+// InstagramConnection...). É a leitura de antes dos canais do contrato: vale
+// enquanto o SQL 2026-10-22 não foi aplicado (ver canais/repositorio.ts) e
+// para o resumo de canais por agente.
+// ---------------------------------------------------------------------------
+
 export const TIPOS_DE_CANAL: TipoDeCanal[] = ["whatsapp_meta", "whatsapp_qr", "instagram", "messenger", "telegram", "tiktok"];
 
-/** Tipos que trocam de agente sem reconectar. */
-export const TROCA_DIRETA = new Set<TipoDeCanal>(["whatsapp_meta", "instagram", "messenger", "telegram"]);
 
 export interface ConexaoDoContrato {
   tipo: TipoDeCanal;
@@ -131,65 +120,4 @@ export async function listarCanais(orgId: string): Promise<CanaisDoContrato> {
       widget: a.widgetEnabled,
     })),
   };
-}
-
-export type ResultadoDaTroca = { ok: true; aviso?: string } | { ok: false; status: number; error: string };
-
-/**
- * Passa a conexão `tipo` do agente `de` para o agente `para`. Os dois têm de
- * ser do contrato; `para` não pode já ter uma conexão desse tipo.
- */
-export async function trocarAgenteDoCanal(orgId: string, tipo: TipoDeCanal, de: string, para: string): Promise<ResultadoDaTroca> {
-  if (!TIPOS_DE_CANAL.includes(tipo)) return { ok: false, status: 400, error: "Canal desconhecido." };
-  if (de === para) return { ok: true };
-  if (!TROCA_DIRETA.has(tipo)) {
-    return {
-      ok: false,
-      status: 409,
-      error:
-        tipo === "whatsapp_qr"
-          ? "O WhatsApp por QR code fica preso à sessão do agente: desconecte aqui e leia o QR de novo no outro agente."
-          : "O TikTok guarda o endereço do agente no portal dele: desconecte e conecte de novo no outro agente.",
-    };
-  }
-
-  const agentes = await prisma.agent.findMany({ where: { orgId, id: { in: [de, para] } }, select: { id: true } });
-  if (agentes.length !== 2) return { ok: false, status: 404, error: "Agente não encontrado neste contrato." };
-
-  const onde = { agentId: de };
-  const jaTem = { agentId: para };
-  const mover = { agentId: para };
-
-  try {
-    if (tipo === "whatsapp_meta") {
-      if (await prisma.metaConnection.findUnique({ where: jaTem })) return ocupado();
-      await prisma.metaConnection.update({ where: onde, data: mover });
-      return { ok: true, aviso: "Os modelos de mensagem (templates) cadastrados no agente anterior continuam com ele." };
-    }
-    if (tipo === "instagram") {
-      if (await prisma.instagramConnection.findUnique({ where: jaTem })) return ocupado();
-      await prisma.instagramConnection.update({ where: onde, data: mover });
-      return { ok: true, aviso: "Gatilhos e automações de comentário continuam no agente anterior." };
-    }
-    if (tipo === "messenger") {
-      if (await prisma.messengerConnection.findUnique({ where: jaTem })) return ocupado();
-      await prisma.messengerConnection.update({ where: onde, data: mover });
-      return { ok: true };
-    }
-    // Telegram: o webhook do bot leva o id do agente; registra de novo.
-    if (await prisma.telegramConnection.findUnique({ where: jaTem })) return ocupado();
-    const conn = await prisma.telegramConnection.update({ where: onde, data: mover });
-    const registro = await registrarWebhookDoTelegram(decryptSecret(conn.botToken), para);
-    await prisma.telegramConnection.update({
-      where: { agentId: para },
-      data: { webhookSet: registro.ok, lastError: registro.ok ? null : registro.erro },
-    });
-    return registro.ok ? { ok: true } : { ok: true, aviso: `O bot passou, mas o Telegram recusou o webhook: ${registro.erro}` };
-  } catch {
-    return { ok: false, status: 404, error: "Esse agente não tem esse canal conectado." };
-  }
-}
-
-function ocupado(): ResultadoDaTroca {
-  return { ok: false, status: 409, error: "O agente escolhido já atende por um canal desse tipo. Tire o outro antes." };
 }

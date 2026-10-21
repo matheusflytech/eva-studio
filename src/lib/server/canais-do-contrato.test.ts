@@ -12,7 +12,7 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/crypto", () => ({ decryptSecret: (s: string) => `claro-${s}` }));
 vi.mock("@/lib/server/telegram-webhook", () => tg);
 
-import { conexoesDoAgente, trocarAgenteDoCanal } from "./canais-do-contrato";
+import { conexoesDoAgente } from "./canais-do-contrato";
 
 const vazio = {
   id: "a1", name: "Vendas", widgetEnabled: false,
@@ -47,43 +47,5 @@ describe("conexoesDoAgente", () => {
 
   it("WhatsApp QR desconectado não conta como canal", () => {
     expect(conexoesDoAgente({ ...vazio, whatsappConnection: { status: "disconnected", phoneNumber: "x", lastError: null } })).toEqual([]);
-  });
-});
-
-describe("trocarAgenteDoCanal", () => {
-  it("WhatsApp oficial: a conexão passa para o outro agente", async () => {
-    db.metaConnection.findUnique.mockResolvedValue(null);
-    const r = await trocarAgenteDoCanal("o1", "whatsapp_meta", "a1", "a2");
-    expect(r.ok).toBe(true);
-    expect(db.metaConnection.update).toHaveBeenCalledWith({ where: { agentId: "a1" }, data: { agentId: "a2" } });
-    expect(db.agent.findMany.mock.calls[0][0].where).toEqual({ orgId: "o1", id: { in: ["a1", "a2"] } });
-  });
-
-  it("agente de outro contrato: recusa", async () => {
-    db.agent.findMany.mockResolvedValue([{ id: "a1" }]);
-    expect(await trocarAgenteDoCanal("o1", "instagram", "a1", "alheio")).toMatchObject({ ok: false, status: 404 });
-    expect(db.instagramConnection.update).not.toHaveBeenCalled();
-  });
-
-  it("destino já tem um canal desse tipo: recusa", async () => {
-    db.messengerConnection.findUnique.mockResolvedValue({ agentId: "a2" });
-    expect(await trocarAgenteDoCanal("o1", "messenger", "a1", "a2")).toMatchObject({ ok: false, status: 409 });
-    expect(db.messengerConnection.update).not.toHaveBeenCalled();
-  });
-
-  it("Telegram: move e registra o webhook com o id do novo agente", async () => {
-    db.telegramConnection.findUnique.mockResolvedValue(null);
-    db.telegramConnection.update.mockResolvedValueOnce({ botToken: "cifrado" });
-    tg.registrarWebhookDoTelegram.mockResolvedValue({ ok: true, erro: null });
-    const r = await trocarAgenteDoCanal("o1", "telegram", "a1", "a2");
-    expect(r).toEqual({ ok: true });
-    expect(tg.registrarWebhookDoTelegram).toHaveBeenCalledWith("claro-cifrado", "a2");
-    expect(db.telegramConnection.update.mock.calls[1][0]).toEqual({ where: { agentId: "a2" }, data: { webhookSet: true, lastError: null } });
-  });
-
-  it("WhatsApp QR e TikTok pedem reconectar, sem mexer em nada", async () => {
-    expect(await trocarAgenteDoCanal("o1", "whatsapp_qr", "a1", "a2")).toMatchObject({ ok: false, status: 409 });
-    expect(await trocarAgenteDoCanal("o1", "tiktok", "a1", "a2")).toMatchObject({ ok: false, status: 409 });
-    expect(db.agent.findMany).not.toHaveBeenCalled();
   });
 });
