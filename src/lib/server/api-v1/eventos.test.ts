@@ -58,7 +58,7 @@ describe("listarEventos", () => {
     expect(r.next_cursor).toBe(codificarCursor(c));
     const r2 = await listarEventos("o1", { tipos: ["deal.*"], desde: new Date("2020-01-01"), cursor: null, limite: 10, agora });
     expect(r2.next_cursor).toBeNull();
-    const gte = db.dealStageEvent.findMany.mock.calls.at(-1)[0].where.at.gte as Date;
+    const gte = db.dealStageEvent.findMany.mock.calls.at(-1)![0].where.at.gte as Date;
     expect(agora.getTime() - gte.getTime()).toBe(30 * 86_400_000);
   });
 
