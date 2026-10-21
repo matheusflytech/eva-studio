@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, ThumbsDown, ThumbsUp, type LucideIcon,
+  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, ThumbsDown, ThumbsUp, UserPlus, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,12 +73,12 @@ export function AtividadeDoNegocio({
         </TabsList>
 
         <TabsContent value="atividade" className="mt-4 outline-none">
-          <NovaNota dealId={deal.id} onCriada={recarregar} compacto />
+          <NovaNota vinculo={{ dealId: deal.id }} onCriada={recarregar} compacto />
           <LinhaDoTempoView itens={itens} falhou={linhaFalhou} agora={agora} />
         </TabsContent>
 
         <TabsContent value="notas" className="mt-4 outline-none">
-          <NovaNota dealId={deal.id} onCriada={recarregar} />
+          <NovaNota vinculo={{ dealId: deal.id }} onCriada={recarregar} />
           {notas.length === 0 ? (
             <Vazio texto="Nenhuma nota ainda. Registre o que foi conversado para o próximo a pegar o negócio." />
           ) : (
@@ -115,6 +115,8 @@ function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string
   switch (item.tipo) {
     case "criado":
       return { icone: CirclePlus, tom: "bg-accent-soft text-accent-400" };
+    case "contato_criado":
+      return { icone: UserPlus, tom: "bg-accent-soft text-accent-400" };
     case "etapa":
       if (item.paraTipo === "won") return { icone: ThumbsUp, tom: "bg-emerald-500/12 text-emerald-400" };
       if (item.paraTipo === "lost") return { icone: ThumbsDown, tom: "bg-rose-500/12 text-rose-400" };
@@ -130,7 +132,21 @@ function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string
   }
 }
 
-function LinhaDoTempoView({ itens, falhou, agora }: { itens: ItemDaLinhaDoTempo[]; falhou: boolean; agora: Date }) {
+/**
+ * Linha do tempo agrupada por dia, com filtros. Usada também na ficha do
+ * contato, onde "Etapas" vira "Negócios" (os itens trazem de qual negócio são).
+ */
+export function LinhaDoTempoView({
+  itens,
+  falhou,
+  agora,
+  rotulos,
+}: {
+  itens: ItemDaLinhaDoTempo[];
+  falhou: boolean;
+  agora: Date;
+  rotulos?: Partial<Record<FiltroDaLinhaDoTempo, string>>;
+}) {
   const [filtro, setFiltro] = React.useState<FiltroDaLinhaDoTempo>("tudo");
   const grupos = React.useMemo(() => agruparPorDia(filtrarItens(itens, filtro), agora), [itens, filtro, agora]);
 
@@ -159,7 +175,7 @@ function LinhaDoTempoView({ itens, falhou, agora }: { itens: ItemDaLinhaDoTempo[
                   : "border-border-subtle text-text-secondary hover:border-border-default hover:text-text-primary"
               )}
             >
-              {f.rotulo}
+              {rotulos?.[f.id] ?? f.rotulo}
               <span className="tabular-nums text-[11px] opacity-70">{n}</span>
             </button>
           );
@@ -209,6 +225,13 @@ function ItemDaLinha({ item, ultimo }: { item: ItemDaLinhaDoTempo; ultimo: boole
               >
                 {titulo}
               </Link>
+            ) : (item.tipo === "criado" || item.tipo === "etapa") && item.negocio ? (
+              <Link
+                href={`/negocios/${item.negocio.id}`}
+                className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              >
+                {titulo}
+              </Link>
             ) : (
               titulo
             )}
@@ -239,7 +262,16 @@ function ItemDaLinha({ item, ultimo }: { item: ItemDaLinhaDoTempo; ultimo: boole
 
 // ---- notas ----
 
-function NovaNota({ dealId, onCriada, compacto }: { dealId: string; onCriada: () => Promise<void>; compacto?: boolean }) {
+/** Composer de nota, preso ao negócio ou ao contato (POST /api/notes aceita os dois). */
+export function NovaNota({
+  vinculo,
+  onCriada,
+  compacto,
+}: {
+  vinculo: { dealId: string } | { contactId: string };
+  onCriada: () => Promise<void>;
+  compacto?: boolean;
+}) {
   const [texto, setTexto] = React.useState("");
   const [salvando, setSalvando] = React.useState(false);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -255,7 +287,7 @@ function NovaNota({ dealId, onCriada, compacto }: { dealId: string; onCriada: ()
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: t, dealId }),
+        body: JSON.stringify({ text: t, ...vinculo }),
       });
       if (!res.ok) {
         setErro(await mensagemDeErro(res, "Não foi possível registrar a nota."));

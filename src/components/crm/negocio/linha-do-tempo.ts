@@ -1,6 +1,6 @@
-// Linha do tempo da ficha do negócio: o formato que a rota
-// /api/deals/[dealId]/linha-do-tempo devolve e as funções puras que viram
-// texto e grupos por dia na tela. Fica fora dos componentes para ser testado
+// Linha do tempo das fichas do negócio e do contato: o formato que as rotas
+// /api/deals/[dealId]/linha-do-tempo e /api/contacts/[contactId]/linha-do-tempo
+// devolvem e as funções puras que viram texto e grupos por dia na tela. Fica fora dos componentes para ser testado
 // sem navegador e para a rota e a tela falarem exatamente o mesmo formato.
 
 export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill" | string;
@@ -11,9 +11,15 @@ interface Base {
   em: string;
 }
 
+/** Na ficha do contato, de qual negócio é o item (a do negócio não precisa). */
+interface DoNegocio {
+  negocio?: { id: string; nome: string };
+}
+
 export type ItemDaLinhaDoTempo =
-  | (Base & { tipo: "criado"; etapa: string | null })
-  | (Base & {
+  | (Base & DoNegocio & { tipo: "criado"; etapa: string | null })
+  | (Base & { tipo: "contato_criado"; origem: string | null })
+  | (Base & DoNegocio & {
       tipo: "etapa";
       de: string | null;
       para: string;
@@ -31,7 +37,14 @@ export type ItemDaLinhaDoTempo =
       texto: string;
       prazo: string | null;
     })
-  | (Base & { tipo: "conversa"; conversaId: string; canal: string; contato: string | null });
+  | (Base & {
+      tipo: "conversa";
+      conversaId: string;
+      canal: string;
+      contato: string | null;
+      /** Ficha do contato: a última mensagem, para ler sem abrir a conversa. */
+      ultimaMensagem?: string;
+    });
 
 export type TipoDoItem = ItemDaLinhaDoTempo["tipo"];
 
@@ -116,14 +129,18 @@ export interface TextoDoItem {
 export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
   switch (item.tipo) {
     case "criado":
+      if (item.negocio) return { titulo: item.etapa ? `Negócio criado em ${item.etapa}` : "Negócio criado", detalhe: item.negocio.nome };
       return { titulo: item.etapa ? `Negócio criado em ${item.etapa}` : "Negócio criado" };
+    case "contato_criado":
+      return { titulo: "Contato criado", detalhe: item.origem ? `Origem: ${item.origem}` : undefined };
     case "etapa": {
       const sufixo =
         (ORIGENS[item.origem] ? ` · ${ORIGENS[item.origem]}` : "") + (item.ignorouObrigatorios ? " · sem os campos obrigatórios" : "");
-      if (item.paraTipo === "won") return { titulo: `Marcado como ganho (${item.para})${sufixo}` };
-      if (item.paraTipo === "lost") return { titulo: `Marcado como perdido (${item.para})${sufixo}` };
-      if (!item.de) return { titulo: `Entrou em ${item.para}${sufixo}` };
-      return { titulo: `Movido de ${item.de} para ${item.para}${sufixo}` };
+      const detalhe = item.negocio?.nome;
+      if (item.paraTipo === "won") return { titulo: `Marcado como ganho (${item.para})${sufixo}`, detalhe };
+      if (item.paraTipo === "lost") return { titulo: `Marcado como perdido (${item.para})${sufixo}`, detalhe };
+      if (!item.de) return { titulo: `Entrou em ${item.para}${sufixo}`, detalhe };
+      return { titulo: `Movido de ${item.de} para ${item.para}${sufixo}`, detalhe };
     }
     case "nota":
       return { titulo: item.autor ? `Nota de ${item.autor}` : "Nota", detalhe: item.texto };
@@ -134,7 +151,7 @@ export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
     case "conversa":
       return {
         titulo: `Nova conversa no ${rotuloDoCanal(item.canal)}`,
-        detalhe: item.contato ? `com ${item.contato}` : undefined,
+        detalhe: item.ultimaMensagem ? `Última: ${item.ultimaMensagem}` : item.contato ? `com ${item.contato}` : undefined,
       };
   }
 }
@@ -144,8 +161,8 @@ export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
 export type FiltroDaLinhaDoTempo = "tudo" | "etapas" | "notas" | "tarefas" | "conversas";
 
 const TIPOS_DO_FILTRO: Record<Exclude<FiltroDaLinhaDoTempo, "tudo">, TipoDoItem[]> = {
-  // A criação entra junto: é a primeira "etapa" do negócio.
-  etapas: ["criado", "etapa"],
+  // A criação entra junto: é a primeira "etapa" do negócio (e do contato).
+  etapas: ["criado", "etapa", "contato_criado"],
   notas: ["nota"],
   tarefas: ["tarefa_criada", "tarefa_concluida"],
   conversas: ["conversa"],
