@@ -64,6 +64,29 @@ function semNos(def: Definicao, ids: Set<string>): Definicao {
   return { ...def, nos };
 }
 
+const TIPOS_DE_NO = new Set(["acao", "condicao", "caminhos", "espera", "esperar_evento", "fim"]);
+
+/** O que dá para mudar em cada tipo de nó pelo "atualizar" (saídas e id nunca). */
+const CHAVES_EDITAVEIS: Record<string, string[]> = {
+  acao: ["rotulo", "config", "comErro"],
+  condicao: ["rotulo", "regra"],
+  caminhos: ["rotulo", "caminhos"],
+  espera: ["rotulo", "config"],
+  esperar_evento: ["rotulo", "evento", "prazo"],
+  fim: ["rotulo"],
+};
+
+/** Recusa o nó novo que quebraria a árvore: tipo desconhecido, id reservado, caminho repetido. */
+function conferirNoNovo(no: No) {
+  if (!no || typeof no !== "object" || !TIPOS_DE_NO.has((no as { tipo?: string }).tipo ?? "")) throw new ErroDeOperacao("Tipo de passo desconhecido.");
+  if (typeof no.id !== "string" || !no.id.trim() || no.id === "gatilho") throw new ErroDeOperacao("Id de passo inválido.");
+  if (no.tipo === "caminhos") {
+    if (!Array.isArray(no.caminhos) || no.caminhos.length === 0) throw new ErroDeOperacao("Caminhos precisa de pelo menos um caminho.");
+    const ids = no.caminhos.map((c) => c?.id);
+    if (ids.some((x) => typeof x !== "string" || !x) || new Set(ids).size !== ids.length) throw new ErroDeOperacao("Cada caminho precisa de um id único.");
+  }
+}
+
 /** Cópia limpa do nó novo: saídas vazias (só as que existem para o tipo). */
 function noLimpo(no: No): No {
   let limpo = no;
@@ -77,6 +100,7 @@ export function aplicar(def: Definicao, op: Operacao): Definicao {
       return { ...def, gatilho: op.gatilho };
 
     case "inserir": {
+      conferirNoNovo(op.no);
       if (def.nos[op.no.id]) throw new ErroDeOperacao("Já existe um passo com este id.");
       const seguinte = pontaAlvo(def, op.ponta);
       let novo = noLimpo(op.no);
@@ -96,6 +120,7 @@ export function aplicar(def: Definicao, op: Operacao): Definicao {
       const pai = paiDe(def, op.id);
       const saidas = saidasDe(no);
       const manter = op.manter ?? saidaPrincipal(no);
+      if (op.manter !== undefined && !saidas.some((s) => s.saida === op.manter)) throw new ErroDeOperacao("Esse ramo não existe neste passo.");
       const continua = manter ? (saidas.find((s) => s.saida === manter)?.alvo ?? null) : null;
       // Ramos que não continuam somem com tudo que vem depois deles.
       const apagar = new Set<string>([op.id]);
@@ -108,16 +133,21 @@ export function aplicar(def: Definicao, op: Operacao): Definicao {
     case "atualizar": {
       const no = def.nos[op.id];
       if (!no) throw new ErroDeOperacao("Passo não existe.");
-      // Saídas e identidade não se mudam por aqui (seria um jeito de criar ciclo).
-      const proibido = ["id", "tipo", "proximo", "erro", "sim", "nao", "senao", "aconteceu", "esgotou"];
-      const patch = Object.fromEntries(Object.entries(op.patch).filter(([k]) => !proibido.includes(k)));
+      // Só as chaves do tipo do nó; saídas e identidade ficam (seria um jeito de criar ciclo).
+      const permitidas = CHAVES_EDITAVEIS[no.tipo] ?? [];
+      const patch = Object.fromEntries(Object.entries(op.patch ?? {}).filter(([k]) => permitidas.includes(k)));
       let atualizado = { ...no, ...patch } as No;
-      if (no.tipo === "caminhos" && Array.isArray(patch.caminhos)) {
-        // Mantém o destino de cada caminho que já existia.
+      if (no.tipo === "caminhos" && "caminhos" in patch) {
+        // Pode renomear, reordenar e mudar regras; a quantidade e os ids ficam,
+        // e cada caminho mantém o destino que já tinha.
+        if (!Array.isArray(patch.caminhos)) throw new ErroDeOperacao("Caminhos precisa ser uma lista.");
+        const novos = patch.caminhos as Caminho[];
         const antigos = new Map(no.caminhos.map((c) => [c.id, c.proximo]));
-        const caminhos = (patch.caminhos as Caminho[]).filter((c) => antigos.has(c.id)).map((c) => ({ ...c, proximo: antigos.get(c.id) ?? null }));
-        if (caminhos.length !== no.caminhos.length) throw new ErroDeOperacao("Use adicionar/remover caminho para mudar a quantidade.");
-        atualizado = { ...(atualizado as typeof no), caminhos };
+        const ids = novos.map((c) => c?.id);
+        if (ids.length !== antigos.size || new Set(ids).size !== ids.length || !ids.every((x) => antigos.has(x))) {
+          throw new ErroDeOperacao("Use adicionar/remover caminho para mudar os caminhos; aqui só renomeia, reordena e muda as regras.");
+        }
+        atualizado = { ...(atualizado as typeof no), caminhos: novos.map((c) => ({ ...c, proximo: antigos.get(c.id) ?? null })) };
       }
       if (no.tipo === "acao" && "comErro" in patch) {
         // Liga/desliga o caminho de erro da ação (desligar apaga o ramo de erro).
@@ -146,12 +176,10 @@ export function aplicar(def: Definicao, op: Operacao): Definicao {
       if (!no || !SAIDAS_DO_NO.has(no.tipo)) throw new ErroDeOperacao("Só ação e espera podem ser movidas.");
       if (op.ponta.de === op.id) return def;
       if (no.tipo === "acao" && no.erro) throw new ErroDeOperacao("Esvazie o caminho de erro antes de mover este passo.");
-      // Não pode ir para dentro do próprio ramo (de um nó de saída única isso é só "depois dele").
+      // Tira e põe de volta: a ação com caminho de erro ligado (e vazio) continua com ele ligado.
       const tirado = aplicar(def, { op: "apagar", id: op.id });
       if (op.ponta.de !== "gatilho" && !tirado.nos[op.ponta.de]) throw new ErroDeOperacao("Destino não existe.");
-      const limpo = { ...no } as Record<string, unknown>;
-      delete limpo.erro;
-      return aplicar(tirado, { op: "inserir", ponta: op.ponta, no: limpo as unknown as No });
+      return aplicar(tirado, { op: "inserir", ponta: op.ponta, no });
     }
 
     case "adicionar_caminho": {

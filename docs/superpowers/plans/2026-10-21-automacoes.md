@@ -73,7 +73,7 @@ Decisões (21/10):
 | `eva_studio_eventos` | barramento de eventos de domínio (outbox): tipo, objeto, id, dados, diff, ator (usuário, automação, integração, api, com automação, execução e profundidade) |
 | `eva_studio_automacao_execucoes` | uma por registro inscrito: versão, evento, chave de dedupe única, status (pendente, rodando, esperando, concluída, falhou, cancelada, objetivo, pausada), passo atual, próxima hora (espera durável), trava (lease), início, fim, duração em ms, teste sim/não |
 | `eva_studio_automacao_passos` | passo a passo da execução: nó, tipo, rótulo, status, tentativa, entrada resolvida, saída, erro, caminho seguido, início, fim, ms (corpo até 16 KB, PII mascarada) |
-| `eva_studio_automacao_esperas` | "esperar evento" com correlação e prazo |
+| `eva_studio_automacao_esperas` | "esperar evento": tipo do evento, registro (orgId + objetoId) e prazo |
 
 Índices para o relógio: `(status, proximaEm)` nas execuções, `(orgId, tipo,
 createdAt)` nos eventos e `(execucaoId, iniciadoEm)` nos passos. Limpeza: passos e
@@ -281,3 +281,21 @@ Riscos e cuidados:
     posterior, aviso de janela de 24h e de autoalimentação;
   - `frase.ts`.
 - 34 testes em `src/lib/automacoes/*.test.ts`.
+
+### Revisão da parte A: corrigida (21/10/2026)
+Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado em
+`src/lib/automacoes/revisao.test.ts`:
+- **Condições:** data só ISO, Date ou ms ("Proposta 2" não vira data); dia sem hora vale
+  o dia inteiro em São Paulo; número estrito com milhar brasileiro; grupo vazio
+  ignorado no OU; caminho só lê propriedade própria.
+- **Variáveis e frase:** dia sem hora não volta um dia; moeda de vazio fica vazia;
+  variável mal escrita e filtro fora da lista viram erro; lista de etapas com nome;
+  padrões do catálogo na frase.
+- **Operações:** chaves editáveis por tipo; caminhos só reordena/renomeia (ids
+  iguais); nó novo com tipo desconhecido, id `gatilho` ou caminho repetido é
+  recusado; apagar com ramo inexistente é erro; mover mantém o erro ligado.
+- **Validação:** forma de cada nó antes de caminhar (JSON quebrado vira pendência);
+  variável de passo posterior também em condição e espera; aviso de 24h zera quando o
+  cliente responde; operandos de "entre", "últimos dias" e datas.
+- **SQL/Prisma:** FK de esperas → execuções (cascade), execuções → versão (no
+  action), versão publicada (set null, única).

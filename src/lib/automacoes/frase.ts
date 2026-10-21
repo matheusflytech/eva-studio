@@ -1,5 +1,5 @@
-import { acaoDoTipo, CAMPOS_DO_CONTEXTO, EVENTOS_DE_ESPERA, gatilhoDoTipo, nomeDe, textoDaDuracao, type Nomes } from "./catalogo";
-import { NOME_DO_OPERADOR, SEM_VALOR } from "./condicoes";
+import { acaoDoTipo, CAMPOS_DO_CONTEXTO, configPadrao, EVENTOS_DE_ESPERA, gatilhoDoTipo, nomeDe, textoDaDuracao, type Nomes } from "./catalogo";
+import { gruposDaRegra, NOME_DO_OPERADOR, SEM_VALOR } from "./condicoes";
 import type { Definicao, No, Regra } from "./tipos";
 
 // ---------------------------------------------------------------------------
@@ -15,16 +15,16 @@ function rotuloDoCampo(def: Definicao, caminho: string): string {
 }
 
 export function fraseDaRegra(def: Definicao, regra: Regra, nomes: Nomes = {}): string {
-  const grupos = regra.grupos.filter((g) => g.condicoes.length);
+  const grupos = gruposDaRegra(regra);
   if (!grupos.length) return "sempre";
   return grupos
     .map((g) =>
       g.condicoes
         .map((c) => {
           const campo = CAMPOS_DO_CONTEXTO[def.objeto]?.find((x) => x.caminho === c.campo);
-          const valor = SEM_VALOR.has(c.operador)
-            ? ""
-            : ` ${campo && ["etapa", "funil", "usuario", "tag"].includes(campo.tipo) ? nomeDe(nomes, campo.tipo as "etapa", c.valor) : Array.isArray(c.valor) ? c.valor.join(" e ") : String(c.valor ?? "…")}`;
+          const comNome = campo && ["etapa", "funil", "usuario", "tag"].includes(campo.tipo);
+          const um = (x: unknown) => (comNome ? nomeDe(nomes, campo!.tipo as "etapa", x) : String(x ?? "…"));
+          const valor = SEM_VALOR.has(c.operador) ? "" : ` ${Array.isArray(c.valor) ? c.valor.map(um).join(c.operador === "entre" ? " e " : ", ") : um(c.valor)}`;
           return `${rotuloDoCampo(def, c.campo)} ${NOME_DO_OPERADOR[c.operador]}${valor}`;
         })
         .join(" e ")
@@ -36,6 +36,8 @@ function fraseDaEspera(def: Definicao, no: Extract<No, { tipo: "espera" }>, nome
   const c = no.config;
   if (c.modo === "duracao") return `esperar ${textoDaDuracao(c.quantidade, c.unidade)}`;
   if (c.modo === "ate_data") {
+    const dia = String(c.data ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dia) return `esperar até ${dia[3]}/${dia[2]}/${dia[1]}`;
     const d = new Date(c.data);
     return Number.isNaN(d.getTime()) ? "esperar até a data" : `esperar até ${d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
   }
@@ -54,7 +56,7 @@ function fraseDoCaminho(def: Definicao, id: string | null, nomes: Nomes, nivel: 
     switch (no.tipo) {
       case "acao": {
         const item = acaoDoTipo(no.acao);
-        partes.push(no.rotulo?.trim() || (item ? item.frase(no.config ?? {}, nomes) : "ação desconhecida"));
+        partes.push(no.rotulo?.trim() || (item ? item.frase({ ...configPadrao(item.campos), ...(no.config ?? {}) }, nomes) : "ação desconhecida"));
         atual = no.proximo;
         continue;
       }
@@ -98,7 +100,7 @@ function fraseDoCaminho(def: Definicao, id: string | null, nomes: Nomes, nivel: 
 
 export function fraseDaAutomacao(def: Definicao, nomes: Nomes = {}): string {
   const item = def.gatilho ? gatilhoDoTipo(def.gatilho.tipo) : undefined;
-  const quando = item && def.gatilho ? item.frase(def.gatilho.config ?? {}, nomes) : "Quando… (escolha o gatilho)";
+  const quando = item && def.gatilho ? item.frase({ ...configPadrao(item.campos), ...(def.gatilho.config ?? {}) }, nomes) : "Quando… (escolha o gatilho)";
   const passos = fraseDoCaminho(def, def.inicio, nomes, 0);
   return passos.length ? `${quando}: ${passos.join("; ")}.` : `${quando}.`;
 }

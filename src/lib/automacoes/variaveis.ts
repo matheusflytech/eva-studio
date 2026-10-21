@@ -14,6 +14,10 @@ export const FILTROS = ["primeiro_nome", "maiusculas", "minusculas", "moeda", "d
 export type Filtro = (typeof FILTROS)[number];
 
 function formatarData(v: unknown, comHora: boolean): string {
+  // Dia sem hora sai como está: passar por Date leria meia-noite UTC e, em
+  // São Paulo, mostraria o dia anterior.
+  const dia = typeof v === "string" ? v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+  if (dia) return `${dia[3]}/${dia[2]}/${dia[1]}`;
   const t = typeof v === "string" || v instanceof Date ? new Date(v) : null;
   if (!t || Number.isNaN(t.getTime())) return String(v ?? "");
   return t.toLocaleString("pt-BR", {
@@ -34,9 +38,10 @@ function aplicarFiltro(valor: unknown, filtro: string, argumento: string | undef
     case "minusculas":
       return String(valor ?? "").toLowerCase();
     case "moeda": {
-      // Centavos (padrão da API) para R$.
-      const n = Number(valor);
-      return Number.isFinite(n) ? (n / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : String(valor ?? "");
+      // Centavos (padrão da API) para R$. Vazio continua vazio (o `padrao` depois vale).
+      if (valor === undefined || valor === null || valor === "") return valor;
+      const n = typeof valor === "number" ? valor : /^-?\d+$/.test(String(valor).trim()) ? Number(valor) : NaN;
+      return Number.isFinite(n) ? (n / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : valor;
     }
     case "data":
       return formatarData(valor, false);
@@ -75,6 +80,25 @@ export function variaveisDoTexto(texto: string): VariavelUsada[] {
     usadas.push({ caminho: m[1], filtros });
   }
   return usadas;
+}
+
+/**
+ * O que parece variável mas não está no formato aceito ({{ Nome }}, filtro com
+ * aspas simples, caminho com hífen) e filtros fora da lista. A validação
+ * transforma em pendência: sem isso, o texto sairia com as chaves para o cliente.
+ */
+export function problemasDasVariaveis(texto: string): string[] {
+  const problemas: string[] = [];
+  const validas = new Set([...texto.matchAll(RE)].map((m) => m.index));
+  for (const m of texto.matchAll(/\{\{[^{}]*\}\}/g)) {
+    if (!validas.has(m.index)) problemas.push(`Variável mal escrita: ${m[0]}. Use {{ caminho | filtro }} com filtro em minúsculas e argumento entre aspas duplas.`);
+  }
+  for (const v of variaveisDoTexto(texto)) {
+    for (const f of v.filtros) {
+      if (!(FILTROS as readonly string[]).includes(f.nome)) problemas.push(`Filtro desconhecido “${f.nome}” em {{${v.caminho}}}. Os aceitos: ${FILTROS.join(", ")}.`);
+    }
+  }
+  return problemas;
 }
 
 /** Troca as variáveis pelo valor do contexto. */

@@ -129,6 +129,24 @@ DO $$ BEGIN
     FOREIGN KEY ("automacaoId") REFERENCES "eva_studio_automacoes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+-- Uma versão publicada por automação; apagar a versão limpa a referência.
+CREATE UNIQUE INDEX IF NOT EXISTS "eva_studio_automacoes_versaoPublicadaId_key" ON "eva_studio_automacoes"("versaoPublicadaId");
+DO $$ BEGIN
+  ALTER TABLE "eva_studio_automacoes" ADD CONSTRAINT "eva_studio_automacoes_versaoPublicadaId_fkey"
+    FOREIGN KEY ("versaoPublicadaId") REFERENCES "eva_studio_automacao_versoes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+-- Versão com execução não se apaga sozinha (NO ACTION: só junto com a automação).
+DO $$ BEGIN
+  ALTER TABLE "eva_studio_automacao_execucoes" ADD CONSTRAINT "eva_studio_automacao_execucoes_versaoId_fkey"
+    FOREIGN KEY ("versaoId") REFERENCES "eva_studio_automacao_versoes"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE "eva_studio_automacao_esperas" ADD CONSTRAINT "eva_studio_automacao_esperas_execucaoId_fkey"
+    FOREIGN KEY ("execucaoId") REFERENCES "eva_studio_automacao_execucoes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 DO $$ BEGIN
   ALTER TABLE "eva_studio_automacao_passos" ADD CONSTRAINT "eva_studio_automacao_passos_execucaoId_fkey"
     FOREIGN KEY ("execucaoId") REFERENCES "eva_studio_automacao_execucoes"("id") ON DELETE CASCADE ON UPDATE CASCADE;

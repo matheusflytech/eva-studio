@@ -2043,7 +2043,7 @@ model Automacao {
   origem            String   @default("fluxo")
   // Definição em edição (src/lib/automacoes/tipos.ts). A que roda é a versão publicada.
   rascunho          Json
-  versaoPublicadaId String?
+  versaoPublicadaId String?   @unique
   // uma_vez | sempre | intervalo (com reinscricaoHoras)
   reinscricao       String   @default("uma_vez")
   reinscricaoHoras  Int?
@@ -2055,8 +2055,9 @@ model Automacao {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  versoes   AutomacaoVersao[]
-  execucoes AutomacaoExecucao[]
+  versoes         AutomacaoVersao[]   @relation("VersoesDaAutomacao")
+  versaoPublicada AutomacaoVersao?    @relation("VersaoPublicada", fields: [versaoPublicadaId], references: [id], onDelete: SetNull)
+  execucoes       AutomacaoExecucao[]
 
   @@index([orgId, status])
   @@map("eva_studio_automacoes")
@@ -2071,7 +2072,10 @@ model AutomacaoVersao {
   publicadaPor String?
   createdAt    DateTime @default(now())
 
-  automacao Automacao @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+  automacao   Automacao           @relation("VersoesDaAutomacao", fields: [automacaoId], references: [id], onDelete: Cascade)
+  publicadaEm Automacao?          @relation("VersaoPublicada")
+  // Versão com execução não se apaga (NoAction); some junto com a automação.
+  execucoes   AutomacaoExecucao[]
 
   @@unique([automacaoId, numero])
   @@map("eva_studio_automacao_versoes")
@@ -2129,7 +2133,9 @@ model AutomacaoExecucao {
   updatedAt    DateTime  @updatedAt
 
   automacao Automacao        @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+  versao    AutomacaoVersao    @relation(fields: [versaoId], references: [id], onDelete: NoAction)
   passos    AutomacaoPasso[]
+  espera    AutomacaoEspera?
 
   @@index([status, proximaEm])
   @@index([automacaoId, createdAt])
@@ -2161,7 +2167,8 @@ model AutomacaoPasso {
   @@map("eva_studio_automacao_passos")
 }
 
-// "Esperar evento": a execução volta quando o evento chega ou o prazo vence.
+// "Esperar evento": a execução volta quando chega um evento do tipo esperado no
+// mesmo registro (orgId + tipo + objetoId) ou quando o prazo vence.
 model AutomacaoEspera {
   id         String   @id @default(uuid())
   orgId      String
@@ -2172,6 +2179,8 @@ model AutomacaoEspera {
   objetoId   String
   expiraEm   DateTime
   createdAt  DateTime @default(now())
+
+  execucao AutomacaoExecucao @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
 
   @@index([orgId, tipo, objetoId])
   @@index([expiraEm])
