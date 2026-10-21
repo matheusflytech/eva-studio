@@ -373,6 +373,15 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   - CHATBOT_ENGINE ainda descreve os canais por agente;
   - templates da Meta e automações do Instagram continuam por agente.
 
+### Também em 21/10
+- **Página completa do contato** (`/contatos/<id>`, `pagina-do-contato.tsx`): dados editáveis, história
+  (linha do tempo do contato em `/api/contacts/[contactId]/linha-do-tempo`, mesmo formato da do negócio),
+  negócios, conversas e réguas. A gaveta da lista tem "Abrir página completa".
+- **Contatos:** atalho do WhatsApp Web ao lado do celular.
+- **Modelos prontos:** "Atendimento com menu" e "FAQ com IA" usam Responder com IA (Central) com a saída
+  Erro no atendente. Modelo novo "Atendimento pelo n8n", que pede a URL na criação do agente. O bloco do n8n
+  agora se chama "Enviar para o n8n".
+
 ### Próximas frentes (`docs/superpowers/plans/2026-10-20-builder-agentes-integracoes.md`)
 - **F3 Central de IA — partes a, b e c feitas em 21/10** (prompt do agente no
   bloco, saída "Erro", modelos pela chave, conexão única com reserva, uso e
