@@ -42,6 +42,21 @@ Ordem: F1 → F2 → F3 → F4 → F5 → F6, com F7 em paralelo (pasta própria
 
 ## Notas de execução
 
+### F6 — n8n fácil: FEITO (23/10/2026, local, SQL não aplicado)
+
+Skills: crm-api-webhooks, crm-n8n-integration.
+- Webhooks de saída: `src/lib/server/webhooks/` (assinatura, emitir, entrega, endpoints,
+  entrada-do-agente), catálogo `src/lib/webhooks/eventos.ts`, tabelas
+  `eva_studio_webhook_endpoints`, `eva_studio_webhook_entregas`,
+  `eva_studio_agente_entradas` (SQL `2026-10-23-webhooks.sql`). Entrega pelo relógio e
+  logo após o evento. O cabeçalho saiu Standard Webhooks em vez do `Eva-Signature` do
+  roteiro API-6 (é o que o n8n, a Svix e a Resend usam).
+- Tela `/integracoes/n8n`; URL de entrada na aba Avançado do agente (substitui o
+  webhook falso); API v1 `GET /me`, `/webhooks`, `POST /messages`.
+- Pacote `n8n-nodes-eva/` e modelos em `n8n-nodes-eva/templates/`.
+- Fica para depois: publicar o pacote, resourceMapper de campos personalizados,
+  `GET /events` (polling para n8n sem URL pública), alerta de webhook falhando.
+
 ### F5 — E-mail automático: FEITO (22/10/2026, local, SQL não aplicado)
 
 Decisões do Alfredo: conta Resend da plataforma; ordem base → réguas/fluxo →

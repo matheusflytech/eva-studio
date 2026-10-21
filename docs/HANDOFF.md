@@ -259,6 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
+| `2026-10-23-webhooks.sql` | Webhooks de saída (endpoints + fila de entregas) e URL de entrada do agente | **não aplicado** (app funciona sem; nenhum evento sai) |
 | `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão | **não aplicado** (app funciona sem; nenhum e-mail novo sai) |
 | `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | aplicado em 21/10 (migrou 1 canal: o QR do Vendedor Virtual, em qr_pending, sem credenciais). Rodado 2x para provar que não duplica. App e worker em produção ainda são os antigos (modo por agente) até o deploy |
 
@@ -373,6 +374,33 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   - testar ponta a ponta com o agente "teste" (QR no worker, Telegram, Instagram);
   - CHATBOT_ENGINE ainda descreve os canais por agente;
   - templates da Meta e automações do Instagram continuam por agente.
+
+### F6 n8n — feito em 23/10, local
+- **Webhooks de saída** (`src/lib/server/webhooks/`): catálogo em `src/lib/webhooks/eventos.ts`
+  (contact.created/updated, lead.captured, deal.created/stage_changed/won/lost/reopened,
+  task.completed, message.received, curinga `deal.*` e `*`). Assinatura Standard Webhooks
+  (`webhook-id`, `webhook-timestamp`, `webhook-signature v1,...`, segredo `whsec_` cifrado).
+  A tabela de entregas é a fila: primeira tentativa logo após a resposta (`after`), novas
+  tentativas no relógio (`entregarPendentes`, FOR UPDATE SKIP LOCKED) em 5 s, 5 min, 30 min,
+  2 h, 5 h, 10 h, 10 h. 4xx definitivo não repete; 410 ou 5 dias falhando desligam.
+- **Onde emite:** `stage-events.ts` (toda mudança de etapa, criação incluída), contato criado
+  ou alterado (tela, conversa, API v1, lead externo), `marcarComoLead`, `concluirTarefa` e
+  concluir em massa e PATCH v1 de tarefa, `registrarMensagens` (mensagem do contato).
+- **Tela:** Integrações → n8n e webhooks (`/integracoes/n8n`): passo a passo nos dois
+  sentidos, cadastro com eventos, "Enviar teste", log com corpo/resposta e "Reenviar",
+  mostrar/trocar segredo.
+- **API v1:** `GET /me` (testa a chave), `GET/POST /webhooks`, `GET/DELETE /webhooks/{id}`
+  (escopo `webhooks`), `POST /messages` (escopo `messages`, manda pelo agente).
+- **URL de entrada do agente** (aba Avançado): `POST /api/hooks/agentes/{agentId}/{token}`
+  manda mensagem pelo agente (responder depois do bloco "Enviar para o n8n"). Token `evh_`
+  na URL, cifrado, trocável. Mesma regra de janela de 24h e modelo aprovado.
+- **Pacote do n8n:** `n8n-nodes-eva/` (fora do tsc/eslint do app, `npm install && npm test`
+  lá dentro). Nó de ação declarativo, gatilho que assina sozinho, credencial, 3 modelos de
+  workflow em `templates/`. Não publicado no npm.
+- **Pendentes:**
+  - aplicar o SQL;
+  - publicar o pacote (npm com provenance via GitHub Actions) e testar num n8n de verdade;
+  - campos personalizados pelo resourceMapper e polling `GET /events` ficaram para depois.
 
 ### F5 E-mail automático — feito em 22/10, local
 - **Conta:** Resend da **plataforma**. Variáveis novas na Vercel: `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`
