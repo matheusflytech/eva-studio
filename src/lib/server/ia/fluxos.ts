@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Node, Edge } from "@xyflow/react";
 import { prisma } from "@/lib/db/prisma";
+import { qrConectado } from "@/lib/server/canais/qr";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
@@ -108,7 +109,7 @@ export async function carregarCatalogoFluxo(orgId: string, agentId: string): Pro
 
   const canais: string[] = [];
   if (agente?.metaConnection) canais.push("WhatsApp oficial");
-  if (agente?.whatsappConnection?.status === "connected") canais.push("WhatsApp (QR)");
+  if (agente && (await qrConectado(agentId, agente.whatsappConnection))) canais.push("WhatsApp (QR)");
   if (agente?.instagramConnection) canais.push("Instagram");
   if (agente?.messengerConnection) canais.push("Messenger");
   if (agente?.telegramConnection) canais.push("Telegram");

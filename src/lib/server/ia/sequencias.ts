@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { qrConectado } from "@/lib/server/canais/qr";
 import {
   CANAIS_DE_SEQUENCIA,
   ehCanalDeSequencia,
@@ -89,7 +90,7 @@ export async function carregarCatalogoSequencia(orgId: string, agentId: string):
 
   const canaisConectados: CanalDeSequencia[] = [];
   if (agente?.metaConnection) canaisConectados.push("whatsapp_meta");
-  if (agente?.whatsappConnection?.status === "connected") canaisConectados.push("whatsapp_qr");
+  if (agente && (await qrConectado(agentId, agente.whatsappConnection))) canaisConectados.push("whatsapp_qr");
   if (agente?.instagramConnection) canaisConectados.push("instagram");
   if (agente?.telegramConnection) canaisConectados.push("telegram");
 

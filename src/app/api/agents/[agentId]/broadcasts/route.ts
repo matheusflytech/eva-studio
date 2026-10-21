@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { qrConectado } from "@/lib/server/canais/qr";
 import { requirePermission } from "@/lib/server/permissions";
 import { runBroadcast } from "@/lib/server/broadcast-runner";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
@@ -39,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 
   return NextResponse.json({
     channels: {
-      whatsapp_qr: agent.whatsappConnection?.status === "connected",
+      whatsapp_qr: await qrConectado(agent.id, agent.whatsappConnection),
       whatsapp_meta: !!agent.metaConnection,
       telegram: !!agent.telegramConnection,
     },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { qrDosAgentes } from "@/lib/server/canais/qr";
 import { requirePermission } from "@/lib/server/permissions";
 import { getProvider } from "@/lib/llm-providers";
 import type { Node, Edge } from "@xyflow/react";
@@ -121,12 +122,15 @@ export async function GET() {
   const nErros = porAgente(erros);
   const nExecucoes = porAgente(execucoes);
 
+  // QR: com os canais do contrato, o estado vem do canal que o agente atende.
+  const qr = await qrDosAgentes(agents.map((a) => a.id));
   const lista = agents.map((agent) => {
     // Canais ligados de verdade. O QR só conta como ligado quando a sessão
     // está conectada: linha existir no banco não significa telefone pareado.
     const canais: { id: string; label: string; detalhe: string }[] = [];
-    if (agent.whatsappConnection?.status === "connected") {
-      canais.push({ id: "whatsapp_qr", label: "WhatsApp", detalhe: agent.whatsappConnection.phoneNumber ?? "via QR" });
+    const sessaoQr = qr.modoCanal ? qr.porAgente.get(agent.id) : agent.whatsappConnection;
+    if (sessaoQr?.status === "connected") {
+      canais.push({ id: "whatsapp_qr", label: "WhatsApp", detalhe: sessaoQr.phoneNumber ?? "via QR" });
     }
     if (agent.metaConnection) {
       canais.push({ id: "whatsapp_meta", label: "WhatsApp oficial", detalhe: agent.metaConnection.displayPhone ?? "" });
