@@ -142,6 +142,39 @@ describe("Responder com IA (ai-agent)", () => {
     await advanceConversation({ ...base, text: "oi" });
     expect(gravado().currentNodeId).toBe("bot");
   });
+
+  it('erro da IA com a saída "Erro" ligada: segue por ela na mesma rodada', async () => {
+    const f = fluxo(ia(), true);
+    f.nodes.push({ id: "falha", position: { x: 0, y: 0 }, data: { iconKey: "message", label: "Falha", detail: "Já te chamo um atendente." } });
+    f.edges.push({ id: "e3", source: "bot", target: "falha", sourceHandle: "erro" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    llm.callLlmWithTools.mockResolvedValue({ text: null, error: "groq 401" });
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Já te chamo um atendente."]);
+  });
+
+  it('a saída "Erro" nunca é usada quando a IA termina bem', async () => {
+    const f = fluxo(ia(), true);
+    f.nodes.push({ id: "falha", position: { x: 0, y: 0 }, data: { iconKey: "message", label: "Falha", detail: "Falhou." } });
+    // Ligação de erro primeiro na lista: o motor não pode pegar "a primeira que achar".
+    f.edges.splice(1, 0, { id: "e3", source: "bot", target: "falha", sourceHandle: "erro" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado("bot", { nome: "Ana" }));
+    iaResponde("Feito.", [{ id: "1", name: "seguir_fluxo", arguments: {} }]);
+    const r = await advanceConversation({ ...base, text: "ok" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Feito.", "Anotado, Ana!"]);
+  });
+
+  it('com só a saída "Erro" ligada, a IA não recebe a ferramenta de seguir', async () => {
+    const f = fluxo(ia(), false);
+    f.edges.push({ id: "e3", source: "bot", target: "start", sourceHandle: "erro" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Oi!");
+    await advanceConversation({ ...base, text: "olá" });
+    expect(ferramentas()).not.toContain("seguir_fluxo");
+  });
 });
 
 describe("Enviar para meu fluxo (agent)", () => {

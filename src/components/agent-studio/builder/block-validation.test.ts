@@ -70,7 +70,13 @@ describe("validação do fluxo: ramos e saídas", () => {
 
   it("Responder com IA e Enviar para meu fluxo podem ficar sem saída (a conversa fica com eles)", () => {
     const nodes = [no("ini", "start"), no("ia", "ai-agent", { aiCredentialId: "c1" })];
-    expect(problemas(nodes, [liga("ini", "ia")])).toEqual([]);
+    expect(problemas(nodes, [liga("ini", "ia")]).filter((p) => p.startsWith("erro:"))).toEqual([]);
+  });
+
+  it('IA sem a saída "Erro" ligada é aviso; ligada, some', () => {
+    const nodes = [no("ini", "start"), no("ia", "ai-agent", { aiCredentialId: "c1" }), no("fim", "end")];
+    expect(problemas(nodes, [liga("ini", "ia"), liga("ia", "fim")])).toEqual([expect.stringMatching(/^aviso:ia:.*"Erro"/)]);
+    expect(problemas(nodes, [liga("ini", "ia"), liga("ia", "fim"), liga("ia", "fim", "erro")])).toEqual([]);
   });
 
   it("o exemplo e os modelos prontos passam sem erro e já vêm organizados", () => {

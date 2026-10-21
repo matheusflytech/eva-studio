@@ -8,6 +8,7 @@ import { getCredentialSecret } from "@/lib/server/credentials";
 import { callLlmWithTools, type LlmTool, type LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
+import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
@@ -297,9 +298,14 @@ export function iaTerminou(opts: {
   return opts.dadosPedidos.length > 0 && opts.dadosPedidos.every((k) => String(opts.variables[k] ?? "").trim() !== "");
 }
 
-/** Tem ligação de saída do fluxo principal (ferramentas não contam). */
+/** Tem ligação de saída do fluxo principal (ferramentas e a saída "Erro" não contam). */
 function temSaidaPrincipal(edges: Edge[], nodeId: string): boolean {
-  return edges.some((e) => e.source === nodeId && e.targetHandle !== "tools");
+  return edges.some((e) => e.source === nodeId && e.targetHandle !== "tools" && e.sourceHandle !== SAIDA_ERRO);
+}
+
+/** Para onde vai a conversa quando a IA falha; null = fica no bloco (sem ligação em "Erro"). */
+function destinoDoErroDaIa(edges: Edge[], nodeId: string, erro: string | undefined): string | null {
+  return erro ? nextNodeId(edges, nodeId, SAIDA_ERRO) : null;
 }
 
 // Roda o Agente de IA nativo (bloco "ai-agent"): junta as ferramentas
@@ -904,7 +910,7 @@ export function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string 
 /** Saída "normal" de um bloco: a aresta sem nome; nunca a de resposta inválida. */
 function nextDefaultNodeId(edges: Edge[], fromId: string): string | null {
   const semNome = edges.find((e) => e.source === fromId && e.sourceHandle == null);
-  const qualquer = edges.find((e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA);
+  const qualquer = edges.find((e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA && e.sourceHandle !== SAIDA_ERRO);
   return (semNome ?? qualquer)?.target ?? null;
 }
 
@@ -1261,8 +1267,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
     if (reply.text) messages.push({ text: reply.text });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
-    if (!reply.seguir) return finish();
-    currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
+    const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
+    if (seErrou) currentId = seErrou; // falhou: segue pela saída "Erro"
+    else if (!reply.seguir) return finish();
+    else currentId = nextDefaultNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
@@ -1513,8 +1521,13 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
       if (reply.text) messages.push({ text: reply.text });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
+      const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
+      if (seErrou) {
+        currentId = seErrou; // falhou: segue pela saída "Erro"
+        continue;
+      }
       if (reply.seguir) {
-        currentId = nextNodeId(edges, node.id);
+        currentId = nextDefaultNodeId(edges, node.id);
         continue;
       }
       currentId = node.id; // fica com a IA até ela terminar (ou para sempre, sem ligação)

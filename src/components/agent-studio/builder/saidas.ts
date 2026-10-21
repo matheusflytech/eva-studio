@@ -13,7 +13,14 @@ import { SAIDA_INVALIDA } from "@/lib/capture-validation";
 // (flow-engine.ts) procura a continuação normal de um bloco.
 // ---------------------------------------------------------------------------
 
-export type TipoDeSaida = "padrao" | "sim" | "nao" | "opcao" | "respondeu" | "invalida";
+export type TipoDeSaida = "padrao" | "sim" | "nao" | "opcao" | "respondeu" | "invalida" | "erro";
+
+/**
+ * Saída "Erro" do bloco de IA: por onde a conversa segue quando o provedor
+ * falha (chave errada, fora do ar, limite). Sem ligação nela, a conversa fica
+ * no bloco de IA, como antes.
+ */
+export const SAIDA_ERRO = "erro";
 
 export interface Saida {
   id: string | null;
@@ -37,6 +44,13 @@ export function saidasDoBloco(data: FlowNodeData): Saida[] {
     return [
       { id: "true", rotulo: "Sim", tipo: "sim" },
       { id: "false", rotulo: "Não", tipo: "nao" },
+    ];
+  }
+  if (data.iconKey === "ai-agent") {
+    // "Terminou" sem id: ligações antigas do bloco continuam valendo.
+    return [
+      { id: null, rotulo: "Terminou", tipo: "padrao" },
+      { id: SAIDA_ERRO, rotulo: "Erro", tipo: "erro" },
     ];
   }
   const opcoes = data.iconKey === "capture" ? data.options ?? [] : [];

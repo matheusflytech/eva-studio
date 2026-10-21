@@ -1,6 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "./flow-node";
-import { capturaComValidacao, ehFerramenta, saidaDaLigacao, saidasDoBloco, temSaidasNomeadas } from "./saidas";
+import { SAIDA_ERRO, capturaComValidacao, ehFerramenta, saidaDaLigacao, saidasDoBloco, temSaidasNomeadas } from "./saidas";
 
 // ---------------------------------------------------------------------------
 // Validação do fluxo, mostrada no canvas antes de publicar.
@@ -154,6 +154,12 @@ export function validateFlow(nodes: Node<FlowNodeData>[], edges: Edge[], ctx: Co
     // ligada pelo meio): o motor nunca passa por ela.
     if (nomeadas && saidas.some((e) => !saidaDaLigacao(node.data, e.sourceHandle))) {
       add(node, "Há uma ligação saindo de uma saída que não existe mais neste bloco. Apague e ligue de novo.");
+    }
+
+    // Todo bloco de IA deveria ter um caminho para quando o provedor falha:
+    // sem ele, a pessoa fica sem resposta e ninguém fica sabendo.
+    if (kind === "ai-agent" && !saidas.some((e) => e.sourceHandle === SAIDA_ERRO)) {
+      add(node, 'A saída "Erro" não está ligada: se a IA falhar, a pessoa fica sem resposta.', "aviso");
     }
 
     if (SAIDA_OPCIONAL.has(kind)) continue;
