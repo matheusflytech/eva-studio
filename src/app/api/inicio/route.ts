@@ -32,6 +32,52 @@ export interface Pendencia {
   quantidade?: number;
 }
 
+const HORA = 60 * 60 * 1000;
+
+function nomeDoWebhook(w: { url: string; descricao: string }): string {
+  if (w.descricao) return w.descricao;
+  try {
+    return new URL(w.url).host;
+  } catch {
+    return w.url;
+  }
+}
+
+async function webhooksComProblema(orgId: string, agora: Date): Promise<Pendencia[]> {
+  try {
+    const lista = await prisma.webhookEndpoint.findMany({
+      where: {
+        orgId,
+        OR: [
+          { ativo: false, desativadoPor: { not: null } },
+          { ativo: true, falhandoDesde: { lt: new Date(agora.getTime() - HORA) } },
+        ],
+      },
+      select: { id: true, url: true, descricao: true, ativo: true, desativadoPor: true, falhandoDesde: true },
+    });
+    return lista.map((w) =>
+      w.ativo
+        ? {
+            id: `webhook-falhando-${w.id}`,
+            tipo: "atencao" as const,
+            titulo: `O webhook ${nomeDoWebhook(w)} está falhando`,
+            detalhe: `Os eventos não chegam desde ${w.falhandoDesde!.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. O Eva segue tentando; veja o log de entregas.`,
+            href: "/integracoes/n8n",
+          }
+        : {
+            id: `webhook-desligado-${w.id}`,
+            tipo: "urgente" as const,
+            titulo: `O webhook ${nomeDoWebhook(w)} foi desligado`,
+            detalhe: `${w.desativadoPor} Nenhum evento sai para ele até alguém corrigir e ligar de novo.`,
+            href: "/integracoes/n8n",
+          }
+    );
+  } catch {
+    // Sem a tabela de webhooks: nada a avisar.
+    return [];
+  }
+}
+
 export async function GET() {
   const ctx = await requirePermission("read");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -141,6 +187,11 @@ export async function GET() {
       href: "/agent-studio",
     });
   }
+
+  // Webhook de saída quebrado: a integração para em silêncio (o n8n não
+  // recebe mais nada). Falha recente fica de fora: as novas tentativas
+  // costumam resolver uma queda curta do outro lado.
+  for (const w of await webhooksComProblema(ctx.orgId, agora)) pendencias.push(w);
 
   // Configuração: não é urgente, mas trava o agente de funcionar.
   for (const agente of agentes) {
