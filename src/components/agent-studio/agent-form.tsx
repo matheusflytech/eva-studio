@@ -14,14 +14,10 @@ import { ToolsPicker } from "./tools-picker";
 import { VariablesEditor } from "./variables-editor";
 import { MessageTemplatesEditor } from "./message-templates-editor";
 import { WebhookConfig } from "./webhook-config";
-import { WhatsAppConnect } from "./whatsapp-connect";
-import { MetaWhatsAppConnect } from "./meta-whatsapp-connect";
-import { InstagramConnect } from "./instagram-connect";
-import { TelegramConnect } from "./telegram-connect";
-import { MessengerConnect, TikTokConnect } from "./channel-connect";
 import { CommentAutomationsEditor } from "./comment-automations-editor";
 import { TriggersEditor } from "./triggers-editor";
 import { WidgetConnect } from "./widget-connect";
+import { CanaisDoAgente } from "./canais-do-agente";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { generateId } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
@@ -289,57 +285,10 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Card>
       </Secao>
 
+      {/* Canais são do contrato (Configurações → Canais); aqui o agente escolhe por onde atende. */}
       {isEdit && (
         <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp oficial (Meta)</CardTitle>
-              <CardDescription>O canal para clientes de verdade: estável, com selo e sem risco de bloqueio.</CardDescription>
-            </CardHeader>
-            <MetaWhatsAppConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp por QR code</CardTitle>
-              <CardDescription>Conecte o número que você já usa, lendo um QR. Bom para testar; para volume alto, prefira o oficial.</CardDescription>
-            </CardHeader>
-            <WhatsAppConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Instagram</CardTitle>
-              <CardDescription>Mensagens diretas do Instagram, pela mesma conta Business ou Creator.</CardDescription>
-            </CardHeader>
-            <InstagramConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <TelegramConnect agentId={agentId} />
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <MessengerConnect agentId={agentId} />
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <TikTokConnect agentId={agentId} />
+          <CanaisDoAgente agentId={agentId} agentNome={agent?.name ?? name} />
         </Secao>
       )}
 

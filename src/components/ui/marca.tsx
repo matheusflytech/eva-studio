@@ -22,6 +22,11 @@ export const MARCAS = {
 
 export type Marca = keyof typeof MARCAS | "site";
 
+/** Fundo do ícone quando a marca usa degradê (o do Instagram atual). */
+const FUNDO: Partial<Record<keyof typeof MARCAS, string>> = {
+  instagram: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)",
+};
+
 /**
  * Logo da marca. Em quadrado com o fundo na cor da marca e o desenho branco
  * (padrão "app icon"), ou só o desenho na cor da marca (`solto`). O TikTok é
@@ -62,7 +67,7 @@ export function LogoDaMarca({
   return (
     <span
       className={cn("inline-flex shrink-0 items-center justify-center rounded-xl", marca === "tiktok" && "ring-1 ring-border-subtle", className)}
-      style={{ width: tamanho, height: tamanho, backgroundColor: cor }}
+      style={{ width: tamanho, height: tamanho, background: FUNDO[marca] ?? cor }}
     >
       {svg}
     </span>

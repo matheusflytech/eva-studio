@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { encryptSecret, decryptSecret } from "@/lib/server/crypto";
+import { registrarWebhookDoTelegram, webhookUrlDoTelegram } from "@/lib/server/telegram-webhook";
 
 // ---------------------------------------------------------------------------
 // Conexão com o Telegram.
@@ -13,12 +14,7 @@ import { encryptSecret, decryptSecret } from "@/lib/server/crypto";
 // um fluxo em um app de mensagem real, sem depender da aprovação da Meta.
 // ---------------------------------------------------------------------------
 
-function webhookUrl(agentId: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "");
-  return `${base}/api/webhooks/telegram/${agentId}`;
-}
+const webhookUrl = webhookUrlDoTelegram;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const ctx = await requirePermission("read");
@@ -58,28 +54,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Token inválido — o Telegram não reconheceu esse bot." }, { status: 400 });
   }
 
-  const url = webhookUrl(agentId);
-  if (!url.startsWith("https://")) {
+  if (!webhookUrl(agentId).startsWith("https://")) {
     return NextResponse.json(
       { error: "O Telegram só aceita webhook em HTTPS. Configure NEXT_PUBLIC_APP_URL com o domínio público do app." },
       { status: 400 }
     );
   }
 
-  // O secret_token volta em todo update no header X-Telegram-Bot-Api-Secret-Token
-  // — é assim que o webhook confere que a chamada veio mesmo do Telegram.
-  const secret = process.env.INTERNAL_API_SECRET ?? "";
-  const hookRes = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url,
-      secret_token: secret || undefined,
-      allowed_updates: ["message", "callback_query"],
-    }),
-  });
-  const hook = await hookRes.json().catch(() => null);
-  const webhookSet = !!hook?.ok;
+  const registro = await registrarWebhookDoTelegram(token, agentId);
+  const webhookSet = registro.ok;
+  const hook = { description: registro.erro };
 
   await prisma.telegramConnection.upsert({
     where: { agentId },

@@ -14,11 +14,13 @@ import { AbaGrupos } from "@/components/configuracoes/aba-grupos";
 import { AbaEquipes } from "@/components/configuracoes/aba-equipes";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { AbaLixeira } from "@/components/configuracoes/aba-lixeira";
+import { AbaCanais } from "@/components/configuracoes/aba-canais";
 import { CanvasThemeSwitch, ThemeChooser } from "@/components/ui/theme";
 
 const ABAS = [
   { id: "contrato", rotulo: "Contrato" },
   { id: "conta", rotulo: "Sua conta" },
+  { id: "canais", rotulo: "Canais" },
   { id: "membros", rotulo: "Membros" },
   { id: "papeis", rotulo: "Papéis e permissões" },
   { id: "grupos", rotulo: "Grupos" },
@@ -248,7 +250,7 @@ function Configuracoes() {
       <div className="mx-auto flex max-w-4xl flex-col gap-5 pb-10">
         <div>
           <h1 className="font-display text-xl font-semibold text-text-primary">Configurações</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contrato, sua conta e aparência, quem participa, o que cada um pode fazer, as chaves de API e a lixeira.</p>
+          <p className="mt-1 text-[13px] text-text-secondary">Contrato, sua conta e aparência, os canais de atendimento, quem participa, o que cada um pode fazer, as chaves de API e a lixeira.</p>
         </div>
 
         {/* A aba fica na URL: dá para mandar o link "aba de membros" a alguém. */}
@@ -267,6 +269,9 @@ function Configuracoes() {
           </TabsContent>
           <TabsContent value="conta" className="mt-5">
             <AbaConta />
+          </TabsContent>
+          <TabsContent value="canais" className="mt-5">
+            <AbaCanais />
           </TabsContent>
           <TabsContent value="membros" className="mt-5">
             <AbaMembros />
