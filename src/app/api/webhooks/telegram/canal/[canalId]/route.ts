@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
 import { POST as entradaDoAgente } from "../../[agentId]/route";
 
 // Entrada do Telegram por canal do contrato. O webhook do bot aponta para o
@@ -10,6 +11,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ can
   const { canalId } = await params;
   const canal = await prisma.canal.findFirst({ where: { id: canalId, tipo: "telegram" }, select: { agentId: true } });
   // Sempre 200 quando não há o que fazer: erro faria o Telegram repetir.
-  if (!canal?.agentId) return NextResponse.json({ ok: true });
+  if (!canal) return NextResponse.json({ ok: true });
+  if (!canal.agentId) {
+    await registrarMensagemSemAgente({ canalId });
+    return NextResponse.json({ ok: true });
+  }
   return entradaDoAgente(request, { params: Promise.resolve({ agentId: canal.agentId }) });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { ehAvisoDeSemAgente } from "@/lib/server/canais/sem-agente";
 import { requirePermission } from "@/lib/server/permissions";
 import { lerEstadoWorker } from "@/lib/server/heartbeat";
 import { whereDeParadosDoContrato } from "@/lib/server/filtro-crm";
@@ -118,6 +119,26 @@ export async function GET() {
       detalhe: "Sem atividade além do prazo da etapa. Ou avança, ou fecha como perdido.",
       href: "/negocios",
       quantidade: parados,
+    });
+  }
+
+  // Canal do contrato recebendo mensagem sem nenhum agente para responder.
+  let semAgente: { id: string; rotulo: string; detalhe: string | null }[] = [];
+  try {
+    semAgente = await prisma.canal.findMany({
+      where: { orgId: ctx.orgId, agentId: null, status: "atencao" },
+      select: { id: true, rotulo: true, detalhe: true },
+    });
+  } catch {
+    // Sem a tabela de canais (SQL 2026-10-22 não aplicado): nada a avisar.
+  }
+  for (const canal of semAgente.filter((c) => ehAvisoDeSemAgente(c.detalhe))) {
+    pendencias.push({
+      id: `canal-sem-agente-${canal.id}`,
+      tipo: "atencao",
+      titulo: `${canal.rotulo} está recebendo mensagens sem agente`,
+      detalhe: "Ninguém responde nem guarda essas conversas. Escolha um agente para este canal na aba Canais do agente.",
+      href: "/agent-studio",
     });
   }
 

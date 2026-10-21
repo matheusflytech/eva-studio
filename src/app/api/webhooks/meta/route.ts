@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
 import { advanceConversation, type OutboundMessage } from "@/lib/server/flow-engine";
 import { matchCommentAutomation } from "@/lib/server/comment-automation";
 import { classifyInstagramMessage } from "@/lib/server/instagram-events";
@@ -354,7 +355,11 @@ async function handleWhatsAppEntries(entries: unknown[]) {
       if (!value.messages) continue;
 
       const connection = await prisma.metaConnection.findUnique({ where: { phoneNumberId } });
-      if (!connection) continue;
+      if (!connection) {
+        // Número conectado no contrato, mas nenhum agente escolheu ele.
+        await registrarMensagemSemAgente({ tipo: "whatsapp_meta", externalId: phoneNumberId });
+        continue;
+      }
       const token = decryptSecret(connection.accessToken);
       const orgId = await orgDoAgente(connection.agentId);
 
@@ -508,7 +513,10 @@ async function handleMessengerEntries(entries: unknown[]) {
     if (!pageId) continue;
 
     const connection = await prisma.messengerConnection.findUnique({ where: { pageId } });
-    if (!connection) continue;
+    if (!connection) {
+      if (entry.messaging?.length) await registrarMensagemSemAgente({ tipo: "messenger", externalId: pageId });
+      continue;
+    }
     const token = decryptSecret(connection.pageAccessToken);
 
     for (const event of entry.messaging ?? []) {
@@ -558,7 +566,10 @@ async function handleInstagramEntries(entries: unknown[]) {
     if (!igBusinessId) continue;
 
     const connection = await prisma.instagramConnection.findUnique({ where: { igBusinessId } });
-    if (!connection) continue;
+    if (!connection) {
+      if (entry.messaging?.length) await registrarMensagemSemAgente({ tipo: "instagram", externalId: igBusinessId });
+      continue;
+    }
     const igAccessToken = decryptSecret(connection.pageAccessToken);
 
     for (const event of entry.messaging ?? []) {

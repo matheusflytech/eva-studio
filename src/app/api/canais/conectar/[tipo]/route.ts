@@ -17,34 +17,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ tip
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { tipo } = await params;
   const b = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
-  const texto = (v: unknown) => String(v ?? "");
+  let r: ResultadoDeConexao | null;
+  try {
+    r = await conectarPorTipo(ctx.orgId, tipo, b);
+  } catch {
+    // Sem a tabela de canais o contrato ainda não conecta canais.
+    return NextResponse.json(
+      { error: "Os canais do contrato ainda não foram ativados no banco (SQL 2026-10-22-canais-do-contrato.sql)." },
+      { status: 409 }
+    );
+  }
+  if (!r) return NextResponse.json({ error: "Canal desconhecido." }, { status: 400 });
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json({ ok: true, canalId: r.canalId, aviso: r.aviso ?? null, webhookUrl: r.webhookUrl ?? null });
+}
 
-  let r: ResultadoDeConexao;
+async function conectarPorTipo(orgId: string, tipo: string, b: Record<string, unknown>): Promise<ResultadoDeConexao | null> {
+  const texto = (v: unknown) => String(v ?? "");
   switch (tipo) {
     case "telegram":
-      r = await conectarTelegram(ctx.orgId, texto(b.botToken));
-      break;
+      return conectarTelegram(orgId, texto(b.botToken));
     case "messenger":
-      r = await conectarMessenger(ctx.orgId, texto(b.pageId), texto(b.pageAccessToken));
-      break;
+      return conectarMessenger(orgId, texto(b.pageId), texto(b.pageAccessToken));
     case "tiktok":
-      r = await conectarTikTok(ctx.orgId, {
+      return conectarTikTok(orgId, {
         businessId: texto(b.businessId),
         accessToken: texto(b.accessToken),
         refreshToken: texto(b.refreshToken),
         expiresIn: Number(b.expiresIn ?? 0),
         displayName: texto(b.displayName),
       });
-      break;
     case "whatsapp_meta":
-      r = await conectarWhatsAppOficial(ctx.orgId, { code: texto(b.code), wabaId: texto(b.wabaId), phoneNumberId: texto(b.phoneNumberId) });
-      break;
+      return conectarWhatsAppOficial(orgId, { code: texto(b.code), wabaId: texto(b.wabaId), phoneNumberId: texto(b.phoneNumberId) });
     case "whatsapp_qr":
-      r = await conectarWhatsAppQr(ctx.orgId);
-      break;
+      return conectarWhatsAppQr(orgId);
     default:
-      return NextResponse.json({ error: "Canal desconhecido." }, { status: 400 });
+      return null;
   }
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
-  return NextResponse.json({ ok: true, canalId: r.canalId, aviso: r.aviso ?? null, webhookUrl: r.webhookUrl ?? null });
 }

@@ -4,6 +4,7 @@ import { requireOrgId } from "@/lib/auth/require-org";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { caminhoDaOrg, classificarMime } from "@/lib/server/storage";
+import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
 
 // Dois jeitos de chamar essa rota:
 // 1) O worker do WhatsApp / webhook da Meta (processos externos, sem sessão
@@ -30,7 +31,18 @@ async function authorize(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { agentId, channel, contactId, text, optionId, media, externalId } = body ?? {};
+  const { agentId, canalId, channel, contactId, text, optionId, media, externalId } = body ?? {};
+
+  // Worker no modo canal: mensagem num canal do contrato sem agente. Só o
+  // worker (segredo interno) chega aqui; registra o aviso e não responde.
+  if (!agentId && typeof canalId === "string") {
+    const expected = process.env.INTERNAL_API_SECRET;
+    if (!expected || !timingSafeEqualStr(request.headers.get("x-internal-secret"), expected)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
+    await registrarMensagemSemAgente({ canalId });
+    return NextResponse.json({ messages: [] });
+  }
 
   if (!agentId || !channel || !contactId) {
     return NextResponse.json({ error: "agentId, channel e contactId são obrigatórios." }, { status: 400 });

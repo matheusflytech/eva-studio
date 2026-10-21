@@ -100,7 +100,7 @@ describe("desconectarCanal", () => {
     const f = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", f);
     await desconectarCanal("o1", "t");
-    expect(f.mock.calls[0][0]).toBe("https://api.telegram.org/bot123:abc/deleteWebhook");
+    expect((f.mock.calls as unknown as [string][])[0][0]).toBe("https://api.telegram.org/bot123:abc/deleteWebhook");
   });
 
   it("canal de outro contrato: não encontra", async () => {
