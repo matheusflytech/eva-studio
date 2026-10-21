@@ -70,6 +70,9 @@ export interface FlowNodeData {
   // Quantas mensagens anteriores da conversa entram no contexto (janela
   // deslizante, sem sumarização — ver runAiAgent em flow-engine.ts).
   aiMemoryWindow?: number;
+  // Junta ao prompt o cadastro do agente (instruções, tom, idioma, "nunca
+  // fazer"). Vazio = ligado; false = só o texto do bloco, como era antes.
+  aiUsarAgente?: boolean;
   // Cada linha = uma variável que o agente tenta extrair da conversa (chave =
   // nome da variável, valor = descrição/como reconhecer) — reaproveita
   // KeyValueRow em vez de um tipo novo.

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { Node } from "@xyflow/react";
 import type { FlowNodeData } from "./flow-node";
 import { VariablePicker } from "./variable-picker";
@@ -492,6 +493,21 @@ export function NodeInspector({
                 </Select>
               </div>
             )}
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+              <span>
+                <span className="block text-[12.5px] font-medium text-text-primary">Usar o cadastro do agente</span>
+                <span className="block text-[11px] text-text-tertiary">
+                  {node.data.aiUsarAgente === false
+                    ? "Só o texto deste bloco vai para a IA."
+                    : "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."}
+                </span>
+              </span>
+              <Switch
+                checked={node.data.aiUsarAgente !== false}
+                onCheckedChange={(v) => onChange({ aiUsarAgente: v })}
+                aria-label="Usar o cadastro do agente"
+              />
+            </label>
             <div>
               <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
               <Input
@@ -511,7 +527,8 @@ export function NodeInspector({
               valuePlaceholder="descrição — o que é e como reconhecer"
             />
             <p className="text-[11.5px] text-text-tertiary">
-              O texto em &quot;Detalhe / mensagem&quot; acima é o system prompt (instruções) do agente. Conecte blocos
+              O texto em &quot;Detalhe / mensagem&quot; acima diz o que a IA faz nesta etapa; o jeito de falar e as
+              regras gerais vêm do cadastro do agente (aba Agente). Conecte blocos
               de Ferramenta na porta roxa embaixo desse card pra dar ferramentas a ele — ele decide sozinho quando
               usar cada uma. Nas &quot;Variáveis para coletar&quot;, cada linha vira um dado que o agente tenta
               extrair da conversa (o modelo chama uma ferramenta interna sempre que identifica um valor) e pergunta

@@ -69,6 +69,25 @@ beforeEach(() => {
 });
 
 describe("Responder com IA (ai-agent)", () => {
+  it("o prompt leva o cadastro do agente antes do texto do bloco; desligado, só o bloco", async () => {
+    db.agent.findUnique.mockResolvedValue({
+      id: "a1", orgId: "o1", name: "Eva", description: "", tone: "Leve.", language: "Português",
+      instructions: "Venda sofás.", guidelines: "Não dê desconto.", outboundUrl: "",
+    });
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia(), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Oi!");
+    await advanceConversation({ ...base, text: "olá" });
+    const prompt = llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt as string;
+    expect(prompt).toContain("## Instruções\nVenda sofás.");
+    expect(prompt).toContain("## Nunca faça\nNão dê desconto.");
+    expect(prompt.indexOf("Venda sofás.")).toBeLessThan(prompt.indexOf("Atenda."));
+
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiUsarAgente: false }), false));
+    await advanceConversation({ ...base, text: "olá" });
+    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt).toBe("Atenda.");
+  });
+
   it("sem ligação: responde e a conversa continua com a IA (e ela nem recebe a ferramenta de seguir)", async () => {
     db.agentFlow.findUnique.mockResolvedValue(fluxo(ia(), false));
     db.conversation.upsert.mockResolvedValue(parado("bot"));

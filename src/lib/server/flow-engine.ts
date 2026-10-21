@@ -7,6 +7,7 @@ import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import { callLlmWithTools, type LlmTool, type LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
+import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
@@ -525,7 +526,7 @@ async function runCrmTool(
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
-  agentId: string,
+  agente: AgenteParaPrompt & { id: string },
   userMessage: string,
   variables: Variables,
   nodes: Node<FlowNodeData>[],
@@ -720,7 +721,7 @@ async function runAiAgent(
     });
   }
 
-  let systemPrompt = node.data.detail || "Você é um assistente útil.";
+  let systemPrompt = montarPromptDoAgente(agente, node.data.detail, { usarAgente: node.data.aiUsarAgente });
   if (collectVars.length > 0) {
     const lines = ["", "## Dados que você precisa coletar nesta conversa"];
     if (collectedVars.length) lines.push(`Já coletados: ${collectedVars.map((v) => `${v.key}=${variables[v.key]}`).join(", ")}.`);
@@ -788,7 +789,7 @@ async function runAiAgent(
         }
         if (toolNode.data.iconKey === "tool-knowledge") {
           const query = String(call.arguments.consulta ?? userMessage);
-          const chunks = await searchKnowledgeBase(agentId, query, 4);
+          const chunks = await searchKnowledgeBase(agente.id, query, 4);
           return chunks.join("\n\n") || "Nenhum trecho relevante encontrado na base de conhecimento.";
         }
         const result = await performHttpRequest(toolNode.data, { ...variables, ...call.arguments });
@@ -1254,7 +1255,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     if (!(reply && done && temSaidaPrincipal(edges, parkedNode.id))) return finish();
     currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+    const reply = await runAiAgent(parkedNode, agent, input.text ?? "", variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
@@ -1506,7 +1507,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent.id, input.text ?? "", variables, nodes, edges, conversation.id, {
+      const reply = await runAiAgent(node, agent, input.text ?? "", variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
