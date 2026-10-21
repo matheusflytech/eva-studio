@@ -4,6 +4,7 @@ import Link from "@/components/contrato/link";
 import { Radio, ArrowRight } from "lucide-react";
 import { CredentialsPanel } from "@/components/integrations/credentials-panel";
 import { ConexaoIaPanel } from "@/components/integrations/conexao-ia-panel";
+import { UsoIaPanel } from "@/components/integrations/uso-ia-panel";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 
@@ -58,6 +59,7 @@ export default function IntegracoesPage() {
       </Link>
 
       <ConexaoIaPanel />
+      <UsoIaPanel />
 
       <CredentialsPanel />
 

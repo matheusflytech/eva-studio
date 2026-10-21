@@ -1787,3 +1787,40 @@ model AiConnection {
 
   @@map("eva_studio_ai_connections")
 }
+
+// Uso de IA (Central de IA, F3c): uma linha por chamada ao provedor, com os
+// tokens que ele informou. Sem chave estrangeira de propósito: apagar a
+// credencial ou o agente não apaga o histórico de consumo. credentialId nulo
+// = chave da plataforma (GROQ_API_KEY).
+model AiUsage {
+  id           String   @id @default(uuid())
+  orgId        String
+  credentialId String?
+  agentId      String?
+  // Onde a IA foi usada: "fluxo" (bloco de IA), "dashboard"...
+  recurso      String   @default("fluxo")
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  ok           Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([credentialId, createdAt])
+  @@map("eva_studio_ai_usage")
+}
+
+// Limite e preço por chave de IA. Limite mensal em tokens (exato: é o que o
+// provedor conta); preço por 1 milhão de tokens informado pelo cliente, só
+// para estimar o custo em reais (o app não inventa tabela de preço).
+model AiKeyLimit {
+  credentialId       String   @id
+  orgId              String
+  limiteMensalTokens Int?
+  precoMilhaoBrl     Decimal? @db.Decimal(10, 4)
+  updatedAt          DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_ai_key_limits")
+}

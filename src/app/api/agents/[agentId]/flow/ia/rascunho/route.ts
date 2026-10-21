@@ -62,6 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const catalogo = await carregarCatalogoFluxo(ctx.orgId, agentId);
 
   const resposta = await pedirRascunho({
+    uso: { orgId: ctx.orgId, agentId, recurso: "rascunho_fluxo" },
     provedor,
     systemPrompt: montarPromptFluxo(catalogo),
     userMessage: montarMensagemFluxo(corpo.pedido, compactarFluxo(corpo.atual)),

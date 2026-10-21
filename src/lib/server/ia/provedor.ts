@@ -35,13 +35,15 @@ export interface ProvedorDeIa {
   apiKey: string;
   model: string;
   origem: "organizacao" | "plataforma";
+  /** Credencial escolhida; vazio = chave da plataforma. */
+  credentialId?: string;
 }
 
 export async function escolherProvedorDeIa(orgId: string): Promise<ProvedorDeIa | null> {
   const tipos = LLM_PROVIDERS.map((p) => p.credentialType);
   const credenciais = await prisma.credential.findMany({
     where: { orgId, type: { in: tipos } },
-    select: { type: true, secretEnc: true },
+    select: { id: true, type: true, secretEnc: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -51,7 +53,7 @@ export async function escolherProvedorDeIa(orgId: string): Promise<ProvedorDeIa 
     for (const cred of credenciais.filter((c) => c.type === info.credentialType)) {
       try {
         const apiKey = decryptSecret(cred.secretEnc);
-        if (apiKey) return { provider, apiKey, model: MODELO_POR_PROVEDOR[provider], origem: "organizacao" };
+        if (apiKey) return { provider, apiKey, model: MODELO_POR_PROVEDOR[provider], origem: "organizacao", credentialId: cred.id };
       } catch {
         // Credencial que não decifra (chave de cifra trocada): tenta a próxima.
       }

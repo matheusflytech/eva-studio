@@ -12,6 +12,7 @@ import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { passosDaConexao } from "@/lib/server/ia/conexao";
 import { chamarComReserva, type PassoDeIa } from "@/lib/server/ia/reserva";
+import { chavesNoLimite, registrarUso, type RegistroDeUso } from "@/lib/server/ia/uso";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
@@ -553,13 +554,28 @@ async function runAiAgent(
     const provider = getProvider(node.data.aiProvider);
     const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
     if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
-    passos = [{ provider: provider.id as LlmProvider, apiKey, model: node.data.aiModel || provider.models[0].id, origem: "bloco" }];
+    passos = [{
+      provider: provider.id as LlmProvider,
+      apiKey,
+      model: node.data.aiModel || provider.models[0].id,
+      origem: "bloco",
+      credentialId: node.data.aiCredentialId,
+    }];
   } else {
     ({ passos, timeoutMs } = await passosDaConexao(agente.orgId));
     if (passos.length === 0) {
       return { text: null, error: "O contrato não tem nenhuma chave de IA: cadastre uma em Integrações → Central de IA.", seguir: false };
     }
   }
+  // Chave que já gastou o limite do mês sai da fila (a reserva assume).
+  const noLimite = await chavesNoLimite(agente.orgId, passos.map((p) => p.credentialId ?? ""));
+  if (noLimite.size > 0) {
+    passos = passos.filter((p) => !p.credentialId || !noLimite.has(p.credentialId));
+    if (passos.length === 0) {
+      return { text: null, error: "As chaves de IA deste bloco atingiram o limite do mês (Integrações → Central de IA).", seguir: false };
+    }
+  }
+  const consumo: RegistroDeUso[] = [];
   const temSaida = temSaidaPrincipal(edges, node.id);
   let pediuParaSeguir = false;
 
@@ -814,7 +830,20 @@ async function runAiAgent(
         const result = await performHttpRequest(toolNode.data, { ...variables, ...call.arguments });
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
+    }, undefined, (passo, r, ok) => {
+      consumo.push({
+        orgId: agente.orgId,
+        credentialId: passo.credentialId ?? null,
+        agentId: agente.id,
+        recurso: "fluxo",
+        provider: passo.provider,
+        model: passo.model,
+        inputTokens: r.usage?.entrada ?? 0,
+        outputTokens: r.usage?.saida ?? 0,
+        ok,
+      });
     });
+    await registrarUso(consumo);
     if (result.tentativas.length > 0 && !result.error) {
       console.warn("[ia] respondeu pela reserva", { usado: result.usado?.origem, falharam: result.tentativas.map((t) => t.origem) });
     }

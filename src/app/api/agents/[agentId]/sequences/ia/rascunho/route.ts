@@ -65,6 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const atual = corpo.atual ? validarRascunhoSequencia(corpo.atual, catalogo) : null;
 
   const resposta = await pedirRascunho({
+    uso: { orgId: ctx.orgId, agentId, recurso: "rascunho_regua" },
     provedor,
     systemPrompt: montarPromptSequencia(catalogo),
     userMessage: montarMensagemSequencia(corpo.pedido, atual?.ok ? atual.sequencia : null),

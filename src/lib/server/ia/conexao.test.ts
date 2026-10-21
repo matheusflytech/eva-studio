@@ -73,8 +73,8 @@ describe("passosDaConexao", () => {
     const r = await passosDaConexao("o1");
     expect(r.timeoutMs).toBe(20000);
     expect(r.passos).toEqual([
-      { provider: "google", apiKey: "chave-g", model: "gemini-2.5-flash", origem: "Gemini" },
-      { provider: "openai", apiKey: "chave-o", model: "gpt-5.6-luna", origem: "OpenAI" },
+      { provider: "google", apiKey: "chave-g", model: "gemini-2.5-flash", origem: "Gemini", credentialId: "g" },
+      { provider: "openai", apiKey: "chave-o", model: "gpt-5.6-luna", origem: "OpenAI", credentialId: "o" },
     ]);
     expect(auto.escolherProvedorDeIa).not.toHaveBeenCalled();
   });
@@ -83,7 +83,7 @@ describe("passosDaConexao", () => {
     db.aiConnection.findUnique.mockRejectedValue(new Error("no table"));
     auto.escolherProvedorDeIa.mockResolvedValue({ provider: "groq", apiKey: "p", model: "llama", origem: "plataforma" });
     const r = await passosDaConexao("o1");
-    expect(r.passos).toEqual([{ provider: "groq", apiKey: "p", model: "llama", origem: "plataforma" }]);
+    expect(r.passos).toEqual([{ provider: "groq", apiKey: "p", model: "llama", origem: "plataforma", credentialId: null }]);
   });
 
   it("nada configurado em lugar nenhum: lista vazia", async () => {

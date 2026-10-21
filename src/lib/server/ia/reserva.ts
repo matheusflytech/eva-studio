@@ -24,6 +24,8 @@ export interface PassoDeIa {
   model: string;
   /** De onde veio (para o log de execuções): nome da credencial ou "plataforma". */
   origem: string;
+  /** Credencial usada (para uso e limite); vazio = chave da plataforma. */
+  credentialId?: string | null;
 }
 
 export type ChamadaSemProvedor = Omit<CallLlmOptions, "provider" | "apiKey" | "model">;
@@ -43,7 +45,9 @@ export function ehErroDeReserva(error: string): boolean {
 export async function chamarComReserva(
   passos: PassoDeIa[],
   opts: ChamadaSemProvedor,
-  chamar: (o: CallLlmOptions) => Promise<LlmResult> = callLlmWithTools
+  chamar: (o: CallLlmOptions) => Promise<LlmResult> = callLlmWithTools,
+  /** Chamado a cada tentativa (deu certo ou não), para registrar o consumo. */
+  aoTentar?: (passo: PassoDeIa, result: LlmResult, ok: boolean) => void
 ): Promise<ResultadoComReserva> {
   const tentativas: ResultadoComReserva["tentativas"] = [];
   if (passos.length === 0) return { text: null, error: "Nenhuma chave de IA configurada.", tentativas };
@@ -63,6 +67,7 @@ export async function chamarComReserva(
     });
 
     const erro = result.error ?? (result.text ? undefined : "O provedor não devolveu resposta.");
+    aoTentar?.(passo, result, !erro);
     if (!erro) return { ...result, usado: passo, tentativas };
 
     const ultimo = i === passos.length - 1;

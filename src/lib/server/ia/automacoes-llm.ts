@@ -1,6 +1,7 @@
 import "server-only";
 import { callLlmWithTools } from "@/lib/server/llm";
 import { escolherProvedorDeIa, type ProvedorDeIa } from "@/lib/server/ia/provedor";
+import { registrarUso } from "@/lib/server/ia/uso";
 
 // ---------------------------------------------------------------------------
 // IA que monta automações (réguas de sequência e fluxos do agente).
@@ -59,6 +60,8 @@ export async function pedirRascunho(opts: {
   userMessage: string;
   descricaoDaFerramenta: string;
   maxTokens?: number;
+  /** Para contar o consumo na Central de IA (Integrações → Uso de IA). */
+  uso?: { orgId: string; agentId?: string; recurso: string };
 }): Promise<ResultadoDoRascunho> {
   let capturado: Record<string, unknown> | null = null;
 
@@ -86,6 +89,17 @@ export async function pedirRascunho(opts: {
     effort: "medium",
     maxTokens: opts.maxTokens ?? 4096,
   });
+  if (opts.uso) {
+    await registrarUso([{
+      ...opts.uso,
+      credentialId: opts.provedor.credentialId ?? null,
+      provider: opts.provedor.provider,
+      model: opts.provedor.model,
+      inputTokens: resultado.usage?.entrada ?? 0,
+      outputTokens: resultado.usage?.saida ?? 0,
+      ok: !resultado.error,
+    }]);
+  }
 
   const args = capturado as Record<string, unknown> | null;
   if (args) {

@@ -33,6 +33,8 @@ vi.mock("@/lib/server/ssrf", () => rede);
 vi.mock("@/lib/server/knowledge-search", () => ({ searchKnowledgeBase: vi.fn(async () => []) }));
 const conexao = vi.hoisted(() => ({ passosDaConexao: vi.fn() }));
 vi.mock("@/lib/server/ia/conexao", () => conexao);
+const uso = vi.hoisted(() => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
+vi.mock("@/lib/server/ia/uso", () => uso);
 
 import { advanceConversation } from "./flow-engine";
 
@@ -213,6 +215,44 @@ describe("Responder com IA usando a conexão do contrato", () => {
     db.conversation.upsert.mockResolvedValue(parado("bot"));
     const r = await advanceConversation({ ...base, text: "olá" });
     expect(r.messages.map((m) => m.text)).toEqual(["Um atendente já fala com você."]);
+    expect(llm.callLlmWithTools).not.toHaveBeenCalled();
+  });
+});
+
+describe("uso e limite da IA", () => {
+  const passo = (origem: string) => ({ provider: "openai", apiKey: `k-${origem}`, model: `m-${origem}`, origem, credentialId: origem });
+
+  it("registra cada tentativa com os tokens do provedor, inclusive a que falhou", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [passo("A"), passo("B")], timeoutMs: 20000 });
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiFonte: "conexao" }), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    llm.callLlmWithTools.mockImplementation(async (o: { apiKey: string }) =>
+      o.apiKey === "k-A" ? { text: null, error: "openai 500", usage: { entrada: 0, saida: 0 } } : { text: "Oi", usage: { entrada: 50, saida: 7 } }
+    );
+    await advanceConversation({ ...base, text: "olá" });
+    expect(uso.registrarUso.mock.calls.at(-1)?.[0]).toEqual([
+      expect.objectContaining({ credentialId: "A", agentId: "a1", orgId: "o1", ok: false }),
+      expect.objectContaining({ credentialId: "B", inputTokens: 50, outputTokens: 7, ok: true }),
+    ]);
+  });
+
+  it("chave no limite do mês sai da fila; a reserva responde", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [passo("A"), passo("B")], timeoutMs: 20000 });
+    uso.chavesNoLimite.mockResolvedValueOnce(new Set(["A"]));
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiFonte: "conexao" }), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Oi da B");
+    await advanceConversation({ ...base, text: "olá" });
+    expect(llm.callLlmWithTools).toHaveBeenCalledTimes(1);
+    expect(llm.callLlmWithTools.mock.calls[0][0].apiKey).toBe("k-B");
+  });
+
+  it("todas no limite: erro claro, sem chamar a IA", async () => {
+    conexao.passosDaConexao.mockResolvedValue({ passos: [passo("A")], timeoutMs: 20000 });
+    uso.chavesNoLimite.mockResolvedValueOnce(new Set(["A"]));
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiFonte: "conexao" }), false));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    await advanceConversation({ ...base, text: "olá" });
     expect(llm.callLlmWithTools).not.toHaveBeenCalled();
   });
 });

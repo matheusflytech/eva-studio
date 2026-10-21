@@ -120,7 +120,7 @@ export async function passosDaConexao(orgId: string): Promise<{ passos: PassoDeI
       if (!cred || !info) continue;
       try {
         const apiKey = decryptSecret(cred.secretEnc);
-        if (apiKey) passos.push({ provider: info.id as LlmProvider, apiKey, model: p.model, origem: cred.name });
+        if (apiKey) passos.push({ provider: info.id as LlmProvider, apiKey, model: p.model, origem: cred.name, credentialId: cred.id });
       } catch {
         // Chave que não decifra (cifra trocada): pula para a próxima.
       }
@@ -135,6 +135,7 @@ export async function passosDaConexao(orgId: string): Promise<{ passos: PassoDeI
         apiKey: automatico.apiKey,
         model: automatico.model,
         origem: automatico.origem === "plataforma" ? "plataforma" : "automática",
+        credentialId: automatico.credentialId ?? null,
       });
     }
   }

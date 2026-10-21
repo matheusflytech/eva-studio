@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/server/permissions";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { callLlmWithTools } from "@/lib/server/llm";
 import { escolherProvedorDeIa } from "@/lib/server/ia/provedor";
+import { registrarUso } from "@/lib/server/ia/uso";
 import { carregarCatalogo } from "@/lib/server/ia/catalogo";
 import {
   LIMITE_DO_PEDIDO,
@@ -85,6 +86,16 @@ export async function POST(request: Request) {
     effort: "low",
     maxTokens: 1500,
   });
+  await registrarUso([{
+    orgId,
+    credentialId: provedor.credentialId ?? null,
+    recurso: "dashboard",
+    provider: provedor.provider,
+    model: provedor.model,
+    inputTokens: resultado.usage?.entrada ?? 0,
+    outputTokens: resultado.usage?.saida ?? 0,
+    ok: !resultado.error && !!resultado.text,
+  }]);
 
   if (resultado.error || !resultado.text) {
     // Só o provedor e o começo do erro dele (status HTTP): nada do pedido.
