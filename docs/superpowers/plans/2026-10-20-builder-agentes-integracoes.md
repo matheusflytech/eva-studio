@@ -54,8 +54,11 @@ Skills: crm-api-webhooks, crm-n8n-integration.
 - Tela `/integracoes/n8n`; URL de entrada na aba Avançado do agente (substitui o
   webhook falso); API v1 `GET /me`, `/webhooks`, `POST /messages`.
 - Pacote `n8n-nodes-eva/` e modelos em `n8n-nodes-eva/templates/`.
+- Sobras feitas no mesmo dia: seletores de funil/etapa/agente no nó, `GET /v1/events`
+  (montado do histórico, sem tabela nova) com o gatilho "Eva Studio Trigger (Consulta)",
+  aviso no Início de webhook falhando há mais de 1 h ou desligado.
 - Fica para depois: publicar o pacote, resourceMapper de campos personalizados,
-  `GET /events` (polling para n8n sem URL pública), alerta de webhook falhando.
+  e-mail ao admin quando um webhook é desligado.
 
 ### F5 — E-mail automático: FEITO (22/10/2026, local, SQL não aplicado)
 

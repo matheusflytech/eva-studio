@@ -8,6 +8,11 @@ Nós do [n8n](https://n8n.io) para o **Eva Studio** (CRM com agentes de IA no Wh
 - **Eva Studio Trigger** (gatilho): começa o workflow quando um negócio é ganho, muda de etapa, um contato é criado,
   chega mensagem etc. Ao ativar o workflow, o nó assina os eventos no Eva Studio; ao desativar, cancela. Toda entrega
   tem a assinatura (Standard Webhooks) conferida antes de seguir.
+- **Eva Studio Trigger (Consulta)**: para n8n sem URL pública (no computador, atrás de firewall). Consulta
+  `GET /events` no intervalo do n8n e começa do momento em que o workflow é ativado. Não tem alteração de contato
+  nem mensagem recebida (essas só por webhook).
+
+Funil, etapa e agente aparecem em listas no nó (buscadas na API com a sua chave); dá para usar expressão com o ID.
 
 Sem dependências de runtime. Licença MIT.
 
@@ -15,6 +20,7 @@ Sem dependências de runtime. Licença MIT.
 
 1. No Eva Studio: Integrações → Chaves de API → crie uma chave só com os escopos que o workflow usa. O gatilho precisa
    de `webhooks:*`; mandar mensagem precisa de `messages:write`.
+   As listas de funil/etapa precisam de `pipelines:read`, e a de agente precisa de `flows:read`.
 2. No n8n: credencial **Eva Studio API** com a chave e o endereço da API (está em Integrações → n8n e webhooks, termina
    em `/api/v1`). O botão de teste chama `GET /me`.
 

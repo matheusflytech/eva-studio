@@ -399,7 +399,11 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   workflow em `templates/`. Não publicado no npm.
 - **Pendentes:**
   - publicar o pacote (npm com provenance via GitHub Actions) e testar num n8n de verdade;
-  - campos personalizados pelo resourceMapper e polling `GET /events` ficaram para depois.
+  - campos personalizados pelo resourceMapper ficaram para depois.
+- **Sobras feitas:** listas de funil/etapa/agente no nó; `GET /v1/events` (eventos por
+  consulta, montados do histórico, até 30 dias; sem contact.updated e message.received) e o
+  gatilho "Eva Studio Trigger (Consulta)"; aviso no Início para webhook falhando há mais de
+  1 h (atenção) ou desligado sozinho (urgente).
 
 ### F5 E-mail automático — feito em 22/10, local
 - **Conta:** Resend da **plataforma**. Variáveis novas na Vercel: `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`

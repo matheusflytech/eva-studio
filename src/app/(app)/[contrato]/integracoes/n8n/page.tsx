@@ -130,7 +130,8 @@ export default function N8nPage() {
           <ol className="flex flex-col gap-3">
             <Passo n={1} titulo="Crie um nó Webhook no n8n">
               Método POST. Copie a &quot;Production URL&quot; e ative o workflow (a &quot;Test URL&quot; só escuta enquanto o
-              editor está aberto).
+              editor está aberto). Sem URL pública (n8n no seu computador)? Use o gatilho &quot;Eva Studio Trigger
+              (Consulta)&quot; ou <code className="font-mono">GET /events</code>, que perguntam de tempos em tempos.
             </Passo>
             <Passo n={2} titulo="Cadastre aqui embaixo">
               Cole a URL e escolha os eventos: negócio ganho, mudou de etapa, contato criado, mensagem recebida...
