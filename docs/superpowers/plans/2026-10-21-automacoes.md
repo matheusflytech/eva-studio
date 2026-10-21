@@ -262,3 +262,22 @@ Riscos e cuidados:
 - **Disparo em massa por "aplicar a quem já atende":** prévia e lote.
 - **WhatsApp:** uma régua e uma automação mandando ao mesmo tempo para o mesmo
   contato. Limite de mensagens por contato por dia, compartilhado com as réguas.
+
+## Andamento
+
+### Parte A: FEITA (21/10/2026, local, SQL não aplicado)
+- SQL `prisma/sql/2026-10-24-automacoes.sql` (6 tabelas, RLS ligada) e modelos
+  `Automacao`, `AutomacaoVersao`, `EventoDeDominio`, `AutomacaoExecucao`,
+  `AutomacaoPasso`, `AutomacaoEspera`.
+- `src/lib/automacoes/` (sem `server-only`, mesmos arquivos na tela e no servidor):
+  - `tipos.ts`: definição em árvore, saídas por tipo de nó;
+  - `catalogo.ts`: 34 gatilhos, 20 ações e os campos que as condições enxergam, com
+    formulário, `mostrarSe` e frase;
+  - `condicoes.ts`: avaliação sem eval (texto sem acento, número, data, listas de
+    etiquetas por id ou nome);
+  - `variaveis.ts`: `{{ caminho | filtro }}` com lista fechada de filtros;
+  - `operacoes.ts`: inserir, apagar, atualizar, duplicar, mover e caminhos;
+  - `validar.ts`: estrutura, obrigatórios, ciclo, passo solto, variável de passo
+    posterior, aviso de janela de 24h e de autoalimentação;
+  - `frase.ts`.
+- 34 testes em `src/lib/automacoes/*.test.ts`.

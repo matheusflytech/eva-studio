@@ -2024,3 +2024,156 @@ model AgenteEntrada {
   @@index([orgId])
   @@map("eva_studio_agente_entradas")
 }
+
+// ---------------------------------------------------------------------------
+// Automações do CRM (plano 2026-10-21-automacoes). SQL 2026-10-24-automacoes.sql.
+// Sem as tabelas nada dispara e a tela avisa que falta ativar.
+// ---------------------------------------------------------------------------
+
+model Automacao {
+  id                String   @id @default(uuid())
+  orgId             String
+  nome              String
+  descricao         String   @default("")
+  // deal | contact | company | task | conversation
+  objeto            String
+  // rascunho | ativa | pausada
+  status            String   @default("rascunho")
+  // fluxo | regra_rapida (regra da coluna do kanban; abre como fluxo)
+  origem            String   @default("fluxo")
+  // Definição em edição (src/lib/automacoes/tipos.ts). A que roda é a versão publicada.
+  rascunho          Json
+  versaoPublicadaId String?
+  // uma_vez | sempre | intervalo (com reinscricaoHoras)
+  reinscricao       String   @default("uma_vez")
+  reinscricaoHoras  Int?
+  // Regra E/OU: quem passa a atender sai da automação (objetivo atingido).
+  objetivo          Json?
+  falhasSeguidas    Int      @default(0)
+  pausadaPor        String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  versoes   AutomacaoVersao[]
+  execucoes AutomacaoExecucao[]
+
+  @@index([orgId, status])
+  @@map("eva_studio_automacoes")
+}
+
+// Definição congelada a cada publicação. Execução fica presa à versão.
+model AutomacaoVersao {
+  id           String   @id @default(uuid())
+  automacaoId  String
+  numero       Int
+  definicao    Json
+  publicadaPor String?
+  createdAt    DateTime @default(now())
+
+  automacao Automacao @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([automacaoId, numero])
+  @@map("eva_studio_automacao_versoes")
+}
+
+// Barramento de eventos de domínio (outbox): webhooks e automações leem daqui.
+model EventoDeDominio {
+  id           String    @id @default(uuid())
+  orgId        String
+  // contact.created, deal.stage_changed, tag.added... (src/lib/automacoes/catalogo.ts)
+  tipo         String
+  objeto       String
+  objetoId     String
+  dados        Json      @default("{}")
+  // Só o que mudou: { campo: { de, para } }.
+  diff         Json?
+  // { tipo: usuario|automacao|integracao|api|sistema, id?, automacaoId?, execucaoId?, profundidade }
+  ator         Json      @default("{}")
+  processadoEm DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([orgId, tipo, createdAt])
+  @@index([processadoEm, createdAt])
+  @@map("eva_studio_eventos")
+}
+
+model AutomacaoExecucao {
+  id           String    @id @default(uuid())
+  orgId        String
+  automacaoId  String
+  versaoId     String
+  objeto       String
+  objetoId     String
+  eventoId     String?
+  // hash(automação, registro, evento): o mesmo evento nunca inscreve duas vezes.
+  chave        String    @unique
+  // pendente | rodando | esperando | concluida | falhou | cancelada | objetivo | pausada
+  status       String    @default("pendente")
+  noAtual      String?
+  // Espera durável: quando volta a rodar.
+  proximaEm    DateTime?
+  // Lease do executor (FOR UPDATE SKIP LOCKED + prazo).
+  travadaAte   DateTime?
+  // Foto do evento que disparou (gatilho.* nas variáveis).
+  gatilho      Json      @default("{}")
+  // Saídas dos passos, por id do nó (passos.<id>.* nas variáveis).
+  variaveis    Json      @default("{}")
+  profundidade Int       @default(0)
+  teste        Boolean   @default(false)
+  erro         String?
+  iniciadaEm   DateTime?
+  terminadaEm  DateTime?
+  duracaoMs    Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  automacao Automacao        @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+  passos    AutomacaoPasso[]
+
+  @@index([status, proximaEm])
+  @@index([automacaoId, createdAt])
+  @@index([orgId, objeto, objetoId])
+  @@map("eva_studio_automacao_execucoes")
+}
+
+model AutomacaoPasso {
+  id          String    @id @default(uuid())
+  execucaoId  String
+  noId        String
+  tipo        String
+  rotulo      String    @default("")
+  // rodando | ok | falhou | pulado | esperando
+  status      String
+  tentativa   Int       @default(1)
+  entrada     Json?
+  saida       Json?
+  erro        String?
+  // Saída escolhida (sim, nao, caminho:<id>, esgotou...).
+  caminho     String?
+  iniciadoEm  DateTime  @default(now())
+  terminadoEm DateTime?
+  ms          Int?
+
+  execucao AutomacaoExecucao @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  @@index([execucaoId, iniciadoEm])
+  @@map("eva_studio_automacao_passos")
+}
+
+// "Esperar evento": a execução volta quando o evento chega ou o prazo vence.
+model AutomacaoEspera {
+  id         String   @id @default(uuid())
+  orgId      String
+  execucaoId String   @unique
+  noId       String
+  tipo       String
+  objeto     String
+  objetoId   String
+  expiraEm   DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, tipo, objetoId])
+  @@index([expiraEm])
+  @@map("eva_studio_automacao_esperas")
+}
