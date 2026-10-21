@@ -2,6 +2,7 @@
 
 import Link from "@/components/contrato/link";
 import { Radio, ArrowRight } from "lucide-react";
+import { LogoDaMarca } from "@/components/ui/marca";
 import { CredentialsPanel } from "@/components/integrations/credentials-panel";
 import { ConexaoIaPanel } from "@/components/integrations/conexao-ia-panel";
 import { UsoIaPanel } from "@/components/integrations/uso-ia-panel";
@@ -41,7 +42,22 @@ export default function IntegracoesPage() {
       {/* Canal não se conecta aqui, e dizer isso em voz alta vale mais do que
           um cartão bonito que não faz nada. */}
       <Link
-        href="/agent-studio"
+        href="/integracoes/n8n"
+        className="glass-card group mb-4 flex items-center gap-4 rounded-2xl px-5 py-4 transition-colors hover:border-border-strong"
+      >
+        <LogoDaMarca marca="n8n" tamanho={44} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-medium text-text-primary">n8n e webhooks</p>
+          <p className="mt-0.5 text-[12.5px] text-text-secondary">
+            Passo a passo para ligar o n8n nos dois sentidos, e os webhooks que avisam quando um negócio é ganho, um contato
+            é criado ou chega mensagem.
+          </p>
+        </div>
+        <ArrowRight size={16} className="shrink-0 text-text-tertiary transition-colors group-hover:text-text-primary" />
+      </Link>
+
+      <Link
+        href="/configuracoes?aba=canais"
         className="glass-card group mb-8 flex items-center gap-4 rounded-2xl px-5 py-4 transition-colors hover:border-border-strong"
       >
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-text-secondary">
@@ -52,8 +68,8 @@ export default function IntegracoesPage() {
             Procurando WhatsApp, Instagram, Telegram ou o widget do site?
           </p>
           <p className="mt-0.5 text-[12.5px] text-text-secondary">
-            Canal é por agente, não por organização — cada agente tem os seus. A conexão fica na aba do agente,
-            no Eva Studio.
+            A conexão dos canais fica em Configurações → Canais. Cada agente escolhe, na aba dele, por quais canais
+            atende.
           </p>
         </div>
         <ArrowRight size={16} className="shrink-0 text-text-tertiary transition-colors group-hover:text-text-primary" />
