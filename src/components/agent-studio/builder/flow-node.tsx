@@ -59,6 +59,11 @@ export interface FlowNodeData {
   emailTo?: string;
   emailSubject?: string;
   emailBody?: string;
+  // "contrato" = domínio do contrato + modelo/texto (padrão novo);
+  // "credencial" = chave Resend do bloco (antigo). Ver fonte-do-email.ts.
+  emailModo?: "contrato" | "credencial";
+  // Modelo da Biblioteca (só no modo contrato). Vazio = assunto/corpo do bloco.
+  emailModeloId?: string;
   // Bloco Agente de IA nativo — "detail" é reaproveitado como o system
   // prompt/instruções. Provedor vazio = Groq, que era o único antes do
   // multi-LLM (mantém fluxo antigo funcionando sem migração).

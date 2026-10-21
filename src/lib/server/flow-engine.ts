@@ -10,6 +10,8 @@ import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
 import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
+import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
+import { enviarEmailDoContrato } from "@/lib/server/email/envio";
 import { passosDaConexao } from "@/lib/server/ia/conexao";
 import { chamarComReserva, type PassoDeIa } from "@/lib/server/ia/reserva";
 import { chavesNoLimite, registrarUso, type RegistroDeUso } from "@/lib/server/ia/uso";
@@ -1534,6 +1536,25 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       const result = await performHttpRequest(node.data, variables);
       if (node.data.variableName) setVar(variables, node.data.variableName, result.value);
       pushStep(node, { output: result.error ? undefined : JSON.stringify(result.value ?? null), error: result.error }, startedAt);
+      currentId = nextNodeId(edges, node.id);
+      continue;
+    }
+
+    if (kind === "email" && fonteDoEmail(node.data) === "contrato") {
+      // Pelo domínio do contrato: modelo da Biblioteca ou texto do bloco (com
+      // as variáveis do fluxo já trocadas); sem "Para", o e-mail do contato.
+      const startedAt = Date.now();
+      const para = interpolate(node.data.emailTo ?? "", variables).trim();
+      const r = await enviarEmailDoContrato(agent.orgId, {
+        contactId: await ensureContactId(),
+        email: para || null,
+        conteudo: node.data.emailModeloId
+          ? { modeloId: node.data.emailModeloId }
+          : { assunto: interpolate(node.data.emailSubject ?? "", variables), corpo: interpolate(node.data.emailBody ?? "", variables), modo: "simples" },
+        origem: "fluxo",
+        refId: node.id,
+      });
+      pushStep(node, r.ok ? { output: "e-mail enviado" } : { error: r.erro }, startedAt);
       currentId = nextNodeId(edges, node.id);
       continue;
     }

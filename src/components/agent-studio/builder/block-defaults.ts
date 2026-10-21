@@ -62,7 +62,7 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     paletteLabel: "Enviar e-mail",
     data: {
       label: "Enviar e-mail",
-      kind: "Via Resend",
+      kind: "Pelo domínio do contrato",
       detail: "Manda um e-mail usando uma credencial Resend cadastrada em Integrações.",
       emailFrom: "",
       emailTo: "",

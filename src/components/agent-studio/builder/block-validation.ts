@@ -1,6 +1,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "./flow-node";
 import { fonteDaIa } from "./fonte-da-ia";
+import { fonteDoEmail } from "./fonte-do-email";
 import { SAIDA_ERRO, capturaComValidacao, ehFerramenta, saidaDaLigacao, saidasDoBloco, temSaidasNomeadas } from "./saidas";
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,13 @@ export function validateNode(data: FlowNodeData): string | null {
       return vazio(data.httpUrl) ? "Informe a URL da requisição." : null;
 
     case "email":
+      if (fonteDoEmail(data) === "contrato") {
+        // Sem "Para", vai para o e-mail do contato da conversa.
+        if (vazio(data.emailModeloId) && (vazio(data.emailSubject) || vazio(data.emailBody))) {
+          return "Escolha um modelo de e-mail ou escreva o assunto e o corpo.";
+        }
+        return null;
+      }
       if (vazio(data.emailCredentialId)) return "Escolha a credencial do Resend.";
       if (vazio(data.emailTo)) return "Informe o destinatário.";
       return null;

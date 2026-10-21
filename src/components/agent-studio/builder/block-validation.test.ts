@@ -106,3 +106,19 @@ describe("saída para o bloco novo", () => {
     expect(saidaParaNovoBloco(no("a", "message").data, "a", [])).toBeUndefined();
   });
 });
+
+describe("bloco Enviar e-mail", () => {
+  it("pelo contrato: precisa de modelo ou de assunto e corpo; Para é opcional (vai para o contato)", () => {
+    const sem = [no("ini", "start"), no("m", "email", { emailSubject: "", emailBody: "" })];
+    expect(problemas(sem, [liga("ini", "m")])).toContainEqual(expect.stringMatching(/^erro:m:.*modelo de e-mail/));
+    const comModelo = [no("ini", "start"), no("m", "email", { emailModeloId: "x" }), no("fim", "end")];
+    expect(problemas(comModelo, [liga("ini", "m"), liga("m", "fim")]).filter((p) => p.startsWith("erro:"))).toEqual([]);
+    const comTexto = [no("ini", "start"), no("m", "email", { emailSubject: "Oi", emailBody: "Corpo" }), no("fim", "end")];
+    expect(problemas(comTexto, [liga("ini", "m"), liga("m", "fim")]).filter((p) => p.startsWith("erro:"))).toEqual([]);
+  });
+
+  it("bloco antigo com credencial: continua pedindo credencial e destinatário", () => {
+    const velho = [no("ini", "start"), no("m", "email", { emailCredentialId: "c1", emailTo: "" })];
+    expect(problemas(velho, [liga("ini", "m")])).toContainEqual(expect.stringMatching(/^erro:m:.*destinatário/));
+  });
+});

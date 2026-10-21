@@ -35,6 +35,8 @@ const conexao = vi.hoisted(() => ({ passosDaConexao: vi.fn() }));
 vi.mock("@/lib/server/ia/conexao", () => conexao);
 const uso = vi.hoisted(() => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
 vi.mock("@/lib/server/ia/uso", () => uso);
+const email = vi.hoisted(() => ({ enviarEmailDoContrato: vi.fn(async () => ({ ok: true, envioId: "env1" })) }));
+vi.mock("@/lib/server/email/envio", () => email);
 
 import { advanceConversation } from "./flow-engine";
 
@@ -254,6 +256,59 @@ describe("uso e limite da IA", () => {
     db.conversation.upsert.mockResolvedValue(parado("bot"));
     await advanceConversation({ ...base, text: "olá" });
     expect(llm.callLlmWithTools).not.toHaveBeenCalled();
+  });
+});
+
+describe("Enviar e-mail pelo domínio do contrato", () => {
+  function fluxoComEmail(bloco: Record<string, unknown>) {
+    return {
+      agentId: "a1",
+      nodes: [
+        { id: "start", position: { x: 0, y: 0 }, data: { iconKey: "start", label: "Início" } },
+        { id: "mail", position: { x: 0, y: 0 }, data: { iconKey: "email", label: "E-mail", ...bloco } },
+        { id: "fim", position: { x: 0, y: 0 }, data: { iconKey: "message", label: "Fim", detail: "Mandei!" } },
+      ],
+      edges: [
+        { id: "e1", source: "start", target: "mail" },
+        { id: "e2", source: "mail", target: "fim" },
+      ],
+    };
+  }
+
+  it("bloco novo (sem credencial): texto do bloco com as variáveis do fluxo, para o contato da conversa", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(fluxoComEmail({ emailSubject: "Oi {nome}", emailBody: "Seu pedido, {nome}." }));
+    db.conversation.upsert.mockResolvedValue(parado(null as unknown as string, { nome: "Ana" }));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Mandei!"]);
+    expect(email.enviarEmailDoContrato).toHaveBeenCalledWith("o1", {
+      contactId: "contato-1",
+      email: null,
+      conteudo: { assunto: "Oi Ana", corpo: "Seu pedido, Ana.", modo: "simples" },
+      origem: "fluxo",
+      refId: "mail",
+    });
+  });
+
+  it("com modelo da Biblioteca e Para preenchido", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(fluxoComEmail({ emailModeloId: "m1", emailTo: "{email}" }));
+    db.conversation.upsert.mockResolvedValue(parado(null as unknown as string, { email: "ana@x.com" }));
+    await advanceConversation({ ...base, text: "oi" });
+    expect((email.enviarEmailDoContrato.mock.calls as unknown as [string, unknown][]).at(-1)?.[1]).toMatchObject({ email: "ana@x.com", conteudo: { modeloId: "m1" } });
+  });
+
+  it("falha no envio não trava o fluxo (fica no registro do passo)", async () => {
+    email.enviarEmailDoContrato.mockResolvedValueOnce({ ok: false, motivo: "sem_dominio", erro: "Verifique o domínio" } as never);
+    db.agentFlow.findUnique.mockResolvedValue(fluxoComEmail({ emailSubject: "a", emailBody: "b" }));
+    db.conversation.upsert.mockResolvedValue(parado(null as unknown as string));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Mandei!"]);
+  });
+
+  it("bloco antigo com credencial própria: não passa pelo envio do contrato", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(fluxoComEmail({ emailCredentialId: "cred", emailTo: "a@b.com", emailSubject: "a", emailBody: "b" }));
+    db.conversation.upsert.mockResolvedValue(parado(null as unknown as string));
+    await advanceConversation({ ...base, text: "oi" });
+    expect(email.enviarEmailDoContrato).not.toHaveBeenCalled();
   });
 });
 

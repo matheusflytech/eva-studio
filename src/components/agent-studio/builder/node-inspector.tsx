@@ -12,6 +12,9 @@ import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
 import { ModeloSelect } from "./modelo-select";
 import { fonteDaIa } from "./fonte-da-ia";
+import { fonteDoEmail } from "./fonte-do-email";
+import { EmailDoContrato } from "./email-do-contrato";
+import { Notice } from "@/components/ui/notice";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
@@ -394,8 +397,18 @@ export function NodeInspector({
           </div>
         )}
 
-        {iconKey === "email" && (
+        {iconKey === "email" && fonteDoEmail(node.data) === "contrato" && (
+          <EmailDoContrato data={node.data} onChange={onChange} />
+        )}
+
+        {iconKey === "email" && fonteDoEmail(node.data) === "credencial" && (
           <div className="flex flex-col gap-3">
+            <Notice tone="info">
+              Este bloco usa uma chave Resend própria (jeito antigo).{" "}
+              <button type="button" className="underline" onClick={() => onChange({ emailModo: "contrato" })}>
+                Passar a enviar pelo domínio do contrato
+              </button>
+            </Notice>
             <CredentialSelect
               type="resend"
               label="Credencial Resend"
