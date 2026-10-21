@@ -1866,3 +1866,85 @@ model CanalWhatsAppQr {
 
   @@map("eva_studio_canais_whatsapp_qr")
 }
+
+// ---------------------------------------------------------------------------
+// E-mail (F5, SQL 2026-10-22-email.sql). Conta Resend da plataforma; cada
+// contrato verifica o próprio domínio e envia como ele mesmo. Ver
+// src/lib/server/email/.
+// ---------------------------------------------------------------------------
+
+// Domínio e remetente do contrato (um por contrato).
+model EmailDominio {
+  id             String    @id @default(uuid())
+  orgId          String    @unique
+  dominio        String    @unique
+  resendId       String
+  // not_started | pending | verified | failed | temporary_failure
+  status         String    @default("not_started")
+  // Registros DNS que o cliente cria (SPF, DKIM, MX), como a Resend devolve.
+  registros      Json      @default("[]")
+  remetenteNome  String    @default("")
+  // Parte antes do @: contato@dominio.
+  remetenteLocal String    @default("contato")
+  responderPara  String    @default("")
+  verificadoEm   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("eva_studio_email_dominios")
+}
+
+// Modelo de e-mail com variáveis (Biblioteca). modo "simples" = editor
+// simples (src/lib/email/editor.ts); "html" = HTML avançado.
+model EmailModelo {
+  id        String   @id @default(uuid())
+  orgId     String
+  nome      String
+  assunto   String   @default("")
+  modo      String   @default("simples")
+  corpo     String   @default("") @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_email_modelos")
+}
+
+// Cada e-mail que saiu, com o que a Resend contou depois (webhook).
+model EmailEnvio {
+  id         String    @id @default(uuid())
+  orgId      String
+  contactId  String?
+  para       String
+  assunto    String    @default("")
+  resendId   String?   @unique
+  // enviado | entregue | atrasado | aberto | clicado | bounce | reclamacao | falhou
+  status     String    @default("enviado")
+  // fluxo | regua | disparo | teste
+  origem     String    @default("teste")
+  // Id de quem mandou (bloco, régua, disparo), para o relatório.
+  refId      String?
+  erro       String?
+  abertoEm   DateTime?
+  clicadoEm  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([contactId])
+  @@map("eva_studio_email_envios")
+}
+
+// Quem não recebe mais e-mail do contrato. Separado do opt-out geral do
+// contato: sair do e-mail não tira do WhatsApp (consentimento por canal).
+model EmailSupressao {
+  orgId     String
+  email     String
+  // descadastro | bounce | reclamacao | manual
+  motivo    String
+  detalhe   String?
+  createdAt DateTime @default(now())
+
+  @@id([orgId, email])
+  @@map("eva_studio_email_supressoes")
+}
