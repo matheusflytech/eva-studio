@@ -102,6 +102,7 @@ const NOME_DO_CANAL: Record<CanalDeSequencia, string> = {
   whatsapp_qr: "WhatsApp (QR)",
   instagram: "Instagram",
   telegram: "Telegram",
+  email: "E-mail",
 };
 
 const semAcento = (s: string) =>

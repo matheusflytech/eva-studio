@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 
 const VALID_TRIGGERS = new Set(["tag", "segment", "stage", "manual"]);
-const VALID_CHANNELS = new Set(["whatsapp_meta", "whatsapp_qr", "instagram", "telegram"]);
+const VALID_CHANNELS = new Set(["whatsapp_meta", "whatsapp_qr", "instagram", "telegram", "email"]);
 
 export async function GET(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
   const ctx = await requirePermission("read");

@@ -49,6 +49,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   whatsapp_qr: "WhatsApp (QR)",
   telegram: "Telegram",
   instagram: "Instagram",
+  email: "E-mail",
 };
 
 const TRIGGER_LABEL: Record<string, string> = {
@@ -419,6 +420,7 @@ function NewSequenceModal({
                 <option value="whatsapp_qr">WhatsApp (QR)</option>
                 <option value="telegram">Telegram</option>
                 <option value="instagram">Instagram</option>
+                <option value="email">E-mail</option>
               </Select>
             </div>
             <div>
@@ -495,6 +497,21 @@ function SequenceEditor({
 }) {
   const [name, setName] = React.useState(sequence.name);
   const [channel, setChannel] = React.useState(sequence.channel);
+  // Régua de e-mail: cada passo é um modelo de e-mail da Biblioteca.
+  const [modelosDeEmail, setModelosDeEmail] = React.useState<{ id: string; nome: string }[] | null>(null);
+  React.useEffect(() => {
+    if (channel !== "email" || modelosDeEmail) return;
+    let vivo = true;
+    void fetch("/api/email/modelos")
+      .then((r) => r.json())
+      .catch(() => ({ modelos: [] }))
+      .then((d) => {
+        if (vivo) setModelosDeEmail(d.modelos ?? []);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [channel, modelosDeEmail]);
   const [trigger, setTrigger] = React.useState(sequence.trigger);
   const [triggerTagId, setTriggerTagId] = React.useState(sequence.triggerTag?.id ?? "");
   const [triggerSegmentId, setTriggerSegmentId] = React.useState(sequence.triggerSegment?.id ?? "");
@@ -614,6 +631,7 @@ function SequenceEditor({
                 <option value="whatsapp_qr">WhatsApp (QR)</option>
                 <option value="telegram">Telegram</option>
                 <option value="instagram">Instagram</option>
+                <option value="email">E-mail</option>
               </Select>
             </div>
           </div>
@@ -745,12 +763,26 @@ function SequenceEditor({
                     </button>
                   </div>
 
-                  <Textarea
-                    rows={2}
-                    value={step.text}
-                    onChange={(e) => updateStep(index, { text: e.target.value })}
-                    placeholder="Oi {nome}, vi que você pediu um orçamento. Ficou alguma dúvida?"
-                  />
+                  {channel === "email" ? (
+                    <Select
+                      aria-label={`Modelo de e-mail do passo ${index + 1}`}
+                      value={step.templateId ?? ""}
+                      onChange={(e) => {
+                        const m = modelosDeEmail?.find((x) => x.id === e.target.value);
+                        updateStep(index, { templateId: m?.id ?? null, text: m ? `E-mail: ${m.nome}` : "" });
+                      }}
+                    >
+                      <option value="">Escolha o modelo de e-mail…</option>
+                      {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    </Select>
+                  ) : (
+                    <Textarea
+                      rows={2}
+                      value={step.text}
+                      onChange={(e) => updateStep(index, { text: e.target.value })}
+                      placeholder="Oi {nome}, vi que você pediu um orçamento. Ficou alguma dúvida?"
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -768,6 +800,12 @@ function SequenceEditor({
               <Plus size={15} /> Adicionar passo
             </Button>
 
+            {channel === "email" && (
+              <p className="text-[12px] text-text-tertiary">
+                Cada passo manda um modelo da Biblioteca → Modelos de e-mail, pelo domínio do contrato. Quem não tem
+                e-mail ou se descadastrou sai da régua com o motivo registrado.
+              </p>
+            )}
             {channel === "whatsapp_meta" && (
               <p className="text-[12px] text-text-tertiary">
                 Passo que cair fora da janela de 24h precisa de um modelo aprovado. Sem ele, a régua desse contato para

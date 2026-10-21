@@ -104,6 +104,7 @@ export async function lerSequencia(orgId: string, corpo: Corpo, atual?: LinhaDeS
     throw new ErroApi(400, "invalid_parameter", `trigger precisa ser um de: ${GATILHOS_DE_SEQUENCIA.join(", ")}.`, { param: "trigger" });
   }
   const gatilho = (corpo.trigger as string | undefined) ?? atual?.trigger ?? "manual";
+  const canal = (data.channel as string | undefined) ?? atual?.channel ?? "whatsapp_meta";
   data.trigger = gatilho;
 
   const tagId = idOpc(corpo, "trigger_tag_id");
@@ -155,15 +156,25 @@ export async function lerSequencia(orgId: string, corpo: Corpo, atual?: LinhaDeS
         text: s.text,
         templateId: s.template_id,
         applyTagId: s.apply_tag_id,
-      }))
+      })),
+      canal
     );
     const etiquetas = [...new Set(passos.map((p) => p.applyTagId).filter((t): t is string => !!t))];
     if (etiquetas.length && (await prisma.tag.count({ where: { orgId, id: { in: etiquetas } } })) !== etiquetas.length) {
       throw new ErroApi(404, "invalid_reference", "apply_tag_id de um passo não existe nesta organização.", { param: "steps" });
     }
     const modelos = [...new Set(passos.map((p) => p.templateId).filter((t): t is string => !!t))];
-    if (modelos.length && (await prisma.messageTemplate.count({ where: { agentId, id: { in: modelos } } })) !== modelos.length) {
+    // Régua de e-mail: template_id é um modelo de e-mail do contrato; nas
+    // outras, um modelo (WhatsApp) do agente.
+    const achados =
+      canal === "email"
+        ? await prisma.emailModelo.count({ where: { orgId, id: { in: modelos } } }).catch(() => 0)
+        : await prisma.messageTemplate.count({ where: { agentId, id: { in: modelos } } });
+    if (modelos.length && achados !== modelos.length) {
       throw new ErroApi(404, "invalid_reference", "template_id de um passo não é um modelo deste agente.", { param: "steps" });
+    }
+    if (canal === "email" && passos.some((p) => !p.templateId)) {
+      throw new ErroApi(400, "invalid_parameter", "Em régua de e-mail, cada passo precisa de template_id (modelo de e-mail).", { param: "steps" });
     }
   }
 
