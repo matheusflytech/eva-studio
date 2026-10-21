@@ -1,0 +1,147 @@
+{
+  "name": "Eva Studio: lead do formulário vira contato e recebe WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-eva",
+        "options": {}
+      },
+      "id": "08ee7249-74d1-4a52-9314-d12abaac5ea4",
+      "name": "Formulário",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "nome",
+              "value": "={{ $json.body.nome }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "telefone",
+              "value": "={{ ($json.body.telefone || '').replace(/\\D/g, '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ba6686d2-6c92-40b7-b758-61f86c0b9ff0",
+      "name": "Limpar dados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "contact",
+        "operation": "upsert",
+        "additionalFields": {
+          "name": "={{ $json.nome }}",
+          "email": "={{ $json.email }}",
+          "phone": "={{ $json.telefone }}"
+        }
+      },
+      "id": "21e340ae-826b-4754-b7bb-74aedb36bd05",
+      "name": "Criar ou atualizar contato",
+      "type": "n8n-nodes-eva-studio.evaStudio",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "evaStudioApi": {
+          "id": "",
+          "name": "Eva Studio API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "agent_id": "ID-DO-AGENTE",
+        "conversation_id": "",
+        "text": "",
+        "additionalFields": {
+          "channel": "whatsapp_meta",
+          "to": "={{ $('Limpar dados').item.json.telefone }}",
+          "template_id": "ID-DO-MODELO-APROVADO",
+          "variables": "={{ JSON.stringify({ nome: $('Limpar dados').item.json.nome }) }}"
+        }
+      },
+      "id": "634eada0-771c-48ab-af66-1378477e025b",
+      "name": "Mandar boas-vindas",
+      "type": "n8n-nodes-eva-studio.evaStudio",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "evaStudioApi": {
+          "id": "",
+          "name": "Eva Studio API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Formulário": {
+      "main": [
+        [
+          {
+            "node": "Limpar dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpar dados": {
+      "main": [
+        [
+          {
+            "node": "Criar ou atualizar contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar ou atualizar contato": {
+      "main": [
+        [
+          {
+            "node": "Mandar boas-vindas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

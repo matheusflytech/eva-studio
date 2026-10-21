@@ -1,0 +1,28 @@
+{
+  "name": "n8n-nodes-eva-studio",
+  "version": "0.1.0",
+  "description": "Nós do n8n para o Eva Studio (CRM e agentes de IA): contatos, negócios, tarefas, notas, mensagens pelo agente e gatilho de eventos do CRM.",
+  "keywords": ["n8n-community-node-package", "eva-studio", "crm", "whatsapp"],
+  "license": "MIT",
+  "author": { "name": "Eva Studio" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copiar-icones.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/assinatura.test.js"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": ["dist/credentials/EvaStudioApi.credentials.js"],
+    "nodes": ["dist/nodes/EvaStudio/EvaStudio.node.js", "dist/nodes/EvaStudioTrigger/EvaStudioTrigger.node.js"]
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "n8n-workflow": "2.16.0",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
