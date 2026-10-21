@@ -162,8 +162,25 @@ Achado: a chave Groq do contrato Eva Holding não lista
 `MODELO_POR_PROVEDOR.groq` (reserva da plataforma). Conferir na Groq se o
 modelo saiu; se saiu, trocar o padrão.
 
-Falta da F3: login OAuth no OpenRouter (PKCE), criação de agente em etapas
-com o modelo no agente, descrição de `seguir_fluxo` no prompt-base.
+- **F3d — Entrar com OpenRouter** (`ia/openrouter-oauth.ts`,
+  `/api/ia/openrouter/start` e `/callback`): OAuth PKCE S256. Verificador e
+  state num cookie httpOnly de 10 min (caminho `/api/ia/openrouter`), só o
+  desafio vai ao OpenRouter; na volta confere o state em tempo constante,
+  troca o código em `POST /api/v1/auth/keys` e grava Credential
+  `openrouter` cifrada. Botão em Integrações → Credenciais. Login real não
+  testado (precisa de conta OpenRouter); rotas e PKCE cobertos por teste.
+- **F3e — criação de agente em etapas** (`novo-agente-etapas.tsx`,
+  `builder/fluxo-inicial.ts`): quem é → como fala → qual IA (Central ou
+  chave + modelo só dele) → como começa (atendente com IA, em branco ou
+  modelo pronto). Cria o agente e o fluxo e abre o builder. O "modelo no
+  agente" fica no bloco de IA do fluxo inicial (sem coluna nova no agente).
+  Edição continua no formulário completo.
+
+Achado: os modelos prontos (`flow-templates.ts`) usam o bloco "Enviar para
+meu fluxo" (n8n) com o rótulo "Agente de IA"; sem URL do fluxo ele dá erro
+(é o erro do agente "teste"). Vale trocar por "Responder com IA".
+
+Falta da F3: descrição de `seguir_fluxo` no prompt-base (pequeno).
 
 ### Pendências para a F3 (anteriores)
 

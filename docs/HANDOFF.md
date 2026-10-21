@@ -362,7 +362,8 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 - **F3 Central de IA — partes a, b e c feitas em 21/10** (prompt do agente no
   bloco, saída "Erro", modelos pela chave, conexão única com reserva, uso e
   limite por chave; detalhes nas notas do plano). Os dois SQLs de 21/10 não
-  foram aplicados. Falta: OAuth do OpenRouter e criação de agente em etapas.
+  foram aplicados. Também feitos: "Entrar com OpenRouter" (OAuth PKCE) e
+  criação de agente em etapas, que já nasce com o fluxo inicial.
   Texto original da frente: o cliente conecta várias chaves de IA (OpenAI,
   Google, xAI, Anthropic, etc.) e os agentes usam **uma conexão única** com
   ordem de preferência e **reserva automática**; modelos GPT-5.6 Luna (id
