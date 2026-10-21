@@ -6,9 +6,12 @@ import { transcreverAudio } from "@/lib/server/transcribe";
 import { entenderAnexo, MAX_ANEXO_BYTES } from "@/lib/server/anexos";
 import { guardarBuffer } from "@/lib/server/media-inbound";
 import { classificarMime, mimeBase } from "@/lib/server/storage";
+import { MAX_TEXTO_WIDGET, audioGrandeDemais, verificarConteudo, verificarEntrada, type Veredito } from "@/lib/server/widget-guard";
+import { mensagem } from "@/lib/server/widget-regras";
 
 // Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
-const MAX_TEXT = 4000;
+// Texto do widget: teto curto, porque cada caractere vira prompt (e gasto de IA).
+const MAX_TEXT = MAX_TEXTO_WIDGET;
 const MAX_CONTACT_ID = 128;
 const MAX_OPTION_ID = 128;
 // A Vercel recusa corpo acima de 4,5 MB. Em base64 o arquivo cresce um terço,
@@ -34,6 +37,14 @@ export async function OPTIONS() {
 
 function resposta(texto: string, extra: Record<string, unknown> = {}) {
   return NextResponse.json({ messages: [{ text: texto }], status: "active", ...extra }, { headers: CORS_HEADERS });
+}
+
+// Resposta educada quando a proteção barra a mensagem. O widget mostra o texto como qualquer outra resposta.
+function respostaBloqueada(v: Extract<Veredito, { ok: false }>) {
+  return NextResponse.json(
+    { messages: [{ text: v.texto }], status: v.status === 429 ? "blocked" : "active" },
+    { status: v.status, headers: CORS_HEADERS }
+  );
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
@@ -73,6 +84,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "optionId inválido." }, { status: 400, headers: CORS_HEADERS });
   }
 
+  // Proteção contra abuso, robôs e gasto de IA: cotas, armadilha anti-robô e classificação do conteúdo.
+  const guarda = await verificarEntrada({
+    agentId,
+    ip,
+    contactId,
+    lang: safeLang,
+    hp: body.hp,
+    texto: typeof text === "string" ? text : undefined,
+    temAudio: typeof body.audio_base64 === "string",
+    temAnexo: !!(body.attachment && typeof body.attachment === "object"),
+  });
+  if (!guarda.ok) return respostaBloqueada(guarda);
+  if (typeof text === "string" && text.trim()) {
+    const conteudo = await verificarConteudo({ agentId, ip, contactId, lang: safeLang, texto: text });
+    if (!conteudo.ok) return respostaBloqueada(conteudo);
+  }
+
   let transcricao: string | undefined;
   let media: { path: string; type: string; mime: string; name?: string; size?: number } | undefined;
   let anexoContexto: string | undefined;
@@ -84,6 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     }
     const mime = typeof body.audio_mime === "string" ? mimeBase(body.audio_mime).slice(0, 40) : "audio/webm";
     const bytes = Buffer.from(body.audio_base64, "base64");
+    if (audioGrandeDemais(bytes.byteLength)) return resposta(mensagem("audioGrande", safeLang));
     const r = await transcreverAudio(agent.orgId, body.audio_base64, mime, safeLang);
     if ("erro" in r) {
       const msg =
@@ -95,6 +124,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       return resposta(msg);
     }
     text = r.texto.slice(0, MAX_TEXT);
+    const conteudoAudio = await verificarConteudo({ agentId, ip, contactId, lang: safeLang, texto: text });
+    if (!conteudoAudio.ok) return respostaBloqueada(conteudoAudio);
     transcricao = text;
     // O áudio fica guardado para a equipe ouvir na caixa de entrada.
     media = (await guardarBuffer(agent.orgId, bytes, mime, { name: "audio" })) ?? undefined;

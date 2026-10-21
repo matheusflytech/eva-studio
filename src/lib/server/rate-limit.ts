@@ -50,3 +50,17 @@ export function getClientIp(request: Request): string {
   if (xff) return xff.split(",")[0].trim();
   return request.headers.get("x-real-ip") ?? "unknown";
 }
+
+// Lê um contador sem incrementar (usado para saber se alguém já está bloqueado por reincidência).
+export async function lerContador(key: string, windowSec: number): Promise<number> {
+  try {
+    const rows = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT "count" FROM "eva_studio_rate_limits"
+      WHERE "key" = ${key} AND "windowStart" >= now() - (${windowSec} * interval '1 second')
+    `;
+    return Number(rows[0]?.count ?? 0);
+  } catch (err) {
+    console.error("[rate-limit] falha ao ler contador, assumindo zero:", err);
+    return 0;
+  }
+}
