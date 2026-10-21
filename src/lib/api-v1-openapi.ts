@@ -285,6 +285,18 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     },
   },
 
+  "/events": {
+    get: {
+      tag: "Webhooks",
+      summary: "Eventos por consulta (sem URL pública)",
+      description:
+        "Os mesmos eventos dos webhooks, montados do histórico do CRM: contact.created, lead.captured, deal.created, deal.stage_changed, " +
+        "deal.won, deal.lost, deal.reopened, task.completed. Comece com since (padrão: últimas 24 h; no máximo 30 dias) e depois mande só " +
+        "o next_cursor (ele vem mesmo sem eventos novos). contact.updated e message.received só existem por webhook.",
+      scope: "webhooks:read",
+      query: [["types", "Lista separada por vírgula; aceita deal.* e *"], ["since", "ISO-8601"], ["cursor", "next_cursor da resposta anterior"], ["limit", "1–200, padrão 50"]],
+    },
+  },
   "/webhooks/{id}": {
     get: { tag: "Webhooks", summary: "Ler webhook", scope: "webhooks:read" },
     delete: { tag: "Webhooks", summary: "Cancelar assinatura", scope: "webhooks:write" },
