@@ -91,6 +91,12 @@ npx next build              # pare o dev antes (senão dá erro de next/font)
   uma vez (regenera os tipos).
 - O lint tem ~50 erros antigos (`react-hooks/set-state-in-effect` e afins).
   Regra: não introduzir erro novo.
+- **Graphify (mapa do código):** o repositório tem um grafo de conhecimento em
+  `graphify-out/` (`graph.json`, `GRAPH_REPORT.md`, `graph.html` para abrir no
+  navegador). Antes de procurar no código, pergunte ao grafo:
+  `graphify query "onde a etapa do negócio muda"`, `graphify path "A" "B"`,
+  `graphify explain "conceito"`. Depois de mexer no código, rode
+  `graphify update .` (só AST, sem custo). Regras completas em `CLAUDE.md`.
 - **Atenção:** `next.config.ts` tem localmente `allowedDevOrigins:
   ["*.ngrok-free.app"]` (para testar pelo celular com ngrok) e está marcado com
   `git update-index --skip-worktree`. Antes de qualquer PR:
@@ -109,9 +115,9 @@ npx next build              # pare o dev antes (senão dá erro de next/font)
 Nada foi enviado ao GitHub. Para subir: revisar, reverter o `next.config.ts`
 (seção 4), abrir PR da `feat/dashboards-funil` para a `main`.
 
-Trabalho em andamento no momento desta escrita (arquivos modificados e não
-commitados na `feat/dashboards-funil`): **F1 tema escuro + F2 builder** (ver
-seção 10). Confira `git status` antes de começar.
+Não há trabalho pela metade: tudo o que está descrito aqui está commitado na
+`feat/dashboards-funil` (último commit de código: `fb22953`, builder). Confira
+`git status` antes de começar.
 
 ## 6. Credenciais e variáveis de ambiente
 
@@ -314,6 +320,31 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
   4. busca global Ctrl+K (~90 ms com índices);
   5. visões salvas + ações em massa com prévia e desfazer.
 
+### Tema e builder (F1 e F2)
+- **Tema:** Configurações → "Sua conta" escolhe Claro / Escuro / Seguir o
+  sistema e "Canvas do builder sempre escuro"; atalho no rodapé do menu
+  lateral (que fica navy nos dois temas). Lógica em
+  `src/lib/design-system/theme.ts` e `src/components/ui/theme.tsx`
+  (`ThemeChooser`, `useCanvasTheme`). Paleta de "cores de categoria" (12 cores
+  com contraste AA nos dois temas) em `src/lib/design-system/category-classes.ts`,
+  usada pelos blocos do builder.
+- **Builder:** rótulo ao lado de cada saída (Sim/Não, opções do menu,
+  Respondeu/Não respondeu certo) e também na ligação; bloco novo entra pela
+  saída livre certa; "+" da ligação sem ferramentas; validação com erro/aviso
+  (ramos, opções soltas, saída inexistente, bloco inalcançável, "Enviar para meu
+  fluxo" sem URL), usada também no salvamento interno e na API v1;
+  **auto-layout esquerda→direita com `@dagrejs/dagre`** (botão "Organizar",
+  fluxos da API v1 sem posição ou sobrepostos, IA e modelos prontos); canvas
+  com `colorMode`. Código morto e o "webhook de entrada" falso foram removidos;
+  "Canal principal", "Habilidades" e "Ferramentas do n8n" estão escondidos (os
+  campos continuam no banco; a F3 decide).
+- **Saída depois da IA (decisão):** sem ligação, a conversa fica no bloco de
+  IA como antes. Com ligação, o fluxo segue na mesma rodada quando o bloco
+  termina: "Responder com IA" termina ao coletar os dados pedidos ou ao chamar
+  a ferramenta interna `seguir_fluxo` (só oferecida quando há ligação);
+  "Enviar para meu fluxo" termina quando o webhook responde `done: true`. Erro
+  nunca pula a etapa.
+
 ### Infra
 - **Cloudflare:** arquitetura alvo em `docs/arquitetura-cloudflare.md` e Worker
   de entrada de webhooks pronto (não implantado). Rota
@@ -321,20 +352,19 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 
 ## 10. Próximos passos mapeados
 
-### Em andamento
-- **F1 tema escuro** (troca em Configurações → Sua conta e no menu; builder
-  legível nos dois temas) e **F2 builder** (bugs do motor e das ligações,
-  rótulos em cada saída, auto-layout esquerda→direita com dagre aplicado também
-  em fluxos vindos da API/IA, validação, limpeza de código morto). Plano:
-  `docs/superpowers/plans/2026-10-20-builder-agentes-integracoes.md`.
+### Conferência pendente
+- F1 e F2 passaram em testes, `tsc` e build, mas **ainda não foram vistas no
+  navegador** (builder do agente "teste" nos dois temas).
 
-### Próximas frentes (mesmo plano)
+### Próximas frentes (`docs/superpowers/plans/2026-10-20-builder-agentes-integracoes.md`)
 - **F3 Central de IA:** o cliente conecta várias chaves de IA (OpenAI,
   Google, xAI, Anthropic, etc.) e os agentes usam **uma conexão única** com
   ordem de preferência e **reserva automática**; modelos GPT-5.6 Luna (id
   configurável), Gemini 2.0/2.5 Flash, Grok, Claude Haiku; login no provedor
   onde existir; uso/custo por chave; criação de agente em etapas; o bloco de IA
-  passa a usar as instruções do agente. Encaixa no AI Gateway da Cloudflare.
+  passa a usar as instruções, o tom e o "nunca deve fazer" do agente (hoje
+  ignora); saída de erro no bloco de IA; destino de "Canal principal",
+  "Habilidades" e "Ferramentas do n8n". Encaixa no AI Gateway da Cloudflare.
 - **F4 Integrações em aba própria** (Configurações): BM/Meta, WhatsApp, Instagram,
   Messenger, Telegram, TikTok, widget, e-mail, n8n, IA, MCP, no nível do
   contrato, com **logos das marcas**; agente só escolhe os canais.
@@ -363,7 +393,9 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 - Pendências citadas nas notas de cada item (ex.: tarefa/nota sem lixeira,
   "editar campo" em massa, ações em massa no quadro, recorrência de tarefa,
   expediente configurável, template de autenticação da Meta não envia,
-  reagendar mensagem avulsa pela tela, escopo de dados em dashboard/empresas).
+  reagendar mensagem avulsa pela tela, escopo de dados em dashboard/empresas;
+  telas fora do builder, como o inbox, ainda têm `text-white`/hex soltos e
+  dependem da ponte de cores do tema).
 - Roadmaps antigos ainda abertos: prospecção por CNAE/CNPJ (pedido do Lucas),
   peças restantes de ManyChat, marketing (Google/Meta Ads,
   `2026-10-18-marketing-integracoes-roadmap.md`), spike do Instagram.
@@ -382,6 +414,7 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 | `worker/README.md`, `worker/META_SETUP.md` | worker do WhatsApp |
 | `cloudflare/webhook-ingress/README.md` | deploy do Worker |
 | `docs/superpowers/plans/*.md` | planos de cada frente, com notas do que foi feito |
+| `graphify-out/GRAPH_REPORT.md`, `graphify-out/graph.html` | mapa do código gerado pelo graphify (comunidades, nós centrais, relações) |
 
 Skills usadas no desenvolvimento (Claude Code, em `C:\Users\skwcx\.claude\skills`):
 `crm-mvp-blueprint` (índice) e as `crm-*` (pipeline, data-model, tasks,
