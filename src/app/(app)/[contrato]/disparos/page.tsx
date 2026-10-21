@@ -278,9 +278,13 @@ export default function DisparosPage() {
       setNotice(
         data.scheduled
           ? `Agendado para ${formatarSaoPaulo(data.scheduledAt)} (horário de São Paulo) — ${data.estimatedCount} contato(s).`
-          : data.queuedCount > 0
-            ? `${data.queuedCount} na fila do WhatsApp; o placar abaixo sobe conforme cada um sai.${data.failedCount ? ` ${data.failedCount} falharam.` : ""}`
-            : `Disparo concluído: ${data.sentCount} enviados, ${data.failedCount} falharam.`
+          : data.parouPorContrato
+            ? `O disparo não começou: ${data.errors?.[0] ?? "verifique o domínio de e-mail do contrato."}`
+            : data.faltam > 0
+              ? `Começou: ${data.sentCount} e-mails enviados agora; os outros ${data.faltam} saem aos poucos (cerca de 40 por minuto). O placar abaixo acompanha.`
+              : data.queuedCount > 0
+                ? `${data.queuedCount} na fila do WhatsApp; o placar abaixo sobe conforme cada um sai.${data.failedCount ? ` ${data.failedCount} falharam.` : ""}`
+                : `Disparo concluído: ${data.sentCount} enviados, ${data.failedCount} falharam.`
       );
       setRecipients("");
       setText("");
