@@ -299,3 +299,35 @@ Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado
   cliente responde; operandos de "entre", "últimos dias" e datas.
 - **SQL/Prisma:** FK de esperas → execuções (cascade), execuções → versão (no
   action), versão publicada (set null, única).
+
+### Parte B: FEITA (21/10/2026, local)
+- **Barramento** (`src/lib/server/eventos/barramento.ts`): `publicarEvento` grava em
+  `eva_studio_eventos` e entrega depois da resposta. Quem marca `processadoEm` primeiro
+  entrega, então a entrega acontece no máximo uma vez. O relógio entrega o que ficou
+  para trás há mais de 1 min (`entregarEventosPendentes`). Sem a tabela, entrega direto,
+  como antes.
+- **Ator** por `AsyncLocalStorage` (`comAtor`): a API v1 marca "api" (com a chave) e o
+  agente marca "agente". O resto sai como "sistema". A parte C marca "automacao", com a
+  cadeia e a profundidade.
+- **Consumidores** em lista fixa. Os webhooks passaram a ler do barramento
+  (`webhooks/do-barramento.ts`) e as automações entram na parte C.
+- **"Campo alterado"** (`eventos/alteracoes.ts`): foto do registro antes e depois, no
+  formato da API, e `<objeto>.updated` só com o que mudou. Campos personalizados vão um
+  a um (`custom_fields.<chave>`), e etiquetas comparam pelos ids. Responsável mudou
+  também publica `deal.owner_changed`.
+- **Pontos de emissão:**
+  - etiqueta adicionada e removida, e opt-out;
+  - tarefa criada (`createTask` e próxima tarefa da conclusão);
+  - empresa criada e alterada (tela e API);
+  - negócio alterado (tela, API, campos pelo fluxo);
+  - contato alterado (tela, API, campos pelo fluxo);
+  - responsável em massa;
+  - conversa aguardando atendente (bloco Equipe do fluxo).
+
+  Os que já existiam passaram a sair pelo barramento.
+- **Webhooks e n8n** ganharam os eventos novos (`contact.tag_added/tag_removed/opted_out`,
+  `company.created/updated`, `deal.updated/owner_changed`, `task.created`), na tela e no
+  gatilho do pacote do n8n.
+- **Fica de fora** (sem emissão ainda): importação de CSV da tela, e edição de contato
+  pelo lead (`atualizarLead`) e pela conversa (`syncContactFromConversation`), que mudam
+  dados a cada mensagem.

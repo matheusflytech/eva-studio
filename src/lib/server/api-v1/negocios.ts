@@ -5,6 +5,7 @@ import { MAX_CENTAVOS, conferirReferencias, reaisParaCentavos, type Corpo } from
 import { createDeal, moveDealStage, resolverEtapaDeEntrada, type OpcoesDaMudanca } from "@/lib/server/crm";
 import { gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
 import { tocarAtividade } from "@/lib/server/atividade-do-negocio";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { resolverPerda } from "@/lib/regras-de-etapa";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
 import type { OrigemDoMovimento } from "@/lib/server/stage-events";
@@ -412,6 +413,7 @@ export async function atualizarNegocio(orgId: string, dealId: string, d: DadosDe
 
   const mudou = moveu || externoMuda || Object.keys(data).length > 0;
   if (op.simular || !mudou) return { mudou };
+  const antes = await fotoDoRegistro(orgId, "deal", dealId);
   if (externoMuda) await vincularExterno(orgId, "deal", dealId, d.externalId ?? null, d.source);
   if (Object.keys(data).length > 0) {
     await prisma.deal.update({ where: { id: dealId }, data });
@@ -420,6 +422,7 @@ export async function atualizarNegocio(orgId: string, dealId: string, d: DadosDe
   }
   // Etapa por último: os campos que o mesmo PATCH grava já estão no banco.
   if (alvo && moveu) await moverNegocio(orgId, dealId, alvo, { ...op, pendente });
+  await publicarAlteracao(orgId, "deal", dealId, antes);
   return { mudou };
 }
 

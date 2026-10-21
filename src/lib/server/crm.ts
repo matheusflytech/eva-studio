@@ -9,6 +9,8 @@ import { tocarAtividade, tocarAtividadeDosContatos } from "@/lib/server/atividad
 import { resolverPerda, type EntradaDaPerda, type EstadoDoNegocio, type PerdaResolvida } from "@/lib/regras-de-etapa";
 import { TIPOS_ACEITOS, normalizarTipoDeTarefa, type OrigemDaTarefa, type Prioridade } from "@/lib/tarefas/tipos";
 import { gravarDetalhes } from "@/lib/server/tarefas-detalhes";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 
 export { ErroDaMudanca };
 
@@ -398,6 +400,7 @@ export async function createTask(input: CreateTaskInput) {
       durationMin: input.duracaoMin && input.duracaoMin > 0 ? Math.min(Math.round(input.duracaoMin), 1440) : null,
     });
   }
+  await publicarEvento({ orgId: input.orgId, tipo: "task.created", objeto: "task", objetoId: task.id, dados: { origem: input.origem ?? "manual", type: task.type } });
   return task;
 }
 
@@ -479,9 +482,11 @@ export async function preencherCamposDoNegocio(orgId: string, dealId: string, en
   if (!deal) return { aplicados: 0, erros: ["Negócio não encontrado."] };
   const defs = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
   return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, async (valores) => {
+    const antes = await fotoDoRegistro(orgId, "deal", dealId);
     await prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } });
     // Edição de campo zera o relógio do "parado".
     await tocarAtividade(dealId);
+    await publicarAlteracao(orgId, "deal", dealId, antes);
   });
 }
 
@@ -489,9 +494,11 @@ export async function preencherCamposDoContato(orgId: string, contactId: string,
   const contato = await prisma.contact.findFirst({ where: { id: contactId, orgId }, select: { customFields: true } });
   if (!contato) return { aplicados: 0, erros: ["Contato não encontrado."] };
   const defs = await carregarDefinicoes(orgId, "contact");
-  return gravarCampos(defs, (contato.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
-    prisma.contact.update({ where: { id: contactId }, data: { customFields: valores as object } })
-  );
+  return gravarCampos(defs, (contato.customFields ?? {}) as Record<string, unknown>, entrada, async (valores) => {
+    const antes = await fotoDoRegistro(orgId, "contact", contactId);
+    await prisma.contact.update({ where: { id: contactId }, data: { customFields: valores as object } });
+    await publicarAlteracao(orgId, "contact", contactId, antes);
+  });
 }
 
 async function gravarCampos(

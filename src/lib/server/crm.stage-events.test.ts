@@ -11,10 +11,12 @@ const db = vi.hoisted(() => ({
   pipelineStageRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   pipelineLostReason: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   dealLoss: { upsert: vi.fn(), deleteMany: vi.fn() },
-  task: { create: vi.fn() },
+  task: { create: vi.fn(async () => ({ id: "t1", type: "ligar" })) },
   $executeRaw: vi.fn(),
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/server/eventos/barramento", () => ({ publicarEvento: vi.fn() }));
+vi.mock("@/lib/server/eventos/alteracoes", () => ({ fotoDoRegistro: vi.fn(), publicarAlteracao: vi.fn() }));
 
 import { ErroDaMudanca, createDeal, moveDealStage } from "./crm";
 

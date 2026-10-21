@@ -5,10 +5,10 @@ const db = vi.hoisted(() => ({
   pipelineStage: { findMany: vi.fn() },
   $executeRaw: vi.fn(),
 }));
-const webhooks = vi.hoisted(() => ({ emitirEventoDeNegocio: vi.fn() }));
+const barramento = vi.hoisted(() => ({ publicarEvento: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
-vi.mock("@/lib/server/webhooks/emitir", () => webhooks);
+vi.mock("@/lib/server/eventos/barramento", () => barramento);
 
 import { registrarMudancaDeEtapa } from "./stage-events";
 
@@ -18,11 +18,11 @@ const tipos = (de: string, para: string) =>
     { id: "s1", type: de },
     { id: "s2", type: para },
   ]);
-const emitidos = () => webhooks.emitirEventoDeNegocio.mock.calls.map((c) => c[2]);
+const emitidos = () => barramento.publicarEvento.mock.calls.map((c) => c[0].tipo);
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("webhooks da mudança de etapa", () => {
+describe("eventos da mudança de etapa", () => {
   it("negócio novo: deal.created", async () => {
     await registrarMudancaDeEtapa({ ...base, fromStageId: null, toStageId: "s2" });
     expect(emitidos()).toEqual(["deal.created"]);
@@ -32,7 +32,12 @@ describe("webhooks da mudança de etapa", () => {
     tipos("open", "won");
     await registrarMudancaDeEtapa({ ...base, fromStageId: "s1", toStageId: "s2" });
     expect(emitidos()).toEqual(["deal.stage_changed", "deal.won"]);
-    expect(webhooks.emitirEventoDeNegocio.mock.calls[1][3]).toEqual({ stage_id: "s1" });
+    expect(barramento.publicarEvento.mock.calls[1][0]).toMatchObject({
+      orgId: "o1",
+      objeto: "deal",
+      objetoId: "d1",
+      dados: { pipeline_id: "p1", from_stage_id: "s1", to_stage_id: "s2", previous: { stage_id: "s1" } },
+    });
   });
 
   it("perdido para aberta: reopened", async () => {

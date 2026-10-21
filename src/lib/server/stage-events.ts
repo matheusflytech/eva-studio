@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { emitirEventoDeNegocio } from "@/lib/server/webhooks/emitir";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 
 export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill";
 
@@ -74,14 +74,16 @@ export async function registrarMudancaDeEtapa(e: {
 }
 
 /**
- * Webhooks de saída: criação, mudança de etapa e, pelo tipo da etapa,
+ * Eventos de domínio: criação, mudança de etapa e, pelo tipo da etapa,
  * ganho, perda e reabertura. É aqui porque toda mudança de etapa (tela,
  * fluxo, API, importação) passa por este ponto.
  */
-async function emitirEventosDaEtapa(e: { orgId: string; dealId: string; fromStageId: string | null; toStageId: string }) {
+async function emitirEventosDaEtapa(e: { orgId: string; dealId: string; pipelineId?: string; fromStageId: string | null; toStageId: string }) {
+  const publicar = (tipo: string, dados: Record<string, unknown>) =>
+    publicarEvento({ orgId: e.orgId, tipo, objeto: "deal", objetoId: e.dealId, dados: { pipeline_id: e.pipelineId ?? null, ...dados } });
   try {
     if (!e.fromStageId) {
-      await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.created");
+      await publicar("deal.created", { to_stage_id: e.toStageId });
       return;
     }
     const etapas = await prisma.pipelineStage.findMany({
@@ -91,13 +93,13 @@ async function emitirEventosDaEtapa(e: { orgId: string; dealId: string; fromStag
     const tipo = (id: string) => etapas.find((s) => s.id === id)?.type ?? "open";
     const de = tipo(e.fromStageId);
     const para = tipo(e.toStageId);
-    const previous = { stage_id: e.fromStageId };
-    await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.stage_changed", previous);
-    if (para === "won") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.won", previous);
-    else if (para === "lost") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.lost", previous);
-    else if (de === "won" || de === "lost") await emitirEventoDeNegocio(e.orgId, e.dealId, "deal.reopened", previous);
+    const dados = { from_stage_id: e.fromStageId, to_stage_id: e.toStageId, previous: { stage_id: e.fromStageId } };
+    await publicar("deal.stage_changed", dados);
+    if (para === "won") await publicar("deal.won", dados);
+    else if (para === "lost") await publicar("deal.lost", dados);
+    else if (de === "won" || de === "lost") await publicar("deal.reopened", dados);
   } catch (error) {
-    console.error("[stage-events] falha ao emitir webhooks", error);
+    console.error("[stage-events] falha ao publicar eventos", error);
   }
 }
 

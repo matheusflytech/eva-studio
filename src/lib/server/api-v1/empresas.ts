@@ -7,6 +7,8 @@ import { ErroApi, iso } from "./http";
 import { externalIdOpc, idOpc, sourceOpc, textoOpc } from "./entrada";
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerDataDaConsulta } from "./paginacao";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 
 // ---------------------------------------------------------------------------
 // Empresas na API v1. Mesmas regras da tela (src/app/api/companies): CNPJ só
@@ -134,6 +136,7 @@ export async function criarEmpresa(orgId: string, d: DadosDeEmpresa): Promise<{ 
     select: { id: true },
   });
   if (d.externalId) await vincularExterno(orgId, "company", c.id, d.externalId, d.source);
+  await publicarEvento({ orgId, tipo: "company.created", objeto: "company", objetoId: c.id, dados: { source: "api" } });
   return c;
 }
 
@@ -147,9 +150,12 @@ export async function atualizarEmpresa(orgId: string, id: string, d: DadosDeEmpr
   if (d.externalId !== undefined) {
     externoMuda = ((await externosDe(orgId, "company", [id], d.source)).get(id) ?? null) !== d.externalId;
   }
+  const mudou = externoMuda || Object.keys(data).length > 0;
+  const antes = mudou ? await fotoDoRegistro(orgId, "company", id) : null;
   if (externoMuda) await vincularExterno(orgId, "company", id, d.externalId ?? null, d.source);
   if (Object.keys(data).length > 0) await prisma.company.update({ where: { id }, data: data as Prisma.CompanyUncheckedUpdateInput });
-  return { mudou: externoMuda || Object.keys(data).length > 0 };
+  if (mudou) await publicarAlteracao(orgId, "company", id, antes);
+  return { mudou };
 }
 
 /** Upsert pelo id externo; sem vínculo, o CNPJ (chave natural) faz o papel de reserva. */

@@ -5,6 +5,7 @@ import type { Corpo } from "@/lib/server/api-validacao";
 import { escopoPermite, type Acao, type Recurso } from "./escopos";
 import { ErroApi, novoRequestId, paraErroApi, respostaDeErro } from "./http";
 import { comIdempotencia, validarChave } from "./idempotencia";
+import { comAtor } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
 // Envoltório de toda rota da API v1: chave → escopo → limite → idempotência
@@ -104,7 +105,8 @@ export function rotaV1<P extends Record<string, string> = Record<string, never>>
       const params = (await contexto?.params) ?? ({} as P);
       const executar = async () => {
         try {
-          return await handler(ctx, params);
+          // Todo evento que a chamada gerar sai com ator "api" (e a chave).
+          return await comAtor({ tipo: "api", id: chave.keyId }, () => handler(ctx, params));
         } catch (e) {
           return respostaDeErro(paraErroApi(e), requestId);
         }

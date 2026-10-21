@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 import type { SessionContext } from "@/lib/server/permissions";
 import { ctxPode } from "@/lib/server/permissions";
 import { donosVisiveis, filtroDeEscopo } from "@/lib/server/escopo-dados";
@@ -136,6 +137,13 @@ async function atribuir(ctx: Ctx, entidade: EntidadeCrm, ids: string[], novo: st
       entidade === "contatos" ? prisma.contact.updateMany({ where, data: { ownerId: novo } }) : prisma.deal.updateMany({ where, data: { ownerId: novo } }),
     ]);
     r.ok += u.count;
+  }
+  // Em massa não vale tirar foto de cada um: o diff é só o responsável (que já se sabe).
+  const objeto = entidade === "contatos" ? "contact" : "deal";
+  for (const l of mudam) {
+    const diff = { owner_id: { de: l.ownerId, para: novo } };
+    await publicarEvento({ orgId: ctx.orgId, tipo: `${objeto}.updated`, objeto, objetoId: l.id, diff });
+    if (objeto === "deal") await publicarEvento({ orgId: ctx.orgId, tipo: "deal.owner_changed", objeto, objetoId: l.id, diff });
   }
   if (mudam.length) r.desfazer = { acao: "restaurar_responsavel", parametros: { itens: mudam.map((l) => ({ id: l.id, responsavelId: l.ownerId })) } };
 }

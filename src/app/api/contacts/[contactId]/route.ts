@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { requirePermission } from "@/lib/server/permissions";
 import { filtroDeEscopo } from "@/lib/server/escopo-dados";
 import { applyTag, removeTag, optOutContact, filtroDeTelefone, telefoneParaGravar } from "@/lib/server/contacts";
@@ -189,13 +189,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   if (body.optIn === true) data.optIn = true;
 
   if (Object.keys(data).length > 0) {
+    const antes = await fotoDoRegistro(ctx.orgId, "contact", contact.id);
     try {
       await prisma.contact.update({ where: { id: contact.id }, data });
     } catch (e) {
       // P2025 = contato (ou empresa/responsável) sumiu no meio do caminho.
       return respostaDeErroDoPrisma(e);
     }
-    await emitirEventoDeContato(ctx.orgId, contact.id, "contact.updated");
+    await publicarAlteracao(ctx.orgId, "contact", contact.id, antes);
   }
 
   const updated = await prisma.contact.findFirst({

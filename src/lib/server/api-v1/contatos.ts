@@ -5,7 +5,8 @@ import { validarEmail } from "@/lib/capture-validation";
 import { conferirReferencias, type Corpo } from "@/lib/server/api-validacao";
 import { applyTag, filtroDeTelefone, optOutContact, removeTag, telefoneParaGravar } from "@/lib/server/contacts";
 import { mesclarCamposDeContato } from "@/lib/server/custom-fields";
-import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { ErroApi, iso } from "./http";
 import {
@@ -251,7 +252,7 @@ export async function criarContato(orgId: string, d: DadosDeContato, op: Opcoes 
     if (op.origem === "importacao") await prisma.contactTag.createMany({ data: [{ contactId: contato.id, tagId }], skipDuplicates: true });
     else await applyTag(contato.id, tagId);
   }
-  await emitirEventoDeContato(orgId, contato.id, "contact.created");
+  await publicarEvento({ orgId, tipo: "contact.created", objeto: "contact", objetoId: contato.id, dados: { source: op.origem ?? "api" } });
   return contato;
 }
 
@@ -321,6 +322,7 @@ export async function atualizarContato(orgId: string, contactId: string, d: Dado
 
   const mudou = Object.keys(data).length > 0 || optOut || adicionar.length > 0 || remover.length > 0 || externoMuda;
   if (op.simular || !mudou) return { mudou };
+  const antes = await fotoDoRegistro(orgId, "contact", contactId);
 
   if (externoMuda) await vincularExterno(orgId, "contact", contactId, d.externalId ?? null, d.source);
   if (Object.keys(data).length > 0) await prisma.contact.update({ where: { id: contactId }, data });
@@ -330,7 +332,7 @@ export async function atualizarContato(orgId: string, contactId: string, d: Dado
     else await applyTag(contactId, tagId);
   }
   for (const tagId of remover) await removeTag(contactId, tagId);
-  await emitirEventoDeContato(orgId, contactId, "contact.updated");
+  await publicarAlteracao(orgId, "contact", contactId, antes);
   return { mudou: true };
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
     },
   }).catch((e: unknown) => respostaDeErroDoPrisma(e));
   if (company instanceof Response) return company;
+  await publicarEvento({ orgId: ctx.orgId, tipo: "company.created", objeto: "company", objetoId: company.id, dados: { source: "manual" } });
 
   return NextResponse.json({ company: { id: company.id, name: company.name } });
 }

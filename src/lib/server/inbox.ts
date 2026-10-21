@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { tocarAtividadeDaConversa } from "@/lib/server/atividade-do-negocio";
-import { emitirEvento } from "@/lib/server/webhooks/emitir";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
 // Caixa de entrada: as regras num lugar só.
@@ -97,12 +97,11 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
   return criadas;
 }
 
-/** Webhook de saída `message.received`: uma entrega por mensagem do contato. */
+/** Evento `message.received`: um por mensagem do contato (webhooks e automações). */
 async function emitirMensagensRecebidas(
   conversationId: string,
   mensagens: { id: string; text: string; mediaType: string | null; mediaMime: string | null; createdAt: Date }[]
 ) {
-  if (!prisma.webhookEndpoint) return;
   const conversa = await prisma.conversation
     .findUnique({
       where: { id: conversationId },
@@ -111,8 +110,12 @@ async function emitirMensagensRecebidas(
     .catch(() => null);
   if (!conversa?.agent) return;
   for (const m of mensagens) {
-    await emitirEvento(conversa.agent.orgId, "message.received", async () => ({
-      data: {
+    await publicarEvento({
+      orgId: conversa.agent.orgId,
+      tipo: "message.received",
+      objeto: "conversation",
+      objetoId: conversationId,
+      dados: {
         id: m.id,
         conversation_id: conversationId,
         agent_id: conversa.agentId,
@@ -125,7 +128,7 @@ async function emitirMensagensRecebidas(
         media_mime: m.mediaMime,
         created_at: m.createdAt.toISOString(),
       },
-    }));
+    });
   }
 }
 

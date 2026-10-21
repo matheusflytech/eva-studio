@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { filtroDeEscopo } from "@/lib/server/escopo-dados";
@@ -215,6 +216,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
 
   // ---- escrita ----
 
+  const antes = await fotoDoRegistro(ctx.orgId, "deal", deal.id);
   try {
     if (Object.keys(data).length > 0) {
       await prisma.deal.update({ where: { id: deal.id }, data });
@@ -243,6 +245,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ de
   // Edição de campo zera o relógio do "parado" (reordenar ou arquivar, não).
   const editou = Object.keys(data).some((k) => k !== "position" && k !== "archivedAt") || !!body.addContactId || !!body.removeContactId;
   if (editou) await tocarAtividade(deal.id);
+  await publicarAlteracao(ctx.orgId, "deal", deal.id, antes);
 
   return NextResponse.json({ ok: true });
 }

@@ -107,6 +107,16 @@ export async function emitirEventoDeTarefa(orgId: string, taskId: string, tipo: 
   });
 }
 
+export async function emitirEventoDeEmpresa(orgId: string, companyId: string, tipo: TipoDeEvento, previous?: Record<string, unknown>): Promise<void> {
+  await emitirEvento(orgId, tipo, async () => {
+    const { carregarEmpresa, serializarEmpresas } = await import("@/lib/server/api-v1/empresas");
+    const linha = await carregarEmpresa(orgId, companyId).catch(() => null);
+    if (!linha) return null;
+    const [data] = await serializarEmpresas(orgId, [linha]);
+    return { data: data as Record<string, unknown>, previous };
+  });
+}
+
 export async function emitirEventoDeContato(
   orgId: string,
   contactId: string,

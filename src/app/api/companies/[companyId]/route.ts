@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
@@ -164,11 +165,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   }
 
   if (Object.keys(data).length > 0) {
+    const antes = await fotoDoRegistro(ctx.orgId, "company", company.id);
     try {
       await prisma.company.update({ where: { id: company.id }, data });
     } catch (e) {
       return respostaDeErroDoPrisma(e);
     }
+    await publicarAlteracao(ctx.orgId, "company", company.id, antes);
   }
 
   // Vincular ou desvincular pessoa da conta, sem precisar abrir o contato.

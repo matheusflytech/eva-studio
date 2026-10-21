@@ -33,6 +33,7 @@ import {
 } from "@/lib/server/crm";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { safeFetch } from "@/lib/server/ssrf";
+import { comAtor, publicarEvento } from "@/lib/server/eventos/barramento";
 import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/server/inbox";
 import { syncContactFromConversation } from "@/lib/server/contacts";
 import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
@@ -1017,7 +1018,12 @@ async function contarDisparo(triggerId: string): Promise<void> {
   }
 }
 
+/** O que o agente fizer no CRM (contato, negócio, tarefa) sai com ator "agente". */
 export async function advanceConversation(input: AdvanceInput): Promise<AdvanceResult> {
+  return comAtor({ tipo: "agente", id: input.agentId }, () => avancarConversa(input));
+}
+
+async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
 
@@ -1184,6 +1190,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   const outsideWindow = input.channel === "whatsapp_meta" && !isGenuineInbound && isOutsideWindow(conversation.lastContactMessageAt);
 
   async function finish(): Promise<AdvanceResult> {
+    const passouParaEquipe = status === "waiting_human" && conversation.status !== "waiting_human";
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {
@@ -1196,6 +1203,15 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     });
     await logMessages(conversation.id, inboundText, messages, input);
     const contatoId = await syncContact(conversation.id, variables, isGenuineInbound);
+    if (passouParaEquipe) {
+      await publicarEvento({
+        orgId: agent!.orgId,
+        tipo: "conversation.waiting_human",
+        objeto: "conversation",
+        objetoId: conversation.id,
+        dados: { agent_id: input.agentId, channel: input.channel, contact_id: contatoId },
+      });
+    }
     if (virouLead && contatoId) {
       // Igual ao syncContact: falha no CRM nunca derruba a resposta da conversa.
       try {

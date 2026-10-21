@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { normalizarCapturados } from "@/lib/server/custom-fields";
 import { normalizarTelefoneBR } from "@/lib/capture-validation";
 import type { Prisma } from "@/generated/prisma/client";
-import { emitirEventoDeContato } from "@/lib/server/webhooks/emitir";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
 // CRM de contatos — a ficha da pessoa, no nível da organização.
@@ -228,7 +228,7 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
         },
       });
       contactId = created.id;
-      await emitirEventoDeContato(orgId, created.id, "contact.created");
+      await publicarEvento({ orgId, tipo: "contact.created", objeto: "contact", objetoId: created.id, dados: { source: "conversa" } });
     }
 
     await prisma.contactChannel.create({ data: { contactId, agentId, channel, externalId } });
@@ -257,10 +257,18 @@ export async function applyTag(contactId: string, tagId: string): Promise<void> 
 
   const { enrollContactByTag } = await import("@/lib/server/sequences");
   await enrollContactByTag(contactId, tagId);
+  await publicarDoContato(contactId, "contact.tag_added", { tag_id: tagId });
 }
 
 export async function removeTag(contactId: string, tagId: string): Promise<void> {
-  await prisma.contactTag.deleteMany({ where: { contactId, tagId } });
+  const r = await prisma.contactTag.deleteMany({ where: { contactId, tagId } });
+  if (r.count > 0) await publicarDoContato(contactId, "contact.tag_removed", { tag_id: tagId });
+}
+
+/** Evento de um contato quando só se tem o id (as funções acima não recebem o contrato). */
+async function publicarDoContato(contactId: string, tipo: string, dados: Record<string, unknown>) {
+  const c = await prisma.contact.findUnique({ where: { id: contactId }, select: { orgId: true } }).catch(() => null);
+  if (c) await publicarEvento({ orgId: c.orgId, tipo, objeto: "contact", objetoId: contactId, dados });
 }
 
 export async function optOutContact(contactId: string): Promise<void> {
@@ -272,4 +280,5 @@ export async function optOutContact(contactId: string): Promise<void> {
     where: { contactId, status: "active" },
     data: { status: "stopped", stoppedReason: "opt-out" },
   });
+  await publicarDoContato(contactId, "contact.opted_out", {});
 }

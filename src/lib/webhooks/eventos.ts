@@ -11,12 +11,20 @@
 export const EVENTOS = [
   { tipo: "contact.created", objeto: "contact", nome: "Contato criado" },
   { tipo: "contact.updated", objeto: "contact", nome: "Contato alterado" },
+  { tipo: "contact.tag_added", objeto: "contact", nome: "Etiqueta adicionada" },
+  { tipo: "contact.tag_removed", objeto: "contact", nome: "Etiqueta removida" },
+  { tipo: "contact.opted_out", objeto: "contact", nome: "Contato pediu para não receber" },
   { tipo: "lead.captured", objeto: "lead", nome: "Lead capturado" },
   { tipo: "deal.created", objeto: "deal", nome: "Negócio criado" },
   { tipo: "deal.stage_changed", objeto: "deal", nome: "Negócio mudou de etapa" },
   { tipo: "deal.won", objeto: "deal", nome: "Negócio ganho" },
   { tipo: "deal.lost", objeto: "deal", nome: "Negócio perdido" },
   { tipo: "deal.reopened", objeto: "deal", nome: "Negócio reaberto" },
+  { tipo: "deal.updated", objeto: "deal", nome: "Negócio alterado" },
+  { tipo: "deal.owner_changed", objeto: "deal", nome: "Responsável do negócio alterado" },
+  { tipo: "company.created", objeto: "company", nome: "Empresa criada" },
+  { tipo: "company.updated", objeto: "company", nome: "Empresa alterada" },
+  { tipo: "task.created", objeto: "task", nome: "Tarefa criada" },
   { tipo: "task.completed", objeto: "task", nome: "Tarefa concluída" },
   { tipo: "message.received", objeto: "message", nome: "Mensagem recebida" },
 ] as const;
@@ -27,6 +35,7 @@ export const OBJETOS_DOS_EVENTOS: Record<string, string> = {
   contact: "Contatos",
   lead: "Leads",
   deal: "Negócios",
+  company: "Empresas",
   task: "Tarefas",
   message: "Mensagens",
 };

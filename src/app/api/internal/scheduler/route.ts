@@ -6,6 +6,7 @@ import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
 import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
 import { limparLixeiraVencida } from "@/lib/server/lixeira";
 import { entregarPendentes } from "@/lib/server/webhooks/entrega";
+import { entregarEventosPendentes } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -69,6 +70,13 @@ export async function POST(request: Request) {
     return { jobs: 0, linhas: 0 };
   });
 
+  // Eventos de domínio que a requisição não chegou a entregar (morreu antes
+  // do `after`). Antes dos webhooks: o que sair daqui já entra na fila deles.
+  const eventos = await entregarEventosPendentes({ orcamentoMs: Math.min(5_000, Math.max(0, 33_000 - (Date.now() - startedAt))) }).catch((e) => {
+    console.error("[scheduler] eventos pendentes falharam", e instanceof Error ? e.message : e);
+    return { entregues: 0 };
+  });
+
   // Webhooks de saída: novas tentativas vencidas (a primeira sai logo após o
   // evento). Sem o SQL dos webhooks, não faz nada.
   const webhooks = await entregarPendentes({ orcamentoMs: Math.min(10_000, Math.max(0, 38_000 - (Date.now() - startedAt))) }).catch((e) => {
@@ -88,6 +96,7 @@ export async function POST(request: Request) {
     ms: Date.now() - startedAt,
     bulkJobs: lotes,
     webhooks,
+    eventos,
     lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
