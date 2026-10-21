@@ -75,6 +75,11 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
   const visiveis = criadas.filter((m) => m.role !== "note");
   const ultima = visiveis[visiveis.length - 1];
   const doContato = visiveis.filter((m) => m.role === "contact");
+  // Antes de atualizar: a conversa já tinha mensagem do contato? (gatilho "primeira mensagem")
+  const jaTinhaDoContato =
+    doContato.length > 0
+      ? !!(await prisma.conversation.findUnique({ where: { id: conversationId }, select: { lastContactMessageAt: true } }).catch(() => null))?.lastContactMessageAt
+      : true;
 
   if (ultima) {
     await prisma.conversation.update({
@@ -92,7 +97,7 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
     // abertos do contato (nota interna não conta: fica fora de `visiveis`).
     await tocarAtividadeDaConversa(conversationId, ultima.createdAt);
   }
-  if (doContato.length > 0) await emitirMensagensRecebidas(conversationId, doContato);
+  if (doContato.length > 0) await emitirMensagensRecebidas(conversationId, doContato, !jaTinhaDoContato);
 
   return criadas;
 }
@@ -100,7 +105,8 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
 /** Evento `message.received`: um por mensagem do contato (webhooks e automações). */
 async function emitirMensagensRecebidas(
   conversationId: string,
-  mensagens: { id: string; text: string; mediaType: string | null; mediaMime: string | null; createdAt: Date }[]
+  mensagens: { id: string; text: string; mediaType: string | null; mediaMime: string | null; createdAt: Date }[],
+  primeiraDaConversa: boolean
 ) {
   const conversa = await prisma.conversation
     .findUnique({
@@ -109,7 +115,7 @@ async function emitirMensagensRecebidas(
     })
     .catch(() => null);
   if (!conversa?.agent) return;
-  for (const m of mensagens) {
+  for (const [i, m] of mensagens.entries()) {
     await publicarEvento({
       orgId: conversa.agent.orgId,
       tipo: "message.received",
@@ -127,6 +133,7 @@ async function emitirMensagensRecebidas(
         media_type: m.mediaType,
         media_mime: m.mediaMime,
         created_at: m.createdAt.toISOString(),
+        primeira: primeiraDaConversa && i === 0,
       },
     });
   }

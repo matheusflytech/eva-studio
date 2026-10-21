@@ -63,9 +63,12 @@ export function atorAtual(): Ator {
 }
 
 // Consumidores em lista fixa (import tardio: evita ciclo de import e não carrega
-// o que não é usado). A parte C acrescenta as automações aqui.
+// o que não é usado).
 type Consumidor = { nome: string; carregar: () => Promise<(e: EventoPublicado) => Promise<void>> };
-const CONSUMIDORES: Consumidor[] = [{ nome: "webhooks", carregar: () => import("@/lib/server/webhooks/do-barramento").then((m) => m.paraWebhooks) }];
+const CONSUMIDORES: Consumidor[] = [
+  { nome: "webhooks", carregar: () => import("@/lib/server/webhooks/do-barramento").then((m) => m.paraWebhooks) },
+  { nome: "automacoes", carregar: () => import("@/lib/server/automacoes/casamento").then((m) => m.paraAutomacoes) },
+];
 
 function semTabela(error: unknown): boolean {
   return /eva_studio_eventos|does not exist|P2021/i.test(String((error as Error)?.message ?? error));

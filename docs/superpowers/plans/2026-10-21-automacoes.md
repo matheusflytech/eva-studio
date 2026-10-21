@@ -331,3 +331,44 @@ Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado
 - **Fica de fora** (sem emissão ainda): importação de CSV da tela, e edição de contato
   pelo lead (`atualizarLead`) e pela conversa (`syncContactFromConversation`), que mudam
   dados a cada mensagem.
+
+### Parte C: FEITA (21/10/2026, local, SQL não aplicado)
+- **Puro** (`src/lib/automacoes/`):
+  - `calendario.ts`: dias úteis com feriados nacionais e Sexta-feira Santa, e horário
+    comercial seg–sáb 8h–20h em São Paulo;
+  - `casar.ts`: o evento casa com o gatilho (etapa na criação ou no movimento, campo
+    alterado ignorando a própria automação, palavra-chave por palavra inteira, canal,
+    motivo e tipo de tarefa), mais os registros que um evento toca;
+  - `interpretar.ts`: próximo movimento de cada nó e o fim de cada espera.
+- **Servidor** (`src/lib/server/automacoes/`):
+  - `contexto.ts`: registro, contato, empresa, gatilho, passos e sistema, relidos a
+    cada passo, com campos derivados (situação do negócio, tarefa aberta, janela de
+    24h);
+  - `executor.ts`: lease de 60 s, até 20 passos por rodada, cada passo gravado com ms.
+    - Espera = status "esperando" + `proximaEm`.
+    - Objetivo encerra na hora.
+    - Opt-out pula e fora do horário comercial espera a janela.
+    - Nova tentativa até 6 com espera crescente; erro definitivo segue o caminho de
+      erro ou falha.
+    - 10 falhas seguidas pausam.
+    - Teste simula as ações externas e não espera.
+  - `inscricao.ts`: uma vez, sempre (uma viva por registro) ou intervalo, com chave
+    única;
+  - `casamento.ts`: consumidor do barramento.
+    - Inscreve, acorda o "esperar evento" (também nos negócios do contato) e confere
+      o objetivo.
+    - Anti-loop: não dispara a si mesma; com cadeia ≥ 3 fica uma execução cancelada
+      "Loop detectado".
+  - `varreduras.ts`: o passo do relógio.
+    - Lease vencido volta para a fila.
+    - Gatilhos parado, tarefa atrasada, data de campo (consulta parametrizada),
+      agendado, sem resposta e aguardando atendente.
+    - Roda as vencidas e faz a limpeza de 90 dias de hora em hora.
+  - `gerenciar.ts`: publicar (versão nova imutável; a versão 0 é o rascunho de
+    teste), pausar, retomar, inscrever à mão e testar.
+  - `acoes.ts`: só nota e etiqueta; o resto é a parte D.
+- **Ligações:** o barramento chama `paraAutomacoes`; o relógio chama
+  `rodarAutomacoes`. A mensagem recebida traz `primeira`.
+- **Cuidado para a parte E:** em gatilho de varredura (parado, agendado, data), a
+  reinscrição padrão na tela deve ser "sempre". Com "uma vez", o registro só entra na
+  primeira vez.

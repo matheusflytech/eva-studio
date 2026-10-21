@@ -7,6 +7,7 @@ import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
 import { limparLixeiraVencida } from "@/lib/server/lixeira";
 import { entregarPendentes } from "@/lib/server/webhooks/entrega";
 import { entregarEventosPendentes } from "@/lib/server/eventos/barramento";
+import { rodarAutomacoes } from "@/lib/server/automacoes/varreduras";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
     return { entregues: 0 };
   });
 
+  // Automações: gatilhos de varredura, esperas vencidas e novas tentativas.
+  const automacoes = await rodarAutomacoes({ orcamentoMs: Math.min(12_000, Math.max(0, 35_000 - (Date.now() - startedAt))) }).catch((e) => {
+    console.error("[scheduler] automações falharam", e instanceof Error ? e.message : e);
+    return null;
+  });
+
   // Webhooks de saída: novas tentativas vencidas (a primeira sai logo após o
   // evento). Sem o SQL dos webhooks, não faz nada.
   const webhooks = await entregarPendentes({ orcamentoMs: Math.min(10_000, Math.max(0, 38_000 - (Date.now() - startedAt))) }).catch((e) => {
@@ -97,6 +104,7 @@ export async function POST(request: Request) {
     bulkJobs: lotes,
     webhooks,
     eventos,
+    automacoes,
     lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
