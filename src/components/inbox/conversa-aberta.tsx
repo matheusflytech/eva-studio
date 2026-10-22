@@ -2,14 +2,21 @@
 
 import * as React from "react";
 import {
-  ArrowLeft, PanelRight, Bot, UserRound, CheckCircle2, Loader2, ChevronDown, Clock, Hand, Undo2,
+  ArrowLeft, PanelRight, Bot, UserRound, CheckCircle2, Loader2, ChevronDown, Clock, Hand, Undo2, MoreHorizontal, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { avisarNaIlha } from "@/lib/fundo/eventos";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AvatarDoContato } from "./avatar";
 import { Balao } from "./balao";
 import { Compositor, type AnexoPreparado } from "./compositor";
 import { useSondagem } from "./use-sondagem";
 import {
-  NOME_DO_CANAL, iniciais, rotuloDoDia, tempoRestante,
+  NOME_DO_CANAL, minutosDesde, rotuloDoDia, tempoRestante,
   type Conversa, type Membro, type Mensagem,
 } from "./tipos";
 
@@ -23,6 +30,14 @@ function juntar(atual: Mensagem[], novas: Mensagem[]): Mensagem[] {
 /** Muda quando algo visível mudou (mensagem nova, tique, falha). Evita re-render à toa. */
 function assinatura(l: Mensagem[]): string {
   return l.map((m) => `${m.id}:${m.entrega?.status ?? ""}:${m.entrega?.atrasada ? 1 : 0}`).join("|");
+}
+
+/** "Esperando há 4 min". Conta da última mensagem, que é quando o agente passou a conversa. */
+function tempoDeEspera(iso: string): string {
+  const m = minutosDesde(iso);
+  if (m < 1) return "Esperando agora";
+  if (m >= 24 * 60) return `Esperando há ${Math.floor(m / (24 * 60))} d`;
+  return `Esperando há ${tempoRestante(m)}`;
 }
 
 async function chamar(url: string, corpo?: unknown, metodo = "POST") {
@@ -222,6 +237,8 @@ export function ConversaAberta({
   }
 
   async function assumir() {
+    // Só avisa quando assumiu de fato: "cancelar" no confirm também volta ok.
+    let assumiu = false;
     await executar("assumir", async () => {
       let r = await chamar(`/api/conversations/${conversa.id}/take`, {});
       if (r.status === 409 && r.json.codigo === "de_outro") {
@@ -229,8 +246,10 @@ export function ConversaAberta({
         if (!ok) return { ok: true, json: {} };
         r = await chamar(`/api/conversations/${conversa.id}/take`, { forcar: true });
       }
+      assumiu = r.ok;
       return r;
     });
+    if (assumiu) avisarNaIlha({ titulo: "Você assumiu a conversa", detalhe: conversa.nome });
   }
 
   const devolver = () => executar("devolver", () => chamar(`/api/conversations/${conversa.id}/resume`));
@@ -241,165 +260,167 @@ export function ConversaAberta({
   const minha = conversa.status === "human" && conversa.assignedTo?.id === meuId;
   const encerrada = conversa.status === "ended";
 
-  // Separadores de dia.
+  // Separadores de dia, e quem leva rótulo: só o primeiro balão de uma
+  // sequência do mesmo autor (como no WhatsApp), para não repetir "Agente de IA".
   const blocos = React.useMemo(() => {
-    const saida: ({ tipo: "dia"; rotulo: string; chave: string } | { tipo: "msg"; m: Mensagem })[] = [];
+    const saida: ({ tipo: "dia"; rotulo: string; chave: string } | { tipo: "msg"; m: Mensagem; mostrarAutor: boolean })[] = [];
     let ultimoDia = "";
+    let anterior: Mensagem | null = null;
     for (const m of mensagens) {
       const dia = new Date(m.createdAt).toDateString();
       if (dia !== ultimoDia) {
         saida.push({ tipo: "dia", rotulo: rotuloDoDia(m.createdAt), chave: `d-${dia}` });
         ultimoDia = dia;
+        anterior = null;
       }
-      saida.push({ tipo: "msg", m });
+      const mesmoAutor = !!anterior && anterior.role === m.role && (anterior.author?.id ?? "") === (m.author?.id ?? "");
+      saida.push({ tipo: "msg", m, mostrarAutor: !mesmoAutor });
+      anterior = m;
     }
     return saida;
   }, [mensagens]);
 
+  const podeDevolver = conversa.status === "human" || conversa.status === "waiting_human";
+  const podeTransferir = membros.length > 1 && !encerrada;
+
   return (
-    <section className={cn("glass-card flex min-h-0 flex-col overflow-hidden rounded-3xl", className)}>
-      <header className="border-b border-border-subtle px-4 py-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onVoltar}
-            aria-label="Voltar para a lista"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary hover:bg-surface-2 hover:text-text-primary lg:hidden"
-          >
-            <ArrowLeft size={17} />
-          </button>
+    <section className={cn("flex min-h-0 flex-col overflow-hidden", className)}>
+      <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border-subtle px-3.5">
+        <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar para a lista" className="-ml-1.5 shrink-0 lg:hidden">
+          <ArrowLeft aria-hidden="true" />
+        </Button>
 
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[12.5px] font-semibold text-text-secondary">
-            {iniciais(conversa.nome) || <UserRound size={18} />}
-          </span>
+        <AvatarDoContato chave={conversa.contactId} nome={conversa.nome} tamanho="sm" />
 
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[14.5px] font-semibold text-text-primary">{conversa.nome}</p>
-            <p className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-text-tertiary">
-              <span>{NOME_DO_CANAL[conversa.channel] ?? conversa.channel}</span>
-              <span>{conversa.agentName}</span>
-              {conversa.status === "waiting_human" && <span className="font-medium text-danger">Esperando atendente</span>}
-              {conversa.status === "active" && (
-                <span className="inline-flex items-center gap-1"><Bot size={11} /> Agente respondendo</span>
-              )}
-              {conversa.status === "human" && (
-                <span className="inline-flex items-center gap-1 text-accent-300">
-                  <UserRound size={11} /> {minha ? "Com você" : conversa.assignedTo?.name ?? "Com a equipe"}
-                </span>
-              )}
-              {encerrada && <span>Encerrada</span>}
-              {conversa.janela.restrita && !conversa.simulado && (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1",
-                    conversa.janela.aberta ? "text-text-tertiary" : "text-amber-300"
-                  )}
-                  title="Regra da Meta: fora de 24h da última mensagem do cliente, só dá para enviar modelo aprovado."
-                >
-                  <Clock size={11} />
-                  {conversa.janela.aberta && conversa.janela.minutosRestantes !== null
-                    ? `Janela: ${tempoRestante(conversa.janela.minutosRestantes)}`
-                    : "Janela encerrada"}
-                </span>
-              )}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onAbrirCliente}
-            aria-label="Ver dados do cliente"
-            title="Dados do cliente"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary hover:bg-surface-2 hover:text-text-primary xl:hidden"
-          >
-            <PanelRight size={17} />
-          </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-semibold text-text-primary">{conversa.nome}</p>
+          <p className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-caption text-text-tertiary">
+            {conversa.status === "waiting_human" && (
+              <Badge variant="danger" dot>{tempoDeEspera(conversa.lastMessageAt)}</Badge>
+            )}
+            {conversa.status === "active" && (
+              <span className="inline-flex shrink-0 items-center gap-1"><Bot size={12} aria-hidden="true" /> Agente respondendo</span>
+            )}
+            {conversa.status === "human" && (
+              <span className="inline-flex shrink-0 items-center gap-1 text-text-secondary">
+                <UserRound size={12} aria-hidden="true" /> {minha ? "Com você" : conversa.assignedTo?.name ?? "Com a equipe"}
+              </span>
+            )}
+            {encerrada && <span className="shrink-0">Encerrada</span>}
+            <span className="truncate">
+              {NOME_DO_CANAL[conversa.channel] ?? conversa.channel} · {conversa.agentName}
+            </span>
+            {conversa.janela.restrita && !conversa.simulado && (
+              <span
+                className={cn("inline-flex shrink-0 items-center gap-1", !conversa.janela.aberta && "text-warning")}
+                title="Regra da Meta: fora de 24h da última mensagem do cliente, só dá para enviar modelo aprovado."
+              >
+                <Clock size={12} aria-hidden="true" />
+                {conversa.janela.aberta && conversa.janela.minutosRestantes !== null
+                  ? `Janela: ${tempoRestante(conversa.janela.minutosRestantes)}`
+                  : "Janela encerrada"}
+              </span>
+            )}
+          </p>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* Uma ação principal (Assumir), Resolver como ícone, o resto no "…". */}
+        <div className="flex shrink-0 items-center gap-1.5">
           {!minha && !encerrada && (
-            <button
-              type="button"
-              onClick={assumir}
-              disabled={acao !== null}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50",
-                conversa.status === "waiting_human"
-                  ? "bg-accent-500 text-text-on-accent hover:bg-accent-400"
-                  : "bg-surface-2 text-text-primary hover:bg-surface-3"
-              )}
-            >
-              {acao === "assumir" ? <Loader2 size={13} className="animate-spin" /> : <Hand size={13} />} Assumir
-            </button>
-          )}
-
-          {(conversa.status === "human" || conversa.status === "waiting_human") && (
-            <button
-              type="button"
-              onClick={devolver}
-              disabled={acao !== null}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-[12.5px] font-medium text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary disabled:opacity-50"
-            >
-              {acao === "devolver" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} Devolver ao agente
-            </button>
+            <Button variant="primary" size="md" onClick={assumir} disabled={acao !== null} loading={acao === "assumir"}>
+              {acao !== "assumir" && <Hand size={14} aria-hidden="true" />} Assumir
+            </Button>
           )}
 
           {!encerrada && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={resolver}
               disabled={acao !== null}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-[12.5px] font-medium text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary disabled:opacity-50"
+              aria-label="Resolver conversa"
+              title="Resolver"
             >
-              {acao === "resolver" ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Resolver
-            </button>
+              {acao === "resolver" ? <Loader2 className="animate-spin" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}
+            </Button>
           )}
 
-          {membros.length > 1 && !encerrada && (
-            <select
-              value={conversa.assignedTo?.id ?? ""}
-              onChange={(e) => void transferir(e.target.value)}
-              disabled={acao !== null}
-              aria-label="Transferir para"
-              className="ml-auto rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12.5px] text-text-secondary outline-none disabled:opacity-50"
-            >
-              <option value="">Transferir para...</option>
-              {membros.map((m) => (
-                <option key={m.id} value={m.id}>{m.isMe ? `${m.name} (você)` : m.name}</option>
-              ))}
-            </select>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onAbrirCliente}
+            aria-label="Ver dados do cliente"
+            title="Dados do cliente"
+            className="xl:hidden"
+          >
+            <PanelRight aria-hidden="true" />
+          </Button>
+
+          {(podeDevolver || podeTransferir) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Mais ações da conversa" disabled={acao !== null}>
+                  {acao === "devolver" || acao === "transferir"
+                    ? <Loader2 className="animate-spin" aria-hidden="true" />
+                    : <MoreHorizontal aria-hidden="true" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[230px]">
+                {podeDevolver && (
+                  <DropdownMenuItem onSelect={() => void devolver()}>
+                    <Undo2 aria-hidden="true" /> Devolver ao agente
+                  </DropdownMenuItem>
+                )}
+                {podeDevolver && podeTransferir && <DropdownMenuSeparator />}
+                {podeTransferir && (
+                  <>
+                    <DropdownMenuLabel>Transferir para</DropdownMenuLabel>
+                    {membros.map((m) => {
+                      const atual = conversa.assignedTo?.id === m.id;
+                      return (
+                        <DropdownMenuItem key={m.id} onSelect={() => { if (!atual) void transferir(m.id); }}>
+                          <span className="min-w-0 flex-1 truncate">{m.isMe ? `${m.name} (você)` : m.name}</span>
+                          {atual && <Check className="text-accent-fg!" aria-label="Responsável atual" />}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
-
-        {erroDeAcao && <p className="mt-2 text-[12px] text-danger">{erroDeAcao}</p>}
       </header>
 
+      {erroDeAcao && (
+        <p className="shrink-0 border-b border-border-subtle bg-danger-subtle px-4 py-2 text-caption text-danger">{erroDeAcao}</p>
+      )}
+
       <div className="relative min-h-0 flex-1">
-        <div ref={rolagem} onScroll={aoRolar} className="h-full overflow-y-auto px-4 py-4">
+        <div ref={rolagem} onScroll={aoRolar} className="h-full overflow-y-auto px-4 py-4 lg:px-5">
           {!carregou ? (
-            <p className="py-10 text-center text-[13px] text-text-tertiary">Carregando mensagens...</p>
+            <p className="py-10 text-center text-small text-text-tertiary">Carregando mensagens...</p>
           ) : mensagens.length === 0 ? (
-            <p className="py-10 text-center text-[13px] text-text-tertiary">Ainda não há mensagens nesta conversa.</p>
+            <p className="py-10 text-center text-small text-text-tertiary">Ainda não há mensagens nesta conversa.</p>
           ) : (
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-1.5">
               {temMais && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={carregarAnteriores}
-                  disabled={carregandoMais}
-                  className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
+                  loading={carregandoMais}
+                  className="mx-auto mb-2"
                 >
-                  {carregandoMais && <Loader2 size={12} className="animate-spin" />} Mensagens anteriores
-                </button>
+                  Mensagens anteriores
+                </Button>
               )}
 
               {blocos.map((b) =>
                 b.tipo === "dia" ? (
-                  <div key={b.chave} className="my-1.5 flex justify-center">
-                    <span className="rounded-full bg-surface-2 px-3 py-1 text-[11px] text-text-tertiary">{b.rotulo}</span>
-                  </div>
+                  <p key={b.chave} className="mb-1 mt-2 text-center text-caption text-text-tertiary">{b.rotulo}</p>
                 ) : (
-                  <Balao key={b.m.id} m={b.m} onReenviar={reenviar} />
+                  <Balao key={b.m.id} m={b.m} mostrarAutor={b.mostrarAutor} onReenviar={reenviar} />
                 )
               )}
             </div>
@@ -407,16 +428,17 @@ export function ConversaAberta({
         </div>
 
         {novas > 0 && (
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => {
               rolarParaOFim(true);
               setNovas(0);
             }}
-            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-accent-500 px-3.5 py-1.5 text-[12px] font-medium text-text-on-accent shadow-lg transition-colors hover:bg-accent-400"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 shadow-overlay"
           >
-            <ChevronDown size={13} /> {novas === 1 ? "1 mensagem nova" : `${novas} mensagens novas`}
-          </button>
+            <ChevronDown size={14} aria-hidden="true" /> {novas === 1 ? "1 mensagem nova" : `${novas} mensagens novas`}
+          </Button>
         )}
       </div>
 

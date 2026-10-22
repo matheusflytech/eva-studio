@@ -9,6 +9,7 @@ import { PainelDoCliente } from "@/components/inbox/painel-do-cliente";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import type { Conversa, IdDoFiltro, Membro, Resumo } from "@/components/inbox/tipos";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,9 @@ import { useAgentsStore } from "@/lib/stores/agents-store";
 // Intercom: quem escreveu, a conversa, e quem é essa pessoa. A terceira é a que
 // importa pro produto: o CRM não fica noutra tela. O atendente muda a etapa do
 // negócio, cria a tarefa e etiqueta o cliente sem sair da conversa.
+//
+// As colunas são coladas, separadas só por uma linha fina: uma superfície só,
+// com o fundo vivo aparecendo por trás (sem cartões flutuando).
 //
 // A tela se mantém atualizada sozinha, mas só com a aba à vista (ver
 // use-sondagem.ts), e escolhe o que pedir: a lista inteira a cada poucos
@@ -228,10 +232,10 @@ function Conversas() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_330px]">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] border-t border-border-subtle lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_240px]">
         <ListaDeConversas
-          className={cn(selecionada ? "hidden lg:flex" : "flex")}
+          className={cn("lg:border-r lg:border-border-subtle", selecionada ? "hidden lg:flex" : "flex")}
           itens={lista}
           selecionada={selecionada}
           onSelecionar={selecionar}
@@ -267,15 +271,13 @@ function Conversas() {
             onAbrirCliente={() => setPainelAberto(true)}
           />
         ) : (
-          <section className={cn("glass-card min-h-0 flex-col items-center justify-center rounded-3xl p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
-            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2 text-text-tertiary">
-              <MessagesSquare size={26} />
-            </span>
-            <h2 className="font-display text-[17px] font-semibold text-text-primary">
+          <section className={cn("min-h-0 flex-col items-center justify-center p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
+            <MessagesSquare size={24} className="mb-3 text-text-tertiary" aria-hidden="true" />
+            <h2 className="text-title-sm font-semibold tracking-tight text-text-primary">
               {selecionada ? "Carregando a conversa..." : "Escolha uma conversa"}
             </h2>
             {!selecionada && (
-              <p className="mt-2 max-w-sm text-[13px] text-text-secondary">
+              <p className="mt-1.5 max-w-sm text-small text-text-secondary">
                 Você vê o histórico, responde, deixa notas para a equipe e mexe no negócio do cliente sem sair daqui.
               </p>
             )}
@@ -285,7 +287,7 @@ function Conversas() {
         {atual && (
           <PainelDoCliente
             key={`painel-${atual.id}`}
-            className="hidden xl:flex"
+            className="hidden border-l border-border-subtle xl:flex"
             conversa={atual}
             onMudou={atualizarTudo}
           />
@@ -295,17 +297,15 @@ function Conversas() {
       {/* Abaixo de 1280px o painel do cliente não cabe como coluna: abre por cima. */}
       {painelAberto && atual && (
         <div className="fixed inset-0 z-40 flex justify-end xl:hidden" role="dialog" aria-label="Dados do cliente">
-          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setPainelAberto(false)} />
-          <div className="relative z-10 h-full w-full max-w-[380px] p-3">
-            <button
-              type="button"
-              onClick={() => setPainelAberto(false)}
-              aria-label="Fechar"
-              className="absolute right-6 top-6 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3 text-text-secondary hover:text-text-primary"
-            >
-              <X size={16} />
-            </button>
-            <PainelDoCliente conversa={atual} onMudou={atualizarTudo} className="glass-card-solid h-full" />
+          <div className="absolute inset-0 bg-backdrop backdrop-blur-sm" onClick={() => setPainelAberto(false)} />
+          <div className="relative z-10 flex h-full w-full max-w-[360px] flex-col border-l border-border-subtle bg-panel">
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-3.5">
+              <h2 className="text-body font-semibold text-text-primary">Cliente</h2>
+              <Button variant="ghost" size="icon" onClick={() => setPainelAberto(false)} aria-label="Fechar">
+                <X aria-hidden="true" />
+              </Button>
+            </div>
+            <PainelDoCliente conversa={atual} onMudou={atualizarTudo} className="min-h-0 flex-1" />
           </div>
         </div>
       )}
