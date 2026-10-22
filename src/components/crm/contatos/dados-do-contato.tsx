@@ -1,28 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { BellOff, BellRing, X } from "lucide-react";
-import { Input, Textarea, Label, Field } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { BellOff, BellRing } from "lucide-react";
+import { Input, Textarea, Field } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { CamposDoContato } from "@/components/crm/campos-do-contato";
-import type { Contact, TagRow } from "./tipos";
+import type { Contact } from "./tipos";
 
 /**
  * Os dados do contato que se editam no lugar: salvam ao sair do campo
- * (sem botão Salvar), etiquetas, campos personalizados, anotações e opt-in.
- * Mesmo componente na gaveta da lista e na página completa do contato.
+ * (sem botão Salvar), campos personalizados, anotações e opt-in. Mesmo
+ * componente na ficha da lista e na aba Dados da página completa. As
+ * etiquetas moram no topo da ficha (EtiquetasDoContato).
  */
-export function DadosDoContato({
-  contact,
-  tags,
-  onChanged,
-}: {
-  contact: Contact;
-  tags: TagRow[];
-  onChanged: (c: Contact) => void;
-}) {
+export function DadosDoContato({ contact, onChanged }: { contact: Contact; onChanged: (c: Contact) => void }) {
   const [form, setForm] = React.useState({ name: contact.name, email: contact.email, phone: contact.phone, notes: contact.notes });
   const [base, setBase] = React.useState(contact);
   // Contato novo (ou salvo pelo servidor): o formulário volta ao que veio.
@@ -56,8 +48,6 @@ export function DadosDoContato({
     patch({ [campo]: form[campo] });
   }
 
-  const disponiveis = tags.filter((t) => !contact.tags.some((ct) => ct.id === t.id));
-
   return (
     <div className="flex flex-col gap-5">
       {erro && <Notice tone="danger">{erro}</Notice>}
@@ -73,48 +63,13 @@ export function DadosDoContato({
         </Field>
       </section>
 
-      <section>
-        <Label>Etiquetas</Label>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {contact.tags.map((t) => (
-            <span key={t.id} className="inline-flex h-6 items-center gap-1 rounded-sm bg-raised pl-2 pr-1 text-caption font-medium text-text-secondary">
-              {t.name}
-              <button
-                type="button"
-                onClick={() => patch({ removeTagId: t.id })}
-                aria-label={`Tirar a etiqueta ${t.name}`}
-                className="grid h-4 w-4 place-items-center rounded-sm text-text-tertiary hover:bg-hover hover:text-danger"
-              >
-                <X size={12} aria-hidden="true" />
-              </button>
-            </span>
-          ))}
-          {contact.tags.length === 0 && <span className="text-small text-text-tertiary">Nenhuma etiqueta.</span>}
-        </div>
-        {disponiveis.length > 0 && (
-          <div className="mt-2">
-            <Select aria-label="Aplicar etiqueta" value="" onChange={(e) => e.target.value && patch({ addTagId: e.target.value })}>
-              <option value="">Aplicar etiqueta…</option>
-              {disponiveis.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-        <p className="mt-1 text-caption text-text-tertiary">
-          Aplicar uma etiqueta pode inscrever o contato numa sequência, se houver alguma com esse gatilho.
-        </p>
-      </section>
-
       <CamposDoContato contactId={contact.id} valores={contact.customFields ?? {}} aoSalvar={(c) => onChanged(c as Contact)} />
 
       <Field label="Anotações">
         <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} onBlur={() => salvarSeMudou("notes")} />
       </Field>
 
-      <section className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle px-3 py-2.5">
+      <section className="flex items-center justify-between gap-3 rounded-[14px] bg-raised px-3.5 py-2.5 ring-1 ring-border-subtle">
         <div className="flex items-center gap-2.5">
           {contact.optIn ? (
             <BellRing size={16} aria-hidden="true" className="text-text-secondary" />
