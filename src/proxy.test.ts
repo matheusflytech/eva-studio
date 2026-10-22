@@ -19,7 +19,7 @@ describe("proxy: caminhos antigos", () => {
   it("link salvo /negocios/123?aba=x vai para o último contrato, preservando tudo", async () => {
     const res = await proxy(pedir("/negocios/123?aba=x", A));
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe(`https://app.eva/${A}/negocios/123?aba=x`);
+    expect(res.headers.get("location")).toBe(`https://app.eva/${A.slice(0, 8)}/negocios/123?aba=x`);
   });
 
   it("sem cookie, pergunta ao servidor em /ir", async () => {

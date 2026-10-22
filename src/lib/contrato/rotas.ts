@@ -1,5 +1,8 @@
 // ---------------------------------------------------------------------------
 // O contrato mora na URL: /<idDoContrato>/negocios, /<id>/contatos/...
+// Na URL vai o id curto (os 8 primeiros caracteres, o mesmo da tela de
+// contratos): /8d8d3a8c/negocios. O id completo continua aceito (links antigos)
+// e o servidor troca o curto pelo completo antes de conferir o acesso.
 //
 // Este arquivo é o único lugar que sabe montar e desmontar esse caminho. Sem
 // dependência de React/Next: é usado pelo proxy (redirecionar caminho antigo),
@@ -37,9 +40,31 @@ const SECOES = new Set<string>(SECOES_DO_CONTRATO);
 // Organization.id é uuid (default do Prisma). Conferir o formato evita tratar
 // "/favicon.ico" ou "/qualquer-coisa" como contrato.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CURTO = /^[0-9a-f]{8}$/i;
 
+/** Id do contrato como vem da URL ou do cabeçalho: completo ou curto. */
 export function ehIdDeContrato(v: unknown): v is string {
+  return typeof v === "string" && (UUID.test(v) || CURTO.test(v));
+}
+
+/** Só o id completo (o do banco). */
+export function ehIdCompletoDeContrato(v: unknown): v is string {
   return typeof v === "string" && UUID.test(v);
+}
+
+export function ehIdCurtoDeContrato(v: unknown): v is string {
+  return typeof v === "string" && CURTO.test(v);
+}
+
+/** O que vai na URL: "8d8d3a8c-2ff6-..." → "8d8d3a8c". */
+export function idCurto(id: string): string {
+  return UUID.test(id) ? id.slice(0, 8).toLowerCase() : id.toLowerCase();
+}
+
+/** O id completo `completo` é o contrato que a URL pediu (curto ou completo)? */
+export function mesmoContrato(completo: string | null | undefined, daUrl: string | null | undefined): boolean {
+  if (!completo || !daUrl) return false;
+  return CURTO.test(daUrl) ? idCurto(completo) === daUrl.toLowerCase() : completo.toLowerCase() === daUrl.toLowerCase();
 }
 
 function primeiroSegmento(caminho: string): string {
@@ -65,7 +90,7 @@ export function contratoDoCaminho(pathname: string | null | undefined): string |
  */
 export function rotaDoContrato(contrato: string | null | undefined, caminho: string): string {
   if (!contrato || !ehCaminhoDeSecao(caminho)) return caminho;
-  return `/${contrato}${caminho}`;
+  return `/${idCurto(contrato)}${caminho}`;
 }
 
 /** O inverso: "/<id>/negocios/1" → "/negocios/1". Sem contrato, volta igual. */
@@ -83,7 +108,7 @@ export function tirarContrato(pathname: string): string {
  */
 export function trocarContrato(pathname: string, novo: string): string {
   const seg = primeiroSegmento(tirarContrato(pathname));
-  return `/${novo}/${SECOES.has(seg) ? seg : "inicio"}`;
+  return `/${idCurto(novo)}/${SECOES.has(seg) ? seg : "inicio"}`;
 }
 
 /**
@@ -104,6 +129,6 @@ export function apiDoContrato(contrato: string | null | undefined, url: string):
 export function destinoDoCaminhoAntigo(pathname: string, search: string, cookie: string | null | undefined): string | null {
   if (!ehCaminhoDeSecao(pathname)) return null;
   const alvo = `${pathname}${search}`;
-  if (ehIdDeContrato(cookie)) return `/${cookie}${alvo}`;
+  if (ehIdDeContrato(cookie)) return `/${idCurto(cookie)}${alvo}`;
   return `/ir?para=${encodeURIComponent(alvo)}`;
 }

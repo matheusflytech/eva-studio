@@ -6,7 +6,7 @@ import { useRouter, usePathname, useParams } from "next/navigation";
 import { Menu, X, ShieldOff, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Sidebar } from "@/components/layout/sidebar";
-import { ehIdDeContrato } from "@/lib/contrato/rotas";
+import { ehIdDeContrato, idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 import { buttonVariants } from "@/components/ui/button";
 import { BuscaGlobal, useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 
@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <div className="min-h-screen bg-bg-base" />;
   }
 
-  if (session.semAcesso || session.contratoId !== contrato) {
+  if (session.semAcesso || !mesmoContrato(session.contratoId, contrato)) {
     return <SemAcesso padrao={session.contratoPadrao ?? null} />;
   }
 
@@ -123,7 +123,7 @@ function SemAcesso({ padrao }: { padrao: string | null }) {
           contrato.
         </p>
         <NextLink
-          href={padrao ? `/${padrao}/inicio` : "/ir"}
+          href={padrao ? `/${idCurto(padrao)}/inicio` : "/ir"}
           className={buttonVariants({ size: "md", className: "mt-5" })}
         >
           Ir para o meu contrato

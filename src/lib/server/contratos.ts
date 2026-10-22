@@ -12,7 +12,7 @@ import {
   type PapelDeSistema,
   type PermissaoGranular,
 } from "@/lib/permissoes/catalogo";
-import { ehIdDeContrato } from "@/lib/contrato/rotas";
+import { ehIdCompletoDeContrato, ehIdCurtoDeContrato } from "@/lib/contrato/rotas";
 
 // ---------------------------------------------------------------------------
 // Contrato ativo: qual Organization esta requisição enxerga.
@@ -146,7 +146,7 @@ function acessoSuperadmin(orgId: string): AcessoAoContrato {
 
 /** A pessoa entra no contrato? null = não (sem vazar o motivo). */
 export async function acessoAoContrato(pessoa: Pessoa, orgId: string): Promise<AcessoAoContrato | null> {
-  if (!ehIdDeContrato(orgId) && orgId !== pessoa.profileOrgId) return null;
+  if (!ehIdCompletoDeContrato(orgId) && orgId !== pessoa.profileOrgId) return null;
 
   let vinculo: VinculoComPapel | null | "legado";
   try {
@@ -195,19 +195,35 @@ export type ResultadoDoContrato =
  *   cookie   eva_contrato, o último usado. Sem acesso = ignorado.
  *   depois   Profile.orgId (contrato padrão) e o primeiro vínculo ativo.
  */
+/**
+ * Id curto da URL (8 primeiros caracteres) → id completo. Dois contratos com o
+ * mesmo começo: null (sem acesso), nunca um deles por sorte; aí só o completo
+ * serve. Id completo ou outra coisa: volta igual.
+ */
+export async function expandirIdDoContrato(id: string): Promise<string | null> {
+  if (!ehIdCurtoDeContrato(id)) return id;
+  const orgs = await prisma.organization.findMany({
+    where: { id: { startsWith: id.toLowerCase() } },
+    select: { id: true },
+    take: 2,
+  });
+  return orgs.length === 1 ? orgs[0].id : null;
+}
+
 export async function resolverContratoAtivo(
   pessoa: Pessoa,
   pedido: string | null | undefined,
   cookie: string | null | undefined
 ): Promise<ResultadoDoContrato> {
   if (pedido) {
-    const acesso = await acessoAoContrato(pessoa, pedido);
+    const completo = await expandirIdDoContrato(pedido);
+    const acesso = completo ? await acessoAoContrato(pessoa, completo) : null;
     return acesso ? { ok: true, acesso } : { ok: false, motivo: "sem_acesso" };
   }
 
   const candidatos = [...new Set([cookie, pessoa.profileOrgId].filter((c): c is string => !!c))];
   for (const c of candidatos) {
-    if (c !== pessoa.profileOrgId && !ehIdDeContrato(c)) continue;
+    if (c !== pessoa.profileOrgId && !ehIdCompletoDeContrato(c)) continue;
     const acesso = await acessoAoContrato(pessoa, c);
     if (acesso) return { ok: true, acesso };
   }

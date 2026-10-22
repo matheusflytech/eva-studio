@@ -3,6 +3,9 @@ import {
   apiDoContrato,
   contratoDoCaminho,
   destinoDoCaminhoAntigo,
+  ehIdDeContrato,
+  idCurto,
+  mesmoContrato,
   rotaDoContrato,
   tirarContrato,
   trocarContrato,
@@ -11,12 +14,15 @@ import { comCabecalhoDoContrato, precisaDoContrato } from "./fetch-do-app";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
+// Na URL vai o id curto (8 primeiros caracteres).
+const a = "11111111";
+const b = "22222222";
 const ORIGEM = "https://app.eva";
 
 describe("rotas do contrato", () => {
   it("põe o contrato na frente só de telas do app", () => {
-    expect(rotaDoContrato(A, "/negocios/9?aba=x")).toBe(`/${A}/negocios/9?aba=x`);
-    expect(rotaDoContrato(A, "/conversas?c=1")).toBe(`/${A}/conversas?c=1`);
+    expect(rotaDoContrato(A, "/negocios/9?aba=x")).toBe(`/${a}/negocios/9?aba=x`);
+    expect(rotaDoContrato(a, "/conversas?c=1")).toBe(`/${a}/conversas?c=1`);
     expect(rotaDoContrato(A, "/api/deals")).toBe("/api/deals");
     expect(rotaDoContrato(A, "/login")).toBe("/login");
     expect(rotaDoContrato(A, "https://x.com/negocios")).toBe("https://x.com/negocios");
@@ -31,12 +37,28 @@ describe("rotas do contrato", () => {
     expect(tirarContrato(`/${A}/negocios/1`)).toBe("/negocios/1");
     expect(tirarContrato(`/${A}`)).toBe("/");
     expect(tirarContrato("/admin")).toBe("/admin");
+    expect(contratoDoCaminho(`/${a}/negocios/1`)).toBe(a);
+    expect(tirarContrato(`/${a}/negocios/1`)).toBe("/negocios/1");
+  });
+
+  it("id curto: 8 caracteres hexadecimais; o completo continua valendo", () => {
+    expect(idCurto(A)).toBe(a);
+    expect(idCurto("8D8D3A8C-2FF6-485E-A325-17384E9990CF")).toBe("8d8d3a8c");
+    expect(ehIdDeContrato(a)).toBe(true);
+    expect(ehIdDeContrato(A)).toBe(true);
+    expect(ehIdDeContrato("inicio")).toBe(false);
+    expect(ehIdDeContrato("1111111")).toBe(false);
+    expect(ehIdDeContrato("favicon1")).toBe(false);
+    expect(mesmoContrato(A, a)).toBe(true);
+    expect(mesmoContrato(A, A)).toBe(true);
+    expect(mesmoContrato(A, b)).toBe(false);
+    expect(mesmoContrato(null, a)).toBe(false);
   });
 
   it("trocar de contrato mantém a seção, não o registro", () => {
-    expect(trocarContrato(`/${A}/negocios/123`, B)).toBe(`/${B}/negocios`);
-    expect(trocarContrato(`/${A}/configuracoes`, B)).toBe(`/${B}/configuracoes`);
-    expect(trocarContrato("/admin", B)).toBe(`/${B}/inicio`);
+    expect(trocarContrato(`/${A}/negocios/123`, B)).toBe(`/${b}/negocios`);
+    expect(trocarContrato(`/${a}/configuracoes`, B)).toBe(`/${b}/configuracoes`);
+    expect(trocarContrato("/admin", B)).toBe(`/${b}/inicio`);
   });
 
   it("link aberto pelo navegador leva o contrato na query", () => {
@@ -47,8 +69,8 @@ describe("rotas do contrato", () => {
 
 describe("redirecionamento dos caminhos antigos", () => {
   it("vai para o último contrato usado, preservando caminho e query", () => {
-    expect(destinoDoCaminhoAntigo("/negocios/42", "?aba=itens", A)).toBe(`/${A}/negocios/42?aba=itens`);
-    expect(destinoDoCaminhoAntigo("/conversas", "?c=9", A)).toBe(`/${A}/conversas?c=9`);
+    expect(destinoDoCaminhoAntigo("/negocios/42", "?aba=itens", A)).toBe(`/${a}/negocios/42?aba=itens`);
+    expect(destinoDoCaminhoAntigo("/conversas", "?c=9", A)).toBe(`/${a}/conversas?c=9`);
   });
 
   it("sem cookie (ou cookie estranho) pergunta ao servidor em /ir", () => {

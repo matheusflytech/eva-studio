@@ -5,7 +5,7 @@ import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Copy, Check, Loader2, ShieldCheck, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
-import { ehCaminhoDeSecao } from "@/lib/contrato/rotas";
+import { ehCaminhoDeSecao, idCurto } from "@/lib/contrato/rotas";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { ContratoDaSessao } from "@/lib/data/types";
@@ -189,7 +189,7 @@ function Escolher() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <NextLink href={`/${c.id}${para}`} className={buttonVariants({ size: "sm" })}>
+                        <NextLink href={`/${idCurto(c.id)}${para}`} className={buttonVariants({ size: "sm" })}>
                           Acessar
                         </NextLink>
                       </td>
