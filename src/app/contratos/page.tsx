@@ -3,11 +3,14 @@
 import * as React from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Copy, Check, Loader2, ShieldCheck, LogOut } from "lucide-react";
+import { ChevronRight, Copy, Check, ShieldCheck, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ehCaminhoDeSecao, idCurto } from "@/lib/contrato/rotas";
-import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { SearchInput } from "@/components/ui/search-input";
+import { FundoVivo } from "@/components/layout/fundo-vivo";
+import { MarcaEva } from "@/components/layout/marca-eva";
+import { pulsar } from "@/lib/fundo/eventos";
 import type { ContratoDaSessao } from "@/lib/data/types";
 
 // "Olá Fulano, qual contrato deseja acessar?" — depois do login, e pelo
@@ -15,6 +18,9 @@ import type { ContratoDaSessao } from "@/lib/data/types";
 // que tenha vindo do menu, ?escolher=1). Superadmin vê todos, paginado.
 //
 // A lista é só navegação: entrar em /<id>/... confere o vínculo no servidor.
+//
+// Visual: continuação do login. Mesmo palco escuro (preto, feixe de luz,
+// fundo vivo) e o mesmo cartão de vidro, agora com a lista dos contratos.
 
 interface Resposta {
   nome: string;
@@ -25,6 +31,18 @@ interface Resposta {
   porPagina: number;
   contratos: ContratoDaSessao[];
   ultimo: string | null;
+}
+
+/** O palco do login fica montado o tempo todo: carregando, redirecionando ou com a lista. */
+function Palco({ children }: { children?: React.ReactNode }) {
+  return (
+    <div data-theme="dark" className="tela-de-entrada relative flex min-h-[100dvh] flex-col overflow-hidden">
+      <FundoVivo escuro forca={2.4} className="pointer-events-none absolute inset-0 h-full w-full" />
+      <span className="feixe-de-luz" aria-hidden="true" />
+      <span className="feixe-de-luz feixe-fino" aria-hidden="true" />
+      {children}
+    </div>
+  );
 }
 
 function IdCurto({ id }: { id: string }) {
@@ -39,8 +57,9 @@ function IdCurto({ id }: { id: string }) {
     }
   }
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <code title={id} className="font-mono text-[12.5px] text-text-secondary">
+    // relative z-10: fica acima do link esticado da linha, para o clique copiar e não entrar.
+    <span className="relative z-10 inline-flex shrink-0 items-center gap-0.5">
+      <code title={id} className="font-mono text-caption text-text-tertiary">
         {id.slice(0, 8)}
       </code>
       <button
@@ -48,9 +67,9 @@ function IdCurto({ id }: { id: string }) {
         onClick={copiar}
         aria-label={copiado ? "Id copiado" : `Copiar o id completo ${id}`}
         title="Copiar o id completo"
-        className="rounded-md p-1 text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary"
+        className="grid h-7 w-7 place-items-center rounded-full text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary"
       >
-        {copiado ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+        {copiado ? <Check size={13} className="text-success" /> : <Copy size={13} />}
       </button>
     </span>
   );
@@ -104,133 +123,128 @@ function Escolher() {
     if (unico) router.replace(`/${unico.id}${para}`);
   }, [unico, router, para]);
 
-  if (isLoading || !session || unico || (!dados && carregando)) {
-    return <div className="min-h-screen bg-bg-base" />;
-  }
+  // Carregando ou indo direto para o contrato: só o palco, sem piscar outra cor.
+  if (isLoading || !session || unico || (!dados && carregando)) return null;
 
   const temMais = dados ? lista.length < dados.total : false;
+  const semContrato = dados && dados.totalSemBusca === 0;
 
   return (
-    <div className="app-backdrop min-h-[100dvh] px-4 py-10">
-      <div className="mx-auto flex max-w-3xl flex-col gap-5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/eva-mark.png" alt="" width={22} height={22} />
-            <span className="font-display text-[14px] font-bold text-text-primary">Eva</span>
-          </span>
-          <div className="flex items-center gap-2">
-            {dados?.superadmin && (
-              <NextLink href="/admin" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                <ShieldCheck size={14} /> Painel da Eva
-              </NextLink>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                logOut();
-                router.push("/login");
-              }}
-            >
-              <LogOut size={14} /> Sair
-            </Button>
-          </div>
+    <>
+      <header className="relative z-10 flex items-center justify-between gap-3 px-4 pt-5 sm:px-8 sm:pt-7">
+        <span className="text-small font-semibold text-text-secondary">Eva Holding</span>
+        <div className="flex items-center gap-1.5">
+          {dados?.superadmin && (
+            <NextLink href="/admin" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              <ShieldCheck size={14} aria-hidden="true" /> Painel da Eva
+            </NextLink>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              logOut();
+              router.push("/login");
+            }}
+          >
+            <LogOut size={14} aria-hidden="true" /> Sair
+          </Button>
         </div>
+      </header>
 
-        <div className="glass-card rounded-3xl p-6">
-          <h1 className="font-display text-xl font-semibold text-text-primary">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8">
+        <div className="cartao-vidro w-full max-w-[460px]">
+          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[13px] bg-page ring-1 ring-border-default">
+            <MarcaEva size={22} className="text-text-primary" />
+          </span>
+          <h1 className="text-center text-title font-semibold tracking-tight text-text-primary">
             Olá {dados?.nome || session.name}, qual contrato deseja acessar?
           </h1>
-          <p className="mt-1 text-[13px] text-text-secondary">
+          <p className="mt-1 text-center text-small text-text-secondary">
             {dados?.superadmin
               ? `Você é da equipe da Eva e vê todos os ${dados.totalSemBusca} contratos.`
               : "Cada contrato é um cliente, com os próprios dados, membros e chaves."}
           </p>
 
-          <div className="relative mt-5">
-            <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Pesquisar por nome ou id"
-              aria-label="Pesquisar por nome ou id"
-              className="pl-10"
-              autoFocus
-            />
-          </div>
-
-          {dados && dados.totalSemBusca === 0 ? (
-            <p className="mt-6 rounded-2xl bg-surface-2 px-4 py-5 text-center text-[13px] text-text-secondary">
+          {semContrato ? (
+            <p className="mt-6 text-center text-small text-text-tertiary">
               Você ainda não participa de nenhum contrato. Peça um convite a quem administra o contrato da sua empresa.
             </p>
           ) : (
-            <div className="mt-5 overflow-hidden rounded-2xl border border-border-subtle">
-              <table className="w-full text-left text-[13px]">
-                <thead className="bg-surface-2 text-[11.5px] font-semibold uppercase tracking-wide text-text-tertiary">
-                  <tr>
-                    <th className="px-4 py-2.5 font-semibold">Id do contrato</th>
-                    <th className="px-4 py-2.5 font-semibold">Nome</th>
-                    <th className="px-4 py-2.5" aria-label="Ação" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lista.map((c) => (
-                    <tr key={c.id} className="border-t border-border-subtle hover:bg-surface-2/60">
-                      <td className="whitespace-nowrap px-4 py-2.5">
-                        <IdCurto id={c.id} />
-                      </td>
-                      <td className="px-4 py-2.5 text-text-primary">
-                        <span className="font-medium">{c.name}</span>
-                        {c.id === dados?.ultimo && (
-                          <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-[11px] text-text-tertiary">
-                            último usado
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <NextLink href={`/${idCurto(c.id)}${para}`} className={buttonVariants({ size: "sm" })}>
-                          Acessar
-                        </NextLink>
-                      </td>
-                    </tr>
-                  ))}
-                  {lista.length === 0 && !carregando && (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-6 text-center text-text-tertiary">
-                        Nenhum contrato com “{busca}”.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+            <>
+              <SearchInput
+                value={busca}
+                onValueChange={setBusca}
+                placeholder="Pesquisar por nome ou id"
+                aria-label="Pesquisar por nome ou id"
+                className="mt-6"
+                autoFocus
+              />
 
-          <div className="mt-4 flex items-center justify-between text-[12px] text-text-tertiary">
-            <span>{dados ? `${lista.length} de ${dados.total}` : ""}</span>
-            {temMais && (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={carregando}
-                onClick={() => dados && carregar(busca, dados.pagina + 1)}
-              >
-                {carregando && <Loader2 size={14} className="animate-spin" />} Mostrar mais
-              </Button>
-            )}
-          </div>
+              {/* Lista colada com linhas finas; rola dentro do cartão para a busca não sumir. */}
+              <ul className="mt-4 max-h-[min(52dvh,440px)] overflow-y-auto border-y border-border-default" aria-busy={carregando || undefined}>
+                {lista.map((c) => (
+                  <li
+                    key={c.id}
+                    className="group relative flex min-h-12 items-center gap-3 border-t border-border-default px-2 transition-colors first:border-t-0 hover:bg-hover"
+                  >
+                    {/* Link esticado: a linha inteira entra no contrato; o botão de copiar fica por cima. */}
+                    <NextLink
+                      href={`/${idCurto(c.id)}${para}`}
+                      onClick={(e) => pulsar(e.currentTarget, 1.6)}
+                      className="min-w-0 flex-1 truncate py-3 text-body font-medium text-text-primary outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-focus"
+                    >
+                      {c.name}
+                      {c.id === dados?.ultimo && (
+                        <span className="ml-2 font-mono text-caption font-normal text-text-tertiary">último usado</span>
+                      )}
+                    </NextLink>
+                    <IdCurto id={c.id} />
+                    <ChevronRight
+                      size={15}
+                      aria-hidden="true"
+                      className="shrink-0 text-text-tertiary transition-transform group-hover:translate-x-0.5 group-hover:text-text-primary"
+                    />
+                  </li>
+                ))}
+                {lista.length === 0 && !carregando && (
+                  <li className="px-2 py-6 text-center text-small text-text-tertiary">Nenhum contrato com “{busca}”.</li>
+                )}
+              </ul>
+
+              <div className="mt-3 flex min-h-7 items-center justify-between gap-3">
+                <span className="font-mono text-caption tabular-nums text-text-tertiary">
+                  {dados ? `${lista.length} de ${dados.total}` : ""}
+                </span>
+                {temMais && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={carregando}
+                    onClick={() => dados && carregar(busca, dados.pagina + 1)}
+                  >
+                    Mostrar mais
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      </div>
-    </div>
+      </main>
+
+      <span className="relative z-10 pb-6 text-center font-mono text-caption text-text-disabled">evapp.vercel.app</span>
+    </>
   );
 }
 
 export default function ContratosPage() {
-  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página.
+  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página. O
+  // palco fica fora dele para o fundo não reiniciar quando a lista chega.
   return (
-    <React.Suspense fallback={<div className="min-h-screen bg-bg-base" />}>
-      <Escolher />
-    </React.Suspense>
+    <Palco>
+      <React.Suspense fallback={null}>
+        <Escolher />
+      </React.Suspense>
+    </Palco>
   );
 }
