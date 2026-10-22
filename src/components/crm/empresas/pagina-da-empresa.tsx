@@ -23,7 +23,7 @@ import { useRouter } from "@/lib/contrato/navegacao";
 import { pulsar, avisarNaIlha } from "@/lib/fundo/eventos";
 import { initials } from "@/lib/design-system/format";
 import { cn, formatRelativeDate } from "@/lib/utils";
-import { FotoDaPessoa, LogoDaEmpresa, cidadeUf, formatCnpj, money, normalizeUrl } from "./pecas";
+import { FotoDaPessoa, LogoDaEmpresa, cidadeUf, formatCnpj, money, normalizeUrl, siglaDe } from "./pecas";
 
 interface Company {
   id: string; name: string; cnpj: string; sector: string; size: number | null;
@@ -138,7 +138,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
     avisarNaIlha({
       titulo: "Contato desvinculado",
       detalhe: `${nomeDaPessoa} saiu de ${data?.company.name || "a empresa"}`,
-      avatar: initials(nomeDaPessoa),
+      avatar: siglaDe(nomeDaPessoa),
       acao: { rotulo: "Desfazer", aoClicar: () => void patch({ addContactId: c.id }) },
     });
   }

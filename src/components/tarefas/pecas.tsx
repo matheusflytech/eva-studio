@@ -66,7 +66,9 @@ export function AcaoRapida({
   const classe = buttonVariants({ variant: "secondary", size: tamanho });
   const conteudo = (
     <>
-      <Icone size={14} aria-hidden /> {acao.rotulo}
+      <Icone size={14} aria-hidden />
+      {/* Na linha, no celular, só o ícone: o título da tarefa precisa do espaço. */}
+      <span className={tamanho === "sm" ? "max-sm:sr-only" : undefined}>{acao.rotulo}</span>
     </>
   );
   if (acao.externo) {

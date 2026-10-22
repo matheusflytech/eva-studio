@@ -69,6 +69,10 @@ export function LinhaDeTarefa({
           <span className={cn("truncate text-body font-medium text-text-primary", feita && "font-normal text-text-tertiary line-through")}>{tarefa.text}</span>
         </span>
         <span className="flex min-w-0 items-center gap-1 truncate text-caption text-text-tertiary">
+          {/* No celular o prazo desce para cá e o título fica com a largura toda. */}
+          <span className={cn("shrink-0 sm:hidden", tarefa.overdue ? "font-medium text-danger" : "text-text-secondary")}>
+            {feita ? `Feita ${textoDoPrazo(tarefa.doneAt, false, agora).toLowerCase()}` : textoDoPrazo(tarefa.dueAt, tarefa.diaTodo, agora)} ·
+          </span>
           <span className="shrink-0">{rotuloDoTipo(tarefa.type)}</span>
           {tarefa.deal && (
             <>
@@ -98,7 +102,7 @@ export function LinhaDeTarefa({
           <MenuDeAdiar tarefa={tarefa} onAdiada={onMudou} />
         </span>
       )}
-      <span className={cn("shrink-0 text-small tabular-nums", tarefa.overdue ? "font-medium text-danger" : "text-text-secondary")}>
+      <span className={cn("hidden shrink-0 text-small tabular-nums sm:inline", tarefa.overdue ? "font-medium text-danger" : "text-text-secondary")}>
         {feita ? `Feita ${textoDoPrazo(tarefa.doneAt, false, agora).toLowerCase()}` : textoDoPrazo(tarefa.dueAt, tarefa.diaTodo, agora)}
         {tarefa.overdue && <span className="sr-only"> (atrasada)</span>}
       </span>

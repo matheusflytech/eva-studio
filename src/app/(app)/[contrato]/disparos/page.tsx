@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Send, Clock, FlaskConical, Plus, X, CalendarClock, Ban, CircleHelp, ListFilter, Mail, MessageCircle, Check } from "lucide-react";
+import { Send, Clock, FlaskConical, Plus, X, CalendarClock, Ban, CircleHelp, ListFilter, Mail, MessageCircle, Check, Megaphone } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { CampoDataSP } from "@/components/whatsapp/campo-data-sp";
 import { deSaoPaulo, formatarSaoPaulo, paraCampoSaoPaulo } from "@/lib/fuso-sp";
 import { useAgentsStore } from "@/lib/stores/agents-store";
@@ -576,12 +577,16 @@ export default function DisparosPage() {
           ))}
         </div>
       ) : broadcasts.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 py-8">
-          <p className="text-body text-text-secondary">Nenhuma campanha ainda para {agente?.name ?? "esse agente"}.</p>
-          <Button variant="secondary" onClick={() => setFormAberto(true)}>
-            <Plus size={14} aria-hidden="true" /> Nova campanha
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Megaphone />}
+          title="Nenhuma campanha ainda"
+          description={`Mande um template aprovado para uma lista de contatos de ${agente?.name ?? "esse agente"}, na hora ou agendado.`}
+          action={
+            <Button variant="primary" onClick={() => setFormAberto(true)}>
+              <Plus size={14} aria-hidden="true" /> Nova campanha
+            </Button>
+          }
+        />
       ) : visiveis.length === 0 ? (
         <div className="flex flex-col items-start gap-3 py-8">
           <p className="text-body text-text-secondary">Nenhuma campanha com essa busca ou esses filtros.</p>

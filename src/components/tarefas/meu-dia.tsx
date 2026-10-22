@@ -154,9 +154,15 @@ export function MeuDia({ versao, onMudou, moldura }: { versao: number; onMudou: 
   const tarefasQueNaoCabem = dia.provavelmenteAmanha.filter((i) => i.tarefa).length;
   const { livres, planejados, excedentes } = dia.capacidade;
 
-  const [destaque, ...seguintes] = dia.agora;
+  // Depois das 18h (ou num dia já estourado) tudo cai em "provavelmente
+  // amanhã": aí a fila de trabalho é essa mesma, para a tela nunca ficar só
+  // com o "Mais N".
+  const semFolga = dia.agora.length === 0;
+  const filaDeHoje = semFolga ? dia.provavelmenteAmanha : dia.agora;
+  const amanha = semFolga ? [] : dia.provavelmenteAmanha;
+  const [destaque, ...seguintes] = filaDeHoje;
   const visiveis = verTudo ? seguintes : seguintes.slice(0, EM_SEGUIDA);
-  const escondidos = seguintes.length - visiveis.length + (verTudo ? 0 : dia.provavelmenteAmanha.length);
+  const escondidos = seguintes.length - visiveis.length + (verTudo ? 0 : amanha.length);
 
   const acoes = (
     <>
@@ -249,7 +255,7 @@ export function MeuDia({ versao, onMudou, moldura }: { versao: number; onMudou: 
 
         {!destaque && dia.fixos.length > 0 && <p className="px-2 text-small text-text-secondary">Nada além dos compromissos.</p>}
 
-        {verTudo && dia.provavelmenteAmanha.length > 0 && (
+        {verTudo && amanha.length > 0 && (
           <section aria-labelledby="grupo-amanha">
             <div className="flex items-center gap-2 pr-2">
               <TituloDeGrupo id="grupo-amanha" className="pb-0">
@@ -258,21 +264,21 @@ export function MeuDia({ versao, onMudou, moldura }: { versao: number; onMudou: 
               <span className="text-caption text-text-tertiary">não cabe no que sobra do seu dia</span>
             </div>
             <ul className="mt-1">
-              {dia.provavelmenteAmanha.map((i) => (
+              {amanha.map((i) => (
                 <ItemDoDia key={i.id} item={i} agora={agora} onConcluir={concluir} onMudou={mudou} />
               ))}
             </ul>
           </section>
         )}
 
-        {(escondidos > 0 || verTudo) && (seguintes.length > EM_SEGUIDA || dia.provavelmenteAmanha.length > 0) && (
+        {(escondidos > 0 || verTudo) && (seguintes.length > EM_SEGUIDA || amanha.length > 0) && (
           <button
             type="button"
             onClick={() => setVerTudo((v) => !v)}
             aria-expanded={verTudo}
             className="inline-flex w-fit items-center gap-1 rounded-full px-2 text-small font-medium text-accent-fg hover:underline"
           >
-            {verTudo ? "Mostrar menos" : `Mais ${escondidos} para hoje`}
+            {verTudo ? "Mostrar menos" : semFolga ? `Mais ${escondidos}` : `Mais ${escondidos} para hoje`}
             {verTudo ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
           </button>
         )}
@@ -384,6 +390,10 @@ function ItemDoDia({
           <span className="truncate text-body font-medium text-text-primary">{item.titulo}</span>
         </span>
         <span className="truncate text-caption text-text-tertiary">
+          {/* No celular o prazo desce para cá e o título fica com a largura toda. */}
+          {prazo && (
+            <span className={cn("sm:hidden", atrasada || item.fonte === "responder" ? "font-medium text-danger" : "text-text-secondary")}>{prazo} · </span>
+          )}
           {fonte ? fonte.rotulo : rotuloDoTipo(item.tipo)}
           {contexto && ` · ${contexto}`}
           {item.prioridade === "alta" && <span className="text-warning"> · alta</span>}
@@ -396,7 +406,7 @@ function ItemDoDia({
       {prazo && (
         <span
           className={cn(
-            "shrink-0 text-small tabular-nums",
+            "hidden shrink-0 text-small tabular-nums sm:inline",
             atrasada || item.fonte === "responder" ? "font-medium text-danger" : fixo ? "font-semibold text-text-primary" : "text-text-secondary"
           )}
         >

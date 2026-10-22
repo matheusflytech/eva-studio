@@ -290,7 +290,8 @@ function OndePara({ itens }: { itens: Payload["ondePara"] }) {
               apoio={p.erros > 0 ? `${p.erros} com erro` : undefined}
               apoioTom="danger"
               fracao={p.total / maior}
-              perigo={p.erros > 0}
+              // Barra vermelha só quando a maioria quebra; poucos erros ficam no texto.
+              perigo={p.erros * 2 > p.total}
               valor={p.total}
             />
           );

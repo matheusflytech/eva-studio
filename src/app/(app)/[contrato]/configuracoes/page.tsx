@@ -236,7 +236,7 @@ function AbaConta() {
         <CabecalhoDaSecao
           nivel={2}
           titulo={<span id="titulo-aparencia">Aparência</span>}
-          descricao="Aplica na hora e vale só neste navegador. O menu lateral continua escuro nos dois temas."
+          descricao="Aplica na hora e vale só neste navegador."
         />
         <LinhaDeConfig rotulo="Tema da interface" descricao="Escolha um tema ou siga o do sistema.">
           <EscolhaDeTema />

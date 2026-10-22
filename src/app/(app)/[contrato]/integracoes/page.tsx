@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio, Sparkles, Workflow } from "lucide-react";
+import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -19,6 +19,7 @@ import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 import { useContrato, usePathname, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato } from "@/lib/contrato/rotas";
+import { MarcaEva } from "@/components/layout/marca-eva";
 
 // ---------------------------------------------------------------------------
 // Integrações.
@@ -45,7 +46,7 @@ import { apiDoContrato } from "@/lib/contrato/rotas";
 type Aba = "ia" | "email" | "mcp" | "api";
 
 const ABAS: { value: Aba; label: string; icon: React.ReactNode }[] = [
-  { value: "ia", label: "IA", icon: <Sparkles aria-hidden="true" /> },
+  { value: "ia", label: "IA", icon: <MarcaEva size={14} /> },
   { value: "email", label: "E-mail", icon: <Mail aria-hidden="true" /> },
   { value: "mcp", label: "Servidores MCP", icon: <Plug aria-hidden="true" /> },
   { value: "api", label: "API do contrato", icon: <KeyRound aria-hidden="true" /> },
@@ -124,7 +125,7 @@ function Integracoes() {
         <SegmentedControl label="Integrações" value={aba} onChange={(v) => router.replace(`${pathname}?aba=${v}`)} options={ABAS} />
       </div>
 
-      <div className="mx-auto w-full max-w-3xl pt-2">
+      <div className="w-full max-w-4xl pt-2">
         {aba === "ia" && (
           <CentralDeIa
             novaAberta={novaAberta}

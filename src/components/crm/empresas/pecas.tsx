@@ -9,6 +9,11 @@ import type { CategoryColor } from "@/lib/design-system/tokens";
 // cor na lista e na página. O logo é quadrado de canto largo (conta), a pessoa
 // é redonda (gente).
 
+/** Iniciais só com letras e sem etiqueta entre colchetes ("[DEMO] Agência Cerrado" vira "AC"). */
+export function siglaDe(nome: string): string {
+  return initials(nome.replace(/\[[^\]]*\]/g, " ").replace(/[^\p{L}\s]/gu, " ").trim()) || "?";
+}
+
 const CORES: CategoryColor[] = ["blue", "cyan", "teal", "green", "amber", "orange", "red", "rose", "violet", "purple", "indigo", "slate"];
 
 function corDa(semente: string): CategoryColor {
@@ -47,7 +52,7 @@ export function LogoDaEmpresa({
         className
       )}
     >
-      {initials(nome || "?")}
+      {siglaDe(nome)}
     </span>
   );
 }
@@ -81,7 +86,7 @@ export function FotoDaPessoa({
         className
       )}
     >
-      {initials(nome || "?")}
+      {siglaDe(nome)}
     </span>
   );
 }
