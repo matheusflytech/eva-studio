@@ -53,9 +53,21 @@ describe("o site busca o que o atendente escreveu", () => {
 });
 
 describe("atendente responde no chat do site", () => {
-  const conversa = { id: "cv1", channel: "website", contactId: "site-live-x", agentId: "a1", status: "waiting_human", assignedToId: null, assignedTo: null, contact: null, variables: {}, lastContactMessageAt: new Date() };
+  const conversa = { id: "cv1", channel: "website", contactId: "site-live-x", agentId: "a1", status: "human", assignedToId: "u1", assignedTo: { id: "u1", name: "Ana" }, contact: null, variables: {}, lastContactMessageAt: new Date() };
 
-  it("grava como enviada e não tenta mandar para lugar nenhum", async () => {
+  it("sem assumir não responde: com o agente ou esperando alguém", async () => {
+    for (const status of ["active", "waiting_human"]) {
+      db.conversation.findFirst.mockResolvedValue({ ...conversa, status, assignedToId: null, assignedTo: null });
+      const r = await responderComoAtendente({ conversationId: "cv1", orgId: "o1", userId: "u1", text: "Oi" });
+      expect(r).toMatchObject({ ok: false, status: 409, codigo: "assumir_antes" });
+    }
+    // De outra pessoa: avisa quem está atendendo.
+    db.conversation.findFirst.mockResolvedValue({ ...conversa, assignedToId: "u2", assignedTo: { id: "u2", name: "Bia" } });
+    expect(await responderComoAtendente({ conversationId: "cv1", orgId: "o1", userId: "u1", text: "Oi" })).toMatchObject({ ok: false, codigo: "de_outro" });
+    expect(caixa.registrarMensagens).not.toHaveBeenCalled();
+  });
+
+  it("assumida por mim: grava como enviada e não tenta mandar para lugar nenhum", async () => {
     db.conversation.findFirst.mockResolvedValue(conversa);
     caixa.registrarMensagens.mockResolvedValue([{ id: "m1" }]);
     db.message.findUniqueOrThrow.mockResolvedValue({ id: "m1" });

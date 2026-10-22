@@ -109,6 +109,19 @@ export async function responderComoAtendente(pedido: PedidoDeResposta): Promise<
     };
   }
 
+  // Trava: só responde quem assumiu. Assumir é um passo explícito (botão
+  // Assumir): enquanto a conversa está com o agente, ele responde sozinho;
+  // depois de assumida, ele fica em silêncio até alguém devolver. Responder
+  // sem assumir faria a pessoa e o agente falarem ao mesmo tempo.
+  if (!simulado && !(conversa.status === "human" && conversa.assignedToId === pedido.userId)) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Assuma a conversa antes de responder.",
+      codigo: "assumir_antes",
+    };
+  }
+
   // Janela de 24h: só vale pros canais que têm a regra e só pra conversa real.
   const janela = janelaDeResposta(conversa.channel, conversa.lastContactMessageAt);
   let template: { name: string; languageCode: string; parameters: string[] } | undefined;
