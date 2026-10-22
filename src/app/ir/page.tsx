@@ -4,7 +4,7 @@ import * as React from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
-import { ehCaminhoDeSecao } from "@/lib/contrato/rotas";
+import { ehCaminhoDeSecao, idCurto } from "@/lib/contrato/rotas";
 import { buttonVariants } from "@/components/ui/button";
 
 // /ir?para=/negocios/123 — leva para a tela no contrato padrão da pessoa
@@ -24,7 +24,7 @@ function Ir() {
       return;
     }
     const contrato = session.contratoPadrao ?? session.contratoId;
-    if (contrato) router.replace(`/${contrato}${para}`);
+    if (contrato) router.replace(`/${idCurto(contrato)}${para}`);
   }, [isLoading, session, router, para]);
 
   if (!isLoading && session && !session.contratoPadrao && !session.contratoId) {

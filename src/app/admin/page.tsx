@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Search, Copy, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { idCurto } from "@/lib/contrato/rotas";
 
 // Painel da equipe Eva (superadmin): todos os contratos, com membros e chaves
 // ativas; criar contrato; entrar em qualquer um. A rota de dados responde 404
@@ -163,7 +164,7 @@ export default function AdminPage() {
                     <td className="px-4 py-2.5 text-text-secondary">{l.membros}</td>
                     <td className="px-4 py-2.5 text-text-secondary">{l.chavesAtivas}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <NextLink href={`/${l.id}/inicio`} className={buttonVariants({ size: "sm" })}>
+                      <NextLink href={`/${idCurto(l.id)}/inicio`} className={buttonVariants({ size: "sm" })}>
                         Entrar no contrato
                       </NextLink>
                     </td>
