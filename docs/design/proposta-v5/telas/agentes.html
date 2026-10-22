@@ -1,0 +1,85 @@
+<!-- id: agentes | titulo: Agentes de IA | grupo: IA | menu: agentes | print: agentes -->
+<style>
+.t-agentes { overflow: hidden; }
+.t-agentes .bx { width: 220px; height: 30px; }
+.t-agentes .corpo { flex: 1; min-height: 0; overflow: hidden; padding: 12px 24px 0; max-width: 860px; }
+.t-agentes .d-linha { min-height: 68px; padding: 10px 4px; gap: 14px; }
+.t-agentes .d-linha + .d-linha::before { left: 56px; }
+.t-agentes .d-linha .col { gap: 3px; }
+.t-agentes .d-linha .t { font-size: 14px; }
+.t-agentes .passo { font-size: 12.5px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-agentes .passo svg { width: 13px; height: 13px; }
+.t-agentes .passo.u { color: var(--dg); font-weight: 500; }
+.t-agentes .passo.a { color: var(--wn); }
+.t-agentes .passo.k { color: var(--t3); }
+.t-agentes .conv { width: 110px; text-align: right; font-size: 12.5px; color: var(--t2); font-variant-numeric: tabular-nums; }
+.t-agentes .conv.zero { color: var(--t3); }
+.t-agentes .st { width: 96px; display: flex; justify-content: flex-end; }
+.t-agentes .d-linha > svg:last-child { color: var(--t3); width: 15px; height: 15px; }
+</style>
+<!--MOCK-->
+<div class="d-main t-agentes">
+  <div class="d-bar">
+    <h4>Agentes de IA</h4>
+    <span class="cnt">2 atendendo</span>
+    <div class="dir">
+      <span class="d-bt ic" title="Modelos de agente, exportar"><svg><use href="#i-more"/></svg></span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Novo agente</span>
+    </div>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas">
+      <span class="on">Todos <em>5</em></span>
+      <span>Precisam de você <em class="dg">2</em></span>
+    </div>
+    <div class="dir">
+      <span class="d-in bx"><svg><use href="#i-search"/></svg>Buscar agente</span>
+      <span class="d-bt sm"><svg><use href="#i-filter"/></svg>Filtros</span>
+    </div>
+  </div>
+
+  <div class="corpo">
+    <div class="d-linha">
+      <span class="sq lg vv">V</span>
+      <span class="col"><span class="t">Vendedor Virtual</span><span class="passo u"><svg><use href="#i-user"/></svg>Uma pessoa esperando atendimento<svg><use href="#i-arrow"/></svg></span></span>
+      <span class="conv">37 conversas</span>
+      <span class="st"><span class="chip ok"><i></i>Atendendo</span></span>
+      <svg><use href="#i-chevr"/></svg>
+    </div>
+    <div class="d-linha">
+      <span class="sq lg dc">S</span>
+      <span class="col"><span class="t">Site Drawing Club</span><span class="passo a"><svg><use href="#i-pencil"/></svg>Monte o fluxo para ele responder</span></span>
+      <span class="conv">3 conversas</span>
+      <span class="st"><span class="chip">Rascunho</span></span>
+      <svg><use href="#i-chevr"/></svg>
+    </div>
+    <div class="d-linha">
+      <span class="sq lg todas">T</span>
+      <span class="col"><span class="t">teste</span><span class="passo a"><svg><use href="#i-plug"/></svg>Conecte um canal</span></span>
+      <span class="conv">1 conversa</span>
+      <span class="st"><span class="chip">Rascunho</span></span>
+      <svg><use href="#i-chevr"/></svg>
+    </div>
+    <div class="d-linha">
+      <span class="sq lg dl">D</span>
+      <span class="col"><span class="t">Demo Lucas</span><span class="passo a"><svg><use href="#i-alert"/></svg>2 blocos incompletos</span></span>
+      <span class="conv zero">sem conversas</span>
+      <span class="st"><span class="chip">Rascunho</span></span>
+      <svg><use href="#i-chevr"/></svg>
+    </div>
+    <div class="d-linha">
+      <span class="sq lg li">L</span>
+      <span class="col"><span class="t">Landing Interativa</span><span class="passo k">Tudo certo</span></span>
+      <span class="conv">18 conversas</span>
+      <span class="st"><span class="chip ok"><i></i>Atendendo</span></span>
+      <svg><use href="#i-chevr"/></svg>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Sem faixa de números</b> Os quatro KPIs saem da frente. Quem espera atendente já aparece na própria linha do agente; respostas, execuções e erros ficam no detalhe de cada agente e em Insights.</li>
+<li><b>Linha com quatro coisas</b> Ícone, nome com o próximo passo, conversas da semana e status. Modelo, número de blocos, canais, execuções 24h e erros ficam ao abrir o agente.</li>
+<li><b>Builder dentro do agente</b> O botão Builder repetido em cada linha sai: clicar na linha abre o agente, e de lá o Builder. Quem precisa de você vem primeiro.</li>
+<li><b>Rascunhos em Filtros</b> Ficam duas abas, Todos e "Precisam de você". Rascunhos viram filtro de status. A tela continua se atualizando sozinha, sem o "atualizado há 8 s".</li>
+<!--/NOTAS-->

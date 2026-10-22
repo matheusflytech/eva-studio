@@ -1,0 +1,107 @@
+<!-- id: celular | titulo: No celular | grupo: Atender | menu: conversas | print: cel-conversas,cel-negocios | casca: livre -->
+<style>
+.t-celular { display: flex; gap: 48px; justify-content: center; padding: 28px 16px; flex-wrap: wrap; background: transparent; }
+.t-celular .fone { width: 375px; height: 760px; border-radius: 36px; border: 8px solid #1b1f29; overflow: hidden; position: relative; box-sizing: content-box; }
+.t-celular .fone > .mk { height: 100%; display: flex; flex-direction: column; }
+.t-celular .stt { height: 46px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 26px; font-size: 14px; font-weight: 600; position: relative; }
+.t-celular .stt .ilha { position: absolute; left: 50%; top: 9px; transform: translateX(-50%); height: 30px; min-width: 110px; justify-content: center; }
+.t-celular .stt .ilha.aberta { height: 64px; border-radius: 30px; min-width: 330px; justify-content: flex-start; }
+.t-celular .topo { padding: 4px 14px 0; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--bs); flex: none; }
+.t-celular .caixa { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.t-celular .caixa .tt { font-size: 16px; font-weight: 600; line-height: 1.2; }
+.t-celular .caixa .ss { font-size: 12px; color: var(--t3); }
+.t-celular .caixa .ss b { color: var(--dg); font-weight: 500; }
+.t-celular .caixa > svg { margin-left: auto; color: var(--t3); }
+.t-celular .d-in { height: 40px; font-size: 16px; flex: 1; }
+.t-celular .d-bt { height: 40px; }
+.t-celular .d-abas { overflow: hidden; }
+.t-celular .row { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--bs); position: relative; }
+.t-celular .row .un { position: absolute; left: 4px; top: 26px; width: 6px; height: 6px; border-radius: 50%; background: var(--ac); }
+.t-celular .row .c { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t-celular .row .l1 { display: flex; gap: 8px; align-items: baseline; }
+.t-celular .row .nome { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-celular .row .nome.b { font-weight: 600; }
+.t-celular .row .hora { margin-left: auto; font-size: 12px; color: var(--t3); flex: none; }
+.t-celular .row .hora.b { color: var(--acfg); font-weight: 600; }
+.t-celular .row .prev { color: var(--t3); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-celular .row .meta { display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: 12px; color: var(--t3); }
+.t-celular .row .meta svg { width: 13px; height: 13px; }
+.t-celular .nav { margin-top: auto; height: 60px; flex: none; border-top: 1px solid var(--bs); display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: var(--t3); background: var(--sb); }
+.t-celular .nav span { display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
+.t-celular .nav span.on { color: var(--acfg); }
+.t-celular .nav svg { width: 20px; height: 20px; }
+.t-celular .nav .b { position: absolute; top: -4px; right: 6px; background: var(--ac); color: #fff; border-radius: 99px; font-size: 10px; font-weight: 600; padding: 0 5px; }
+.t-celular .etapas { display: flex; gap: 6px; padding: 10px 14px; overflow: hidden; flex: none; border-bottom: 1px solid var(--bs); }
+.t-celular .etapas span { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 16px; border: 1px solid var(--bd); font-size: 13px; font-weight: 500; white-space: nowrap; color: var(--t2); }
+.t-celular .etapas span.on { background: var(--t1); color: var(--pg); border-color: var(--t1); }
+.t-celular .etapas span em { font-style: normal; opacity: .7; }
+.t-celular .eva { margin: 10px 14px 4px; display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; background: var(--aisub); color: var(--ai); font-size: 13px; }
+.t-celular .eva svg { width: 15px; height: 15px; margin-top: 1px; }
+.t-celular .soma { padding: 8px 14px; font-size: 12px; color: var(--t3); display: flex; justify-content: space-between; }
+.t-celular .soma b { color: var(--t1); font-weight: 600; }
+.t-celular .card { margin: 0 14px 8px; border: 1px solid var(--bs); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.t-celular .card .n { font-size: 14px; font-weight: 500; }
+.t-celular .card .l { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--t3); }
+.t-celular .card .v { display: flex; justify-content: space-between; align-items: center; }
+.t-celular .card .v b { font-size: 14px; font-weight: 600; }
+.t-celular .sinal { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; font-weight: 500; }
+.t-celular .sinal svg { width: 13px; height: 13px; }
+.t-celular .sinal.dg { color: var(--dg); } .t-celular .sinal.wn { color: var(--wn); } .t-celular .sinal.ok { color: var(--ok); }
+.t-celular .fab { position: absolute; right: 16px; bottom: 76px; height: 48px; padding: 0 18px; border-radius: 24px; background: var(--ac); color: #fff; display: flex; gap: 8px; align-items: center; font-weight: 600; box-shadow: var(--sh); }
+.t-celular .legenda { font-size: 13px; color: var(--muted, #5a6170); text-align: center; margin-top: 10px; font-family: "Geist", sans-serif; }
+</style>
+<!--MOCK-->
+<div class="t-celular">
+  <div>
+    <div class="fone"><div class="mk mk-depois">
+      <div class="stt"><span>9:41</span><span class="ilha" data-ilha><span class="pto"></span><span class="mono">2</span></span><span>5G</span></div>
+      <div class="topo">
+        <div class="caixa"><span class="sq dc">D</span><span><span class="tt">Site Drawing Club</span><br><span class="ss">9 conversas · <b>2 esperando</b></span></span><svg><use href="#i-chevs"/></svg></div>
+        <div style="display:flex;gap:6px"><span class="d-in"><svg><use href="#i-search"/></svg>Buscar</span><span class="d-bt ic" style="width:40px"><svg><use href="#i-filter"/></svg></span></div>
+        <div class="d-abas"><span class="on">Todas</span><span>Esperando <em class="dg">2</em></span><span>Minhas <em>1</em></span><span>Agente</span></div>
+      </div>
+      <div class="row"><span class="un"></span><span class="d-av h-rose">MC</span><span class="c"><span class="l1"><span class="nome b">Mariana Couto</span><span class="hora b">14:32</span></span><span class="prev">Quero saber se o curso tem certificado</span><span class="meta"><span class="chip esp"><i></i>Esperando</span><svg><use href="#i-globe"/></svg>Site</span></span></div>
+      <div class="row"><span class="d-av h-teal">JP</span><span class="c"><span class="l1"><span class="nome">Juliana Prado</span><span class="hora">13:48</span></span><span class="prev">Agente: As inscrições fecham sexta.</span><span class="meta"><svg><use href="#i-bot"/></svg>Agente · Site</span></span></div>
+      <div class="row"><span class="un"></span><span class="d-av h-violet">AS</span><span class="c"><span class="l1"><span class="nome b">Ana Beatriz Sá</span><span class="hora b">13:10</span></span><span class="prev">Tem desconto pra turma?</span><span class="meta"><span class="chip esp"><i></i>Esperando</span><svg><use href="#i-globe"/></svg>Site</span></span></div>
+      <div class="row"><span class="d-av h-blue">RT</span><span class="c"><span class="l1"><span class="nome">Rafael Teixeira</span><span class="hora">12:05</span></span><span class="prev">Você: Te mando o link da matrícula</span><span class="meta"><span class="mini-av h-teal">MP</span>Matheus · Site</span></span></div>
+      <div class="row"><span class="d-av h-amber">+55</span><span class="c"><span class="l1"><span class="nome">(11) 98422-1307</span><span class="hora">Ontem</span></span><span class="prev">Agente: Oi! Como posso ajudar?</span><span class="meta"><svg><use href="#i-bot"/></svg>Agente · Site</span></span></div>
+      <div class="nav"><span class="on"><svg><use href="#i-msg"/></svg>Conversas<em class="b" style="font-style:normal">3</em></span><span><svg><use href="#i-deal"/></svg>Negócios</span><span><svg><use href="#i-task"/></svg>Tarefas</span><span><svg><use href="#i-more"/></svg>Mais</span></div>
+    </div></div>
+    <p class="legenda">Caixa de entrada: lista primeiro, como o WhatsApp</p>
+  </div>
+  <div>
+    <div class="fone"><div class="mk mk-depois">
+      <div class="stt"><span>9:41</span><span class="ilha"><span class="pto azul"></span><span class="mono">R$ 9 mil</span></span><span>5G</span></div>
+      <div class="topo" style="padding-bottom:10px">
+        <div class="caixa"><span class="tt">Negócios</span><span class="ss" style="margin-left:6px">Vendas</span><svg><use href="#i-chevs"/></svg></div>
+      </div>
+      <div class="etapas"><span class="on">Novo <em>3</em></span><span>Qualificado <em>1</em></span><span>Proposta <em>1</em></span><span>Negociação <em>1</em></span></div>
+      <div class="eva"><svg><use href="#i-spark"/></svg><span>R$ 9 mil na mesa. De Proposta para Negociação só 50% avançam.</span></div>
+      <div class="soma"><span>3 negócios em Novo</span><b>R$ 4.800</b></div>
+      <div class="card"><span class="n">Clínica Aurora · Piloto</span><span class="l"><span class="d-av xs emp h-cyan">CA</span>Clínica Aurora</span><span class="v"><b>R$ 4.800</b><span class="sinal dg"><svg><use href="#i-clock"/></svg>Atrasada 2d</span></span></div>
+      <div class="card"><span class="n">Lead do site: Matheus</span><span class="l"><span class="d-av xs h-blue">M</span>Matheus · Site</span><span class="v"><b class="t3" style="font-weight:500">Sem valor</b><span class="sinal wn"><svg><use href="#i-alert"/></svg>Sem atividade</span></span></div>
+      <div class="card"><span class="n">Teste Guard</span><span class="l"><span class="d-av xs h-slate">TG</span>Teste Guard · Site</span><span class="v"><b class="t3" style="font-weight:500">Sem valor</b><span class="t3 sm12">23h na etapa</span></span></div>
+      <span class="fab"><svg style="width:18px;height:18px"><use href="#i-plus"/></svg>Negócio</span>
+      <div class="nav"><span><svg><use href="#i-msg"/></svg>Conversas</span><span class="on"><svg><use href="#i-deal"/></svg>Negócios</span><span><svg><use href="#i-task"/></svg>Tarefas</span><span><svg><use href="#i-more"/></svg>Mais</span></div>
+    </div></div>
+    <p class="legenda">Negócios: uma etapa por vez, deslizando</p>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.celular = function (c) {
+  c.entra(".row, .card", { passo: 60 });
+  var orig = c.q("[data-ilha]").innerHTML;
+  return c.espera(1200).then(function () {
+    c.ilha('<span class="av" style="background:#b5456a">AS</span><span class="txt"><b>Ana Beatriz Sá</b><span>"Tem desconto pra turma?"</span></span><span class="acao">Abrir</span>', true);
+    return c.espera(3000);
+  }).then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Barra de navegação embaixo.</b> Hoje o celular abre um menu escondido no hambúrguer. Conversas, Negócios e Tarefas ficam a um toque, com o contador de quem espera.</li>
+<li><b>Negócios mostra negócios na primeira tela.</b> No print, o quadro só aparece depois de rolar recado, tendências, "Desde ontem" e "Pede sua atenção". No celular vira uma etapa por vez, com abas deslizantes e o recado da Eva em uma linha.</li>
+<li><b>Alvos de toque de 40px e campo de busca de 16px.</b> O iPhone não dá zoom ao tocar na busca, e os botões cabem no dedo.</li>
+<li><b>A ilha dinâmica é a do próprio iPhone.</b> No celular, quem espera e as novidades aparecem na ilha do topo, com uma ação a um toque.</li>
+<li><b>Sem cartão dentro de cartão.</b> A lista vai de borda a borda, como no WhatsApp.</li>
+<!--/NOTAS-->

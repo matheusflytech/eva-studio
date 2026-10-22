@@ -1,0 +1,69 @@
+<!-- id: conta | titulo: Menu da conta e do contrato | grupo: Conta | menu: dashboard | base: dashboard | print: - | semprint: Hoje o contrato abre num menu simples no topo do menu lateral, sem fundo desfocado, e a conta fica espalhada no rodapé. -->
+<style>
+.d-casca { position: relative; }
+.t-conta { position: absolute; inset: 0; z-index: 30; }
+.t-conta .veu { position: absolute; inset: 0; background: rgba(0,0,0,.38); -webkit-backdrop-filter: blur(10px) saturate(120%); backdrop-filter: blur(10px) saturate(120%); }
+.mk-depois:not([data-modo="dark"]) .t-conta .veu { background: rgba(245,245,247,.35); }
+.t-conta .menu { position: absolute; left: 12px; bottom: 72px; width: 330px; border-radius: 24px; padding: 6px; display: flex; flex-direction: column; transform-origin: 30% 100%; }
+.t-conta .quem { display: flex; align-items: center; gap: 12px; padding: 12px 12px 14px; border-bottom: 1px solid var(--bs); }
+.t-conta .quem .foto { width: 46px; height: 46px; border-radius: 14px; }
+.t-conta .quem b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.t-conta .quem span { font-size: 12.5px; color: var(--t3); }
+.t-conta .contratos { margin: 8px 4px; border-radius: 18px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 10px 8px 6px; }
+.t-conta .contratos .rot { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t3); padding: 0 8px 6px; }
+.t-conta .ct { display: flex; align-items: center; gap: 11px; height: 42px; padding: 0 8px; border-radius: 12px; font-weight: 500; }
+.t-conta .ct.on { background: var(--hv); }
+.t-conta .ct .sq { width: 28px; height: 28px; border-radius: 8px; font-size: 12px; }
+.t-conta .ct .dir { margin-left: auto; font: 400 11.5px ui-monospace, "SF Mono", monospace; color: var(--t3); display: flex; gap: 8px; align-items: center; }
+.t-conta .ct .dir svg { width: 14px; height: 14px; color: var(--acfg); }
+.t-conta .ct.troca { color: var(--t2); font-weight: 400; }
+.t-conta .ct.troca .ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--bd); }
+.t-conta .ct.troca svg { width: 14px; height: 14px; }
+.t-conta .op { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 12px; font-size: 13.5px; color: var(--t1); }
+.t-conta .op.foco { background: var(--hv); }
+.t-conta .op svg { width: 17px; height: 17px; color: var(--t2); }
+.t-conta .op .dir { margin-left: auto; font: 400 11.5px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-conta .sep { height: 1px; background: var(--bs); margin: 6px 8px; }
+.t-conta .op.sair { color: var(--dg); }
+.t-conta .op.sair svg { color: var(--dg); }
+</style>
+<!--MOCK-->
+<div class="t-conta" data-conta>
+  <div class="veu" data-veu></div>
+  <div class="menu vidro" data-menu>
+    <div class="quem"><span class="foto" style="--f1:#d9b8a0;--f2:#23303f;--f3:#5c7088;--f4:#202a36"></span><span><b>Matheus Paes</b><span>Dono do contrato</span></span></div>
+    <div class="contratos">
+      <div class="rot">Seus contratos</div>
+      <div class="ct on"><span class="sq eva">E</span>Eva Holding<span class="dir">Dono<svg><use href="#i-check"/></svg></span></div>
+      <div class="ct"><span class="sq dc">D</span>Drawing Club<span class="dir">Membro</span></div>
+      <div class="ct troca"><span class="ico"><svg><use href="#i-repeat"/></svg></span>Trocar de contrato</div>
+    </div>
+    <div class="op foco" data-op1><svg><use href="#i-user"/></svg>Sua conta</div>
+    <div class="op"><svg><use href="#i-gear"/></svg>Configurações do contrato</div>
+    <div class="op"><svg><use href="#i-upload"/></svg>Alterar imagem do contrato</div>
+    <div class="op"><svg><use href="#i-zap"/></svg>Atalhos de teclado<span class="dir">?</span></div>
+    <div class="op"><svg><use href="#i-help"/></svg>Eva Help</div>
+    <div class="sep"></div>
+    <div class="op sair"><svg><use href="#i-arrow"/></svg>Sair</div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.conta = function (c) {
+  var veu = c.q("[data-veu]"), menu = c.q("[data-menu]"), eu = c.q("[data-eu]");
+  veu.style.opacity = "0"; menu.style.opacity = "0";
+  return c.espera(500).then(function () {
+    if (eu) eu.animate([{ transform: "scale(1)" }, { transform: "scale(.97)" }, { transform: "scale(1)" }], { duration: 260 });
+    veu.style.opacity = ""; menu.style.opacity = "";
+    veu.animate([{ opacity: 0, backdropFilter: "blur(0px)" }, { opacity: 1, backdropFilter: "blur(10px)" }], { duration: 420, easing: "ease-out" });
+    menu.animate([{ opacity: 0, transform: "translateY(16px) scale(.94)", filter: "blur(6px)" }, { opacity: 1, transform: "none", filter: "none" }], { duration: 560, easing: "cubic-bezier(.34,1.25,.5,1)" });
+    c.entra(menu.querySelectorAll(".ct, .op"), { d: 180, passo: 35, y: 6 });
+  });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Sobreposição de verdade.</b> O menu abre por cima da tela com o fundo desfocado e escurecido, como nas suas duas referências. Fica claro que é uma camada, e a tela de trás continua reconhecível.</li>
+<li><b>Você e o contrato num lugar só.</b> Hoje o contrato fica no topo do menu e a conta espalhada no rodapé. Agora o cartão com foto no rodapé abre tudo: quem você é, seus contratos com o papel em cada um, e "Trocar de contrato".</li>
+<li><b>Os mesmos itens de hoje.</b> Sua conta, Configurações do contrato, Alterar imagem, Atalhos de teclado (o "?" que já existe), Eva Help e Sair. Nada novo, só reunido.</li>
+<li><b>Vidro fosco premium.</b> Cartão com canto 24, borda fina, bloco interno para os contratos e entrada com mola curta. Clique em "Ver animação".</li>
+<!--/NOTAS-->

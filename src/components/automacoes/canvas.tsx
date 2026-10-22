@@ -282,7 +282,10 @@ function CanvasInterno({
     return () => clearTimeout(t);
   }, [tamanho, rf]);
 
+  // data-theme no contêiner: "canvas sempre escuro" vale também para os
+  // cartões (tokens), não só para o fundo do React Flow.
   return (
+    <div data-theme={tema} className="h-full w-full bg-page text-text-primary">
     <ReactFlow
       colorMode={tema}
       nodes={nos}
@@ -312,6 +315,7 @@ function CanvasInterno({
         nodeColor={(n) => (contagem.get(n.id) ? "var(--danger-solid)" : "var(--border-strong)")}
       />
     </ReactFlow>
+    </div>
   );
 }
 

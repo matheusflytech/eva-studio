@@ -107,12 +107,6 @@ const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
 const PADRAO = { visao: "todos", tamanho: 25 };
 const IDS_DAS_VISOES = VISOES_DE_NEGOCIO.map((v) => v.id as string);
 const POR_ETAPA = 30;
-const ESTILOS: { value: EstiloDaTela; label: string }[] = [
-  { value: "classico", label: "Atual" },
-  { value: "v1", label: "Eva · 1" },
-  { value: "v2", label: "Eva · 2" },
-  { value: "v3", label: "Eva · 3" },
-];
 
 /** Lista de ids guardada no navegador, sem validar (quem usa valida contra as disponíveis). */
 function lerListaDeIds(bruto: string | null): string[] {
@@ -169,7 +163,9 @@ function NegociosConteudo() {
     // só quando a visão (ou o modo guardado nela) muda
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado.visao, modoDaVisao]);
-  const [estilo, setEstilo] = usePreferencia<EstiloDaTela>("eva:negocios:estilo", "v3", ["classico", "v1", "v2", "v3"]);
+  // Estilo escolhido pelo dono do produto: Eva · 3, fixo (o seletor de
+  // comparação saiu; uma escolha antiga "Atual" guardada no navegador não volta).
+  const estilo = "v3" as EstiloDaTela;
   const [quadro, setQuadro] = React.useState<Quadro | null>(null);
   const [carregando, setCarregando] = React.useState(true);
   const [carregandoMais, setCarregandoMais] = React.useState<Set<string>>(new Set());
@@ -698,14 +694,6 @@ function NegociosConteudo() {
               <DropdownMenuItem onSelect={() => setLegendaAberta(true)}>
                 <CircleHelp aria-hidden="true" /> Como ler o quadro
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {/* Troca de estilo enquanto comparamos as variações (sai quando uma for escolhida). */}
-              <DropdownMenuLabel>Estilo da tela</DropdownMenuLabel>
-              {ESTILOS.map((e) => (
-                <DropdownMenuCheckboxItem key={e.value} checked={estilo === e.value} onCheckedChange={() => setEstilo(e.value)}>
-                  {e.label}
-                </DropdownMenuCheckboxItem>
-              ))}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="primary" onClick={() => setNovoNaEtapa("")} title="Criar negócio (N)">

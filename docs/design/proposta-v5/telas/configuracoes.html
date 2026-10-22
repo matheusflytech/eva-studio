@@ -1,0 +1,121 @@
+<!-- id: configuracoes | titulo: Configurações | grupo: Conta | menu: configuracoes | print: configuracoes -->
+<style>
+.t-cfg { flex-direction: row; }
+.t-cfg .nav { width: 210px; flex: none; padding: 14px 12px; border-right: 1px solid var(--bs); display: flex; flex-direction: column; gap: 1px; }
+.t-cfg .nav .g { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t3); padding: 12px 10px 6px; }
+.t-cfg .nav .i { height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 10px; font-size: 13px; color: var(--t2); }
+.t-cfg .nav .i svg { width: 15px; height: 15px; color: var(--t3); }
+.t-cfg .nav .i.on { background: var(--sel); color: var(--t1); }
+.t-cfg .nav .i.on svg { color: var(--t1); }
+.t-cfg .cont { flex: 1; min-width: 0; padding: 8px 32px; overflow: hidden; }
+.t-cfg .cont h4 { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; }
+.t-cfg .cont .lead { font-size: 13px; color: var(--t3); margin: 2px 0 6px; }
+.t-cfg .lin { display: grid; grid-template-columns: 180px 1fr; gap: 24px; padding: 20px 0; border-top: 1px solid var(--bs); }
+.t-cfg .lin b { display: block; font-size: 14px; font-weight: 600; }
+.t-cfg .lin .d { font-size: 13px; color: var(--t3); margin-top: 2px; }
+.t-cfg .opcoes { display: flex; gap: 12px; }
+.t-cfg .op { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 500; color: var(--t2); }
+.t-cfg .op.on { color: var(--t1); }
+.t-cfg .mini { width: 128px; height: 84px; border-radius: 12px; overflow: hidden; display: flex; box-shadow: 0 0 0 1px var(--bd); position: relative; }
+.t-cfg .op.on .mini { box-shadow: 0 0 0 2px var(--pg), 0 0 0 4px var(--t1); }
+.t-cfg .mini .s { width: 38px; padding: 10px 6px; display: flex; flex-direction: column; gap: 5px; }
+.t-cfg .mini .s i { height: 4px; border-radius: 2px; display: block; }
+.t-cfg .mini .c { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 6px; }
+.t-cfg .mini .c i { height: 5px; border-radius: 3px; display: block; }
+.t-cfg .mini .c u { flex: 1; border-radius: 6px; display: block; }
+.t-cfg .mini.cl { background: #fff; } .t-cfg .mini.cl .s { background: #f0f0f2; } .t-cfg .mini.cl i { background: #d8d8dc; } .t-cfg .mini.cl u { background: #f2f2f4; } .t-cfg .mini.cl .c i:first-child { background: #1d1d1f; width: 50%; }
+.t-cfg .mini.es { background: #0a0a0b; } .t-cfg .mini.es .s { background: #141416; } .t-cfg .mini.es i { background: #2a2a2e; } .t-cfg .mini.es u { background: #161618; } .t-cfg .mini.es .c i:first-child { background: #f2f2f4; width: 50%; }
+.t-cfg .mini.si { background: linear-gradient(135deg, #fff 50%, #0a0a0b 50%); }
+.t-cfg .mini.si .s { background: linear-gradient(135deg, #f0f0f2 60%, #141416 60%); } .t-cfg .mini.si i { background: #8a8a90; } .t-cfg .mini.si u { background: transparent; box-shadow: inset 0 0 0 1px rgba(128,128,128,.3); }
+.t-cfg .mini .bolas { position: absolute; top: 6px; left: 7px; display: flex; gap: 3px; }
+.t-cfg .mini .bolas em { width: 5px; height: 5px; border-radius: 50%; background: #8a8a90; opacity: .6; }
+.t-cfg .canv { width: 128px; height: 84px; border-radius: 12px; box-shadow: 0 0 0 1px var(--bd); overflow: hidden; position: relative; }
+.t-cfg .canv.tema { background-color: var(--pg); background-image: radial-gradient(var(--pontos) 1px, transparent 1.2px); background-size: 10px 10px; }
+.t-cfg .canv.esc { background: #0a0a0b radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.2px) 0 0 / 10px 10px; }
+.t-cfg .canv b { position: absolute; width: 38px; height: 22px; border-radius: 6px; top: 37px; }
+.t-cfg .canv.tema b { background: var(--cartao); box-shadow: 0 0 0 1px var(--cartao-bd); }
+.t-cfg .canv.esc b { background: #1c1c1f; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+.t-cfg .canv b:nth-child(1) { left: 14px; } .t-cfg .canv b:nth-child(2) { left: 66px; } .t-cfg .canv b:nth-child(3) { left: 112px; width: 12px; }
+.t-cfg .canv s { position: absolute; top: 48px; height: 1.5px; background: #5aa8ff; text-decoration: none; }
+.t-cfg .canv s:nth-of-type(1) { left: 52px; width: 14px; } .t-cfg .canv s:nth-of-type(2) { left: 104px; width: 14px; }
+.t-cfg .op.on .canv { box-shadow: 0 0 0 2px var(--pg), 0 0 0 4px var(--t1); }
+.t-cfg .imagem { display: flex; align-items: center; gap: 14px; }
+.t-cfg .imagem .logo { width: 64px; height: 64px; border-radius: 16px; background: #0f0f10; display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.t-cfg .imagem .logo svg { width: 28px; height: 28px; color: #7ab8ff; stroke-width: 2.2; }
+.t-cfg .cursor { position: absolute; left: 0; top: 0; width: 18px; height: 18px; z-index: 20; pointer-events: none; opacity: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.t-cfg .cursor svg { width: 18px; height: 18px; fill: #fff; stroke: #111; stroke-width: 1.2; }
+</style>
+<!--ILHA-->
+<span class="pto azul"></span><span>Tudo salvo</span><span class="cinza mono">agora</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-cfg">
+  <div class="nav">
+    <div class="g">Contrato</div>
+    <div class="i"><svg><use href="#i-building"/></svg>Contrato</div>
+    <div class="i"><svg><use href="#i-msg"/></svg>Canais</div>
+    <div class="i"><svg><use href="#i-key"/></svg>Chaves de API</div>
+    <div class="g">Pessoas e acesso</div>
+    <div class="i"><svg><use href="#i-users"/></svg>Membros</div>
+    <div class="i"><svg><use href="#i-lock"/></svg>Papéis e permissões</div>
+    <div class="i"><svg><use href="#i-contact"/></svg>Grupos</div>
+    <div class="i"><svg><use href="#i-users"/></svg>Equipes</div>
+    <div class="g">Você</div>
+    <div class="i on"><svg><use href="#i-user"/></svg>Sua conta</div>
+    <div class="g">Dados</div>
+    <div class="i"><svg><use href="#i-trash"/></svg>Lixeira</div>
+  </div>
+  <div class="cont" style="position:relative">
+    <h4>Sua conta</h4>
+    <p class="lead">Como o app aparece para você. Vale só para a sua conta.</p>
+    <div class="lin">
+      <div><b>Tema da interface</b><span class="d">Escolha um tema ou siga o do sistema.</span></div>
+      <div class="opcoes">
+        <span class="op" data-tema="light"><span class="mini cl"><span class="bolas"><em></em><em></em><em></em></span><span class="s" style="padding-top:18px"><i></i><i></i><i></i><i></i></span><span class="c" style="padding-top:18px"><i></i><i style="width:80%"></i><u></u></span></span>Claro</span>
+        <span class="op on" data-tema="dark"><span class="mini es"><span class="bolas"><em></em><em></em><em></em></span><span class="s" style="padding-top:18px"><i></i><i></i><i></i><i></i></span><span class="c" style="padding-top:18px"><i></i><i style="width:80%"></i><u></u></span></span>Escuro</span>
+        <span class="op"><span class="mini si"><span class="bolas"><em></em><em></em><em></em></span><span class="s" style="padding-top:18px"><i></i><i></i><i></i><i></i></span><span class="c" style="padding-top:18px"><i></i><i style="width:80%"></i><u></u></span></span>Seguir o sistema</span>
+      </div>
+    </div>
+    <div class="lin">
+      <div><b>Canvas do builder</b><span class="d">O quadro dos fluxos acompanha o tema ou fica sempre escuro.</span></div>
+      <div class="opcoes">
+        <span class="op on"><span class="canv tema"><b></b><b></b><b></b><s></s><s></s></span>Acompanhar o tema</span>
+        <span class="op"><span class="canv esc"><b></b><b></b><b></b><s></s><s></s></span>Sempre escuro</span>
+      </div>
+    </div>
+    <div class="lin">
+      <div><b>Atalhos de teclado</b><span class="d">Busca, navegação e ações sem tirar a mão do teclado.</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><kbd class="d-kbd" style="font-size:12px;padding:3px 8px">Ctrl K</kbd><span class="t3 sm12">buscar</span><kbd class="d-kbd" style="font-size:12px;padding:3px 8px;margin-left:10px">?</kbd><span class="t3 sm12">ver todos</span><span class="d-bt sm" style="margin-left:auto">Ver atalhos</span></div>
+    </div>
+    <span class="cursor" data-cursor><svg viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1 3.5 7-2.6 1.2-3.4-7.1L5 19z"/></svg></span>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.configuracoes = function (c) {
+  var MOLA = "cubic-bezier(.32,.72,0,1)", root = c.root, cont = c.q(".cont"), cur = c.q("[data-cursor]");
+  var k = function () { return (root.getBoundingClientRect().width / root.offsetWidth) || 1; };
+  var pos = { x: 520, y: 320 };
+  var vai = function (el) { var r = el.getBoundingClientRect(), p = cont.getBoundingClientRect(), s = k(); var nx = (r.left - p.left) / s + r.width / s / 2, ny = (r.top - p.top) / s + r.height / s / 2; var a = cur.animate([{ transform: "translate(" + pos.x + "px," + pos.y + "px)", opacity: 1 }, { transform: "translate(" + nx + "px," + ny + "px)", opacity: 1 }], { duration: 700, easing: MOLA, fill: "forwards" }); pos = { x: nx, y: ny }; return c.espera(720); };
+  var tema = function (m) {
+    var ops = c.qa("[data-tema]"); ops.forEach(function (o) { o.classList.toggle("on", o.dataset.tema === m); });
+    root.animate([{ opacity: 1 }, { opacity: .35 }, { opacity: 1 }], { duration: 520, easing: "ease-in-out" });
+    setTimeout(function () { root.setAttribute("data-modo", m); }, 240);
+  };
+  var inicial = root.getAttribute("data-modo") || "dark";
+  c.entra(".lin", { passo: 80 }); c.entra(".nav .i", { passo: 25 });
+  var orig = c.q("[data-ilha]").innerHTML;
+  var outro = inicial === "dark" ? "light" : "dark";
+  return c.espera(800).then(function () { return vai(c.q('[data-tema="' + outro + '"] .mini')); })
+    .then(function () { tema(outro); c.ilha('<svg><use href="#i-check"/></svg><span class="txt"><b>Tema ' + (outro === "dark" ? "escuro" : "claro") + ' aplicado</b><span>vale para todas as suas telas</span></span>', true); return c.espera(1800); })
+    .then(function () { return vai(c.q('[data-tema="' + inicial + '"] .mini')); })
+    .then(function () { tema(inicial); return c.espera(900); })
+    .then(function () { cur.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }); c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Linhas de configuração, como no exemplo.</b> Rótulo e explicação à esquerda, o controle à direita, linha fina entre elas. Sem formulário dentro de cartão.</li>
+<li><b>Tema escolhido vendo o resultado.</b> Claro, Escuro e Seguir o sistema viram miniaturas do próprio app; a escolhida ganha o anel. O mesmo para o canvas do builder ("acompanhar o tema" ou "sempre escuro"), que já existe hoje.</li>
+<li><b>Seções agrupadas à esquerda.</b> As nove abas viram um menu com grupos: Contrato, Pessoas e acesso, Você e Dados.</li>
+<li><b>Veja a troca.</b> Em "Ver animação", clicar no tema troca a tela inteira na hora e a ilha confirma. Contrato, imagem e nome do contrato ficam na seção "Contrato".</li>
+<!--/NOTAS-->

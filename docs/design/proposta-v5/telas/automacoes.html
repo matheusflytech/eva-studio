@@ -1,0 +1,71 @@
+<!-- id: automacoes | titulo: Automações | grupo: Automação | menu: automacoes | print: automacoes -->
+<style>
+.t-automacoes .d-tool { border-bottom: 0; gap: 8px; }
+.t-automacoes .d-tool .d-in { width: 300px; }
+.t-automacoes .corpo { flex: 1; min-height: 0; overflow: hidden; padding: 8px 24px 0; display: flex; flex-direction: column; gap: 28px; }
+.t-automacoes .d-kpis { gap: 12px; }
+.t-automacoes .d-kpi { padding: 14px 18px; }
+.t-automacoes .d-kpi .v { font-size: 26px; }
+.t-automacoes .d-kpi .v small { font-size: 13px; color: var(--t3); font-weight: 400; letter-spacing: 0; margin-left: 4px; }
+.t-automacoes .lin { display: grid; grid-template-columns: 34px minmax(0,1fr) 110px; align-items: center; gap: 16px; height: 68px; padding: 0 8px; border-bottom: 1px solid var(--bs); }
+.t-automacoes .lin:last-child { border-bottom: 0; }
+.t-automacoes .lin .d-ic { width: 34px; height: 34px; border-radius: 10px; }
+.t-automacoes .lin .col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.t-automacoes .lin b { font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-automacoes .frase { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; }
+.t-automacoes .frase svg { width: 12px; height: 12px; }
+.t-automacoes .frase.wn { color: var(--wn); }
+.t-automacoes .lin > .chip { justify-self: end; }
+</style>
+<!--MOCK-->
+<div class="d-main t-automacoes">
+  <div class="d-bar">
+    <h4>Automações</h4><span class="cnt">4</span>
+    <div class="dir">
+      <span class="d-bt ghost ic" title="Como funcionam as automações"><svg><use href="#i-help"/></svg></span>
+      <span class="d-bt"><svg><use href="#i-book"/></svg>Modelos</span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Nova automação</span>
+    </div>
+  </div>
+  <div class="d-tool">
+    <span class="d-in"><svg><use href="#i-search"/></svg>Buscar automação</span>
+    <span class="d-filtro"><svg><use href="#i-filter"/></svg>Filtros</span>
+  </div>
+  <div class="corpo">
+    <div class="d-kpis">
+      <div class="d-kpi"><span class="r">Execuções hoje</span><span class="v">128</span></div>
+      <div class="d-kpi"><span class="r">Erros hoje</span><span class="v down">3</span></div>
+      <div class="d-kpi"><span class="r">Ligadas</span><span class="v">2<small>de 4</small></span></div>
+    </div>
+
+    <div class="lista">
+      <div class="lin">
+        <span class="d-ic"><svg><use href="#i-msg"/></svg></span>
+        <span class="col"><b>Lead novo no WhatsApp</b><span class="frase">1ª mensagem<svg><use href="#i-arrow"/></svg>abre o negócio e avisa quem pegou</span></span>
+        <span class="chip ok"><i></i>Ligada</span>
+      </div>
+      <div class="lin">
+        <span class="d-ic"><svg><use href="#i-deal"/></svg></span>
+        <span class="col"><b>Proposta sem resposta</b><span class="frase">Entrou em Proposta<svg><use href="#i-arrow"/></svg>modelo e tarefa após 2 dias</span></span>
+        <span class="chip dg"><i></i>3 erros</span>
+      </div>
+      <div class="lin">
+        <span class="d-ic"><svg><use href="#i-won"/></svg></span>
+        <span class="col"><b>Ganho: pós-venda</b><span class="frase wn">Webhook do n8n fora do ar</span></span>
+        <span class="chip wn"><i></i>Pausada</span>
+      </div>
+      <div class="lin">
+        <span class="d-ic"><svg><use href="#i-clock"/></svg></span>
+        <span class="col"><b>SLA: cliente esperando atendente</b><span class="frase">Passou para a equipe<svg><use href="#i-arrow"/></svg>avisa a fila em 5 min</span></span>
+        <span class="chip">Rascunho</span>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Uma pergunta: está tudo rodando?</b> Três números do dia e, em cada linha, o nome, o que ela faz em meia frase e um status. Erro e pausa aparecem no próprio status.</li>
+<li><b>Colunas de execuções, erros 30d e última saíram da linha.</b> Ficam ao abrir a automação, com a causa de cada erro e quem pausou.</li>
+<li><b>Abas de status viraram filtro.</b> Ligadas, Pausadas e Rascunhos estão dentro de "Filtros", ao lado da busca.</li>
+<li><b>Galeria de modelos saiu da frente.</b> Os modelos e o "Em branco" por tipo de registro abrem no botão "Modelos" e também em "Nova automação".</li>
+<!--/NOTAS-->

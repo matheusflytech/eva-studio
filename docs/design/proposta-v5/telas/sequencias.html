@@ -1,0 +1,65 @@
+<!-- id: sequencias | titulo: Sequências | grupo: Automação | menu: sequencias | print: sequencias -->
+<style>
+.t-sequencias .ag { color: var(--t1); padding: 0 8px 0 4px; gap: 8px; }
+.t-sequencias .ag > svg { color: var(--t3); width: 14px; height: 14px; }
+.t-sequencias .corpo { flex: 1; min-height: 0; overflow: hidden; padding: 12px 24px 0; display: flex; flex-direction: column; gap: 28px; }
+.t-sequencias .d-kpi { padding: 14px 18px; }
+.t-sequencias .d-kpi .v { font-size: 26px; }
+.t-sequencias .lin { display: grid; grid-template-columns: 34px minmax(0,1fr) 150px 36px; align-items: center; gap: 16px; height: 72px; padding: 0 8px; border-bottom: 1px solid var(--bs); }
+.t-sequencias .lin:last-child { border-bottom: 0; }
+.t-sequencias .lin .d-ic { width: 34px; height: 34px; border-radius: 10px; }
+.t-sequencias .lin .d-ic svg.wa { color: var(--wa); }
+.t-sequencias .lin b { font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-sequencias .resp { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; font-size: 12px; color: var(--t3); white-space: nowrap; }
+.t-sequencias .resp b { font-size: 15px; font-weight: 600; color: var(--t1); font-variant-numeric: tabular-nums; }
+.t-sequencias .lin.off b, .t-sequencias .lin.off .resp b { color: var(--t3); }
+.t-sequencias .lin .d-switch { justify-self: end; }
+</style>
+<!--MOCK-->
+<div class="d-main t-sequencias">
+  <div class="d-bar">
+    <h4>Sequências</h4><span class="cnt">3</span>
+    <span class="vbar"></span>
+    <span class="d-bt ag"><span class="sq md dc">D</span><span class="b5">Site Drawing Club</span><svg><use href="#i-chev"/></svg></span>
+    <div class="dir">
+      <span class="d-bt ghost ic" title="Régua: mensagens com espera entre elas; o contato entra sozinho e sai ao responder"><svg><use href="#i-help"/></svg></span>
+      <span class="d-bt ia"><svg><use href="#i-spark"/></svg>Criar com IA</span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Nova sequência</span>
+    </div>
+  </div>
+  <div class="corpo">
+    <div class="d-kpis">
+      <div class="d-kpi"><span class="r">Na régua agora</span><span class="v">47</span></div>
+      <div class="d-kpi"><span class="r">Responderam</span><span class="v">91</span></div>
+      <div class="d-kpi"><span class="r">Taxa de resposta</span><span class="v">23%</span></div>
+    </div>
+
+    <div class="lista">
+      <div class="lin">
+        <span class="d-ic"><svg class="wa"><use href="#i-wa"/></svg></span>
+        <b>Follow-up de orçamento</b>
+        <span class="resp"><b>28%</b>responderam</span>
+        <span class="d-switch on"></span>
+      </div>
+      <div class="lin">
+        <span class="d-ic"><svg class="wa"><use href="#i-wa"/></svg></span>
+        <b>Recuperar proposta parada</b>
+        <span class="resp"><b>26%</b>responderam</span>
+        <span class="d-switch on"></span>
+      </div>
+      <div class="lin off">
+        <span class="d-ic"><svg><use href="#i-mail"/></svg></span>
+        <b>Lembrete da aula grátis</b>
+        <span class="resp"><b>14%</b>responderam</span>
+        <span class="d-switch"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Uma pergunta: a régua traz resposta?</b> Três números no topo e, em cada linha, o canal, o nome, a taxa de resposta e o liga e desliga.</li>
+<li><b>Inscritos, na régua, saídas e a barra colorida deixaram a linha.</b> Ficam no resumo ao abrir a sequência.</li>
+<li><b>Passos e regras foram para dentro da sequência.</b> Mensagens, esperas, modelo fora da janela, "Sair ao responder" e "Permitir entrar de novo" abrem no clique, com "Ajustar com IA". Apagar também está lá.</li>
+<li><b>Ajuda num ícone.</b> A explicação do que é uma régua fica no ponto de interrogação. Ficam visíveis só o agente, "Criar com IA" e "Nova sequência".</li>
+<!--/NOTAS-->

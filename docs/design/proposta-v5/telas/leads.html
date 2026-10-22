@@ -1,0 +1,45 @@
+<!-- id: leads | titulo: Leads | grupo: Vender | menu: leads | print: leads -->
+<style>
+.t-leads { overflow: hidden; }
+.t-leads .bx { width: 200px; height: 30px; }
+.t-leads .d-board { padding-top: 12px; gap: 16px; }
+.t-leads .d-col { width: 206px; gap: 10px; }
+.t-leads .d-lc { padding: 14px; gap: 8px; }
+.t-leads .d-lc .t .d-av { width: 26px; height: 26px; font-size: 10px; }
+.t-leads .vz { padding: 18px 10px; text-align: center; font-size: 12px; color: var(--t3); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--bs); }
+</style>
+<!--MOCK-->
+<div class="d-main t-leads">
+  <div class="d-bar">
+    <h4>Leads</h4><span class="cnt">48</span>
+    <div class="dir">
+      <span class="d-in bx"><svg><use href="#i-search"/></svg>Buscar lead</span>
+      <span class="d-bt"><svg><use href="#i-filter"/></svg>Filtros</span>
+      <span class="d-bt ic" title="Adicionar via API, exportar CSV"><svg><use href="#i-more"/></svg></span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Novo lead</span>
+    </div>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas"><span class="on"><svg><use href="#i-kanban"/></svg>Quadro</span><span><svg><use href="#i-msg"/></svg>Conversas</span></div>
+  </div>
+  <div class="d-board">
+    <div class="d-col"><div class="h"><i style="background:var(--d-slate)"></i>Novo<em>47</em></div>
+      <div class="d-lc"><div class="t"><span class="d-av h-violet">AS</span><span class="n">Ana Beatriz Sá</span><span class="tm">2h</span></div><div class="q">Tem desconto pra turma?</div></div>
+      <div class="d-lc"><div class="t"><span class="d-av h-amber">+55</span><span class="n">(47) 99812-3310</span><span class="tm">7h</span></div><div class="q">Preciso de um site novo para minha empresa.</div></div>
+      <div class="d-lc"><div class="t"><span class="d-av h-blue">PL</span><span class="n">Pedro Lima</span><span class="tm">ontem</span></div><div class="q">Queria entender os planos de infraestrutura.</div></div>
+      <div class="d-addcard">Mais 44</div>
+    </div>
+    <div class="d-col"><div class="h"><i style="background:var(--d-blue)"></i>Contatado<em>1</em></div>
+      <div class="d-lc"><div class="t"><span class="d-av h-teal">JP</span><span class="n">Juliana Prado</span><span class="tm">14 min</span></div><div class="q">R$&nbsp;57 por mês no plano anual, em até 12x?</div></div>
+    </div>
+    <div class="d-col"><div class="h"><i style="background:var(--d-violet)"></i>Qualificado<em>0</em></div><div class="vz">Nenhum lead</div></div>
+    <div class="d-col"><div class="h"><i style="background:var(--d-green)"></i>Ganho<em>0</em></div><div class="vz">Nenhum lead</div></div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Cartão com nome, tempo e a mensagem</b> E-mail, canal, contagem de dados e o quadradinho do site saem do cartão. Tudo isso continua ao abrir o lead.</li>
+<li><b>Site e origem viram Filtros</b> O seletor "Todos os sites" e o botão Origem se juntam num botão Filtros, ao lado da busca.</li>
+<li><b>Menos cartões por coluna</b> A coluna Novo mostra três leads com mais espaço e "Mais 44" para o resto, em vez de uma pilha.</li>
+<li><b>Dicas saem</b> "Arraste o cartão para mudar a etapa" e o "+" de cada coluna saem da frente. Criar lead fica em "Novo lead"; API e CSV, no "…".</li>
+<!--/NOTAS-->

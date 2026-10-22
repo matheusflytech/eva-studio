@@ -1,0 +1,63 @@
+<!-- id: biblioteca | titulo: Biblioteca | grupo: Automação | menu: biblioteca | print: biblioteca -->
+<style>
+.t-biblioteca { overflow: hidden; }
+.t-biblioteca .alvo { color: var(--t1); padding: 0 10px 0 5px; gap: 8px; }
+.t-biblioteca .alvo > svg { color: var(--t3); width: 14px; height: 14px; }
+.t-biblioteca .rot { font-size: 13px; color: var(--t3); white-space: nowrap; }
+.t-biblioteca .d-pagina.estreita { padding: 18px 24px; gap: 0; }
+.t-biblioteca .d-linha { min-height: 72px; padding: 12px 4px; gap: 14px; }
+.t-biblioteca .d-linha + .d-linha::before { left: 50px; right: 4px; }
+.t-biblioteca .d-ic { width: 34px; height: 34px; border-radius: 10px; }
+.t-biblioteca .d-ic.ia { color: var(--ai); background: var(--aisub); box-shadow: none; }
+.t-biblioteca .d-linha .col { gap: 3px; }
+.t-biblioteca .d-linha .t { font-size: 14px; }
+.t-biblioteca .d-linha .s { font-size: 12.5px; }
+.t-biblioteca .d-linha .s .ok { color: var(--ok); font-weight: 500; }
+</style>
+<!--MOCK-->
+<div class="d-main t-biblioteca">
+  <div class="d-bar">
+    <h4>Biblioteca</h4>
+    <span class="vbar"></span>
+    <span class="rot">Aplicar em</span>
+    <span class="d-bt alvo"><span class="sq md vv">V</span><span class="b5">Vendedor Virtual</span><svg><use href="#i-chev"/></svg></span>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas">
+      <span class="on"><svg><use href="#i-flow"/></svg>Fluxos <em>4</em></span>
+      <span><svg><use href="#i-mail"/></svg>E-mails <em>6</em></span>
+    </div>
+  </div>
+
+  <div class="d-scroll">
+    <div class="d-pagina estreita">
+      <div class="d-linha">
+        <span class="d-ic ia"><svg><use href="#i-eva"/></svg></span>
+        <span class="col"><span class="t">Atendimento com menu</span><span class="s">Menu de opções, depois IA ou humano · 7 blocos</span></span>
+        <span class="dir"><span class="d-bt sm">Aplicar</span></span>
+      </div>
+      <div class="d-linha">
+        <span class="d-ic ia"><svg><use href="#i-eva"/></svg></span>
+        <span class="col"><span class="t">FAQ com IA</span><span class="s"><span class="ok">Aplicado</span> · responde pela base de conhecimento</span></span>
+        <span class="dir"><span class="d-link">Abrir o builder<svg><use href="#i-arrow"/></svg></span></span>
+      </div>
+      <div class="d-linha">
+        <span class="d-ic"><svg><use href="#i-flow"/></svg></span>
+        <span class="col"><span class="t">Qualificação de lead</span><span class="s">Coleta nome, telefone e interesse e envia pro CRM · 8 blocos</span></span>
+        <span class="dir"><span class="d-bt sm">Aplicar</span></span>
+      </div>
+      <div class="d-linha">
+        <span class="d-ic"><svg><use href="#i-zap"/></svg></span>
+        <span class="col"><span class="t">Atendimento pelo n8n</span><span class="s">Seu workflow do n8n responde · 4 blocos</span></span>
+        <span class="dir"><span class="d-bt sm">Aplicar</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Os blocos de cada modelo saíram da linha</b> A sequência de sete ou oito chips vira só a contagem de blocos. A ordem completa aparece ao clicar no modelo, antes de aplicar.</li>
+<li><b>O aviso vai para a confirmação</b> "Aplicar troca o fluxo atual e não dá para desfazer" sai do topo e fica na confirmação, com o nome do agente que vai perder o fluxo.</li>
+<li><b>Uma linha por modelo</b> Ícone, nome, uma frase curta e o botão. Modelo que usa IA leva o símbolo da Eva; o que já está aplicado mostra "Aplicado" e o link para o builder.</li>
+<li><b>Agente escolhido no título</b> "Aplicar em" fica ao lado do nome da tela, e as abas Fluxos e E-mails seguem com a contagem. A dica "os mesmos modelos do builder" saiu.</li>
+<!--/NOTAS-->

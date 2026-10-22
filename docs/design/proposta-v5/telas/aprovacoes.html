@@ -1,0 +1,77 @@
+<!-- id: aprovacoes | titulo: Aprovações | grupo: Automação | menu: aprovacoes | print: aprovacoes -->
+<style>
+.t-aprovacoes { overflow: hidden; }
+.t-aprovacoes .ag { color: var(--t1); padding: 0 10px 0 5px; gap: 8px; }
+.t-aprovacoes .ag > svg { color: var(--t3); width: 14px; height: 14px; }
+.t-aprovacoes .d-pagina.estreita { padding: 22px 24px; gap: 28px; }
+.t-aprovacoes .alerta { align-items: center; padding: 12px 14px; font-size: 13px; }
+.t-aprovacoes .alerta svg { margin-top: 0; }
+.t-aprovacoes .alerta b { font-weight: 600; }
+.t-aprovacoes .alerta .d-bt { margin-left: auto; color: var(--t1); }
+.t-aprovacoes .alerta .d-bt svg { margin-top: 0; }
+.t-aprovacoes .lista { display: flex; flex-direction: column; }
+.t-aprovacoes .lista .d-h5 { padding: 0 4px 8px; }
+.t-aprovacoes .lista .d-h5 .dir { margin-left: auto; }
+.t-aprovacoes .d-linha { min-height: 60px; padding: 10px 4px; gap: 14px; }
+.t-aprovacoes .d-linha + .d-linha::before { left: 4px; right: 4px; }
+.t-aprovacoes .d-linha .col { gap: 3px; }
+.t-aprovacoes .d-linha .t { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; letter-spacing: 0; }
+.t-aprovacoes .d-linha .s.dg { color: var(--dg); }
+.t-aprovacoes .d-linha .dir > svg { width: 14px; height: 14px; color: var(--t3); }
+</style>
+<!--MOCK-->
+<div class="d-main t-aprovacoes">
+  <div class="d-bar">
+    <h4>Aprovações</h4><span class="cnt">6 templates</span>
+    <span class="vbar"></span>
+    <span class="d-bt ag"><span class="sq md vv">V</span><span class="b5">Vendedor Virtual</span><svg><use href="#i-chev"/></svg></span>
+    <div class="dir">
+      <span class="d-bt ic" title="Mais: consultar a Meta de novo, Gerenciador da Meta"><svg><use href="#i-more"/></svg></span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Novo template</span>
+    </div>
+  </div>
+  <div class="d-scroll">
+    <div class="d-pagina estreita">
+      <div class="d-aviso dg alerta">
+        <svg><use href="#i-alert"/></svg>
+        <span><b>3 mensagens</b> deste agente não saem fora da janela de 24h</span>
+        <span class="d-bt sm">Ver quais<svg><use href="#i-chevr"/></svg></span>
+      </div>
+
+      <div class="lista">
+        <div class="d-h5">Templates na Meta<span class="dir">5 aprovados</span></div>
+        <div class="d-linha">
+          <span class="col"><span class="t">lembrete_pagamento_v2</span><span class="s dg">Recusado: categoria incorreta</span></span>
+          <span class="dir"><span class="chip dg"><svg><use href="#i-x"/></svg>Rejeitado</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+        <div class="d-linha">
+          <span class="col"><span class="t">oferta_novembro</span><span class="s">Marketing</span></span>
+          <span class="dir"><span class="chip wn"><svg><use href="#i-clock"/></svg>Em análise</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+        <div class="d-linha">
+          <span class="col"><span class="t">boas_vindas_lead</span><span class="s">Utilidade · em uso</span></span>
+          <span class="dir"><span class="chip ok"><svg><use href="#i-check"/></svg>Aprovado</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+        <div class="d-linha">
+          <span class="col"><span class="t">proposta_followup</span><span class="s">Marketing · em uso</span></span>
+          <span class="dir"><span class="chip ok"><svg><use href="#i-check"/></svg>Aprovado</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+        <div class="d-linha">
+          <span class="col"><span class="t">lembrete_reuniao</span><span class="s">Utilidade</span></span>
+          <span class="dir"><span class="chip ok"><svg><use href="#i-check"/></svg>Aprovado</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+        <div class="d-linha">
+          <span class="col"><span class="t">codigo_acesso</span><span class="s">Autenticação</span></span>
+          <span class="dir"><span class="chip ok"><svg><use href="#i-check"/></svg>Aprovado</span><svg><use href="#i-chevr"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Um aviso no lugar do bloco de problemas</b> As três mensagens que não saem fora da janela viram uma linha só. "Ver quais" abre a lista com o motivo de cada uma e o atalho para o Builder.</li>
+<li><b>Linha com nome, categoria e status</b> Idioma, qualidade e o texto do template saíram da lista e ficam no detalhe, que abre ao clicar na linha. O que tem problema sobe para o topo; o motivo da recusa continua na própria linha.</li>
+<li><b>Ações extras no "…"</b> Consultar a Meta de novo, o link para o Gerenciador da Meta e o número da conta de negócio ficam no menu. Na frente só fica "Novo template".</li>
+<li><b>Agente sem WhatsApp oficial</b> O exemplo do segundo agente saiu da tela. Quem escolhe um agente sem Cloud API vê um estado vazio curto com o botão para conectar.</li>
+<!--/NOTAS-->
