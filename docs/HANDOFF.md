@@ -257,12 +257,13 @@ foi conferido depois de cada um.
 | `2026-10-20-busca.sql` | unaccent, pg_trgm, função de normalização, 11 índices GIN (criados CONCURRENTLY) | aplicado |
 | `2026-10-20-visoes-salvas.sql` | visões salvas e padrão por pessoa | aplicado |
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
-| `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
-| `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
+| `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva (RLS ligada) | **aplicado em 22/10** (vazia: sem linha, o app usa a escolha automática) |
+| `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave (RLS ligada) | **aplicado em 22/10** (vazias) |
 | `2026-10-25-avisos-rodizio.sql` | Avisos internos da equipe e contagem do rodízio de responsável (RLS ligada) | **aplicado em 21/10** (tabelas vazias) |
 | `2026-10-24-automacoes.sql` | Automações: automações, versões, barramento de eventos, execuções, passos e esperas (RLS ligada) | **aplicado em 21/10** (tabelas vazias; motor testado ponta a ponta) |
 | `2026-10-23-webhooks.sql` | Webhooks de saída (endpoints + fila de entregas) e URL de entrada do agente, com RLS ligada | **aplicado em 21/10** (tabelas vazias) |
-| `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão | **não aplicado** (app funciona sem; nenhum e-mail novo sai) |
+| `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão (RLS ligada) | **aplicado em 22/10** (vazias; envio só com `RESEND_API_KEY` na Vercel) |
+| `scripts/backfill-leads.mjs` | Fase 2, Task 10: conversas `website` antigas viram leads (contato com etapa); cria contato para as 10 sem contato | **rodado em 22/10**: 49 leads (47 da Eva Holding, igual à tela antiga), 10 contatos criados; ids em `scripts/backfill-leads-2026-10-22.json` |
 | `2026-10-22-canais-do-contrato.sql` | Canais do contrato + sessão do QR por canal, com migração das conexões atuais | aplicado em 21/10 (migrou 1 canal: o QR do Vendedor Virtual, em qr_pending, sem credenciais). Rodado 2x para provar que não duplica. App e worker em produção ainda são os antigos (modo por agente) até o deploy |
 
 Para aplicar um SQL novo: script Node com `pg` usando `DIRECT_URL`, rodando o

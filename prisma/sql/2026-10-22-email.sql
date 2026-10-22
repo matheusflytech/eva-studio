@@ -65,4 +65,11 @@ CREATE TABLE IF NOT EXISTS "eva_studio_email_supressoes" (
     CONSTRAINT "eva_studio_email_supressoes_pkey" PRIMARY KEY ("orgId", "email")
 );
 
+-- RLS ligada sem política: o app entra como postgres (passa por cima); a
+-- chave anon do Supabase não lê nada.
+ALTER TABLE "eva_studio_email_dominios" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_email_modelos" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_email_envios" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_email_supressoes" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

@@ -20,4 +20,8 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- RLS ligada sem política: o app entra como postgres (passa por cima); a
+-- chave anon do Supabase não lê nada.
+ALTER TABLE "eva_studio_ai_connections" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

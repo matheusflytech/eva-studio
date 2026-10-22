@@ -31,4 +31,9 @@ CREATE TABLE IF NOT EXISTS "eva_studio_ai_key_limits" (
 );
 CREATE INDEX IF NOT EXISTS "eva_studio_ai_key_limits_orgId_idx" ON "eva_studio_ai_key_limits"("orgId");
 
+-- RLS ligada sem política: o app entra como postgres (passa por cima); a
+-- chave anon do Supabase não lê nada.
+ALTER TABLE "eva_studio_ai_usage" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "eva_studio_ai_key_limits" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;
