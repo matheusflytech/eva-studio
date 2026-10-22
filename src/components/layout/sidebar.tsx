@@ -20,6 +20,7 @@ import {
   Users,
   Contact,
   Repeat,
+  Workflow,
   Building2,
   Handshake,
   CheckSquare,
@@ -70,6 +71,7 @@ const NAV_AVANCADO: NavGroup[] = [
   {
     label: "Automação",
     items: [
+      { href: "/automacoes", label: "Automações", icon: Workflow },
       { href: "/sequencias", label: "Sequências", icon: Repeat },
       { href: "/disparos", label: "Disparos", icon: Send },
       { href: "/aprovacoes", label: "Aprovações", icon: CheckCheck },

@@ -425,3 +425,39 @@ Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado
   - os avisos não aparecem em lugar nenhum da tela (sino ou Início): é a parte F;
   - a idempotência do WhatsApp na nova tentativa depende de o passo não ter chegado a
     enviar (não há conferência no canal).
+
+### Parte E: FEITA (21/10/2026, local; SQL de avisos e rodízio aplicado)
+- **APIs** (`src/app/api/automacoes/`):
+  - lista com KPIs; criar em branco ou por modelo;
+  - rascunho (GET, PATCH, DELETE);
+  - publicar, pausar, retomar, testar e rodar à mão;
+  - versões e restaurar;
+  - execuções (lista e detalhe com os passos);
+  - opções dos seletores e busca de registros.
+
+  A permissão nova é `automacoes:ver` (todos) e `automacoes:gerenciar` (dono e admin),
+  fora dos pacotes antigos.
+- **Telas:**
+  - Menu: Automação → Automações.
+  - Lista (`/automacoes`): faixa "Eva Automação" com execuções hoje, tempo médio,
+    erros e ligadas. Cada cartão traz a frase, o status, as execuções e os erros em
+    30 dias, e a última execução.
+  - Galeria: 9 modelos (`src/lib/automacoes/modelos.ts`) mais "em branco" por tipo de
+    registro.
+  - Editor (`/automacoes/[id]`):
+    - canvas React Flow com layout esquerda→direita (`layout.ts`), sem arrastar;
+    - "+" no meio das ligações e nos espaços vazios abre o seletor com busca;
+    - painel à direita com o formulário gerado do catálogo, variáveis, regra E/OU,
+      espera, esperar evento, caminhos e caminho de erro;
+    - configurações (reinscrição e objetivo);
+    - pendências no cartão e no topo;
+    - salva sozinho; desfazer/refazer (Ctrl+Z);
+    - publicar com a conferência das pendências; pausar/ligar; apagar.
+- **Teste no navegador** (conta do Alfredo, banco de produção): criar pelo modelo,
+  escolher a etapa, inserir passo, desfazer, testar num negócio e apagar. O teste deu
+  "concluída" em 612 ms com o passo a passo, e o banco ficou zerado.
+- **Mudança de regra:** no teste, nenhuma ação muda nada, nem as internas (tarefa,
+  nota, etapa, etiqueta). Cada passo só mostra o que faria. Campo faltando não impede
+  testar; só estrutura quebrada impede.
+- **Fica para a F:** a aba de execuções ao vivo com a linha do tempo e "aplicar a quem
+  já atende" na publicação.

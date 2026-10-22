@@ -79,14 +79,16 @@ export async function inscreverManualmente(orgId: string, id: string, objetoIds:
 }
 
 /**
- * Testa o rascunho num registro real: ações externas só mostram o que fariam
+ * Testa o rascunho num registro real: as ações só mostram o que fariam
  * e as esperas não esperam. Fica no histórico marcado como teste.
  */
 export async function testarAutomacao(orgId: string, id: string, objetoId: string, userId: string | null) {
   const a = await carregar(orgId, id);
   const def = a.rascunho as unknown as Definicao;
-  const erros = validar(def).filter((p) => p.nivel === "erro" && p.no !== "gatilho");
-  if (erros.length) throw new ErroDaAutomacao("Corrija as pendências dos passos antes de testar.", 422, erros);
+  // Teste não muda nada: campo faltando só aparece no passo. Estrutura quebrada
+  // (ciclo, passo solto, malformado) não dá para percorrer.
+  const erros = validar(def).filter((p) => p.nivel === "erro" && p.no !== "gatilho" && !/falta /.test(p.mensagem));
+  if (erros.length) throw new ErroDaAutomacao("Corrija a estrutura antes de testar.", 422, erros);
   const versao = await prisma.automacaoVersao.upsert({
     where: { automacaoId_numero: { automacaoId: id, numero: VERSAO_DE_TESTE } },
     create: { automacaoId: id, numero: VERSAO_DE_TESTE, definicao: def as object, publicadaPor: userId },

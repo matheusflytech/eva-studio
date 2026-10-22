@@ -19,6 +19,7 @@ export const SECOES_DO_CONTRATO = [
   "dashboard",
   "agent-studio",
   "sequencias",
+  "automacoes",
   "disparos",
   "aprovacoes",
   "biblioteca",

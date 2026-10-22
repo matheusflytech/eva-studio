@@ -20,7 +20,7 @@ import { MANIPULADORES, type ManipuladorDeAcao } from "./acoes";
 // - erro retentável: nova tentativa com espera crescente, até 6; definitivo:
 //   caminho de erro do passo ou a execução falha;
 // - 10 falhas seguidas pausam a automação (e o Início avisa);
-// - teste: ações externas só mostram o que fariam e as esperas não esperam.
+// - teste: nenhuma ação muda nada (só mostra o que faria) e as esperas não esperam.
 // ---------------------------------------------------------------------------
 
 export const PASSOS_POR_RODADA = 20;
@@ -250,7 +250,8 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
     const manipulador = manipuladores[noAcao.acao];
     let r: Awaited<ReturnType<ManipuladorDeAcao>>;
     if (!manipulador) r = { ok: false, erro: `A ação “${item?.nome ?? noAcao.acao}” ainda não está disponível.` };
-    else if (exec.teste && item?.efeito === "externo") r = { ok: true, saida: { simulado: true, enviaria: config } };
+    // Teste (modo seguro): nenhuma ação muda nada; o passo mostra o que faria.
+    else if (exec.teste) r = { ok: true, saida: { simulado: true, faria: config } };
     else {
       try {
         r = await comAtor({ tipo: "automacao", automacaoId: exec.automacaoId, execucaoId: id, profundidade: exec.profundidade + 1 }, () =>

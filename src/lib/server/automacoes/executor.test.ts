@@ -167,12 +167,15 @@ describe("executor", () => {
     expect(volta.getTime()).toBeLessThan(new Date("2026-10-26T11:11:00Z").getTime());
   });
 
-  it("teste: ação externa só mostra o que faria e a espera não espera", async () => {
+  it("teste: nenhuma ação roda de verdade (nem as internas) e a espera não espera", async () => {
     novaExecucao(exemploProposta(), { teste: true });
     const enviou = vi.fn(ok);
-    const r = await executarExecucao("x1", { manipuladores: manip({ "whatsapp.send": enviou }), agora: () => DOMINGO });
+    const criouTarefa = vi.fn(ok);
+    const r = await executarExecucao("x1", { manipuladores: manip({ "whatsapp.send": enviou, "task.create": criouTarefa }), agora: () => DOMINGO });
     expect(r).toEqual({ status: "concluida" });
     expect(enviou).not.toHaveBeenCalled();
+    expect(criouTarefa).not.toHaveBeenCalled();
+    expect(estado.passos.find((p) => p.noId === "tarefa")!.saida).toMatchObject({ simulado: true, faria: { texto: "Ligar para Ana" } });
     expect(estado.passos.find((p) => p.noId === "zap")!.saida).toMatchObject({ simulado: true });
     expect(estado.automacao.falhasSeguidas).toBe(0);
   });
