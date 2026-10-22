@@ -45,8 +45,10 @@ export const QuickAdd = React.forwardRef<
     dealId?: string | null;
     className?: string;
     placeholder?: string;
+    /** Opcional: Esc (ou sair do campo vazio) fecha quem abriu o campo. */
+    onFechar?: () => void;
   }
->(function QuickAdd({ onCriada, contactId, dealId, className, placeholder }, ref) {
+>(function QuickAdd({ onCriada, contactId, dealId, className, placeholder, onFechar }, ref) {
   const toast = useToast();
   const [texto, setTexto] = React.useState("");
   const [enviando, setEnviando] = React.useState(false);
@@ -100,7 +102,16 @@ export const QuickAdd = React.forwardRef<
               e.preventDefault();
               criar();
             }
-            if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              (e.target as HTMLInputElement).blur();
+              onFechar?.();
+            }
+          }}
+          onBlur={(e) => {
+            // Saiu do campo sem escrever nada (e não foi para o botão Criar): fecha.
+            if (!onFechar || texto.trim()) return;
+            if (e.relatedTarget && e.currentTarget.parentElement?.contains(e.relatedTarget)) return;
+            onFechar();
           }}
           placeholder={placeholder ?? "Nova tarefa: “ligar João amanhã 14h” (atalho T)"}
           aria-label="Nova tarefa em linguagem natural"

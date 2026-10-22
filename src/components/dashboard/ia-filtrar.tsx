@@ -3,6 +3,7 @@
 import * as React from "react";
 import { LayoutGrid, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarcaEva } from "@/components/layout/marca-eva";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { CampoDePedido, EntendiAssim, pedirParaEva, type SugestaoDaIa } from "@/components/dashboard/ia-pergunte-a-eva";
 import type { OpcoesDoDashboard } from "@/components/dashboard/opcoes";
@@ -58,9 +59,11 @@ export function PainelFiltrarComIa({
   }
 
   return (
-    <div className="flex flex-col gap-2.5 border-t border-border-subtle pt-3">
+    <div className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[12.5px] text-text-secondary">Me diz que recorte você quer ver no painel.</p>
+        <p className="inline-flex items-center gap-1.5 text-small text-text-secondary">
+          <MarcaEva size={13} className="text-text-secondary" /> Me diz que recorte você quer ver no painel.
+        </p>
         <div className="flex items-center gap-1">
           {anterior && (
             <button
@@ -70,7 +73,7 @@ export function PainelFiltrarComIa({
                 setAnterior(null);
                 setResposta(null);
               }}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-caption text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary"
             >
               <Undo2 size={13} /> Desfazer
             </button>
@@ -91,7 +94,7 @@ export function PainelFiltrarComIa({
       />
 
       {erro && (
-        <p className="text-[12.5px] text-danger" role="alert">
+        <p className="text-small text-danger" role="alert">
           {erro}
         </p>
       )}
@@ -100,8 +103,8 @@ export function PainelFiltrarComIa({
         <>
           <EntendiAssim explicacao={resposta.explicacao} avisos={resposta.avisos} />
           {resposta.sobras.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
-              <p className="text-[12.5px] leading-relaxed text-text-secondary">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-raised px-3 py-2.5">
+              <p className="text-small leading-relaxed text-text-secondary">
                 O painel filtra só por período, funil e responsável. Isto aqui só cabe num cartão:{" "}
                 <span className="text-text-primary">{resposta.sobras.join("; ")}</span>.
               </p>
