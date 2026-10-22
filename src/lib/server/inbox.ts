@@ -188,3 +188,15 @@ export const CANAIS_RESPONDIVEIS = new Set([
   "telegram",
   "tiktok",
 ]);
+
+/**
+ * Canais em que o próprio cliente busca a resposta: o chat do site. A mensagem
+ * do atendente fica gravada e o site mostra quando buscar as novas
+ * (src/lib/server/site-atendimento.ts). Nada a enviar daqui.
+ */
+export const CANAIS_POR_BUSCA = new Set(["website"]);
+
+/** Dá para um atendente escrever de volta neste canal? */
+export function podeResponderNoCanal(channel: string): boolean {
+  return CANAIS_RESPONDIVEIS.has(channel) || CANAIS_POR_BUSCA.has(channel);
+}

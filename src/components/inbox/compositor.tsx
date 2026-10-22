@@ -358,7 +358,8 @@ export function Compositor({
           respostaBloqueada && "opacity-60"
         )}
       >
-        {modo === "responder" && (
+        {/* No chat do site só vai texto: ele não mostra arquivo do atendente. */}
+        {modo === "responder" && conversa.channel !== "website" && (
           <>
             <input ref={arquivo} type="file" accept={TIPOS_ACEITOS} onChange={aoEscolherArquivo} className="hidden" />
             <button

@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
-import { janelaDeResposta, CANAIS_RESPONDIVEIS, type JanelaDeResposta } from "@/lib/server/inbox";
+import { janelaDeResposta, podeResponderNoCanal, type JanelaDeResposta } from "@/lib/server/inbox";
 
 // ---------------------------------------------------------------------------
 // Leitura da caixa de entrada.
@@ -160,7 +160,7 @@ export async function montarItens(linhas: LinhaDeConversa[]): Promise<ItemDeConv
           }
         : null,
       negocio: n ? { id: n.id, name: n.name, etapa: n.etapa, valorCents: n.valorCents } : null,
-      respondivel: CANAIS_RESPONDIVEIS.has(l.channel),
+      respondivel: podeResponderNoCanal(l.channel),
       simulado: CANAIS_DE_TESTE.includes(l.channel),
     };
   });
