@@ -81,6 +81,9 @@ export interface AdvanceInput {
   // Que tipo de evento é (só o Instagram distingue hoje): DM comum, resposta
   // ou reação a story, menção em story. Sem isso, é DM.
   event?: { kind: InboundKind; storyId?: string; isReaction?: boolean };
+  // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
+  // da pergunta para o modelo, mas não é gravado na conversa.
+  anexoContexto?: string;
 }
 
 export interface AdvanceResult {
@@ -332,10 +335,12 @@ async function montarFerramentaDeCampos(
 ): Promise<{ action: string; tool: LlmTool }[]> {
   const contactId = await resolveContactId().catch(() => null);
   const deal = contactId ? await findOpenDealForContact(contactId).catch(() => null) : null;
-  const defsNegocio = deal ? await carregarDefinicoes(orgId, "deal", deal.pipelineId) : [];
+  // Sem negócio aberto ainda, oferece os campos que valem em todos os funis: a IA
+  // costuma criar o negócio e preencher no mesmo turno, e a lista de parâmetros
+  // da ferramenta é montada antes, quando o negócio ainda não existe.
+  const defsNegocio = await carregarDefinicoes(orgId, "deal", deal?.pipelineId ?? null);
   const defsContato = await carregarDefinicoes(orgId, "contact");
   const todas = [...defsNegocio, ...defsContato];
-  if (todas.length === 0) return [];
 
   const dica = (d: (typeof todas)[number]): string => {
     const base = d.label;
@@ -347,7 +352,24 @@ async function montarFerramentaDeCampos(
     return base;
   };
 
+  const registrar: { action: string; tool: LlmTool } = {
+    action: "registrar_lead",
+    tool: {
+      name: "crm_registrar_lead",
+      description:
+        "Registra um lead no CRM em uma única chamada: cria o negócio (ou completa o que já existe), preenche os campos, aplica a etiqueta e anota o resumo. Use quando já tiver o nome e um contato da pessoa.",
+      params: [
+        { name: "nome", description: "Nome da pessoa." },
+        ...todas.map((d) => ({ name: d.key, description: dica(d), required: false })),
+        { name: "etiqueta", description: "Nome exato da etiqueta a aplicar, se houver.", required: false },
+        { name: "resumo", description: "Resumo curto do que a pessoa quer, para a equipe.", required: false },
+      ],
+    },
+  };
+  if (todas.length === 0) return [registrar];
+
   return [
+    registrar,
     {
       action: "atualizar_campos",
       tool: {
@@ -501,6 +523,44 @@ async function runCrmTool(
     return (partes.length > 0 ? `Campos salvos: ${partes.join(", ")}.` : "Nada foi salvo.") + (erros.length > 0 ? ` Problemas: ${erros.join(" ")}` : "");
   }
 
+  if (call.name === "crm_registrar_lead") {
+    const texto = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
+    const nome = texto(args.nome) || "Contato do site";
+
+    // Um lead, um negócio: se a pessoa já tem negócio aberto, só completa os dados.
+    let dealId = (await findOpenDealForContact(contactId))?.id ?? null;
+    const jaExistia = !!dealId;
+    if (!dealId) dealId = (await createDeal({ orgId, name: `Lead do site: ${nome}`, contactId })).id;
+
+    const dados: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args)) {
+      if (["nome", "etiqueta", "resumo"].includes(k)) continue;
+      if (texto(v)) dados[k] = v;
+    }
+    const noNegocio = await preencherCamposDoNegocio(orgId, dealId, dados);
+    const noContato = await preencherCamposDoContato(orgId, contactId, dados);
+
+    const partes = [jaExistia ? "negócio já existia, completado" : "negócio criado"];
+    const aplicados = noNegocio.aplicados + noContato.aplicados;
+    if (aplicados > 0) partes.push(`${aplicados} campo(s) preenchido(s)`);
+
+    const nomeTag = texto(args.etiqueta);
+    if (nomeTag) {
+      const tag = await prisma.tag.findFirst({ where: { orgId, name: { equals: nomeTag, mode: "insensitive" } } });
+      if (tag) {
+        const { applyTag } = await import("@/lib/server/contacts");
+        await applyTag(contactId, tag.id);
+        partes.push(`etiqueta "${tag.name}"`);
+      }
+    }
+    if (texto(args.resumo)) {
+      await addNote({ orgId, text: texto(args.resumo), contactId, dealId });
+      partes.push("nota registrada");
+    }
+    const erros = [...noNegocio.erros, ...noContato.erros];
+    return `Lead registrado: ${partes.join(", ")}.` + (erros.length > 0 ? ` Problemas: ${erros.join(" ")}` : "");
+  }
+
   if (call.name === "crm_criar_tarefa") {
     const deal = await findOpenDealForContact(contactId);
     await createTask({
@@ -537,6 +597,19 @@ async function runCrmTool(
   return "Ação de CRM desconhecida.";
 }
 
+/** A pergunta do visitante mais o que a IA entendeu do anexo dele, se houver. */
+function textoParaIA(input: { text?: string; anexoContexto?: string }): string {
+  const texto = input.text ?? "";
+  return input.anexoContexto ? `${texto}
+
+${input.anexoContexto}`.trim() : texto;
+}
+
+// Sem resposta da IA e sem saída "Erro": a pessoa recebe isto em vez de silêncio
+// (no Playground e na prévia o erro aparece no log, então não manda nada).
+const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
+const CANAIS_DE_TESTE_DA_IA = ["playground", "builder_preview"];
+
 async function runAiAgent(
   node: Node<FlowNodeData>,
   agente: AgenteParaPrompt & { id: string; orgId: string },
@@ -557,13 +630,17 @@ async function runAiAgent(
     const provider = getProvider(node.data.aiProvider);
     const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
     if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
-    passos = [{
+    // Modelos reserva do bloco: mesma chave, outro modelo (o limite por minuto
+    // do provedor vale por modelo).
+    const principal = node.data.aiModel || provider.models[0].id;
+    const modelos = [principal, ...(node.data.aiFallbackModels ?? []).filter((m) => m && m !== principal)];
+    passos = modelos.map((model, i) => ({
       provider: provider.id as LlmProvider,
       apiKey,
-      model: node.data.aiModel || provider.models[0].id,
-      origem: "bloco",
+      model,
+      origem: i === 0 ? "bloco" : `bloco (reserva ${model})`,
       credentialId: node.data.aiCredentialId,
-    }];
+    }));
   } else {
     ({ passos, timeoutMs } = await passosDaConexao(agente.orgId));
     if (passos.length === 0) {
@@ -779,7 +856,7 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const result = await chamarComReserva(passos, {
+    const chamar = () => chamarComReserva(passos, {
       effort: node.data.aiEffort,
       timeoutMs,
       systemPrompt,
@@ -795,7 +872,7 @@ async function runAiAgent(
           const saved: string[] = [];
           for (const v of collectVars) {
             const value = call.arguments[v.key];
-            if (value !== undefined && String(value).trim()) {
+            if (value !== undefined && value !== null && String(value).trim() && String(value).trim().toLowerCase() !== "null") {
               setVar(variables, v.key, value);
               saved.push(v.key);
             }
@@ -846,6 +923,14 @@ async function runAiAgent(
         ok,
       });
     });
+    let result = await chamar();
+    // Todas as opções no limite por minuto (429): espera o que o provedor
+    // mandou esperar (no máximo 12 s) e tenta uma vez mais.
+    if (!result.text && result.error && /429/.test(result.error) && !result.executouFerramenta) {
+      const dito = /try again in ([\d.]+)s/i.exec(result.error);
+      await new Promise((r) => setTimeout(r, Math.min(12, (dito ? Number(dito[1]) : 6) + 0.5) * 1000));
+      result = await chamar();
+    }
     await registrarUso(consumo);
     if (result.tentativas.length > 0 && !result.error) {
       console.warn("[ia] respondeu pela reserva", { usado: result.usado?.origem, falharam: result.tentativas.map((t) => t.origem) });
@@ -1325,13 +1410,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     if (!(reply && done && temSaidaPrincipal(edges, parkedNode.id))) return finish();
     currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent, input.text ?? "", variables, nodes, edges, conversation.id, {
+    const reply = await runAiAgent(parkedNode, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
-    if (reply.text) messages.push({ text: reply.text });
-    pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
+    if (reply.text) messages.push({ text: reply.text });
+    else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
+    pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     if (seErrou) currentId = seErrou; // falhou: segue pela saída "Erro"
     else if (!reply.seguir) return finish();
     else currentId = nextDefaultNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
@@ -1598,13 +1684,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent, input.text ?? "", variables, nodes, edges, conversation.id, {
+      const reply = await runAiAgent(node, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
-      if (reply.text) messages.push({ text: reply.text });
-      pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
+      if (reply.text) messages.push({ text: reply.text });
+      else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
+      pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       if (seErrou) {
         currentId = seErrou; // falhou: segue pela saída "Erro"
         continue;

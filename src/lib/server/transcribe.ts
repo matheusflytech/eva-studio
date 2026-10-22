@@ -7,7 +7,7 @@ import { decryptSecret } from "@/lib/server/crypto";
 
 export const MAX_AUDIO_BYTES = 6 * 1024 * 1024;
 
-async function chaveGroq(orgId: string): Promise<string | null> {
+export async function chaveGroq(orgId: string): Promise<string | null> {
   const cred = await prisma.credential.findFirst({ where: { orgId, type: "groq" }, orderBy: { createdAt: "desc" } });
   if (cred) {
     try {

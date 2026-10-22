@@ -62,6 +62,7 @@ describe("chamarComReserva", () => {
     const r = await chamarComReserva([passo("A"), passo("B")], base, chamar);
     expect(chamar).toHaveBeenCalledTimes(1);
     expect(r.error).toContain("500");
+    expect(r.executouFerramenta).toBe(true);
     expect(base.executeTool).toHaveBeenCalledTimes(1);
   });
 

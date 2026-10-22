@@ -35,6 +35,8 @@ export interface ResultadoComReserva extends LlmResult {
   usado?: PassoDeIa;
   /** Erros dos passos que falharam antes, na ordem. */
   tentativas: { origem: string; model: string; error: string }[];
+  /** A IA chegou a executar ferramenta (repetir a chamada duplicaria a ação). */
+  executouFerramenta?: boolean;
 }
 
 /** O erro é do provedor (vale tentar o próximo) ou do pedido (não adianta)? */
@@ -72,7 +74,7 @@ export async function chamarComReserva(
 
     const ultimo = i === passos.length - 1;
     if (ultimo || executouFerramenta || !ehErroDeReserva(erro)) {
-      return { text: result.text, error: erro, usado: passo, tentativas };
+      return { text: result.text, error: erro, usado: passo, tentativas, executouFerramenta };
     }
     tentativas.push({ origem: passo.origem, model: passo.model, error: erro });
   }

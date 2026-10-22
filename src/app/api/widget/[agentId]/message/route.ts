@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
-import { transcreverAudio, MAX_AUDIO_BYTES } from "@/lib/server/transcribe";
-import { safeFetch } from "@/lib/server/ssrf";
-
-const MAX_AUDIO_B64 = Math.ceil((MAX_AUDIO_BYTES * 4) / 3);
+import { transcreverAudio } from "@/lib/server/transcribe";
+import { entenderAnexo, MAX_ANEXO_BYTES } from "@/lib/server/anexos";
+import { guardarBuffer } from "@/lib/server/media-inbound";
+import { classificarMime, mimeBase } from "@/lib/server/storage";
 
 // Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
 const MAX_TEXT = 4000;
 const MAX_CONTACT_ID = 128;
 const MAX_OPTION_ID = 128;
+// A Vercel recusa corpo acima de 4,5 MB. Em base64 o arquivo cresce um terço,
+// então 3 MB de arquivo é o teto que cabe com folga.
+const MAX_BASE64 = Math.ceil((MAX_ANEXO_BYTES * 4) / 3) + 64;
 
 // Rota pública (sem sessão) — o widget roda no site de um visitante
 // qualquer, então não tem cookie de login nem X-Internal-Secret pra
@@ -27,6 +30,10 @@ const CORS_HEADERS = {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function resposta(texto: string, extra: Record<string, unknown> = {}) {
+  return NextResponse.json({ messages: [{ text: texto }], status: "active", ...extra }, { headers: CORS_HEADERS });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
@@ -49,51 +56,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Muitas mensagens. Aguarde um instante." }, { status: 429, headers: CORS_HEADERS });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const { optionId, lang } = body;
   let { text } = body;
   // O site antigo mandava `conversation_id`; aceita os dois nomes.
   const contactId = body.contactId ?? body.conversation_id;
-
-  // Áudio: transcreve e segue como se o visitante tivesse digitado.
-  let transcricao: string | undefined;
-  if (typeof body.audio_base64 === "string") {
-    const mime = typeof body.audio_mime === "string" ? body.audio_mime.slice(0, 40) : "audio/webm";
-    const r = await transcreverAudio(agent.orgId, body.audio_base64, mime, typeof lang === "string" ? lang : undefined);
-    // Sem chave Groq aqui, mas com um fluxo n8n ligado ao agente: ele já sabe
-    // transcrever e responder áudio (audio_base64 -> Whisper -> resposta).
-    if ("erro" in r && r.erro === "sem_chave" && agent.outboundUrl && body.audio_base64.length <= MAX_AUDIO_B64) {
-      try {
-        const res = await safeFetch(agent.outboundUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            audio_base64: body.audio_base64,
-            audio_mime: mime,
-            conversation_id: `website:${String(contactId ?? "").slice(0, MAX_CONTACT_ID)}`,
-            lang: typeof lang === "string" ? lang.slice(0, 8) : undefined,
-          }),
-        });
-        const d = res.ok ? await res.json() : null;
-        if (typeof d?.reply === "string" && d.reply.trim()) {
-          return NextResponse.json({ messages: [{ text: d.reply }], status: "active" }, { headers: CORS_HEADERS });
-        }
-      } catch {
-        /* cai na mensagem abaixo */
-      }
-    }
-    if ("erro" in r) {
-      const msg =
-        r.erro === "sem_chave"
-          ? "O atendimento por voz ainda não está configurado. Pode escrever sua mensagem?"
-          : r.erro === "vazio"
-            ? "Não consegui ouvir nada nesse áudio. Tente de novo ou escreva."
-            : "Não consegui entender o áudio agora. Pode escrever sua mensagem?";
-      return NextResponse.json({ messages: [{ text: msg }], status: "active" }, { headers: CORS_HEADERS });
-    }
-    text = r.texto.slice(0, MAX_TEXT);
-    transcricao = text;
-  }
+  const safeLang = typeof lang === "string" ? lang.slice(0, 8) : undefined;
 
   if (!contactId || typeof contactId !== "string" || contactId.length > MAX_CONTACT_ID) {
     return NextResponse.json({ error: "contactId inválido." }, { status: 400, headers: CORS_HEADERS });
@@ -104,8 +72,71 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   if (optionId !== undefined && (typeof optionId !== "string" || optionId.length > MAX_OPTION_ID)) {
     return NextResponse.json({ error: "optionId inválido." }, { status: 400, headers: CORS_HEADERS });
   }
-  const safeLang = typeof lang === "string" ? lang.slice(0, 8) : undefined;
 
-  const result = await advanceConversation({ agentId, channel: "website", contactId, text, optionId, lang: safeLang });
+  let transcricao: string | undefined;
+  let media: { path: string; type: string; mime: string; name?: string; size?: number } | undefined;
+  let anexoContexto: string | undefined;
+
+  // Áudio: guarda o arquivo, transcreve e segue como se o visitante tivesse digitado.
+  if (typeof body.audio_base64 === "string") {
+    if (body.audio_base64.length > MAX_BASE64) {
+      return resposta("Esse áudio ficou grande demais. Pode mandar um mais curto ou escrever?");
+    }
+    const mime = typeof body.audio_mime === "string" ? mimeBase(body.audio_mime).slice(0, 40) : "audio/webm";
+    const bytes = Buffer.from(body.audio_base64, "base64");
+    const r = await transcreverAudio(agent.orgId, body.audio_base64, mime, safeLang);
+    if ("erro" in r) {
+      const msg =
+        r.erro === "sem_chave"
+          ? "O atendimento por voz ainda não está configurado. Pode escrever sua mensagem?"
+          : r.erro === "vazio"
+            ? "Não consegui ouvir nada nesse áudio. Tente de novo ou escreva."
+            : "Não consegui entender o áudio agora. Pode escrever sua mensagem?";
+      return resposta(msg);
+    }
+    text = r.texto.slice(0, MAX_TEXT);
+    transcricao = text;
+    // O áudio fica guardado para a equipe ouvir na caixa de entrada.
+    media = (await guardarBuffer(agent.orgId, bytes, mime, { name: "audio" })) ?? undefined;
+  }
+
+  // Anexo (imagem, PDF, Word, texto): guarda, entende e passa o contexto à IA.
+  const a = body.attachment;
+  if (a && typeof a === "object") {
+    const base64 = typeof a.base64 === "string" ? a.base64 : "";
+    const mime = typeof a.mime === "string" ? mimeBase(a.mime).slice(0, 120) : "";
+    const nome = typeof a.name === "string" ? a.name.replace(/[\r\n]+/g, " ").slice(0, 120) : "";
+
+    if (!base64 || base64.length > MAX_BASE64) {
+      return resposta("Esse arquivo é grande demais. O limite é de 3 MB. Pode mandar um menor?");
+    }
+    const classe = classificarMime(mime);
+    if (!classe || classe.tipo === "audio" || classe.tipo === "video") {
+      return resposta("Eu consigo receber imagens, PDF, Word e texto. Esse tipo de arquivo não dá. Pode mandar em outro formato?");
+    }
+    // Anexo é mais caro que texto (visão e extração): limite próprio por IP.
+    const anexos = await checkRateLimit(`widget-anexo:${agentId}:${ip}`, 6, 60);
+    if (!anexos.allowed) return resposta("Muitos arquivos de uma vez. Espere um instante e mande de novo.");
+
+    const bytes = Buffer.from(base64, "base64");
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_ANEXO_BYTES) {
+      return resposta("Esse arquivo é grande demais. O limite é de 3 MB. Pode mandar um menor?");
+    }
+    media = (await guardarBuffer(agent.orgId, bytes, mime, { name: nome || undefined })) ?? undefined;
+    anexoContexto = await entenderAnexo(agent.orgId, bytes, mime, nome);
+    // Sem legenda, a mensagem mostra o nome do arquivo na caixa de entrada.
+    if (!text || !String(text).trim()) text = `📎 ${nome || "arquivo"}`;
+  }
+
+  const result = await advanceConversation({
+    agentId,
+    channel: "website",
+    contactId,
+    text,
+    optionId,
+    lang: safeLang,
+    media,
+    anexoContexto,
+  });
   return NextResponse.json(transcricao ? { ...result, transcricao } : result, { headers: CORS_HEADERS });
 }

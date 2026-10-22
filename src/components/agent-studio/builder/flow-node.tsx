@@ -85,6 +85,9 @@ export interface FlowNodeData {
   // nome da variável, valor = descrição/como reconhecer) — reaproveita
   // KeyValueRow em vez de um tipo novo.
   collectVars?: KeyValueRow[];
+  // Modelos reserva (mesma credencial) usados quando o principal bate no limite de
+  // tokens por minuto do provedor.
+  aiFallbackModels?: string[];
   // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
   // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
   mcpServerId?: string;

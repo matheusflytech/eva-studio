@@ -490,6 +490,7 @@ export function CrmBlockFields({
       { id: "buscar", label: "Consultar CRM", hint: "Só leitura. Seguro deixar sempre ligado." },
       { id: "criar_negocio", label: "Criar negócio", hint: "A IA decide quando há intenção de compra." },
       { id: "mover_etapa", label: "Mover etapa", hint: "Limitado às etapas liberadas abaixo." },
+      { id: "registrar_lead", label: "Registrar lead (tudo de uma vez)", hint: "Cria o negócio, preenche os campos, etiqueta e anota. Gasta menos que usar as ações separadas." },
       { id: "atualizar_campos", label: "Salvar dados do cliente", hint: "A IA preenche os campos que você criou (consumo, tipo de imóvel...)." },
       { id: "criar_tarefa", label: "Criar tarefa", hint: "Gera trabalho pra equipe, não altera o funil." },
       { id: "etiquetar", label: "Etiquetar", hint: "Pode iniciar uma sequência automaticamente." },
