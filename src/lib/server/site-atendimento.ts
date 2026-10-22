@@ -12,8 +12,9 @@ import { agentePausado } from "@/lib/server/inbox";
 
 export const CANAL_DO_SITE = "website";
 
-/** Quanto voltar no tempo quando o site ainda não sabe a última que mostrou. */
-const JANELA_SEM_CORTE_MS = 60 * 60 * 1000;
+/** Quanto voltar no tempo quando o site ainda não sabe a última que mostrou
+ * (aba recarregada, visitante que volta horas depois). */
+const JANELA_SEM_CORTE_MS = 24 * 60 * 60 * 1000;
 const MAX_POR_BUSCA = 20;
 
 export interface MensagemDoAtendente {
