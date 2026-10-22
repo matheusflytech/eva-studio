@@ -37,13 +37,13 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
         <div className="flex flex-col gap-5 overflow-y-auto px-5 pb-5">
           {erro && <Notice tone="danger">{erro}</Notice>}
           <section>
-            <p className="eyebrow mb-2">Em branco</p>
+            <p className="mb-2 font-mono text-caption text-text-tertiary">Em branco</p>
             <div className="flex flex-wrap gap-2">
               {OBJETOS.map((o) => {
                 const Icone = ICONE_DO_OBJETO[o];
                 return (
                   <Button key={o} type="button" variant="secondary" size="sm" disabled={!!ocupado} onClick={() => void escolher(`branco:${o}`, { objeto: o })}>
-                    <Icone size={14} /> {NOMES_DOS_OBJETOS[o].plural}
+                    <Icone size={14} aria-hidden="true" /> {NOMES_DOS_OBJETOS[o].plural}
                   </Button>
                 );
               })}
@@ -51,7 +51,7 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
           </section>
           {categorias.map((cat) => (
             <section key={cat}>
-              <p className="eyebrow mb-2">{cat}</p>
+              <p className="mb-2 font-mono text-caption text-text-tertiary">{cat}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {MODELOS.filter((m) => m.categoria === cat).map((m) => {
                   const d = m.definicao();
@@ -65,17 +65,17 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
                       disabled={!!ocupado}
                       onClick={() => void escolher(m.id, { modeloId: m.id })}
                       className={cn(
-                        "flex gap-3 rounded-xl border border-border-default bg-panel p-3 text-left transition-colors hover:border-border-strong hover:bg-raised disabled:opacity-60",
-                        ocupado === m.id && "border-accent-solid"
+                        "flex gap-3 rounded-[14px] border border-border-subtle bg-panel p-3 text-left transition-colors hover:bg-raised disabled:opacity-60",
+                        ocupado === m.id && "border-accent-solid ring-1 ring-accent-solid"
                       )}
                     >
-                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-                        <Icone size={17} />
+                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
+                        <Icone size={16} aria-hidden="true" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[13px] font-medium text-text-primary">{m.nome}</span>
-                        <span className="mt-0.5 block text-[12px] leading-snug text-text-secondary">{m.descricao}</span>
-                        <span className="mt-1 block truncate text-[11px] text-text-tertiary" title={fraseDaAutomacao(d)}>
+                        <span className="block text-small font-medium text-text-primary">{m.nome}</span>
+                        <span className="mt-0.5 block text-caption text-text-secondary">{m.descricao}</span>
+                        <span className="mt-1 block truncate font-mono text-caption text-text-tertiary" title={fraseDaAutomacao(d)}>
                           {NOMES_DOS_OBJETOS[m.objeto].plural} · {fraseDaAutomacao(d)}
                         </span>
                       </span>
@@ -85,8 +85,8 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
               </div>
             </section>
           ))}
-          <p className="flex items-center gap-1.5 text-[12px] text-text-tertiary">
-            <Plus size={12} /> O que o modelo não sabe do seu contrato (etapa, pessoas, modelo aprovado) fica marcado para você escolher antes de ligar.
+          <p className="flex items-start gap-1.5 text-caption text-text-tertiary">
+            <Plus size={12} aria-hidden="true" className="mt-0.5 shrink-0" /> O que o modelo não sabe do seu contrato (etapa, pessoas, modelo aprovado) fica marcado para você escolher antes de ligar.
           </p>
         </div>
       </ModalContent>

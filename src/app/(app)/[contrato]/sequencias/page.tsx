@@ -1,18 +1,50 @@
 "use client";
 
 import * as React from "react";
-import { Repeat, Plus, Trash2, Clock, X, Loader2, GripVertical, ArrowRight, Sparkles } from "lucide-react";
+import {
+  AtSign,
+  ChevronsUpDown,
+  CircleHelp,
+  Clock,
+  GripVertical,
+  Mail,
+  MessageCircle,
+  Plus,
+  Repeat,
+  Send,
+  Trash2,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { IconButton } from "@/components/ui/icon-button";
 import { Switch } from "@/components/ui/switch";
+import { Notice } from "@/components/ui/notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Modal, ModalContent } from "@/components/ui/modal";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { pulsar } from "@/lib/fundo/eventos";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { AssistenteIaSequencia, type RascunhoSequencia } from "./assistente-ia";
+import { MarcaEva } from "@/components/layout/marca-eva";
+
+// ---------------------------------------------------------------------------
+// Sequências (réguas). v5: uma pergunta por tela — a régua está rodando?
+// Números do agente no topo e, em cada linha, canal, nome, quantos estão na
+// régua agora e o liga/desliga. Gatilho, passos, regras, "Ajustar com IA" e
+// Apagar moram no detalhe, que abre numa gaveta ao clicar na linha.
+// ---------------------------------------------------------------------------
 
 interface SequenceStep {
   id?: string;
@@ -52,12 +84,34 @@ const CHANNEL_LABEL: Record<string, string> = {
   email: "E-mail",
 };
 
+// Ícone do canal na linha: o canal é identidade, então é o único lugar com cor.
+const CHANNEL_ICON: Record<string, { Icone: LucideIcon; cor: string }> = {
+  whatsapp_meta: { Icone: MessageCircle, cor: "text-success" },
+  whatsapp_qr: { Icone: MessageCircle, cor: "text-success" },
+  telegram: { Icone: Send, cor: "text-info" },
+  instagram: { Icone: AtSign, cor: "text-text-secondary" },
+  email: { Icone: Mail, cor: "text-text-secondary" },
+};
+
 const TRIGGER_LABEL: Record<string, string> = {
   tag: "Ao receber etiqueta",
   segment: "Ao entrar no segmento",
   stage: "Por etapa do funil",
   manual: "Inscrição manual",
 };
+
+const AJUDA_DA_REGUA =
+  "Régua de acompanhamento: mensagens com espera entre elas. O contato entra sozinho ao receber uma etiqueta e sai sozinho ao responder.";
+
+/** "Ao receber etiqueta “Orçamento”": o gatilho numa frase, para o resumo do detalhe. */
+function fraseDoGatilho(s: Sequence): string {
+  let f = TRIGGER_LABEL[s.trigger] ?? s.trigger;
+  if (s.trigger === "tag" && s.triggerTag) f += ` “${s.triggerTag.name}”`;
+  if (s.trigger === "segment" && s.triggerSegment) f += ` “${s.triggerSegment.name}”`;
+  if (s.trigger === "stage" && s.triggerStage)
+    f += ` “${s.triggerStage.name}”${s.triggerStageDays > 0 ? ` parado há ${s.triggerStageDays}d` : ""}`;
+  return f;
+}
 
 // Atraso é guardado em minutos, mas ninguém pensa em "2880 minutos".
 /**
@@ -78,7 +132,7 @@ function StageTrigger({
   onDays: (n: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_140px] gap-4">
+    <div className="grid grid-cols-[1fr_120px] gap-3 sm:grid-cols-[1fr_140px] sm:gap-4">
       <div>
         <Label htmlFor={`${idPrefix}-etapa`}>Etapa do funil</Label>
         <Select id={`${idPrefix}-etapa`} value={stageId} onChange={(e) => onStage(e.target.value)}>
@@ -99,7 +153,7 @@ function StageTrigger({
           value={days}
           onChange={(e) => onDays(Math.max(0, Number(e.target.value) || 0))}
         />
-        <p className="mt-1 text-[11px] text-text-tertiary">dias. 0 = na hora</p>
+        <p className="mt-1 text-caption text-text-tertiary">dias. 0 = na hora</p>
       </div>
     </div>
   );
@@ -157,6 +211,19 @@ const DELAY_PRESETS = [
   { label: "7 dias", value: 10080 },
 ];
 
+/** Número do topo: rótulo pequeno em cima, número grande sem ícone. */
+function Numero({ rotulo, valor, apoio }: { rotulo: string; valor: React.ReactNode; apoio?: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 rounded-[18px] border border-border-subtle bg-panel px-4 py-3 sm:px-5">
+      <span className="truncate text-small text-text-secondary">{rotulo}</span>
+      <span className="flex items-baseline gap-1.5 text-display font-medium tabular-nums tracking-tight text-text-primary">
+        {valor}
+        {apoio && <span className="font-mono text-caption font-normal tracking-normal text-text-tertiary">{apoio}</span>}
+      </span>
+    </div>
+  );
+}
+
 export default function SequenciasPage() {
   const { agents, isLoaded, load } = useAgentsStore();
   const [agentId, setAgentId] = React.useState<string | null>(null);
@@ -169,6 +236,8 @@ export default function SequenciasPage() {
   const [showNew, setShowNew] = React.useState(false);
   const [showIa, setShowIa] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Só para o esqueleto: até a primeira resposta, a lista vazia não é "nenhuma sequência".
+  const [carregou, setCarregou] = React.useState(false);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -195,7 +264,10 @@ export default function SequenciasPage() {
     setTemplates(tpl);
   }, [agentId]);
 
-  React.useEffect(() => { refresh(); }, [refresh]);
+  React.useEffect(() => {
+    if (!agentId) return;
+    refresh().finally(() => setCarregou(true));
+  }, [refresh, agentId]);
 
   async function toggleActive(sequence: Sequence) {
     if (!agentId) return;
@@ -217,111 +289,146 @@ export default function SequenciasPage() {
 
   if (isLoaded && agents.length === 0) {
     return (
-      <EmptyState
-        icon={<Repeat size={40} className="text-text-tertiary" />}
-        title="Nenhum agente ainda"
-        description="Sequências mandam mensagens de acompanhamento em nome de um agente. Crie um agente primeiro."
-      />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Sequências</h1>
+        <EmptyState
+          icon={<Repeat />}
+          title="Nenhum agente ainda"
+          description="Sequências mandam mensagens de acompanhamento em nome de um agente. Crie um agente primeiro."
+        />
+      </div>
     );
   }
 
+  const agente = agents.find((a) => a.id === agentId);
+  const naRegua = sequences.reduce((t, s) => t + s.activeEnrollments, 0);
+  const inscritos = sequences.reduce((t, s) => t + s.totalEnrollments, 0);
+  const ligadas = sequences.filter((s) => s.active).length;
+
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary">Sequências</h1>
-          <p className="mt-1 max-w-2xl text-[15px] text-text-secondary">
-            Régua de acompanhamento: uma fila de mensagens com espera entre elas, que o contato entra sozinho ao
-            receber uma etiqueta e sai sozinho ao responder.
-          </p>
-        </div>
-        <div className="flex items-end gap-3">
-          <div className="w-[220px]">
-            <Label htmlFor="seq-agente">Agente</Label>
-            <Select id="seq-agente" value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
-              {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </Select>
-          </div>
-          <Button variant="secondary" onClick={() => setShowIa(true)} disabled={!agentId}>
-            <Sparkles size={15} className="text-accent-500" /> Criar com IA
-          </Button>
-          <Button onClick={() => setShowNew(true)}>
-            <Plus size={15} /> Nova sequência
-          </Button>
-        </div>
-      </header>
-
-      {error && <div className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
-
-      {sequences.length === 0 ? (
-        <EmptyState
-          icon={<Repeat size={36} className="text-text-tertiary" />}
-          title="Nenhuma sequência ainda"
-          description="Ex: quem pediu orçamento e não respondeu recebe uma lembrança em 1 dia e outra em 3."
-          action={
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setShowIa(true)}>
-                <Sparkles size={15} className="text-accent-500" /> Criar com IA
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      {/* Barra da tela: título, agente e, à direita, ajuda, "Criar com IA" e a ação principal. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Sequências</h1>
+        {carregou && (
+          <span className="font-mono text-caption tabular-nums text-text-tertiary">
+            {sequences.length} {sequences.length === 1 ? "régua" : "réguas"}
+          </span>
+        )}
+        <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
+        {agents.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" aria-label={`Agente: ${agente?.name ?? ""}. Trocar de agente`} className="max-w-[220px] px-2 text-text-primary">
+                <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-raised font-mono text-caption text-text-secondary">
+                  {(agente?.name ?? "?").charAt(0).toUpperCase()}
+                </span>
+                <span className="truncate">{agente?.name ?? "Agente"}</span>
+                <ChevronsUpDown size={14} aria-hidden="true" className="text-text-tertiary" />
               </Button>
-              <Button onClick={() => setShowNew(true)}><Plus size={15} /> Nova sequência</Button>
-            </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Agentes</DropdownMenuLabel>
+              {agents.map((a) => (
+                <DropdownMenuCheckboxItem key={a.id} checked={a.id === agentId} onCheckedChange={() => setAgentId(a.id)}>
+                  {a.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <IconButton aria-label="Como funcionam as sequências" tooltip={AJUDA_DA_REGUA}>
+            <CircleHelp />
+          </IconButton>
+          <Button variant="secondary" onClick={() => setShowIa(true)} disabled={!agentId}>
+            <MarcaEva size={14} className="shrink-0" /> Criar com IA
+          </Button>
+          <Button variant="primary" onClick={() => setShowNew(true)}>
+            <Plus size={14} aria-hidden="true" /> Nova sequência
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <Notice tone="danger" onDismiss={() => setError(null)}>
+          {error}
+        </Notice>
+      )}
+
+      {!carregou ? (
+        <div className="flex flex-col gap-4" aria-busy="true" aria-label="Carregando sequências">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[84px] animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+            ))}
+          </div>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-12 animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+          ))}
+        </div>
+      ) : sequences.length === 0 ? (
+        <EmptyState
+          icon={<Repeat />}
+          title="Nenhuma sequência ainda"
+          description="Ex.: quem pediu orçamento e não respondeu recebe uma lembrança em 1 dia e outra em 3."
+          action={
+            <Button variant="primary" onClick={() => setShowNew(true)}>
+              <Plus size={14} aria-hidden="true" /> Nova sequência
+            </Button>
           }
         />
       ) : (
-        <div className="flex flex-col gap-3">
-          {sequences.map((s) => (
-            <Card key={s.id} className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2.5">
-                    <h2 className="font-display text-[17px] font-semibold text-text-primary">{s.name}</h2>
-                    <Badge variant={s.active ? "success" : "neutral"}>{s.active ? "Ativa" : "Pausada"}</Badge>
-                  </div>
-                  <p className="mt-1 text-[13px] text-text-secondary">
-                    {CHANNEL_LABEL[s.channel] ?? s.channel} · {TRIGGER_LABEL[s.trigger]}
-                    {s.trigger === "tag" && s.triggerTag && ` “${s.triggerTag.name}”`}
-                    {s.trigger === "segment" && s.triggerSegment && ` “${s.triggerSegment.name}”`}
-                    {s.trigger === "stage" && s.triggerStage &&
-                      ` “${s.triggerStage.name}”${s.triggerStageDays > 0 ? ` parado há ${s.triggerStageDays}d` : ""}`}
-                    {" · "}
-                    {s.steps.length} passo{s.steps.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="font-display text-lg font-semibold text-text-primary">{s.activeEnrollments}</div>
-                    <div className="text-[11px] uppercase tracking-wide text-text-tertiary">na régua</div>
-                  </div>
-                  <Switch checked={s.active} onCheckedChange={() => toggleActive(s)} aria-label="Ativar sequência" />
-                  <Button variant="secondary" onClick={() => setEditing(s)}>Editar</Button>
-                  <button
-                    onClick={() => remove(s.id)}
-                    className="rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
-                    aria-label={`Apagar sequência ${s.name}`}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
+        <>
+          {/* Os números que existem hoje na API: quem está na régua, quantos já entraram e quantas estão ligadas. */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Numero rotulo="Na régua agora" valor={naRegua.toLocaleString("pt-BR")} />
+            <Numero rotulo="Inscritos" valor={inscritos.toLocaleString("pt-BR")} />
+            <Numero rotulo="Ligadas" valor={ligadas} apoio={`de ${sequences.length}`} />
+          </div>
 
-              {s.steps.length > 0 && (
-                <ol className="flex flex-wrap items-center gap-2">
-                  {s.steps.map((step, i) => (
-                    <li key={step.id ?? i} className="flex items-center gap-2">
-                      <div className="max-w-[230px] rounded-2xl bg-surface-2 px-3 py-2">
-                        <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary">
-                          <Clock size={11} /> {formatDelay(step.delayMinutes)}
-                        </div>
-                        <div className="mt-0.5 truncate text-[13px] text-text-primary">{step.text}</div>
-                      </div>
-                      {i < s.steps.length - 1 && <ArrowRight size={14} className="text-text-tertiary" />}
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Card>
-          ))}
-        </div>
+          <ul aria-label="Sequências" className="flex flex-col">
+            {sequences.map((s) => {
+              const canal = CHANNEL_ICON[s.channel] ?? { Icone: Repeat, cor: "text-text-secondary" };
+              return (
+                <li
+                  key={s.id}
+                  className="flex h-[60px] items-center gap-3 border-b border-border-subtle px-2 transition-colors last:border-b-0 hover:bg-raised sm:gap-4"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setEditing(s)}
+                    className="flex h-full min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-solid sm:gap-4"
+                    aria-label={`Abrir ${s.name}`}
+                  >
+                    <span
+                      title={CHANNEL_LABEL[s.channel] ?? s.channel}
+                      className={cn("flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-border-subtle bg-raised", canal.cor)}
+                    >
+                      <canal.Icone size={15} aria-hidden="true" />
+                    </span>
+                    <span className={cn("min-w-0 flex-1 truncate text-body font-medium", s.active ? "text-text-primary" : "text-text-tertiary")}>
+                      {s.name}
+                    </span>
+                    <span className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap text-caption text-text-tertiary">
+                      <span className={cn("text-body-lg font-semibold tabular-nums", s.active ? "text-text-primary" : "text-text-tertiary")}>
+                        {s.activeEnrollments.toLocaleString("pt-BR")}
+                      </span>
+                      na régua
+                    </span>
+                  </button>
+                  <Switch
+                    checked={s.active}
+                    onClick={(e) => pulsar(e.currentTarget, 1.2)}
+                    onCheckedChange={() => toggleActive(s)}
+                    aria-label={s.active ? `Desligar ${s.name}` : `Ligar ${s.name}`}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       {showIa && agentId && (
@@ -359,6 +466,7 @@ export default function SequenciasPage() {
           templates={templates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); refresh(); }}
+          onRemove={(id) => { setEditing(null); remove(id); }}
           onError={setError}
         />
       )}
@@ -406,13 +514,24 @@ function NewSequenceModal({
 
   return (
     <Modal open onOpenChange={(open) => !open && onClose()}>
-      <ModalContent title="Nova sequência" description="Depois de criar, você adiciona os passos e liga a régua.">
+      <ModalContent
+        title="Nova sequência"
+        description="Depois de criar, você adiciona os passos e liga a régua."
+        footer={
+          <>
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button variant="primary" onClick={save} disabled={saving || !name.trim()} loading={saving}>
+              Criar
+            </Button>
+          </>
+        }
+      >
         <div className="flex flex-col gap-4">
           <div>
             <Label htmlFor="ns-nome">Nome</Label>
-            <Input id="ns-nome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: follow-up de orçamento" />
+            <Input id="ns-nome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: follow-up de orçamento" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="ns-canal">Canal</Label>
               <Select id="ns-canal" value={channel} onChange={(e) => setChannel(e.target.value)}>
@@ -464,18 +583,11 @@ function NewSequenceModal({
           )}
 
           {channel === "instagram" && (
-            <p className="rounded-2xl bg-surface-2 px-4 py-3 text-[12px] text-text-secondary">
+            <Notice tone="info">
               No Instagram a Meta só permite mensagem automatizada dentro de 24h da última mensagem da pessoa. Passos
               marcados para depois disso não serão entregues.
-            </p>
+            </Notice>
           )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button onClick={save} disabled={saving || !name.trim()}>
-              {saving && <Loader2 size={15} className="animate-spin" />} Criar
-            </Button>
-          </div>
         </div>
       </ModalContent>
     </Modal>
@@ -483,7 +595,7 @@ function NewSequenceModal({
 }
 
 function SequenceEditor({
-  agentId, sequence, tags, segments, pipelines, templates, onClose, onSaved, onError,
+  agentId, sequence, tags, segments, pipelines, templates, onClose, onSaved, onRemove, onError,
 }: {
   agentId: string;
   sequence: Sequence;
@@ -493,6 +605,7 @@ function SequenceEditor({
   templates: MessageTemplate[];
   onClose: () => void;
   onSaved: () => void;
+  onRemove: (id: string) => void;
   onError: (e: string | null) => void;
 }) {
   const [name, setName] = React.useState(sequence.name);
@@ -597,17 +710,58 @@ function SequenceEditor({
     onSaved();
   }
 
+  const rotuloDoGrupo = "font-mono text-caption text-text-tertiary";
+
   return (
-    <Modal open onOpenChange={(open) => !open && onClose()}>
-      <ModalContent
-        className="max-w-3xl"
-        title={nova ? "Revisar rascunho da IA" : `Editar “${sequence.name}”`}
-        description={nova ? "Confira os passos. A régua só é criada quando você clicar em Salvar, e nasce desligada." : undefined}
+    <Drawer open onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent
+        size="lg"
+        title={nova ? "Revisar rascunho da IA" : sequence.name}
+        description={
+          nova
+            ? "Confira os passos. A régua só é criada quando você clicar em Salvar, e nasce desligada."
+            : `${CHANNEL_LABEL[sequence.channel] ?? sequence.channel} · ${fraseDoGatilho(sequence)}`
+        }
+        footer={
+          <>
+            {!nova && (
+              <Button
+                variant="ghost"
+                className="mr-auto text-danger hover:bg-danger-subtle hover:text-danger"
+                onClick={() => onRemove(sequence.id)}
+                aria-label={`Apagar sequência ${sequence.name}`}
+              >
+                <Trash2 size={14} aria-hidden="true" /> Apagar
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button variant="primary" onClick={save} disabled={saving} loading={saving}>
+              Salvar
+            </Button>
+          </>
+        }
       >
-        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto pr-1">
-          <div className="flex justify-end">
+        <div className="flex flex-col gap-6">
+          {/* Resumo: o que saiu da linha da lista (inscritos, na régua, passos). */}
+          {!nova && (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { r: "Inscritos", v: sequence.totalEnrollments },
+                { r: "Na régua agora", v: sequence.activeEnrollments },
+                { r: "Passos", v: sequence.steps.length },
+              ].map((n) => (
+                <div key={n.r} className="flex min-w-0 flex-col gap-0.5 rounded-[14px] bg-raised px-3 py-2.5">
+                  <span className="truncate text-caption text-text-tertiary">{n.r}</span>
+                  <span className="text-title-sm font-semibold tabular-nums text-text-primary">{n.v.toLocaleString("pt-BR")}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <span className={rotuloDoGrupo}>Régua</span>
             <Button variant="secondary" size="sm" onClick={() => setShowIa(true)}>
-              <Sparkles size={14} className="text-accent-500" /> {steps.length > 0 ? "Ajustar com IA" : "Criar com IA"}
+              <MarcaEva size={13} className="shrink-0" /> {steps.length > 0 ? "Ajustar com IA" : "Criar com IA"}
             </Button>
           </div>
           {showIa && (
@@ -619,7 +773,7 @@ function SequenceEditor({
               onUsar={usarRascunho}
             />
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="-mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="es-nome">Nome</Label>
               <Input id="es-nome" value={name} onChange={(e) => setName(e.target.value)} />
@@ -634,9 +788,6 @@ function SequenceEditor({
                 <option value="email">E-mail</option>
               </Select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="es-gatilho">Entra quando</Label>
               <Select id="es-gatilho" value={trigger} onChange={(e) => setTrigger(e.target.value)}>
@@ -677,45 +828,52 @@ function SequenceEditor({
             />
           )}
 
-          <div className="flex flex-col gap-2.5 rounded-2xl bg-surface-2 px-4 py-3">
-            <label className="flex items-center justify-between gap-4">
-              <span>
-                <span className="block text-[13px] font-medium text-text-primary">Sair ao responder</span>
-                <span className="block text-[12px] text-text-tertiary">
-                  Respondeu, a régua para. Deixar desligado transforma follow-up em insistência.
+          <div className="flex flex-col gap-2">
+            <span className={rotuloDoGrupo}>Regras</span>
+            <div className="flex flex-col rounded-[14px] bg-raised px-4">
+              <label className="flex items-center justify-between gap-4 py-3">
+                <span>
+                  <span className="block text-small font-medium text-text-primary">Sair ao responder</span>
+                  <span className="block text-caption text-text-tertiary">
+                    Respondeu, a régua para. Deixar desligado transforma follow-up em insistência.
+                  </span>
                 </span>
-              </span>
-              <Switch checked={stopOnReply} onCheckedChange={setStopOnReply} />
-            </label>
-            <label className="flex items-center justify-between gap-4 border-t border-border-subtle pt-2.5">
-              <span>
-                <span className="block text-[13px] font-medium text-text-primary">Permitir entrar de novo</span>
-                <span className="block text-[12px] text-text-tertiary">
-                  Quem já passou pela régua pode ser inscrito outra vez.
+                <Switch checked={stopOnReply} onCheckedChange={setStopOnReply} />
+              </label>
+              <label className="flex items-center justify-between gap-4 border-t border-border-subtle py-3">
+                <span>
+                  <span className="block text-small font-medium text-text-primary">Permitir entrar de novo</span>
+                  <span className="block text-caption text-text-tertiary">
+                    Quem já passou pela régua pode ser inscrito outra vez.
+                  </span>
                 </span>
-              </span>
-              <Switch checked={allowReentry} onCheckedChange={setAllowReentry} />
-            </label>
+                <Switch checked={allowReentry} onCheckedChange={setAllowReentry} />
+              </label>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <Label>Passos</Label>
-              <span className="text-[12px] text-text-tertiary">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className={rotuloDoGrupo}>Passos · {steps.length}</span>
+              <span className="text-caption text-text-tertiary">
                 A espera de cada passo conta a partir do passo anterior.
               </span>
             </div>
 
             {steps.map((step, index) => (
-              <div key={index} className="flex gap-3 rounded-2xl bg-surface-2 px-4 py-3">
+              <div key={index} className="flex gap-3 rounded-[14px] bg-raised px-3 py-3 sm:px-4">
                 <div className="flex flex-col items-center gap-1 pt-1.5 text-text-tertiary">
-                  <GripVertical size={14} />
-                  <span className="text-[11px] font-semibold">{index + 1}</span>
+                  <GripVertical size={14} aria-hidden="true" />
+                  <span className="font-mono text-caption tabular-nums">{index + 1}</span>
                 </div>
-                <div className="flex flex-1 flex-col gap-2.5">
+                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                   <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1 text-caption text-text-tertiary" aria-hidden="true">
+                      <Clock size={12} /> {formatDelay(step.delayMinutes)}
+                    </span>
                     <Select
-                      className="w-[150px]"
+                      aria-label={`Espera do passo ${index + 1}`}
+                      className="w-full sm:w-[150px]"
                       value={DELAY_PRESETS.some((p) => p.value === step.delayMinutes) ? String(step.delayMinutes) : "custom"}
                       onChange={(e) => {
                         if (e.target.value !== "custom") updateStep(index, { delayMinutes: Number(e.target.value) });
@@ -726,7 +884,8 @@ function SequenceEditor({
                     </Select>
                     {!DELAY_PRESETS.some((p) => p.value === step.delayMinutes) && (
                       <Input
-                        className="w-[110px]"
+                        aria-label={`Espera em minutos do passo ${index + 1}`}
+                        className="w-full sm:w-[110px]"
                         type="number"
                         min={0}
                         value={step.delayMinutes}
@@ -736,7 +895,8 @@ function SequenceEditor({
 
                     {channel === "whatsapp_meta" && (
                       <Select
-                        className="w-[220px]"
+                        aria-label={`Modelo fora da janela do passo ${index + 1}`}
+                        className="w-full sm:w-[220px]"
                         value={step.templateId ?? ""}
                         onChange={(e) => updateStep(index, { templateId: e.target.value || null })}
                       >
@@ -746,7 +906,8 @@ function SequenceEditor({
                     )}
 
                     <Select
-                      className="w-[190px]"
+                      aria-label={`Etiqueta ao entregar o passo ${index + 1}`}
+                      className="w-full sm:w-[190px]"
                       value={step.applyTagId ?? ""}
                       onChange={(e) => updateStep(index, { applyTagId: e.target.value || null })}
                     >
@@ -754,13 +915,14 @@ function SequenceEditor({
                       {tags.map((t) => <option key={t.id} value={t.id}>Etiquetar: {t.name}</option>)}
                     </Select>
 
-                    <button
+                    <IconButton
+                      size="sm"
+                      className="ml-auto hover:bg-danger-subtle hover:text-danger"
                       onClick={() => setSteps(steps.filter((_, i) => i !== index))}
-                      className="ml-auto rounded-lg p-1.5 text-text-tertiary hover:bg-danger/10 hover:text-danger"
                       aria-label="Remover passo"
                     >
-                      <X size={15} />
-                    </button>
+                      <X />
+                    </IconButton>
                   </div>
 
                   {channel === "email" ? (
@@ -777,6 +939,7 @@ function SequenceEditor({
                     </Select>
                   ) : (
                     <Textarea
+                      aria-label={`Mensagem do passo ${index + 1}`}
                       rows={2}
                       value={step.text}
                       onChange={(e) => updateStep(index, { text: e.target.value })}
@@ -797,31 +960,24 @@ function SequenceEditor({
                 ])
               }
             >
-              <Plus size={15} /> Adicionar passo
+              <Plus size={14} aria-hidden="true" /> Adicionar passo
             </Button>
 
             {channel === "email" && (
-              <p className="text-[12px] text-text-tertiary">
+              <p className="text-caption text-text-tertiary">
                 Cada passo manda um modelo da Biblioteca → Modelos de e-mail, pelo domínio do contrato. Quem não tem
                 e-mail ou se descadastrou sai da régua com o motivo registrado.
               </p>
             )}
             {channel === "whatsapp_meta" && (
-              <p className="text-[12px] text-text-tertiary">
+              <p className="text-caption text-text-tertiary">
                 Passo que cair fora da janela de 24h precisa de um modelo aprovado. Sem ele, a régua desse contato para
                 com o motivo registrado, em vez de tentar um envio que a Meta recusaria.
               </p>
             )}
           </div>
-
-          <div className="flex justify-end gap-2 border-t border-border-subtle pt-4">
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button onClick={save} disabled={saving}>
-              {saving && <Loader2 size={15} className="animate-spin" />} Salvar
-            </Button>
-          </div>
         </div>
-      </ModalContent>
-    </Modal>
+      </DrawerContent>
+    </Drawer>
   );
 }

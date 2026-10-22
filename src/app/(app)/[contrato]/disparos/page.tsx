@@ -1,18 +1,36 @@
 "use client";
 
 import * as React from "react";
-import { Send, Clock, FlaskConical, Users, Plus, X, CalendarClock, Ban } from "lucide-react";
+import { Send, Clock, FlaskConical, Plus, X, CalendarClock, Ban, CircleHelp, ListFilter, Mail, MessageCircle, Check } from "lucide-react";
 import { CampoDataSP } from "@/components/whatsapp/campo-data-sp";
 import { deSaoPaulo, formatarSaoPaulo, paraCampoSaoPaulo } from "@/lib/fuso-sp";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import { formatRelativeDate } from "@/lib/utils";
+import { Notice } from "@/components/ui/notice";
+import { SearchInput } from "@/components/ui/search-input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Switch } from "@/components/ui/switch";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { SeletorDeAgente } from "@/components/biblioteca/seletor-de-agente";
+import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
+import { pulsar } from "@/lib/fundo/eventos";
+import { cn, formatRelativeDate } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
+
+// ---------------------------------------------------------------------------
+// Disparos.
+//
+// v5: a tela responde "o que está saindo?". Só a lista de campanhas (canal,
+// nome, um número que importa e o status), com o envio em curso no topo. O
+// formulário abre em "Nova campanha"; o placar completo (enviados, falhas,
+// último erro, A/B) e Reagendar/Cancelar ficam ao abrir a campanha. Status e
+// canal viraram filtro, dentro de "Filtros". Regras de envio (opt-out, fila,
+// ritmo do e-mail, modelo aprovado) continuam todas no servidor, iguais.
+// ---------------------------------------------------------------------------
 
 interface Variant {
   id?: string;
@@ -79,7 +97,7 @@ function AcoesDoAgendado({
   }
 
   return (
-    <div className="mt-2 border-t border-border-subtle pt-2">
+    <div className="flex flex-col gap-2">
       {editando ? (
         <div className="flex flex-col gap-2">
           <CampoDataSP valor={quando} onChange={setQuando} />
@@ -87,6 +105,7 @@ function AcoesDoAgendado({
             <Button
               type="button"
               size="sm"
+              variant="primary"
               disabled={ocupado}
               onClick={() => {
                 const d = deSaoPaulo(quando);
@@ -102,22 +121,23 @@ function AcoesDoAgendado({
       ) : (
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="secondary" disabled={ocupado} onClick={() => setEditando(true)}>
-            <CalendarClock size={13} /> Reagendar
+            <CalendarClock size={13} aria-hidden="true" /> Reagendar
           </Button>
           <Button
             type="button"
             size="sm"
-            variant="danger"
+            variant="ghost"
+            className="text-danger hover:text-danger"
             disabled={ocupado}
             onClick={() => {
               if (window.confirm("Cancelar este disparo agendado? Ninguém vai receber.")) void enviar({ acao: "cancelar" });
             }}
           >
-            <Ban size={13} /> Cancelar
+            <Ban size={13} aria-hidden="true" /> Cancelar
           </Button>
         </div>
       )}
-      {erro && <p className="mt-1.5 text-[12px] text-danger">{erro}</p>}
+      {erro && <p className="text-caption text-danger">{erro}</p>}
     </div>
   );
 }
@@ -137,18 +157,182 @@ const CHANNEL_LABEL: Record<string, string> = {
   email: "E-mail",
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Agendado",
-  sending: "Enviando...",
-  done: "Concluído",
-  canceled: "Cancelado",
-};
-
 const AUDIENCE_LABEL: Record<string, string> = {
   manual: "Lista manual",
   tags: "Por etiqueta",
   segment: "Por segmento",
 };
+
+// Status na linha: cor só no dado. Enviando em azul, enviado em verde.
+const STATUS_DA_LINHA: Record<string, { rotulo: string; variante: "info" | "success" | "neutral" }> = {
+  sending: { rotulo: "Enviando", variante: "info" },
+  scheduled: { rotulo: "Agendado", variante: "neutral" },
+  done: { rotulo: "Enviado", variante: "success" },
+  canceled: { rotulo: "Cancelado", variante: "neutral" },
+};
+
+// Filtro de status (o que antes seriam abas). "todos" não conta no contador.
+const FILTROS_DE_STATUS = [
+  { id: "todos", rotulo: "Todos" },
+  { id: "sending", rotulo: "Enviando" },
+  { id: "scheduled", rotulo: "Agendados" },
+  { id: "done", rotulo: "Enviados" },
+  { id: "canceled", rotulo: "Cancelados" },
+] as const;
+
+// O envio em curso sobe para o topo; depois os agendados; o resto na ordem do servidor.
+const ORDEM_DO_STATUS: Record<string, number> = { sending: 0, scheduled: 1 };
+
+function StatusDaCampanha({ status }: { status: string }) {
+  const s = STATUS_DA_LINHA[status] ?? { rotulo: status, variante: "neutral" as const };
+  return (
+    <Badge variant={s.variante} dot={status === "sending" || status === "done"}>
+      {status === "scheduled" && <Clock size={11} aria-hidden="true" />}
+      {s.rotulo}
+    </Badge>
+  );
+}
+
+function IconeDoCanal({ canal }: { canal: string }) {
+  const whats = canal.startsWith("whatsapp");
+  const Icone = canal === "email" ? Mail : canal === "telegram" ? Send : MessageCircle;
+  return (
+    <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-border-subtle bg-raised">
+      <Icone size={15} aria-hidden="true" className={whats ? CATEGORY_CLASSES.green.fg : "text-text-secondary"} />
+    </span>
+  );
+}
+
+/** Nome da campanha na lista: a primeira linha do texto (e-mail e modelo não têm texto). */
+function nomeDaCampanha(b: BroadcastRow): string {
+  const linha = b.text.trim().split("\n")[0]?.trim();
+  if (linha) return linha;
+  const publico = `${AUDIENCE_LABEL[b.audience] ?? b.audience}${b.segmentName ? `: ${b.segmentName}` : ""}`;
+  return `${CHANNEL_LABEL[b.channel] ?? b.channel} · ${publico}`;
+}
+
+function BarraDeProgresso({ feito, total }: { feito: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, Math.round((feito / total) * 100)) : 0;
+  return (
+    <span className="h-1.5 min-w-12 flex-1 overflow-hidden rounded-full bg-hover" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      <span className="block h-full rounded-full bg-accent-solid transition-[width] duration-500" style={{ width: `${pct}%` }} />
+    </span>
+  );
+}
+
+/** O número que importa em cada status: progresso, hora marcada ou o resultado. */
+function DadoDaCampanha({ b }: { b: BroadcastRow }) {
+  if (b.status === "sending") {
+    const feito = b.sentCount + b.failedCount;
+    return (
+      <span className="flex min-w-0 items-center gap-2.5">
+        <BarraDeProgresso feito={feito} total={b.totalCount} />
+        <span className="shrink-0 font-mono text-caption tabular-nums text-text-tertiary">
+          {feito} de {b.totalCount}
+        </span>
+      </span>
+    );
+  }
+  if (b.status === "scheduled" && b.scheduledAt) {
+    return <span className="truncate text-small tabular-nums text-text-secondary">{formatarSaoPaulo(b.scheduledAt)}</span>;
+  }
+  if (b.status === "done") {
+    const respostas = b.variants.reduce((s, v) => s + (v.replyCount ?? 0), 0);
+    return (
+      <span className="truncate text-small tabular-nums text-text-secondary">
+        {b.variants.length > 0 ? `${respostas} ${respostas === 1 ? "resposta" : "respostas"}` : `${b.sentCount} enviados`}
+        {b.failedCount > 0 && <span className="text-danger"> · {b.failedCount} falharam</span>}
+      </span>
+    );
+  }
+  return <span className="truncate text-small tabular-nums text-text-tertiary">{formatRelativeDate(b.createdAt)}</span>;
+}
+
+function Numero({ rotulo, valor, tom }: { rotulo: string; valor: number; tom?: "danger" }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 rounded-[14px] bg-raised px-3.5 py-3">
+      <span className="truncate text-caption text-text-tertiary">{rotulo}</span>
+      <span className={cn("text-title font-semibold tabular-nums tracking-tight", tom === "danger" && valor > 0 ? "text-danger" : "text-text-primary")}>{valor}</span>
+    </div>
+  );
+}
+
+/** Placar completo da campanha aberta, com Reagendar/Cancelar quando agendada. */
+function DetalheDaCampanha({ b, agentId, onMudou }: { b: BroadcastRow; agentId: string | null; onMudou: () => Promise<void> | void }) {
+  const agendado = b.status === "scheduled";
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusDaCampanha status={b.status} />
+        <span className="font-mono text-caption text-text-tertiary">
+          {agendado && b.scheduledAt ? `para ${formatarSaoPaulo(b.scheduledAt)} · horário de São Paulo` : `criado ${formatRelativeDate(b.createdAt)}`}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {agendado ? (
+          <div className="col-span-3">
+            <Numero rotulo="Contatos estimados" valor={b.totalCount} />
+          </div>
+        ) : (
+          <>
+            <Numero rotulo="Enviados" valor={b.sentCount} />
+            <Numero rotulo="Falharam" valor={b.failedCount} tom="danger" />
+            <Numero rotulo="No total" valor={b.totalCount} />
+          </>
+        )}
+      </div>
+      {b.status === "sending" && (
+        <div className="flex items-center gap-2.5">
+          <BarraDeProgresso feito={b.sentCount + b.failedCount} total={b.totalCount} />
+          <span className="font-mono text-caption tabular-nums text-text-tertiary">
+            {b.sentCount + b.failedCount} de {b.totalCount}
+          </span>
+        </div>
+      )}
+      {b.lastError && b.failedCount > 0 && <Notice tone="danger">Último erro: {b.lastError}</Notice>}
+
+      {agendado && agentId && (
+        <section className="flex flex-col gap-2">
+          <p className="font-mono text-caption text-text-tertiary">Agendamento</p>
+          <AcoesDoAgendado agentId={agentId} broadcast={b} onMudou={onMudou} />
+        </section>
+      )}
+
+      <section className="flex flex-col gap-2">
+        <p className="font-mono text-caption text-text-tertiary">Para quem</p>
+        <p className="text-small text-text-secondary">
+          {CHANNEL_LABEL[b.channel] ?? b.channel} · {AUDIENCE_LABEL[b.audience] ?? b.audience}
+          {b.segmentName ? `: ${b.segmentName}` : ""}
+        </p>
+      </section>
+
+      {b.text.trim() && (
+        <section className="flex flex-col gap-2">
+          <p className="font-mono text-caption text-text-tertiary">Mensagem</p>
+          <p className="whitespace-pre-wrap rounded-[14px] bg-raised px-3.5 py-3 text-small text-text-primary">{b.text}</p>
+        </section>
+      )}
+
+      {b.variants.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <p className="mb-1 flex items-center gap-1.5 font-mono text-caption text-text-tertiary">
+            <FlaskConical size={12} aria-hidden="true" /> Teste A/B
+          </p>
+          {b.variants.map((v) => (
+            <div key={v.id ?? v.label} className="flex items-center gap-3 border-b border-border-subtle py-2 last:border-b-0">
+              <Badge>{v.label}</Badge>
+              <span className="min-w-0 flex-1 truncate text-small text-text-secondary">{v.text || "Modelo"}</span>
+              <span className="shrink-0 font-mono text-caption tabular-nums text-text-tertiary">
+                {v.sentCount ?? 0} enviados · {v.replyCount ?? 0} responderam
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
 
 export default function DisparosPage() {
   const { agents, isLoaded, load } = useAgentsStore();
@@ -177,6 +361,15 @@ export default function DisparosPage() {
   const [isSending, setIsSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  // Só apresentação: o formulário, a campanha aberta e os filtros da lista.
+  const [formAberto, setFormAberto] = React.useState(false);
+  const [abertaId, setAbertaId] = React.useState<string | null>(null);
+  const [filtrosAbertos, setFiltrosAbertos] = React.useState(false);
+  const [busca, setBusca] = React.useState("");
+  const [filtroStatus, setFiltroStatus] = React.useState<string>("todos");
+  const [filtroCanal, setFiltroCanal] = React.useState<string>("todos");
+  const botaoNovoRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -281,14 +474,17 @@ export default function DisparosPage() {
           : data.parouPorContrato
             ? `O disparo não começou: ${data.errors?.[0] ?? "verifique o domínio de e-mail do contrato."}`
             : data.faltam > 0
-              ? `Começou: ${data.sentCount} e-mails enviados agora; os outros ${data.faltam} saem aos poucos (cerca de 40 por minuto). O placar abaixo acompanha.`
+              ? `Começou: ${data.sentCount} e-mails enviados agora; os outros ${data.faltam} saem aos poucos (cerca de 40 por minuto). A lista abaixo acompanha.`
               : data.queuedCount > 0
-                ? `${data.queuedCount} na fila do WhatsApp; o placar abaixo sobe conforme cada um sai.${data.failedCount ? ` ${data.failedCount} falharam.` : ""}`
+                ? `${data.queuedCount} na fila do WhatsApp; a lista abaixo sobe conforme cada um sai.${data.failedCount ? ` ${data.failedCount} falharam.` : ""}`
                 : `Disparo concluído: ${data.sentCount} enviados, ${data.failedCount} falharam.`
       );
       setRecipients("");
       setText("");
       setScheduledAt("");
+      // Saiu (ou agendou): fecha o formulário e o fundo pulsa do "Nova campanha".
+      setFormAberto(false);
+      pulsar(botaoNovoRef.current, 1.2);
       await refresh(agentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
@@ -297,372 +493,444 @@ export default function DisparosPage() {
     }
   }
 
-  if (!isLoaded) return <div className="flex-1 p-8" />;
+  // ── Lista: ordem (envio em curso no topo), busca e filtros, tudo no navegador ──
+  const visiveis = React.useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return broadcasts
+      .map((b, i) => ({ b, i }))
+      .filter(({ b }) => filtroStatus === "todos" || b.status === filtroStatus)
+      .filter(({ b }) => filtroCanal === "todos" || b.channel === filtroCanal)
+      .filter(({ b }) => !q || `${b.text} ${b.segmentName ?? ""}`.toLowerCase().includes(q))
+      .sort((x, y) => (ORDEM_DO_STATUS[x.b.status] ?? 2) - (ORDEM_DO_STATUS[y.b.status] ?? 2) || x.i - y.i)
+      .map(({ b }) => b);
+  }, [broadcasts, busca, filtroStatus, filtroCanal]);
+  const nFiltros = (filtroStatus !== "todos" ? 1 : 0) + (filtroCanal !== "todos" ? 1 : 0);
+  const canaisNaLista = [...new Set(broadcasts.map((b) => b.channel))];
+  // A campanha aberta vem da lista viva (o placar acompanha o polling).
+  const aberta = abertaId ? broadcasts.find((b) => b.id === abertaId) ?? null : null;
+  const agente = agents.find((a) => a.id === agentId);
+
+  if (!isLoaded) return <div className="flex-1" />;
 
   if (agents.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-10">
-        <EmptyState
-          className="max-w-lg"
-          icon={<Send size={30} className="text-text-secondary" />}
-          title="Disparos"
-          description="Crie um agente no Eva Studio primeiro pra poder mandar uma campanha."
-        />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Disparos</h1>
+        <p className="text-body text-text-secondary">Crie um agente no Eva Studio primeiro pra poder mandar uma campanha.</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-1 flex-col gap-5 p-8 pb-16">
-      <div>
-        <h1 className="font-display text-xl font-semibold text-text-primary">Disparos</h1>
-        <p className="mt-1 text-[13px] text-text-secondary">
-          Uma campanha para uma lista, uma etiqueta ou um segmento — agora ou com hora marcada.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Nova campanha</CardTitle>
-          <CardDescription>
-            Em público por etiqueta ou segmento, só entra quem aceita receber mensagem.
-          </CardDescription>
-        </CardHeader>
-
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="disparo-agent">Agente</Label>
-              <Select id="disparo-agent" value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
-                {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="disparo-channel">Canal</Label>
-              <Select id="disparo-channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
-                {(["whatsapp_qr", "whatsapp_meta", "telegram", "email"] as const).map((c) => (
-                  <option key={c} value={c} disabled={channels ? !channels[c] : false}>
-                    {CHANNEL_LABEL[c]}
-                    {channels && !channels[c] ? (c === "email" ? " — domínio não verificado" : " — não conectado") : ""}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          {/* Público */}
-          <div>
-            <Label>Para quem</Label>
-            <div className="mt-1.5 flex gap-2">
-              {(["manual", "tags", "segment"] as const).map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => setAudience(a)}
-                  className={
-                    audience === a
-                      ? "rounded-xl bg-accent-soft px-3 py-2 text-[13px] font-medium text-accent-400"
-                      : "rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-3"
-                  }
-                >
-                  {AUDIENCE_LABEL[a]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {audience === "manual" && (
-            <div>
-              <Label htmlFor="disparo-recipients">{isEmail ? "E-mails (um por linha)" : "Contatos (um por linha, com DDI)"}</Label>
-              <Textarea
-                id="disparo-recipients"
-                rows={4}
-                className="font-mono text-[12.5px]"
-                placeholder={isEmail ? "ana@empresa.com\nbeto@empresa.com" : "5511999998888\n5511999997777"}
-                value={recipients}
-                onChange={(e) => setRecipients(e.target.value)}
-              />
-            </div>
-          )}
-
-          {audience === "tags" && (
-            <div>
-              <Label>Etiquetas</Label>
-              {tags.length === 0 ? (
-                <p className="mt-1.5 text-[13px] text-text-tertiary">
-                  Nenhuma etiqueta ainda. Crie em Contatos &gt; Etiquetas.
-                </p>
-              ) : (
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  {tags.map((t) => {
-                    const on = selectedTags.includes(t.id);
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() =>
-                          setSelectedTags(on ? selectedTags.filter((x) => x !== t.id) : [...selectedTags, t.id])
-                        }
-                        className={
-                          on
-                            ? "rounded-full bg-accent-soft px-3 py-1.5 text-[12px] font-medium text-accent-400"
-                            : "rounded-full bg-surface-3 px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-surface-2"
-                        }
-                      >
-                        {t.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-                Quem tiver qualquer uma das etiquetas selecionadas entra na campanha.
-              </p>
-            </div>
-          )}
-
-          {audience === "segment" && (
-            <div>
-              <Label htmlFor="disparo-segment">Segmento</Label>
-              <Select id="disparo-segment" value={segmentId} onChange={(e) => setSegmentId(e.target.value)}>
-                <option value="">Selecione...</option>
-                {segments.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-              {segments.length === 0 && (
-                <p className="mt-1.5 text-[13px] text-text-tertiary">
-                  Nenhum segmento ainda. Crie em Contatos &gt; Segmentos.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Mensagem */}
-          <div className="flex items-center justify-between border-t border-border-subtle pt-4">
-            <Label className="mb-0">Mensagem</Label>
-            <button
-              type="button"
-              onClick={() => setAbEnabled(!abEnabled)}
-              className={
-                abEnabled
-                  ? "inline-flex items-center gap-1.5 rounded-xl bg-accent-soft px-3 py-1.5 text-[12px] font-medium text-accent-400"
-                  : "inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-surface-3"
-              }
-            >
-              <FlaskConical size={13} /> Teste A/B
-            </button>
-          </div>
-
-          {abEnabled ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-[12px] text-text-tertiary">
-                Cada contato recebe uma das variantes, sorteada pelo peso. O placar de entrega fica separado por
-                variante, para comparar as duas com número em vez de opinião.
-              </p>
-              {variants.map((v, i) => (
-                <div key={i} className="flex flex-col gap-2 rounded-2xl bg-surface-2 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Badge>{v.label}</Badge>
-                    <Label className="mb-0 text-[12px]">Peso</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      className="w-[80px]"
-                      value={v.weight}
-                      onChange={(e) =>
-                        setVariants(variants.map((x, j) => (j === i ? { ...x, weight: Number(e.target.value) } : x)))
-                      }
-                    />
-                    {isEmail && (
-                      <Select
-                        className="flex-1"
-                        aria-label={`Modelo de e-mail da variante ${v.label}`}
-                        value={v.templateId ?? ""}
-                        onChange={(e) =>
-                          setVariants(variants.map((x, j) => (j === i ? { ...x, templateId: e.target.value || null } : x)))
-                        }
-                      >
-                        <option value="">Modelo de e-mail...</option>
-                        {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                      </Select>
-                    )}
-                    {isMeta && (
-                      <Select
-                        className="flex-1"
-                        value={v.templateId ?? ""}
-                        onChange={(e) =>
-                          setVariants(variants.map((x, j) => (j === i ? { ...x, templateId: e.target.value || null } : x)))
-                        }
-                      >
-                        <option value="">Modelo aprovado...</option>
-                        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </Select>
-                    )}
-                    {variants.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => setVariants(variants.filter((_, j) => j !== i))}
-                        className="rounded-lg p-1.5 text-text-tertiary hover:bg-danger/10 hover:text-danger"
-                        aria-label="Remover variante"
-                      >
-                        <X size={15} />
-                      </button>
-                    )}
-                  </div>
-                  {!isEmail && (
-                    <Textarea
-                      rows={2}
-                      value={v.text}
-                      onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                      placeholder={`Texto da variante ${v.label}`}
-                    />
-                  )}
-                </div>
-              ))}
-              {variants.length < 4 && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="self-start"
-                  onClick={() =>
-                    setVariants([
-                      ...variants,
-                      { label: String.fromCharCode(65 + variants.length), text: "", templateId: null, weight: 1 },
-                    ])
-                  }
-                >
-                  <Plus size={15} /> Variante
-                </Button>
-              )}
-            </div>
-          ) : isEmail ? (
-            <div>
-              <Label htmlFor="disparo-email-modelo">Modelo de e-mail</Label>
-              <Select id="disparo-email-modelo" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                <option value="">Selecione um modelo...</option>
-                {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-              </Select>
-              <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-                Os modelos ficam na Biblioteca → Modelos de e-mail. Só recebe quem aceita mensagens e tem e-mail; quem se
-                descadastrou fica de fora. O disparo sai aos poucos (cerca de 40 por minuto) para não cair no spam.
-              </p>
-            </div>
-          ) : (
-            <>
-              {isMeta && (
-                <div>
-                  <Label htmlFor="disparo-template">Modelo aprovado</Label>
-                  <Select id="disparo-template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                    <option value="">Selecione um modelo...</option>
-                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </Select>
-                  <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-                    Disparo pro canal oficial precisa ser modelo aprovado — a lista inteira está fora da janela de 24h.
-                  </p>
-                </div>
-              )}
-              <div>
-                <Label htmlFor="disparo-text">Texto</Label>
-                <Textarea
-                  id="disparo-text"
-                  rows={4}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Oi {nome}, tudo bem?"
-                />
-                <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-                  {"{nome}"}, {"{email}"} e os campos capturados no fluxo são trocados pelos dados de cada contato.
-                </p>
-              </div>
-            </>
-          )}
-
-          <div className="border-t border-border-subtle pt-4">
-            <Label htmlFor="disparo-quando">
-              <span className="inline-flex items-center gap-1.5"><Clock size={13} /> Quando enviar</span>
-            </Label>
-            <CampoDataSP id="disparo-quando" valor={scheduledAt} onChange={setScheduledAt} />
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-              Em branco, sai agora. Agendado, dá para cancelar ou mudar a hora no histórico até começar a enviar.
-              {scheduledAt && (
-                <button type="button" onClick={() => setScheduledAt("")} className="ml-1.5 underline hover:text-text-secondary">
-                  Mandar agora
-                </button>
-              )}
-            </p>
-          </div>
-
-          {error && <p className="text-[13px] text-danger">{error}</p>}
-          {notice && <p className="text-[13px] text-emerald-400">{notice}</p>}
-
-          <Button type="button" onClick={handleSend} disabled={isSending}>
-            <Send size={15} /> {isSending ? "Enviando..." : scheduledAt ? "Agendar" : "Disparar"}
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      {/* Barra: título, contagem, agente e, à direita, a ajuda e a ação principal. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Disparos</h1>
+        {channels && (
+          <span className="font-mono text-caption tabular-nums text-text-tertiary">
+            {broadcasts.length} {broadcasts.length === 1 ? "campanha" : "campanhas"}
+          </span>
+        )}
+        <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
+        <SeletorDeAgente agentes={agents} agentId={agentId} onChange={setAgentId} />
+        <div className="ml-auto flex items-center gap-2">
+          <IconButton
+            aria-label="Como funcionam os disparos"
+            tooltip="Uma campanha para uma lista, uma etiqueta ou um segmento, agora ou com hora marcada."
+          >
+            <CircleHelp />
+          </IconButton>
+          <Button ref={botaoNovoRef} variant="primary" onClick={() => setFormAberto(true)}>
+            <Plus size={14} aria-hidden="true" />
+            Nova campanha
           </Button>
         </div>
-      </Card>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico</CardTitle>
-        </CardHeader>
-        {broadcasts.length === 0 ? (
-          <p className="text-[13px] text-text-tertiary">Nenhum disparo ainda pra esse agente.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {broadcasts.map((b) => (
-              <div key={b.id} className="rounded-xl border border-border-default bg-surface-2 px-3.5 py-3">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="neutral">{CHANNEL_LABEL[b.channel] ?? b.channel}</Badge>
-                    <Badge variant={b.status === "done" ? "success" : "neutral"}>
-                      {STATUS_LABEL[b.status] ?? b.status}
-                    </Badge>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-text-tertiary">
-                      <Users size={11} /> {AUDIENCE_LABEL[b.audience] ?? b.audience}
-                      {b.segmentName ? `: ${b.segmentName}` : ""}
-                    </span>
-                    {b.variants.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-text-tertiary">
-                        <FlaskConical size={11} /> A/B
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-text-tertiary">
-                    {b.scheduledAt && b.status === "scheduled" ? (
-                      <span className="inline-flex items-center gap-1 font-medium text-accent-400">
-                        <CalendarClock size={11} /> agendado para {formatarSaoPaulo(b.scheduledAt)}
-                      </span>
-                    ) : (
-                      formatRelativeDate(b.createdAt)
-                    )}
+      {/* Busca + Filtros (status e canal moram no botão). */}
+      <div className="flex items-center gap-2">
+        <SearchInput
+          aria-label="Buscar campanha"
+          placeholder="Buscar campanha"
+          value={busca}
+          onValueChange={setBusca}
+          className="min-w-0 flex-1 sm:w-72 sm:flex-none"
+        />
+        <Button variant="secondary" onClick={() => setFiltrosAbertos(true)} aria-label={nFiltros ? `Filtros, ${nFiltros} ligados` : "Filtros"}>
+          <ListFilter size={14} aria-hidden="true" />
+          Filtros
+          {nFiltros > 0 && <span className="font-mono text-caption tabular-nums text-accent-fg">{nFiltros}</span>}
+        </Button>
+      </div>
+
+      {notice && (
+        <Notice tone="info" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Notice>
+      )}
+
+      {!channels ? (
+        <div className="flex flex-col gap-2" aria-busy="true" aria-label="Carregando campanhas">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-[60px] animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+          ))}
+        </div>
+      ) : broadcasts.length === 0 ? (
+        <div className="flex flex-col items-start gap-3 py-8">
+          <p className="text-body text-text-secondary">Nenhuma campanha ainda para {agente?.name ?? "esse agente"}.</p>
+          <Button variant="secondary" onClick={() => setFormAberto(true)}>
+            <Plus size={14} aria-hidden="true" /> Nova campanha
+          </Button>
+        </div>
+      ) : visiveis.length === 0 ? (
+        <div className="flex flex-col items-start gap-3 py-8">
+          <p className="text-body text-text-secondary">Nenhuma campanha com essa busca ou esses filtros.</p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setBusca("");
+              setFiltroStatus("todos");
+              setFiltroCanal("todos");
+            }}
+          >
+            Limpar busca e filtros
+          </Button>
+        </div>
+      ) : (
+        <ul className="flex flex-col">
+          {visiveis.map((b) => (
+            <li key={b.id} className="border-b border-border-subtle last:border-b-0">
+              <button
+                type="button"
+                onClick={() => setAbertaId(b.id)}
+                className={cn(
+                  "grid min-h-[60px] w-full grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] px-2 py-2 text-left transition-colors hover:bg-raised sm:grid-cols-[34px_minmax(0,1fr)_200px_110px] sm:gap-4",
+                  b.status === "canceled" && "text-text-tertiary"
+                )}
+              >
+                <IconeDoCanal canal={b.channel} />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className={cn("truncate text-body font-medium", b.status === "canceled" ? "text-text-tertiary" : "text-text-primary")}>{nomeDaCampanha(b)}</span>
+                  {/* No celular o número vai embaixo do nome. */}
+                  <span className="flex min-w-0 sm:hidden">
+                    <DadoDaCampanha b={b} />
                   </span>
-                </div>
-                <p className="truncate text-[13px] text-text-secondary">{b.text}</p>
-                <p className="mt-1 text-[11.5px] text-text-tertiary">
-                  {b.status === "scheduled"
-                    ? `${b.totalCount} contato(s) estimado(s) · horário de São Paulo`
-                    : `${b.sentCount} enviados · ${b.failedCount} falharam · ${b.totalCount} no total`}
-                </p>
-                {b.lastError && b.failedCount > 0 && (
-                  <p className="mt-1 text-[11.5px] text-danger">Último erro: {b.lastError}</p>
-                )}
-                {b.status === "scheduled" && agentId && (
-                  <AcoesDoAgendado agentId={agentId} broadcast={b} onMudou={() => refresh(agentId)} />
-                )}
-                {b.variants.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-3 border-t border-border-subtle pt-2">
-                    {b.variants.map((v) => (
-                      <div key={v.id} className="text-[11.5px] text-text-tertiary">
-                        <span className="font-semibold text-text-secondary">{v.label}</span>: {v.sentCount ?? 0}{" "}
-                        enviados · {v.replyCount ?? 0} responderam
-                      </div>
-                    ))}
+                </span>
+                <span className="hidden min-w-0 sm:flex">
+                  <DadoDaCampanha b={b} />
+                </span>
+                <span className="justify-self-end">
+                  <StatusDaCampanha status={b.status} />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Filtros: status (as antigas abas) e canal. */}
+      <Drawer open={filtrosAbertos} onOpenChange={setFiltrosAbertos}>
+        <DrawerContent title="Filtros" description="Valem para a lista de campanhas deste agente." size="sm">
+          <div className="flex flex-col gap-5">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 font-mono text-caption text-text-tertiary">Status</legend>
+              <div className="flex flex-wrap gap-1.5">
+                {FILTROS_DE_STATUS.map((f) => (
+                  <Pilula key={f.id} ativa={filtroStatus === f.id} onClick={() => setFiltroStatus(f.id)}>
+                    {f.rotulo}
+                  </Pilula>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-2 font-mono text-caption text-text-tertiary">Canal</legend>
+              <div className="flex flex-wrap gap-1.5">
+                <Pilula ativa={filtroCanal === "todos"} onClick={() => setFiltroCanal("todos")}>
+                  Todos
+                </Pilula>
+                {canaisNaLista.map((c) => (
+                  <Pilula key={c} ativa={filtroCanal === c} onClick={() => setFiltroCanal(c)}>
+                    {CHANNEL_LABEL[c] ?? c}
+                  </Pilula>
+                ))}
+              </div>
+            </fieldset>
+            {nFiltros > 0 && (
+              <div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFiltroStatus("todos");
+                    setFiltroCanal("todos");
+                  }}
+                >
+                  Limpar filtros
+                </Button>
+              </div>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Campanha aberta: placar completo e, se agendada, Reagendar/Cancelar. */}
+      <Drawer open={!!aberta} onOpenChange={(v) => !v && setAbertaId(null)}>
+        {aberta && (
+          <DrawerContent title={nomeDaCampanha(aberta)} description={CHANNEL_LABEL[aberta.channel] ?? aberta.channel} size="md">
+            <DetalheDaCampanha b={aberta} agentId={agentId} onMudou={() => (agentId ? refresh(agentId) : undefined)} />
+          </DrawerContent>
+        )}
+      </Drawer>
+
+      {/* Nova campanha: o formulário de antes, inteiro, fora da frente da tela. */}
+      <Drawer open={formAberto} onOpenChange={setFormAberto}>
+        <DrawerContent
+          title="Nova campanha"
+          description="Em público por etiqueta ou segmento, só entra quem aceita receber mensagem."
+          size="md"
+          footer={
+            <Button type="button" variant="primary" onClick={handleSend} disabled={isSending}>
+              <Send size={14} aria-hidden="true" /> {isSending ? "Enviando..." : scheduledAt ? "Agendar" : "Disparar"}
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="disparo-agent">Agente</Label>
+                <Select id="disparo-agent" value={agentId ?? ""} onChange={(e) => setAgentId(e.target.value)}>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="disparo-channel">Canal</Label>
+                <Select id="disparo-channel" value={channel} onChange={(e) => setChannel(e.target.value)}>
+                  {(["whatsapp_qr", "whatsapp_meta", "telegram", "email"] as const).map((c) => (
+                    <option key={c} value={c} disabled={channels ? !channels[c] : false}>
+                      {CHANNEL_LABEL[c]}
+                      {channels && !channels[c] ? (c === "email" ? " — domínio não verificado" : " — não conectado") : ""}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            {/* Público */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="mb-0">Para quem</Label>
+              <SegmentedControl
+                label="Para quem"
+                value={audience}
+                onChange={setAudience}
+                options={(["manual", "tags", "segment"] as const).map((a) => ({ value: a, label: AUDIENCE_LABEL[a] }))}
+                className="w-fit max-w-full"
+              />
+            </div>
+
+            {audience === "manual" && (
+              <div>
+                <Label htmlFor="disparo-recipients">{isEmail ? "E-mails (um por linha)" : "Contatos (um por linha, com DDI)"}</Label>
+                <Textarea
+                  id="disparo-recipients"
+                  rows={4}
+                  className="font-mono text-small"
+                  placeholder={isEmail ? "ana@empresa.com\nbeto@empresa.com" : "5511999998888\n5511999997777"}
+                  value={recipients}
+                  onChange={(e) => setRecipients(e.target.value)}
+                />
+              </div>
+            )}
+
+            {audience === "tags" && (
+              <div>
+                <Label>Etiquetas</Label>
+                {tags.length === 0 ? (
+                  <p className="mt-1.5 text-small text-text-tertiary">Nenhuma etiqueta ainda. Crie em Contatos &gt; Etiquetas.</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {tags.map((t) => {
+                      const on = selectedTags.includes(t.id);
+                      return (
+                        <Pilula
+                          key={t.id}
+                          ativa={on}
+                          onClick={() => setSelectedTags(on ? selectedTags.filter((x) => x !== t.id) : [...selectedTags, t.id])}
+                        >
+                          {on && <Check size={12} aria-hidden="true" />}
+                          {t.name}
+                        </Pilula>
+                      );
+                    })}
                   </div>
+                )}
+                <p className="mt-1.5 text-caption text-text-tertiary">Quem tiver qualquer uma das etiquetas selecionadas entra na campanha.</p>
+              </div>
+            )}
+
+            {audience === "segment" && (
+              <div>
+                <Label htmlFor="disparo-segment">Segmento</Label>
+                <Select id="disparo-segment" value={segmentId} onChange={(e) => setSegmentId(e.target.value)}>
+                  <option value="">Selecione...</option>
+                  {segments.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </Select>
+                {segments.length === 0 && (
+                  <p className="mt-1.5 text-small text-text-tertiary">Nenhum segmento ainda. Crie em Contatos &gt; Segmentos.</p>
                 )}
               </div>
-            ))}
+            )}
+
+            {/* Mensagem */}
+            <div className="flex items-center justify-between border-t border-border-subtle pt-4">
+              <Label className="mb-0">Mensagem</Label>
+              <label className="flex items-center gap-2 text-small text-text-secondary">
+                <FlaskConical size={13} aria-hidden="true" /> Teste A/B
+                <Switch checked={abEnabled} onCheckedChange={setAbEnabled} aria-label="Teste A/B" />
+              </label>
+            </div>
+
+            {abEnabled ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-caption text-text-tertiary">
+                  Cada contato recebe uma das variantes, sorteada pelo peso. O placar de entrega fica separado por variante, para comparar as duas
+                  com número em vez de opinião.
+                </p>
+                {variants.map((v, i) => (
+                  <div key={i} className="flex flex-col gap-2 rounded-[14px] bg-raised px-3.5 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="accent">{v.label}</Badge>
+                      <Label className="mb-0 text-caption">Peso</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        className="w-20"
+                        value={v.weight}
+                        onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, weight: Number(e.target.value) } : x)))}
+                      />
+                      {isEmail && (
+                        <Select
+                          className="min-w-0 flex-1"
+                          aria-label={`Modelo de e-mail da variante ${v.label}`}
+                          value={v.templateId ?? ""}
+                          onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, templateId: e.target.value || null } : x)))}
+                        >
+                          <option value="">Modelo de e-mail...</option>
+                          {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                        </Select>
+                      )}
+                      {isMeta && (
+                        <Select
+                          className="min-w-0 flex-1"
+                          aria-label={`Modelo aprovado da variante ${v.label}`}
+                          value={v.templateId ?? ""}
+                          onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, templateId: e.target.value || null } : x)))}
+                        >
+                          <option value="">Modelo aprovado...</option>
+                          {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </Select>
+                      )}
+                      {variants.length > 2 && (
+                        <IconButton size="sm" aria-label="Remover variante" className="ml-auto hover:text-danger" onClick={() => setVariants(variants.filter((_, j) => j !== i))}>
+                          <X />
+                        </IconButton>
+                      )}
+                    </div>
+                    {!isEmail && (
+                      <Textarea
+                        rows={2}
+                        value={v.text}
+                        onChange={(e) => setVariants(variants.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+                        placeholder={`Texto da variante ${v.label}`}
+                      />
+                    )}
+                  </div>
+                ))}
+                {variants.length < 4 && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => setVariants([...variants, { label: String.fromCharCode(65 + variants.length), text: "", templateId: null, weight: 1 }])}
+                  >
+                    <Plus size={13} aria-hidden="true" /> Variante
+                  </Button>
+                )}
+              </div>
+            ) : isEmail ? (
+              <div>
+                <Label htmlFor="disparo-email-modelo">Modelo de e-mail</Label>
+                <Select id="disparo-email-modelo" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                  <option value="">Selecione um modelo...</option>
+                  {(modelosDeEmail ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                </Select>
+                <p className="mt-1.5 text-caption text-text-tertiary">
+                  Os modelos ficam na Biblioteca → Modelos de e-mail. Só recebe quem aceita mensagens e tem e-mail; quem se descadastrou fica de
+                  fora. O disparo sai aos poucos (cerca de 40 por minuto) para não cair no spam.
+                </p>
+              </div>
+            ) : (
+              <>
+                {isMeta && (
+                  <div>
+                    <Label htmlFor="disparo-template">Modelo aprovado</Label>
+                    <Select id="disparo-template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                      <option value="">Selecione um modelo...</option>
+                      {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </Select>
+                    <p className="mt-1.5 text-caption text-text-tertiary">
+                      Disparo pro canal oficial precisa ser modelo aprovado — a lista inteira está fora da janela de 24h.
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <Label htmlFor="disparo-text">Texto</Label>
+                  <Textarea id="disparo-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Oi {nome}, tudo bem?" />
+                  <p className="mt-1.5 text-caption text-text-tertiary">
+                    {"{nome}"}, {"{email}"} e os campos capturados no fluxo são trocados pelos dados de cada contato.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <div className="border-t border-border-subtle pt-4">
+              <Label htmlFor="disparo-quando">
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock size={13} aria-hidden="true" /> Quando enviar
+                </span>
+              </Label>
+              <CampoDataSP id="disparo-quando" valor={scheduledAt} onChange={setScheduledAt} />
+              <p className="mt-1.5 text-caption text-text-tertiary">
+                Em branco, sai agora. Agendado, dá para cancelar ou mudar a hora ao abrir a campanha até começar a enviar.
+                {scheduledAt && (
+                  <button type="button" onClick={() => setScheduledAt("")} className="ml-1.5 underline hover:text-text-secondary">
+                    Mandar agora
+                  </button>
+                )}
+              </p>
+            </div>
+
+            {error && <Notice tone="danger">{error}</Notice>}
           </div>
-        )}
-      </Card>
+        </DrawerContent>
+      </Drawer>
     </div>
+  );
+}
+
+/** Opção em cápsula (filtros, etiquetas): ativa no polegar invertido. */
+function Pilula({ ativa, onClick, children }: { ativa: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={ativa}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-7 items-center gap-1 rounded-full px-3 text-small transition-colors",
+        ativa ? "bg-inverse font-medium text-inverse-fg" : "border border-border-subtle bg-raised text-text-secondary hover:bg-hover hover:text-text-primary"
+      )}
+    >
+      {children}
+    </button>
   );
 }

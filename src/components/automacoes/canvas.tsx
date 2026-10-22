@@ -66,40 +66,47 @@ interface DadosDaLigacao extends Record<string, unknown> {
 }
 
 const ANEL: Record<EstadoDoNo, string> = {
-  rodando: "ring-2 ring-info animate-pulse",
+  rodando: "ring-2 ring-accent-solid animate-pulse motion-reduce:animate-none",
   ok: "ring-2 ring-success",
   falhou: "ring-2 ring-danger",
   pulado: "ring-2 ring-border-strong",
   esperando: "ring-2 ring-warning",
 };
 
+// Alça: um ponto vazado na cor da página, como os nós de um diagrama (não se liga à mão).
+const ALCA = "!h-2 !w-2 !border !border-border-strong !bg-page";
+
+// v5: nós como cartões arredondados e calmos; a cor fica só no ícone (o tipo do passo).
 function CartaoDoPasso({ data }: NodeProps<Node<DadosDoPasso>>) {
   const v = visualDoPasso(data.tipo, data.acao);
   const Icone = v.icone;
+  const gatilho = data.tipo === "gatilho";
   return (
     <div
       className={cn(
-        "relative flex h-[78px] w-[264px] cursor-pointer items-center gap-3 rounded-xl border bg-raised px-3 shadow-sm transition-shadow",
-        data.selecionado ? "border-accent-solid shadow-md" : "border-border-default hover:border-border-strong",
+        "relative flex h-[78px] w-[264px] cursor-pointer items-center gap-3 rounded-[18px] border bg-panel px-3.5 transition-[border-color,box-shadow] duration-150",
+        data.selecionado ? "border-accent-solid ring-1 ring-accent-solid" : gatilho ? "border-border-default hover:border-border-strong" : "border-border-subtle hover:border-border-strong",
         data.estado && ANEL[data.estado]
       )}
     >
-      {data.tipo !== "gatilho" && <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-border-strong" isConnectable={false} />}
-      <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-        <Icone size={18} />
+      {!gatilho && <Handle type="target" position={Position.Left} className={ALCA} isConnectable={false} />}
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
+        <Icone size={16} aria-hidden="true" />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className={cn("font-mono text-[9.5px] uppercase tracking-[0.14em]", CATEGORY_CLASSES[v.cor].fg)}>{v.categoria}</p>
-        <p className="truncate text-[13px] font-semibold text-text-primary" title={data.titulo}>{data.titulo}</p>
-        <p className="truncate text-[11.5px] text-text-secondary" title={data.subtitulo}>{data.subtitulo}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="font-mono text-caption leading-none text-text-tertiary">{v.categoria}</p>
+        <p className="truncate text-small font-medium text-text-primary" title={data.titulo}>{data.titulo}</p>
+        <p className="truncate text-caption text-text-tertiary" title={data.subtitulo}>{data.subtitulo}</p>
       </div>
       {data.pendencias > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger-solid px-1 text-[10.5px] font-semibold text-text-on-danger" title="Pendências">
-          <AlertCircle size={11} />
+        <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-danger-solid text-text-on-danger" title="Pendências">
+          <AlertCircle size={12} aria-hidden="true" />
         </span>
       )}
-      {data.ms !== undefined && <span className="absolute -bottom-2 right-3 rounded-full bg-surface-3 px-1.5 font-mono text-[10px] text-text-secondary">{data.ms} ms</span>}
-      {data.tipo !== "fim" && <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-border-strong" isConnectable={false} />}
+      {data.ms !== undefined && (
+        <span className="absolute -bottom-2.5 right-3 rounded-full border border-border-subtle bg-raised px-1.5 font-mono text-caption leading-4 text-text-secondary">{data.ms} ms</span>
+      )}
+      {data.tipo !== "fim" && <Handle type="source" position={Position.Right} className={ALCA} isConnectable={false} />}
     </div>
   );
 }
@@ -112,22 +119,28 @@ function EspacoVazio({ data }: NodeProps<Node<DadosDoVazio>>) {
         e.stopPropagation();
         data.inserir(data.ponta);
       }}
-      className="flex h-[44px] w-[160px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-strong text-[12.5px] text-text-tertiary transition-colors hover:border-accent-solid hover:text-accent-fg"
+      className="flex h-[44px] w-[160px] items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-border-default text-caption text-text-tertiary transition-colors hover:border-accent-solid hover:text-accent-fg"
     >
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !border-0 !bg-transparent" isConnectable={false} />
-      <Plus size={14} /> Passo
+      <Plus size={14} aria-hidden="true" /> Passo
     </button>
   );
 }
 
+// Fio fino; o caminho percorrido num teste acende no azul do destaque.
 function Ligacao({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps<Edge<DadosDaLigacao>>) {
   const [caminho, x, y] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   return (
     <>
-      <BaseEdge id={id} path={caminho} style={{ stroke: data?.ativa ? "var(--info)" : "var(--border-strong)", strokeWidth: data?.ativa ? 2 : 1.5 }} className={data?.ativa ? "automacao-ligacao-ativa" : undefined} />
+      <BaseEdge
+        id={id}
+        path={caminho}
+        style={{ stroke: data?.ativa ? "var(--accent-solid)" : "var(--border-strong)", strokeWidth: data?.ativa ? 1.75 : 1.25 }}
+        className={data?.ativa ? "automacao-ligacao-ativa" : undefined}
+      />
       <EdgeLabelRenderer>
         <div className="nodrag nopan pointer-events-auto absolute flex items-center gap-1" style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}>
-          {data?.nome && <span className="rounded-full border border-border-subtle bg-panel px-2 py-0.5 text-[10.5px] font-medium text-text-secondary">{data.nome}</span>}
+          {data?.nome && <span className="rounded-full border border-border-subtle bg-panel px-2 font-mono text-caption leading-5 text-text-tertiary">{data.nome}</span>}
           {data && !data.paraVazio && (
             <button
               type="button"
@@ -136,9 +149,9 @@ function Ligacao({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
                 e.stopPropagation();
                 data.inserir(data.ponta);
               }}
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-border-default bg-panel text-text-tertiary opacity-70 transition hover:border-accent-solid hover:text-accent-fg hover:opacity-100"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-border-default bg-raised text-text-tertiary opacity-80 transition hover:border-accent-solid hover:bg-accent-solid hover:text-text-on-accent hover:opacity-100"
             >
-              <Plus size={11} />
+              <Plus size={11} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -148,6 +161,21 @@ function Ligacao({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
 }
 
 const TIPOS_DE_NO = { passo: CartaoDoPasso, vazio: EspacoVazio };
+
+// Cores do React Flow pelas variáveis dele (sem mexer no CSS global): quadro
+// transparente sobre o fundo da página, controles e minimapa nos tokens.
+const ESTILO_DO_QUADRO = {
+  "--xy-background-color": "transparent",
+  "--xy-controls-button-background-color": "var(--surface-raised)",
+  "--xy-controls-button-background-color-hover": "var(--surface-hover)",
+  "--xy-controls-button-color": "var(--text-secondary)",
+  "--xy-controls-button-color-hover": "var(--text-primary)",
+  "--xy-controls-button-border-color": "var(--border-subtle)",
+  "--xy-controls-box-shadow": "none",
+  "--xy-minimap-background-color": "var(--surface-panel)",
+  "--xy-minimap-mask-background-color": "color-mix(in srgb, var(--surface-page) 70%, transparent)",
+  "--xy-edge-label-background-color": "var(--surface-panel)",
+} as React.CSSProperties;
 const TIPOS_DE_LIGACAO = { ligacao: Ligacao };
 
 /** Título e resumo do cartão de cada passo. */
@@ -271,10 +299,18 @@ function CanvasInterno({
       minZoom={0.25}
       maxZoom={1.5}
       proOptions={{ hideAttribution: true }}
+      style={ESTILO_DO_QUADRO}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-default)" />
-      <Controls showInteractive={false} />
-      <MiniMap pannable zoomable style={{ width: 140, height: 90 }} nodeColor={(n) => (contagem.get(n.id) ? "var(--danger)" : "var(--border-strong)")} />
+      <Controls showInteractive={false} position="center-right" className="!overflow-hidden !rounded-full !border !border-border-subtle !shadow-none" />
+      <MiniMap
+        pannable
+        zoomable
+        className="!overflow-hidden !rounded-[14px] !border !border-border-subtle"
+        style={{ width: 140, height: 90 }}
+        nodeBorderRadius={8}
+        nodeColor={(n) => (contagem.get(n.id) ? "var(--danger-solid)" : "var(--border-strong)")}
+      />
     </ReactFlow>
   );
 }

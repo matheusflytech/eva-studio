@@ -55,17 +55,17 @@ function InserirVariavel({ variaveis, inserir }: { variaveis: VariavelDisponivel
         <Braces size={13} />
       </IconButton>
       {aberto && (
-        <div className="absolute right-0 top-8 z-30 max-h-72 w-64 overflow-y-auto rounded-lg border border-border-default bg-overlay p-1 shadow-overlay">
+        <div className="absolute right-0 top-8 z-30 max-h-72 w-64 overflow-y-auto rounded-[14px] border border-border-default bg-overlay p-1 shadow-overlay">
           {grupos.map((g) => (
             <div key={g}>
-              <p className="px-2 pb-0.5 pt-2 text-[10.5px] font-semibold uppercase tracking-wide text-text-tertiary">{g}</p>
+              <p className="px-2 pb-0.5 pt-2 font-mono text-caption text-text-tertiary">{g}</p>
               {variaveis
                 .filter((v) => v.grupo === g)
                 .map((v) => (
                   <button
                     key={v.caminho}
                     type="button"
-                    className="block w-full rounded px-2 py-1 text-left text-[12.5px] text-text-secondary hover:bg-hover hover:text-text-primary"
+                    className="block w-full rounded-[8px] px-2 py-1 text-left text-small text-text-secondary hover:bg-hover hover:text-text-primary"
                     onClick={() => {
                       inserir(`{{${v.caminho}}}`);
                       setAberto(false);
@@ -173,7 +173,7 @@ export function FormularioDoCatalogo({
 }) {
   const por = (chave: string, v: unknown) => mudar({ ...config, [chave]: v });
   const visiveis = camposVisiveis(campos, config);
-  if (!visiveis.length) return <p className="text-[12.5px] text-text-tertiary">Nada para configurar aqui.</p>;
+  if (!visiveis.length) return <p className="text-small text-text-tertiary">Nada para configurar aqui.</p>;
   return (
     <div className="flex flex-col gap-3.5">
       {visiveis.map((c) => {
@@ -185,7 +185,7 @@ export function FormularioDoCatalogo({
             {c.obrigatorio && <span className="text-danger">*</span>}
           </Label>
         );
-        const ajuda = c.ajuda ? <p className="mt-1 text-[11.5px] text-text-tertiary">{c.ajuda}</p> : null;
+        const ajuda = c.ajuda ? <p className="mt-1 text-caption text-text-tertiary">{c.ajuda}</p> : null;
 
         if (c.tipo === "booleano") {
           return (
@@ -211,10 +211,10 @@ export function FormularioDoCatalogo({
           return (
             <div key={c.chave}>
               {rotulo}
-              <div className="flex flex-col gap-1 rounded-lg border border-border-subtle p-2">
-                {opcoes.usuarios.length === 0 && <p className="text-[12px] text-text-tertiary">Carregando pessoas...</p>}
+              <div className="flex flex-col gap-1 rounded-[14px] bg-raised p-2.5">
+                {opcoes.usuarios.length === 0 && <p className="text-caption text-text-tertiary">Carregando pessoas...</p>}
                 {opcoes.usuarios.map((u) => (
-                  <label key={u.id} className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+                  <label key={u.id} className="flex items-center gap-2 text-small text-text-secondary">
                     <input type="checkbox" checked={sel.includes(u.id)} onChange={(e) => por(c.chave, e.target.checked ? [...sel, u.id] : sel.filter((x) => x !== u.id))} />
                     {u.nome}
                   </label>
@@ -247,7 +247,7 @@ export function FormularioDoCatalogo({
               {c.tipo !== "numero" && <InserirVariavel variaveis={variaveis} inserir={(v) => por(c.chave, `${String(config[c.chave] ?? "")}${v}`)} />}
             </div>
             {texto ? (
-              <Textarea id={id} rows={c.tipo === "json" ? 3 : 4} className={c.tipo === "json" ? "font-mono text-[12px]" : undefined} value={String(valor ?? "")} onChange={(e) => por(c.chave, e.target.value)} />
+              <Textarea id={id} rows={c.tipo === "json" ? 3 : 4} className={c.tipo === "json" ? "font-mono text-caption" : undefined} value={String(valor ?? "")} onChange={(e) => por(c.chave, e.target.value)} />
             ) : (
               <Input
                 id={id}

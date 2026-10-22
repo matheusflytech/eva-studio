@@ -101,12 +101,12 @@ export function SeletorDePasso({
         onSelect={() => pegar(novoPasso(tipo as No["tipo"], objeto, acao))}
         className="flex items-start gap-2.5 py-2"
       >
-        <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-          <Icone size={14} />
+        <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px]", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
+          <Icone size={14} aria-hidden="true" />
         </span>
         <span className="min-w-0">
-          <span className="block text-[13px] text-text-primary">{nome}</span>
-          <span className="block text-[11.5px] text-text-tertiary">{desativado ? "Só no fim de um caminho." : descricao}</span>
+          <span className="block text-small text-text-primary">{nome}</span>
+          <span className="block text-caption text-text-tertiary">{desativado ? "Só no fim de um caminho." : descricao}</span>
         </span>
       </CommandItem>
     );
@@ -123,8 +123,8 @@ export function SeletorDePasso({
                 type="button"
                 onClick={() => finalizar(pendente, s.saida)}
                 className={cn(
-                  "rounded-lg border border-border-default px-3 py-2 text-left text-[13px] text-text-primary hover:border-border-strong hover:bg-raised",
-                  s.saida === saidaPrincipal(pendente) && "border-accent-solid"
+                  "rounded-[14px] border border-border-subtle px-3 py-2.5 text-left text-small text-text-primary hover:bg-raised",
+                  s.saida === saidaPrincipal(pendente) && "border-accent-solid ring-1 ring-accent-solid"
                 )}
               >
                 Pelo ramo “{s.nome || "seguinte"}”

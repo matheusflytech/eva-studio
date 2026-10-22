@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { Sparkles, Loader2, AlertTriangle, RotateCcw, Clock, Zap, Tag as TagIcon } from "lucide-react";
+import { RotateCcw, Clock, Zap, Tag as TagIcon } from "lucide-react";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
+import { Notice } from "@/components/ui/notice";
+import { MarcaEva } from "@/components/layout/marca-eva";
 import type { MessageTemplate } from "@/lib/data/templates";
 
 // ---------------------------------------------------------------------------
@@ -124,11 +126,31 @@ export function AssistenteIaSequencia({
   return (
     <Modal open onOpenChange={(o) => !o && !carregando && onClose()}>
       <ModalContent
-        className="max-w-2xl"
+        size="lg"
         title={atual ? "Ajustar régua com IA" : "Criar régua com IA"}
-        description="Descreve com suas palavras. A IA monta um rascunho e nada é salvo até você clicar em Salvar no editor."
+        description="Descreve com suas palavras. A Eva monta um rascunho e nada é salvo até você clicar em Salvar no editor."
+        footer={
+          !r ? (
+            <>
+              <Button variant="ghost" onClick={onClose} disabled={carregando}>Cancelar</Button>
+              <Button variant="primary" onClick={() => gerar(pedido.trim(), atual)} disabled={carregando || pedido.trim().length < 5} loading={carregando}>
+                {!carregando && <MarcaEva size={14} className="shrink-0" />}
+                {carregando ? "Montando o rascunho..." : "Montar rascunho"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" className="mr-auto" onClick={() => setResultado(null)} disabled={carregando}>
+                <RotateCcw size={14} aria-hidden="true" /> Começar de novo
+              </Button>
+              <Button variant="primary" onClick={() => onUsar(r)} disabled={carregando}>
+                Usar este rascunho
+              </Button>
+            </>
+          )
+        }
       >
-        <div className="flex max-h-[68vh] flex-col gap-4 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-4">
           {!r ? (
             <>
               <div>
@@ -147,17 +169,17 @@ export function AssistenteIaSequencia({
                       : "Ex.: quem pediu orçamento e não respondeu recebe uma lembrança em 1 dia e outra em 3."
                   }
                 />
-                <p className="mt-1 text-right text-[11px] text-text-tertiary">{pedido.length}/800</p>
+                <p className="mt-1 text-right font-mono text-caption tabular-nums text-text-tertiary">{pedido.length}/800</p>
               </div>
               {!atual && (
                 <div className="flex flex-col gap-2">
-                  <span className="text-[12px] text-text-tertiary">Ou comece por um exemplo:</span>
+                  <span className="font-mono text-caption text-text-tertiary">Ou comece por um exemplo</span>
                   {EXEMPLOS.map((ex) => (
                     <button
                       key={ex}
                       type="button"
                       onClick={() => setPedido(ex)}
-                      className="rounded-xl border border-border-subtle bg-surface-2 px-3 py-2 text-left text-[12.5px] text-text-secondary transition-colors hover:border-accent-500/40 hover:text-text-primary"
+                      className="rounded-[14px] border border-border-subtle bg-raised px-3 py-2 text-left text-small text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
                     >
                       {ex}
                     </button>
@@ -168,8 +190,8 @@ export function AssistenteIaSequencia({
           ) : (
             <>
               <div>
-                <h3 className="font-display text-[16px] font-semibold text-text-primary">{r.name}</h3>
-                <p className="text-[12.5px] text-text-tertiary">
+                <h3 className="text-title-sm font-semibold tracking-tight text-text-primary">{r.name}</h3>
+                <p className="text-small text-text-tertiary">
                   {CANAL[r.channel] ?? r.channel}
                   {r.stopOnReply ? " · sai da régua quando responder" : " · continua mesmo se responder"}
                   {r.allowReentry ? " · pode entrar de novo" : ""}
@@ -177,36 +199,39 @@ export function AssistenteIaSequencia({
               </div>
 
               {resultado.explicacao && (
-                <div className="rounded-2xl bg-accent-soft px-4 py-3 text-[13px] text-text-primary">
-                  <Sparkles size={13} className="mr-1.5 inline text-accent-500" />
-                  {resultado.explicacao}
+                <div className="flex gap-2.5 rounded-[14px] bg-raised px-4 py-3 text-small text-text-primary">
+                  <MarcaEva size={14} className="shrink-0 mt-0.5 text-accent-fg" />
+                  <span>
+                    <span className="block font-mono text-caption text-text-tertiary">Eva</span>
+                    {resultado.explicacao}
+                  </span>
                 </div>
               )}
 
               <ol className="relative flex flex-col gap-3 border-l border-border-subtle pl-5">
                 <li className="relative">
-                  <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent-500 text-text-on-accent">
+                  <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-accent-solid text-text-on-accent">
                     <Zap size={10} />
                   </span>
-                  <p className="text-[13px] font-medium text-text-primary">{descreverGatilho(r, catalogo)}</p>
-                  <p className="text-[12px] text-text-tertiary">o contato entra na régua</p>
+                  <p className="text-small font-medium text-text-primary">{descreverGatilho(r, catalogo)}</p>
+                  <p className="text-caption text-text-tertiary">o contato entra na régua</p>
                 </li>
                 {r.steps.map((s, i) => {
                   const modelo = catalogo.templates.find((t) => t.id === s.templateId);
                   const tag = catalogo.tags.find((t) => t.id === s.applyTagId);
                   return (
                     <li key={s.order} className="relative">
-                      <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-3 text-[10px] font-semibold text-text-secondary">
+                      <span className="absolute -left-[29px] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-hover font-mono text-caption text-text-secondary">
                         {s.order}
                       </span>
-                      <p className="flex items-center gap-1.5 text-[12px] text-text-tertiary">
+                      <p className="flex items-center gap-1.5 text-caption text-text-tertiary">
                         <Clock size={11} />
                         {s.order === 1 ? `Espera ${tempoHumano(s.delayMinutes)}` : `Mais ${tempoHumano(s.delayMinutes)} depois`}
                         {s.order > 1 && ` (${tempoHumano(acumulados[i])} desde a entrada)`}
                       </p>
-                      <div className="mt-1 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[13px] text-text-primary">{s.text}</div>
+                      <div className="mt-1 rounded-[14px] bg-raised px-3.5 py-2.5 text-small text-text-primary">{s.text}</div>
                       {(modelo || tag) && (
-                        <p className="mt-1 flex flex-wrap gap-3 text-[11.5px] text-text-tertiary">
+                        <p className="mt-1 flex flex-wrap gap-3 text-caption text-text-tertiary">
                           {modelo && <span>Fora da janela usa o modelo “{modelo.name}”</span>}
                           {tag && (
                             <span className="flex items-center gap-1">
@@ -221,14 +246,12 @@ export function AssistenteIaSequencia({
               </ol>
 
               {resultado.avisos.length > 0 && (
-                <div className="flex flex-col gap-1.5 rounded-2xl border border-amber-400/25 bg-amber-400/5 px-4 py-3">
-                  <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-amber-400">
-                    <AlertTriangle size={13} /> Vale conferir
-                  </span>
+                <Notice tone="warning">
+                  <span className="block font-medium">Vale conferir</span>
                   {resultado.avisos.map((a) => (
-                    <p key={a} className="text-[12.5px] text-text-secondary">{a}</p>
+                    <span key={a} className="block">{a}</span>
                   ))}
-                </div>
+                </Notice>
               )}
 
               <div>
@@ -246,9 +269,10 @@ export function AssistenteIaSequencia({
                     variant="secondary"
                     className="self-end"
                     disabled={carregando || ajuste.trim().length < 5}
+                    loading={carregando}
                     onClick={() => gerar(ajuste.trim(), r)}
                   >
-                    {carregando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Ajustar
+                    {!carregando && <MarcaEva size={14} className="shrink-0" />} Ajustar
                   </Button>
                 </div>
               </div>
@@ -256,37 +280,17 @@ export function AssistenteIaSequencia({
           )}
 
           {erro && (
-            <div className="rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+            <Notice tone="danger">
               {erro.msg}
               {erro.semChave && (
                 <Link href="/integracoes" className="ml-1 font-medium underline">
                   Abrir Integrações
                 </Link>
               )}
-            </div>
+            </Notice>
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-border-subtle pt-4">
-          {!r ? (
-            <>
-              <Button variant="ghost" onClick={onClose} disabled={carregando}>Cancelar</Button>
-              <Button onClick={() => gerar(pedido.trim(), atual)} disabled={carregando || pedido.trim().length < 5}>
-                {carregando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                {carregando ? "Montando o rascunho..." : "Montar rascunho"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" className="mr-auto" onClick={() => setResultado(null)} disabled={carregando}>
-                <RotateCcw size={14} /> Começar de novo
-              </Button>
-              <Button onClick={() => onUsar(r)} disabled={carregando}>
-                Usar este rascunho
-              </Button>
-            </>
-          )}
-        </div>
       </ModalContent>
     </Modal>
   );
