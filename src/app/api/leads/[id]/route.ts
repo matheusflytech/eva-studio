@@ -1,34 +1,51 @@
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
-import { prisma } from "@/lib/db/prisma";
+import { requirePermission } from "@/lib/server/permissions";
+import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
+import { atualizarLead, buscarLead, removerDosLeads, resolverIdDoLead } from "@/lib/server/leads";
 
-const VALID_STAGES = ["novo", "contatado", "qualificado", "ganho", "perdido"];
+// `id` é o id do contato; id antigo (de conversa, antes da Fase 2) também
+// resolve para o contato ligado a ela.
+type Params = { params: Promise<{ id: string }> };
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+export async function GET(_request: Request, { params }: Params) {
+  const ctx = await requirePermission("read");
+  if ("error" in ctx) return erro(ctx.error, ctx.status);
   const { id } = await params;
-
-  const conversation = await prisma.conversation.findFirst({ where: { id, channel: "website", agent: { orgId } } });
-  if (!conversation) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
-
-  const { leadStage } = await request.json();
-  if (!VALID_STAGES.includes(leadStage)) {
-    return NextResponse.json({ error: "leadStage inválido." }, { status: 400 });
-  }
-
-  await prisma.conversation.update({ where: { id }, data: { leadStage } });
-  return NextResponse.json({ ok: true });
+  const contactId = await resolverIdDoLead(ctx.orgId, id);
+  const lead = contactId ? await buscarLead(ctx.orgId, contactId) : null;
+  if (!lead) return erro("Lead não encontrado.", 404);
+  return NextResponse.json({ lead });
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+// Corpo: { stage | leadStage, fields | variables } — pelo menos um dos dois.
+export async function PATCH(request: Request, { params }: Params) {
+  const ctx = await requirePermission("contacts:manage");
+  if ("error" in ctx) return erro(ctx.error, ctx.status);
   const { id } = await params;
 
-  const conversation = await prisma.conversation.findFirst({ where: { id, channel: "website", agent: { orgId } } });
-  if (!conversation) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
 
-  await prisma.conversation.delete({ where: { id } });
+  const contactId = await resolverIdDoLead(ctx.orgId, id);
+  if (!contactId) return erro("Lead não encontrado.", 404);
+
+  const r = await atualizarLead(ctx.orgId, contactId, {
+    stage: body.stage ?? body.leadStage,
+    fields: body.fields ?? body.variables,
+  });
+  if ("error" in r) {
+    return NextResponse.json({ error: r.error, ...(r.fieldErrors ? { fieldErrors: r.fieldErrors } : {}) }, { status: r.status });
+  }
+  return NextResponse.json({ ok: true, lead: await buscarLead(ctx.orgId, r.contactId) });
+}
+
+// Tira da lista de leads (leadStage = null). O contato, as conversas e os
+// negócios continuam — antes isso apagava a conversa inteira.
+export async function DELETE(_request: Request, { params }: Params) {
+  const ctx = await requirePermission("contacts:manage");
+  if ("error" in ctx) return erro(ctx.error, ctx.status);
+  const { id } = await params;
+  const contactId = await resolverIdDoLead(ctx.orgId, id);
+  if (!contactId || !(await removerDosLeads(ctx.orgId, contactId))) return erro("Lead não encontrado.", 404);
   return NextResponse.json({ ok: true });
 }

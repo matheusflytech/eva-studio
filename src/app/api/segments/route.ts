@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { buildSegmentWhere, parseRules, type SegmentRule } from "@/lib/server/segments";
+import { buildSegmentWhere, lerRegras, parseRules } from "@/lib/server/segments";
+import { erro, JSON_INVALIDO, lerCorpo } from "@/lib/server/api-validacao";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Cada segmento volta com quantas pessoas ele pega AGORA: é o número que
@@ -36,11 +37,13 @@ export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Nome do segmento é obrigatório." }, { status: 400 });
 
-  const rules: SegmentRule[] = parseRules(body.rules);
+  const rules = lerRegras(body.rules);
+  if (typeof rules === "string") return erro(rules);
   const match = body.match === "any" ? "any" : "all";
 
   const segment = await prisma.segment.create({

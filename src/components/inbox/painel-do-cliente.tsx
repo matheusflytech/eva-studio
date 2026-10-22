@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   Plus, X, Check, Phone, Mail, Building2, ExternalLink, Handshake, Loader2, Clock, UserRoundX, UserRound,
 } from "lucide-react";
 import { DealDrawer } from "@/components/crm/deal-drawer";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { dinheiro, iniciais, type Conversa, type Contexto } from "./tipos";
 import { useSondagem } from "./use-sondagem";
+import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 
 interface Funil {
   id: string;
@@ -115,11 +117,16 @@ export function PainelDoCliente({
     await carregar();
   }
 
-  async function moverEtapa(dealId: string, stageId: string) {
-    const r = await enviar(`/api/deals/${dealId}`, "PATCH", { stageId });
-    if (!r.ok) setErro(r.json.error ?? "Não foi possível mover o negócio.");
+  // Mudança de etapa pelas regras da etapa (motivo da perda, "Complete para
+  // mover"): os mesmos modais do quadro.
+  const mudanca = useMudancaDeEtapa({ onErro: setErro });
+  async function moverEtapa(negocio: { id: string; name: string }, funil: Funil, stageId: string) {
+    const para = funil.stages.find((s) => s.id === stageId);
+    if (!para) return;
+    setErro(null);
+    const r = await mudanca.mover({ dealId: negocio.id, nome: negocio.name, pipelineId: funil.id, para, defs: [] });
     await carregar();
-    onMudou();
+    if (r === "movido") onMudou();
   }
 
   function abrirNovoNegocio() {
@@ -160,10 +167,10 @@ export function PainelDoCliente({
     await carregar();
   }
 
-  async function concluirTarefa(id: string) {
-    await enviar(`/api/tasks/${id}`, "PATCH", { done: true });
-    await carregar();
-  }
+  // Concluir passa pelo diálogo (resultado + próximo passo obrigatório).
+  const { abrir: concluirTarefa, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => {
+    void carregar();
+  });
 
   const funilEscolhido = funis.find((f) => f.id === formNegocio.funilId);
   const capturados = Object.entries(contato?.customFields ?? {}).filter(([k]) => !k.startsWith("__"));
@@ -325,7 +332,7 @@ export function PainelDoCliente({
                       type="button"
                       onClick={criarNegocio}
                       disabled={salvandoNegocio || !formNegocio.nome.trim()}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent-500 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent-500 py-1.5 text-[12.5px] font-medium text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-50"
                     >
                       {salvandoNegocio ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Criar
                     </button>
@@ -366,7 +373,7 @@ export function PainelDoCliente({
                         {funil ? (
                           <select
                             value={n.stage.id}
-                            onChange={(e) => moverEtapa(n.id, e.target.value)}
+                            onChange={(e) => moverEtapa(n, funil, e.target.value)}
                             aria-label={`Etapa de ${n.name}`}
                             className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2 py-1 text-[12px] text-text-secondary outline-none"
                           >
@@ -406,7 +413,7 @@ export function PainelDoCliente({
               <div className="flex flex-col gap-1">
                 {(ctx?.tarefas ?? []).map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-1.5 py-1.5 hover:bg-surface-2">
-                    <Checkbox checked={false} onCheckedChange={() => concluirTarefa(t.id)} />
+                    <Checkbox checked={false} onCheckedChange={() => concluirTarefa(t)} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12.5px] text-text-primary">{t.text}</span>
                       {t.dueAt && (
@@ -462,6 +469,8 @@ export function PainelDoCliente({
           onChanged={() => { void carregar(); onMudou(); }}
         />
       )}
+      {mudanca.elementos}
+      {dialogoDeConclusao}
     </aside>
   );
 }

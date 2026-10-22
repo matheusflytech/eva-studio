@@ -88,7 +88,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ag
         templateId: s.templateId || null,
         applyTagId: s.applyTagId || null,
       }))
-      .filter((s) => s.text.length > 0);
+      // E-mail: o passo é o modelo da Biblioteca (templateId); o texto é só o nome.
+      .filter((s) => s.text.length > 0 || ((body.channel ?? sequence.channel) === "email" && !!s.templateId));
 
     await prisma.$transaction([
       prisma.sequenceStep.deleteMany({ where: { sequenceId } }),

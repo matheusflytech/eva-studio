@@ -8,6 +8,8 @@ import { Modal, ModalContent } from "@/components/ui/modal";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { cn } from "@/lib/utils";
 import { tamanhoLegivel, type Conversa } from "./tipos";
+import { AgendarMensagem } from "@/components/whatsapp/agendar-mensagem";
+import { CANAIS_AGENDAVEIS } from "@/lib/whatsapp/janela";
 
 export interface AnexoPreparado {
   path: string;
@@ -124,7 +126,7 @@ function EscolherModelo({
                     await onEscolher(m);
                     setEnviando(null);
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-accent-400 disabled:opacity-50"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-[12.5px] font-medium text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-50"
                 >
                   {enviando === m.id && <Loader2 size={12} className="animate-spin" />} Enviar este modelo
                 </button>
@@ -177,6 +179,7 @@ export function Compositor({
   const janelaFechada = conversa.janela.restrita && !conversa.janela.aberta && !conversa.simulado;
   const podeModelo = conversa.channel === "whatsapp_meta";
   const respostaBloqueada = modo === "responder" && (deOutro || semCanal || janelaFechada);
+  const podeAgendar = !conversa.simulado && conversa.respondivel && CANAIS_AGENDAVEIS.has(conversa.channel);
 
   async function aoEscolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -276,6 +279,25 @@ export function Compositor({
       )}
 
       <div className="mb-2 flex items-center gap-1">
+        {podeAgendar && (
+          <AgendarMensagem
+            rotulo="Agendar"
+            variante="ghost"
+            className="order-last ml-auto h-7 px-2.5 text-[12.5px]"
+            destino={{
+              agentId: conversa.agentId,
+              agentName: conversa.agentName,
+              channel: conversa.channel,
+              to: conversa.contactId,
+              // A janela abre na última mensagem do cliente: expiraEm - 24h.
+              lastContactMessageAt: conversa.janela.expiraEm
+                ? new Date(new Date(conversa.janela.expiraEm).getTime() - 24 * 60 * 60 * 1000).toISOString()
+                : null,
+              contactId: conversa.contato?.id ?? null,
+              contactName: conversa.nome,
+            }}
+          />
+        )}
         {(["responder", "nota"] as const).map((m) => (
           <button
             key={m}

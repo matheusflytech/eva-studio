@@ -38,6 +38,16 @@ model Organization {
   notes       Note[]
   dashboard   DashboardLayout?
   customFieldDefs CustomField[]
+  products        Product[]
+  // Contratos e permissões (ver o fim do arquivo).
+  memberships      Membership[]
+  customRoles      CustomRole[]
+  permissionGroups PermissionGroup[]
+  teams            Team[]
+  // Lixeira (2026-10-20-lixeira.sql): só relação, nenhuma coluna nova aqui.
+  trash            TrashItem[]
+  // Central de IA (2026-10-21-conexao-ia.sql): só relação, nenhuma coluna nova aqui.
+  aiConnection     AiConnection?
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -59,8 +69,17 @@ model ApiKey {
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
   revokedAt  DateTime?
+  // O que a chave pode fazer na API v1: "*" (tudo, o padrão das chaves
+  // antigas), "<recurso>:*" ou "<recurso>:read|write". Ver
+  // src/lib/server/api-v1/escopos.ts.
+  scopes     String[]  @default(["*"])
+  // Quem criou (se a pessoa sair, a chave continua) e, se quiser, até quando
+  // vale. Vencida = 401, igual revogada.
+  createdById String?
+  expiresAt   DateTime?
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy    Profile?     @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([keyHash])
@@ -106,6 +125,10 @@ model Profile {
   assignedTasks   Task[]         @relation("TaskAssignee")
   authoredNotes   Note[]         @relation("NoteAuthor")
   messages        Message[]      @relation("MessageAuthor")
+  memberships     Membership[]   @relation("ProfileMemberships")
+  teamMemberships TeamMember[]   @relation("TeamMemberships")
+  ledTeams        Team[]         @relation("TeamLeader")
+  createdApiKeys  ApiKey[]       @relation("ApiKeyCreator")
 
   @@index([orgId])
   @@map("eva_studio_profiles")
@@ -148,6 +171,7 @@ model Agent {
   outboundQueue       OutboundQueueItem[]
   broadcasts          Broadcast[]
   commentAutomations  CommentAutomation[]
+  triggers            AgentTrigger[]
   executions          FlowExecution[]
   contactChannels     ContactChannel[]
   sequences           Sequence[]
@@ -368,12 +392,23 @@ model MessageTemplate {
   metaTemplateName String   @default("")
   metaLanguageCode String   @default("pt_BR")
   variableOrder    Json     @default("[]")
+  // Acompanhamento do template na Meta (preenchido quando ele foi criado por
+  // aqui ou quando chega um webhook de status). A consulta ao vivo em
+  // Aprovações continua sendo a fonte da tela; isto é o último aviso gravado,
+  // usado quando a Meta não responde.
+  metaTemplateId   String?
+  metaStatus       String? // PENDING | APPROVED | REJECTED | PAUSED | DISABLED | ...
+  metaStatusReason String?
+  metaStatusAt     DateTime?
+  // Componentes enviados à Meta (header/body/footer/botões), pra prévia.
+  metaComponents   Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([agentId])
+  @@index([metaTemplateId])
   @@map("eva_studio_message_templates")
 }
 
@@ -457,6 +492,34 @@ model CommentAutomation {
   @@map("eva_studio_comment_automations")
 }
 
+// Gatilhos do agente: palavra-chave na DM (qualquer canal), resposta/reação a
+// story e menção em story (Instagram). Casamento em src/lib/server/triggers.ts.
+// Ação: replyText (opcional) e/ou pular para targetNodeId no fluxo.
+model AgentTrigger {
+  id               String    @id @default(uuid())
+  agentId          String
+  name             String
+  kind             String // dm_keyword | story_reply | story_mention
+  channels         String[]  @default([]) // vazio = todos
+  matchMode        String    @default("contains") // any | exact | contains
+  keywords         String[]  @default([])
+  storyId          String    @default("") // story_reply: vazio = qualquer story
+  includeReactions Boolean   @default(true)
+  replyText        String    @default("") @db.Text
+  targetNodeId     String    @default("")
+  priority         Int       @default(0)
+  active           Boolean   @default(true)
+  triggerCount     Int       @default(0)
+  lastTriggeredAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, active])
+  @@map("eva_studio_agent_triggers")
+}
+
 // Fila de envio pro WhatsApp via QR (Baileys) — o app principal (serverless)
 // não segura o socket do Baileys, então em vez de mandar direto, ele grava
 // aqui e o worker (processo sempre ligado) drena por polling. Usada por (1)
@@ -479,8 +542,11 @@ model OutboundQueueItem {
   mediaType      String?
   mediaMime      String?
   mediaName      String?
-  status         String    @default("pending") // pending | sent | failed
+  status         String    @default("pending") // pending | sending | sent | failed
   error          String?
+  // Quando o worker pegou o item (status "sending"). Trava com FOR UPDATE
+  // SKIP LOCKED; item preso em "sending" por muito tempo vira "failed".
+  claimedAt      DateTime?
   createdAt      DateTime  @default(now())
   sentAt         DateTime?
   // Quando o contato respondeu depois de receber esse item. So e usado pelo
@@ -529,6 +595,17 @@ model Broadcast {
   // polling — a Vercel no plano gratis so permite cron 1x/dia, entao o
   // agendamento NAO vive la. Ver docs/CHATBOT_ENGINE.md §15.
   scheduledAt DateTime?
+  // "campaign" = campanha da tela de Disparos; "single" = mensagem avulsa
+  // agendada pra um contato (a partir da conversa ou da ficha do negócio).
+  // Mesmo relógio, mesma fila, mesmo envio — só muda onde aparece.
+  kind            String  @default("campaign") // campaign | single
+  // Contexto da mensagem avulsa (sem FK de propósito: só pra listar na
+  // conversa/ficha; apagar o contato ou o negócio não deve travar nada).
+  contactRecordId String?
+  dealId          String?
+  createdById     String?
+  // Último motivo de falha legível (ex.: janela de 24h fechada sem modelo).
+  lastError       String?
   createdAt   DateTime @default(now())
 
   agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -538,6 +615,8 @@ model Broadcast {
 
   @@index([agentId])
   @@index([status, scheduledAt])
+  @@index([contactRecordId])
+  @@index([dealId])
   @@map("eva_studio_broadcasts")
 }
 
@@ -613,6 +692,13 @@ model Contact {
   optIn        Boolean   @default(true)
   optOutAt     DateTime?
   lastSeenAt   DateTime  @default(now())
+  // Lead = contato com etapa. null = ainda não é lead (só conversou).
+  // Vira lead na 1ª captura validada de nome/e-mail/telefone/campo, ou
+  // quando é criado pela tela/API de Leads. Ver src/lib/server/leads.ts.
+  leadStage    String?
+  leadAt       DateTime?
+  leadAgentId  String?
+  leadChannel  String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -630,7 +716,12 @@ model Contact {
   @@index([orgId])
   @@index([orgId, email])
   @@index([orgId, phone])
+  @@index([orgId, leadStage])
   @@index([companyId])
+  // Listas (prisma/sql/2026-10-20-indices-listas.sql): ordem por atividade/criação e filtro por responsável.
+  @@index([orgId, lastSeenAt])
+  @@index([orgId, ownerId])
+  @@index([orgId, createdAt])
   @@map("eva_studio_contacts")
 }
 
@@ -956,9 +1047,28 @@ model Pipeline {
   stages       PipelineStage[]
   deals        Deal[]
   customFields CustomField[]
+  cardLayout   PipelineCardLayout?
+  lostReasons  PipelineLostReason[]
 
   @@index([orgId])
   @@map("eva_studio_pipelines")
+}
+
+// Como o cartão do negócio aparece neste funil (campos, prévia, densidade).
+// Tabela à parte em vez de coluna no funil: sem o registro, o padrão de
+// src/lib/cartao-layout.ts vale, e o resto do CRM não depende desta tabela.
+model PipelineCardLayout {
+  id         String   @id @default(uuid())
+  orgId      String
+  pipelineId String   @unique
+  // { campos: string[], previa: string[], densidade: "compacto" | "confortavel" }
+  layout     Json     @default("{}")
+  updatedAt  DateTime @updatedAt
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_pipeline_card_layouts")
 }
 
 model PipelineStage {
@@ -980,9 +1090,56 @@ model PipelineStage {
   pipeline  Pipeline   @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   deals     Deal[]
   sequences Sequence[] @relation("SequenceTriggerStage")
+  // Só relação (nenhuma coluna nova aqui): sem o SQL das regras aplicado,
+  // vale a regra padrão de src/lib/regras-de-etapa.ts.
+  rule      PipelineStageRule?
 
   @@index([pipelineId])
   @@map("eva_studio_pipeline_stages")
+}
+
+// Regras da etapa (prisma/sql/2026-10-20-regras-de-etapa.sql): campos exigidos
+// ao ENTRAR na etapa, se ela pode ser pulada, prazo de "parado" e o texto de
+// orientação. Tabela à parte em vez de colunas na etapa pelo mesmo motivo de
+// PipelineCardLayout: sem o registro (ou sem a tabela), vale o padrão.
+model PipelineStageRule {
+  stageId        String   @id
+  orgId          String
+  pipelineId     String
+  // ["valor", "previsao", "responsavel", "contato", "empresa", "produtos", "cf:<chave>"]
+  requiredFields Json     @default("[]")
+  // false = quem pula esta etapa (vai de antes dela para depois) também
+  // precisa ter os campos dela preenchidos.
+  canBeSkipped   Boolean  @default(true)
+  // Dias sem atividade para o negócio aberto ficar "parado". null = nunca.
+  rottingDays    Int?
+  // "O que fazer nesta etapa": dica no cabeçalho da coluna e na ficha.
+  guidance       String   @default("") @db.Text
+  updatedAt      DateTime @updatedAt
+
+  stage PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId])
+  @@map("eva_studio_pipeline_stage_rules")
+}
+
+// Motivos de perda do funil, em ordem. "Outro" (exigeNota) pede o detalhe.
+// Sem registro para o funil, valem os motivos padrão do código.
+model PipelineLostReason {
+  id           String    @id @default(uuid())
+  orgId        String
+  pipelineId   String
+  label        String
+  requiresNote Boolean   @default(false)
+  position     Int       @default(0)
+  // Arquivado some da escolha, mas a perda antiga continua com o rótulo.
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId, position])
+  @@map("eva_studio_pipeline_lost_reasons")
 }
 
 model Deal {
@@ -1022,10 +1179,22 @@ model Deal {
   contacts     DealContact[]
   tasks        Task[]
   notes        Note[]
+  stageEvents  DealStageEvent[]
+  // Só relações (nenhuma coluna nova em eva_studio_deals): sem o SQL dos
+  // produtos aplicado, o resto do negócio continua funcionando.
+  items         DealItem[]
+  amountSetting DealAmountSetting?
+  // Regras de etapa (2026-10-20-regras-de-etapa.sql): também só relações.
+  loss          DealLoss?
+  activity      DealActivity?
 
   @@index([orgId, stageId])
   @@index([pipelineId])
   @@index([companyId])
+  // Listas (prisma/sql/2026-10-20-indices-listas.sql): coluna do quadro paginada por (position, id).
+  @@index([orgId, pipelineId, stageId, position, id])
+  @@index([orgId, ownerId])
+  @@index([orgId, createdAt])
   @@map("eva_studio_deals")
 }
 
@@ -1042,6 +1211,140 @@ model DealContact {
   @@map("eva_studio_deal_contacts")
 }
 
+// Cada vez que um negócio entra numa etapa (inclusive ao nascer). É o que
+// permite medir conversão etapa a etapa e tempo em cada etapa — `stageSince`
+// só sabe da etapa atual. Gravado só por registrarMudancaDeEtapa
+// (src/lib/server/stage-events.ts). Sem FK para a etapa de propósito: etapa
+// apagada não pode apagar a história.
+model DealStageEvent {
+  id          String   @id @default(uuid())
+  orgId       String
+  dealId      String
+  pipelineId  String
+  fromStageId String?
+  toStageId   String
+  origem      String   @default("usuario") // usuario | fluxo | api | importacao | backfill
+  // Importação/automação que moveu sem os campos obrigatórios da etapa (com a
+  // flag explícita). Coluna aditiva: quem grava tolera a ausência dela
+  // (src/lib/server/stage-events.ts) e quem lê usa select explícito.
+  ignorouObrigatorios Boolean @default(false)
+  at          DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, pipelineId, at])
+  @@index([dealId, at])
+  @@map("eva_studio_deal_stage_events")
+}
+
+// Motivo estruturado da perda (um por negócio perdido). `lostReason` do
+// negócio continua com o rótulo, para relatório, exportação e API antigos.
+// Sem FK para o motivo: motivo apagado não apaga a história.
+model DealLoss {
+  dealId      String   @id
+  orgId       String
+  pipelineId  String
+  reasonId    String?
+  reasonLabel String
+  note        String   @default("") @db.Text
+  lostAt      DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, pipelineId, reasonLabel])
+  @@map("eva_studio_deal_losses")
+}
+
+// Última atividade do negócio (tarefa concluída, nota, mensagem entrando ou
+// saindo nas conversas dos contatos, edição de campo). É o relógio do
+// "parado": greatest(lastActivityAt, stageSince). Atualizado só por
+// tocarAtividade (src/lib/server/atividade-do-negocio.ts).
+model DealActivity {
+  dealId         String   @id
+  orgId          String
+  lastActivityAt DateTime
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, lastActivityAt])
+  @@map("eva_studio_deal_activity")
+}
+
+// Catálogo de produtos e serviços da organização (o "Products" do HubSpot e
+// do Pipedrive). O negócio não aponta para o preço daqui: cada item copia
+// nome, código, unidade, preço e recorrência na hora em que entra, e mudar o
+// catálogo depois não reescreve proposta antiga.
+model Product {
+  id          String    @id @default(uuid())
+  orgId       String
+  name        String
+  sku         String    @default("")
+  description String    @default("") @db.Text
+  // Centavos, como em Deal.amountCents.
+  priceCents  Int       @default(0)
+  currency    String    @default("BRL")
+  // "un", "h", "mês", "licença"... texto livre e curto.
+  unit        String    @default("un")
+  // unico | mensal | anual
+  recurrence  String    @default("unico")
+  category    String    @default("")
+  // Arquivado some da busca para adicionar, mas os itens antigos ficam.
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  items        DealItem[]
+
+  @@index([orgId, archivedAt])
+  @@map("eva_studio_products")
+}
+
+// Item (linha) do negócio. productId nulo = item avulso, ou produto apagado
+// depois: o nome e o preço congelados seguem contando a história.
+model DealItem {
+  id             String   @id @default(uuid())
+  orgId          String
+  dealId         String
+  productId      String?
+  name           String
+  sku            String   @default("")
+  unit           String   @default("un")
+  recurrence     String   @default("unico")
+  unitPriceCents Int      @default(0)
+  quantity       Decimal  @default(1) @db.Decimal(12, 3)
+  // percentual: centésimos de ponto (1050 = 10,50%); valor: centavos.
+  discountType   String   @default("percentual")
+  discountValue  Int      @default(0)
+  // Calculado no servidor (src/lib/produtos.ts → totalDoItem).
+  totalCents     Int      @default(0)
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([dealId, position])
+  @@index([orgId, productId])
+  @@map("eva_studio_deal_items")
+}
+
+// Escolha "usar valor manual" do negócio. Tabela à parte em vez de coluna em
+// eva_studio_deals pelo mesmo motivo de PipelineCardLayout: sem o registro,
+// vale o padrão (o valor é a soma dos itens quando há itens).
+model DealAmountSetting {
+  dealId       String   @id
+  orgId        String
+  manualAmount Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_deal_amount_settings")
+}
+
 // No Atomic CRM a tarefa so amarra em contato e contact_id e obrigatorio.
 // Aqui os dois sao opcionais: tarefa pode ser de um contato, de um negocio
 // ou dos dois.
@@ -1051,7 +1354,7 @@ model Task {
   contactId    String?
   dealId       String?
   assignedToId String?
-  type         String    @default("ligar") // ligar | email | reuniao | outro
+  type         String    @default("ligar") // ligar | whatsapp | email | reuniao | visita | afazer ("outro" antigo = afazer; src/lib/tarefas/tipos.ts)
   text         String    @db.Text
   dueAt        DateTime?
   doneAt       DateTime?
@@ -1062,9 +1365,14 @@ model Task {
   contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
   deal         Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
   assignedTo   Profile?     @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // Só relação (nenhuma coluna nova em eva_studio_tasks): sem o SQL das
+  // tarefas (2026-10-20-tarefas.sql) a tarefa continua funcionando.
+  details      TaskDetail?
 
   @@index([orgId, doneAt, dueAt])
   @@index([assignedToId, doneAt])
+  // Minhas/Equipe e Meu dia (prisma/sql/2026-10-20-tarefas.sql).
+  @@index([orgId, assignedToId, doneAt, dueAt])
   @@index([contactId])
   @@index([dealId])
   @@map("eva_studio_tasks")
@@ -1143,4 +1451,773 @@ model CustomField {
   @@unique([orgId, entity, key])
   @@index([orgId, entity])
   @@map("eva_studio_custom_fields")
+}
+
+// ---------------------------------------------------------------------------
+// API pública v1 (docs/superpowers/plans/2026-10-19-api-crm-roadmap.md)
+//
+// Tabelas sem relação Prisma com Organization de propósito: são só da API,
+// e ficar fora do model da organização evita mexer no núcleo do schema.
+// Limpeza de org apagada fica por conta do orgId indexado.
+// ---------------------------------------------------------------------------
+
+// Idempotency-Key de POST/PATCH na API v1. Guarda a resposta por 24h: a
+// mesma chave com o mesmo corpo devolve a mesma resposta em vez de criar de
+// novo. status 0 = a primeira requisição ainda está rodando.
+model IdempotencyKey {
+  id        String   @id @default(uuid())
+  orgId     String
+  key       String
+  method    String
+  path      String
+  bodyHash  String
+  status    Int      @default(0)
+  response  Json?
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, key])
+  @@index([createdAt])
+  @@map("eva_studio_idempotency_keys")
+}
+
+// Id do registro no sistema de quem integra (ERP, planilha, outro CRM). É o
+// que faz reimportar ou reenviar não duplicar. Um id externo por registro e
+// por origem; entity = contact | company | deal.
+model ExternalRef {
+  id         String   @id @default(uuid())
+  orgId      String
+  entity     String
+  source     String   @default("api")
+  externalId String
+  entityId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([orgId, entity, source, externalId])
+  @@unique([orgId, entity, source, entityId])
+  @@index([orgId, entity, entityId])
+  @@map("eva_studio_external_refs")
+}
+
+// Lápide de exclusão: o registro some de verdade (as telas não sabem de
+// exclusão lógica), mas quem sincroniza pela API precisa saber que sumiu.
+model DeletedRecord {
+  id         String   @id @default(uuid())
+  orgId      String
+  entity     String
+  entityId   String
+  externalId String   @default("")
+  deletedAt  DateTime @default(now())
+
+  @@index([orgId, entity, deletedAt])
+  @@map("eva_studio_deleted_records")
+}
+
+// Lixeira (30 dias) por "foto": apagar continua apagando de verdade (as
+// listas, a busca, o dashboard e a API não precisam filtrar nada), mas antes
+// grava aqui o registro E tudo o que a cascata leva junto (tarefas, notas,
+// histórico de etapa, itens, vínculos, canais, etiquetas...). Restaurar recria
+// com os mesmos ids na mesma transação. Ver src/lib/server/lixeira.ts e
+// prisma/sql/2026-10-20-lixeira.sql. Sem FK para quem apagou: a pessoa sair
+// do contrato não pode apagar a lixeira.
+model TrashItem {
+  id            String   @id @default(uuid())
+  orgId         String
+  entity        String // deal | contact | company
+  entityId      String
+  name          String   @default("")
+  // Resumo do que foi junto ("3 tarefas · 2 notas"), para a lista não ler a foto.
+  detail        String   @default("")
+  // Responsável do registro na hora de apagar: escopo "só os meus/da equipe".
+  ownerId       String?
+  snapshot      Json
+  deletedById   String?
+  deletedByName String   @default("")
+  deletedAt     DateTime @default(now())
+  expiresAt     DateTime
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, deletedAt])
+  @@index([orgId, entity, entityId])
+  @@index([expiresAt])
+  @@map("eva_studio_trash")
+}
+
+// Importação/exportação em lote, processada em fatias pelo relógio
+// (/api/internal/scheduler). `cursor` é o ponto de retomada: a próxima rodada
+// continua de onde a anterior parou.
+model BulkJob {
+  id         String    @id @default(uuid())
+  orgId      String
+  apiKeyId   String?
+  kind       String // import | export
+  entity     String // contacts | deals
+  // pending_upload | queued | processing | completed | completed_with_errors | failed | canceled
+  status     String    @default("queued")
+  format     String    @default("json") // json | csv | jsonl
+  mode       String    @default("upsert") // upsert | create
+  dryRun     Boolean   @default(false)
+  options    Json      @default("{}")
+  records    Json?
+  inputText  String?   @db.Text
+  filePath   String?
+  cursor     String    @default("")
+  total      Int       @default(0)
+  processed  Int       @default(0)
+  created    Int       @default(0)
+  updated    Int       @default(0)
+  unchanged  Int       @default(0)
+  failed     Int       @default(0)
+  // [{ row, column?, code, message, value? }]
+  errors     Json      @default("[]")
+  result     Json      @default("{}")
+  buffer     String    @default("") @db.Text
+  lockedAt   DateTime?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([orgId, kind, status])
+  @@index([status, updatedAt])
+  @@map("eva_studio_bulk_jobs")
+}
+
+// Versão anterior do fluxo do agente, guardada a cada substituição pela API.
+// É o "desfazer": restaurar troca o fluxo atual por esta foto.
+model AgentFlowVersion {
+  id        String   @id @default(uuid())
+  orgId     String
+  agentId   String
+  nodes     Json
+  edges     Json
+  origem    String   @default("api")
+  createdAt DateTime @default(now())
+
+  @@index([agentId, createdAt])
+  @@map("eva_studio_agent_flow_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Contratos e permissões (ver docs/superpowers/plans/2026-10-20-contratos-permissoes.md).
+// O contrato é a Organization. Profile.orgId continua sendo o contrato padrão
+// (compatibilidade); o acesso a N contratos mora no vínculo abaixo.
+// ---------------------------------------------------------------------------
+
+// Vínculo pessoa × contrato. Sem linha aqui e com Profile.orgId = contrato, a
+// pessoa ainda entra (legado, antes do backfill). Status "removido" bloqueia
+// mesmo assim — é por isso que remover não apaga a linha.
+model Membership {
+  id          String   @id @default(uuid())
+  orgId       String
+  userId      String
+  // Papel de sistema (owner | admin | agent | viewer). Com roleId preenchido,
+  // as permissões vêm do papel personalizado e este fica como base/legado.
+  role        String   @default("viewer")
+  roleId      String?
+  // Grupos de permissões somados ao papel, só desta pessoa.
+  groupIds    String[] @default([])
+  status      String   @default("ativo") // ativo | convidado | removido
+  invitedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         Profile      @relation("ProfileMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@map("eva_studio_memberships")
+}
+
+// Papel personalizado do contrato: nome + permissões do catálogo
+// (src/lib/permissoes/catalogo.ts) + escopo de dados por módulo.
+model CustomRole {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String   @default("")
+  permissions String[] @default([])
+  // Grupos que todo mundo com este papel ganha.
+  groupIds    String[] @default([])
+  // { negocios, contatos, conversas }: "proprios" | "equipe" | "todos"
+  dataScope   Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+
+  @@index([orgId])
+  @@map("eva_studio_roles")
+}
+
+// Grupo de permissões: pacote extra reutilizável ("Financeiro", "Exportar
+// dados"), somado ao papel de quem recebe.
+model PermissionGroup {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String   @default("")
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_permission_groups")
+}
+
+// Equipe: base do escopo de dados "os da minha equipe".
+model Team {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  leaderId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leader       Profile?     @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  members      TeamMember[]
+
+  @@index([orgId])
+  @@map("eva_studio_teams")
+}
+
+model TeamMember {
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  team Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user Profile @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@map("eva_studio_team_members")
+}
+
+// Detalhes da tarefa (item 3 de docs/superpowers/plans/2026-10-20-melhorias-crm-skills.md):
+// dia todo, prioridade, duração, origem e o fluxo de conclusão (resultado,
+// nota e a decisão do próximo passo). Tabela à parte de propósito: coluna nova
+// em eva_studio_tasks quebraria toda leitura de tarefa até o SQL ser aplicado.
+// Sem linha = padrão (normal, manual, duração do tipo; dia todo deduzido da
+// hora 23:59 de SP). Leitura e escrita toleram a tabela ausente
+// (src/lib/server/tarefas-detalhes.ts).
+model TaskDetail {
+  taskId           String    @id
+  orgId            String
+  allDay           Boolean   @default(false)
+  priority         String    @default("normal") // normal | alta
+  durationMin      Int?
+  origin           String    @default("manual") // manual | automacao | ia
+  outcome          String? // falou | nao_atendeu | remarcou | outro
+  outcomeNote      String?   @db.Text
+  // agendou | sem_proximo — a escolha obrigatória do "Agendar próxima atividade?".
+  nextStepDecision String?
+  nextTaskId       String?
+  completedById    String?
+  snoozedCount     Int       @default(0)
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("eva_studio_task_details")
+}
+
+// Visões salvas das listas do CRM (item 5 de
+// docs/superpowers/plans/2026-10-20-melhorias-crm-skills.md, fase L4): abas de
+// Contatos e Negócios com filtro, colunas, ordem, colunas recolhidas e modo.
+// Tabela nova (prisma/sql/2026-10-20-visoes-salvas.sql); sem ela a tela usa
+// só as visões de sistema e o navegador (src/lib/server/visoes-salvas.ts).
+// Visibilidade: pessoal (só o dono), equipe (membros de teamId) ou contrato.
+model SavedView {
+  id         String   @id @default(uuid())
+  orgId      String
+  entity     String // contatos | negocios
+  // Só negócios: visão presa a um funil (null = vale para todos).
+  pipelineId String?
+  name       String
+  ownerId    String
+  visibility String   @default("pessoal") // pessoal | equipe | contrato
+  teamId     String?
+  // { visaoBase, estado: { busca, listas, datas, avancado, ordem, tamanho }, colunas?, recolhidas?, modo? }
+  config     Json     @default("{}")
+  position   Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([orgId, entity, position])
+  @@index([ownerId])
+  @@map("eva_studio_saved_views")
+}
+
+// Visão padrão de cada pessoa por lista (id de visão salva ou de sistema).
+model SavedViewDefault {
+  orgId     String
+  userId    String
+  entity    String // contatos | negocios
+  viewKey   String
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@id([orgId, userId, entity])
+  @@map("eva_studio_saved_view_defaults")
+}
+
+// Conexão de IA do contrato (Central de IA, F3): a lista em ordem de
+// preferência das chaves + modelos que os agentes usam, com reserva
+// automática (ver src/lib/server/ia/reserva.ts). Tabela à parte: sem o
+// registro (ou sem a tabela), vale a escolha automática de
+// src/lib/server/ia/provedor.ts, que é o comportamento de antes.
+model AiConnection {
+  id        String   @id @default(uuid())
+  orgId     String   @unique
+  // [{ credentialId: string, model: string }], na ordem de preferência.
+  passos    Json     @default("[]")
+  // Tempo máximo de cada tentativa antes de passar para a próxima.
+  timeoutMs Int      @default(25000)
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("eva_studio_ai_connections")
+}
+
+// Uso de IA (Central de IA, F3c): uma linha por chamada ao provedor, com os
+// tokens que ele informou. Sem chave estrangeira de propósito: apagar a
+// credencial ou o agente não apaga o histórico de consumo. credentialId nulo
+// = chave da plataforma (GROQ_API_KEY).
+model AiUsage {
+  id           String   @id @default(uuid())
+  orgId        String
+  credentialId String?
+  agentId      String?
+  // Onde a IA foi usada: "fluxo" (bloco de IA), "dashboard"...
+  recurso      String   @default("fluxo")
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  ok           Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([credentialId, createdAt])
+  @@map("eva_studio_ai_usage")
+}
+
+// Limite e preço por chave de IA. Limite mensal em tokens (exato: é o que o
+// provedor conta); preço por 1 milhão de tokens informado pelo cliente, só
+// para estimar o custo em reais (o app não inventa tabela de preço).
+model AiKeyLimit {
+  credentialId       String   @id
+  orgId              String
+  limiteMensalTokens Int?
+  precoMilhaoBrl     Decimal? @db.Decimal(10, 4)
+  updatedAt          DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_ai_key_limits")
+}
+
+// Canais do contrato (F4 fase 2, SQL 2026-10-22-canais-do-contrato.sql).
+// A conexão é do contrato (Configurações → Canais); o agente que atende é
+// escolhido na aba dele (agentId, nulo = ninguém). As tabelas por agente
+// (MetaConnection, InstagramConnection...) viram a "ativação": cópia das
+// credenciais para o agente que atende, lida pela entrada e pelos envios.
+// Ver src/lib/server/canais/ e docs/superpowers/plans/2026-10-21-canais-do-contrato.md.
+model Canal {
+  id         String   @id @default(uuid())
+  orgId      String
+  // whatsapp_meta | whatsapp_qr | instagram | messenger | telegram | tiktok
+  tipo       String
+  rotulo     String   @default("")
+  // phoneNumberId | número do QR | igBusinessId | pageId | bot | businessId
+  externalId String?
+  // JSON cifrado (crypto.ts) com o que a ativação precisa (token, wabaId...).
+  // Nulo nos canais migrados: as credenciais ainda estão só na ativação.
+  segredos   String?  @db.Text
+  status     String   @default("conectado") // conectado | atencao | pendente | desconectado
+  detalhe    String?
+  agentId    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_canais")
+}
+
+// Sessão do WhatsApp por QR de um canal do contrato (o worker abre uma por
+// canal). Mesmo formato da antiga eva_studio_whatsapp_connections.
+model CanalWhatsAppQr {
+  canalId     String   @id
+  status      String   @default("disconnected") // disconnected | requesting | qr_pending | connected | logging_out
+  qrDataUrl   String?  @db.Text
+  phoneNumber String?
+  creds       Json?
+  keys        Json?
+  lastError   String?
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("eva_studio_canais_whatsapp_qr")
+}
+
+// ---------------------------------------------------------------------------
+// E-mail (F5, SQL 2026-10-22-email.sql). Conta Resend da plataforma; cada
+// contrato verifica o próprio domínio e envia como ele mesmo. Ver
+// src/lib/server/email/.
+// ---------------------------------------------------------------------------
+
+// Domínio e remetente do contrato (um por contrato).
+model EmailDominio {
+  id             String    @id @default(uuid())
+  orgId          String    @unique
+  dominio        String    @unique
+  resendId       String
+  // not_started | pending | verified | failed | temporary_failure
+  status         String    @default("not_started")
+  // Registros DNS que o cliente cria (SPF, DKIM, MX), como a Resend devolve.
+  registros      Json      @default("[]")
+  remetenteNome  String    @default("")
+  // Parte antes do @: contato@dominio.
+  remetenteLocal String    @default("contato")
+  responderPara  String    @default("")
+  verificadoEm   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("eva_studio_email_dominios")
+}
+
+// Modelo de e-mail com variáveis (Biblioteca). modo "simples" = editor
+// simples (src/lib/email/editor.ts); "html" = HTML avançado.
+model EmailModelo {
+  id        String   @id @default(uuid())
+  orgId     String
+  nome      String
+  assunto   String   @default("")
+  modo      String   @default("simples")
+  corpo     String   @default("") @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_email_modelos")
+}
+
+// Cada e-mail que saiu, com o que a Resend contou depois (webhook).
+model EmailEnvio {
+  id         String    @id @default(uuid())
+  orgId      String
+  contactId  String?
+  para       String
+  assunto    String    @default("")
+  resendId   String?   @unique
+  // enviado | entregue | atrasado | aberto | clicado | bounce | reclamacao | falhou
+  status     String    @default("enviado")
+  // fluxo | regua | disparo | teste | automacao
+  origem     String    @default("teste")
+  // Id de quem mandou (bloco, régua, disparo), para o relatório.
+  refId      String?
+  erro       String?
+  abertoEm   DateTime?
+  clicadoEm  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([contactId])
+  @@map("eva_studio_email_envios")
+}
+
+// Quem não recebe mais e-mail do contrato. Separado do opt-out geral do
+// contato: sair do e-mail não tira do WhatsApp (consentimento por canal).
+model EmailSupressao {
+  orgId     String
+  email     String
+  // descadastro | bounce | reclamacao | manual
+  motivo    String
+  detalhe   String?
+  createdAt DateTime @default(now())
+
+  @@id([orgId, email])
+  @@map("eva_studio_email_supressoes")
+}
+
+// ---------------------------------------------------------------------------
+// Webhooks de saída (F6). SQL 2026-10-23-webhooks.sql. Sem as tabelas, nada
+// é emitido e a tela avisa que falta ativar.
+// ---------------------------------------------------------------------------
+
+// Endereço que recebe os eventos do contrato (um fluxo do n8n, por exemplo).
+model WebhookEndpoint {
+  id            String    @id @default(uuid())
+  orgId         String
+  url           String
+  descricao     String    @default("")
+  // "*", "deal.*" ou tipos exatos (src/lib/webhooks/eventos.ts).
+  eventos       String[]
+  // whsec_..., cifrado com encryptSecret.
+  segredo       String
+  ativo         Boolean   @default(true)
+  // Quem criou: "tela" ou "api" (gatilho do n8n assina e desassina sozinho).
+  origem        String    @default("tela")
+  // Desligado sozinho (410 ou falha por dias seguidos): por quê.
+  desativadoPor String?
+  falhandoDesde DateTime?
+  ultimoSucesso DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  entregas WebhookEntrega[]
+
+  @@index([orgId])
+  @@map("eva_studio_webhook_endpoints")
+}
+
+// Uma entrega de um evento a um endpoint. É a própria fila (outbox): o
+// relógio pega as pendentes vencidas com FOR UPDATE SKIP LOCKED.
+model WebhookEntrega {
+  id            String    @id @default(uuid())
+  orgId         String
+  endpointId    String
+  // webhook-id: estável entre tentativas, para quem recebe descartar repetido.
+  eventoId      String
+  tipo          String
+  payload       Json
+  // pendente | entregue | falhou | cancelada
+  status        String    @default("pendente")
+  tentativas    Int       @default(0)
+  proximaEm     DateTime  @default(now())
+  ultimoStatus  Int?
+  // Corpo da resposta (até 4 KB) ou o erro de rede.
+  ultimaResposta String?
+  latenciaMs    Int?
+  entregueEm    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, proximaEm])
+  @@index([endpointId, createdAt])
+  @@map("eva_studio_webhook_entregas")
+}
+
+// URL de entrada do agente (F6): o fluxo do cliente (n8n) manda mensagem
+// pelo agente com POST /api/hooks/agentes/{agentId}/{token}. Um por agente;
+// trocar o token invalida a URL antiga. Mesmo SQL dos webhooks.
+model AgenteEntrada {
+  agentId   String   @id
+  orgId     String
+  // evh_..., cifrado com encryptSecret (a tela mostra a URL de novo).
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_agente_entradas")
+}
+
+// ---------------------------------------------------------------------------
+// Automações do CRM (plano 2026-10-21-automacoes). SQL 2026-10-24-automacoes.sql.
+// Sem as tabelas nada dispara e a tela avisa que falta ativar.
+// ---------------------------------------------------------------------------
+
+model Automacao {
+  id                String   @id @default(uuid())
+  orgId             String
+  nome              String
+  descricao         String   @default("")
+  // deal | contact | company | task | conversation
+  objeto            String
+  // rascunho | ativa | pausada
+  status            String   @default("rascunho")
+  // fluxo | regra_rapida (regra da coluna do kanban; abre como fluxo)
+  origem            String   @default("fluxo")
+  // Definição em edição (src/lib/automacoes/tipos.ts). A que roda é a versão publicada.
+  rascunho          Json
+  versaoPublicadaId String?   @unique
+  // uma_vez | sempre | intervalo (com reinscricaoHoras)
+  reinscricao       String   @default("uma_vez")
+  reinscricaoHoras  Int?
+  // Regra E/OU: quem passa a atender sai da automação (objetivo atingido).
+  objetivo          Json?
+  falhasSeguidas    Int      @default(0)
+  pausadaPor        String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  versoes         AutomacaoVersao[]   @relation("VersoesDaAutomacao")
+  versaoPublicada AutomacaoVersao?    @relation("VersaoPublicada", fields: [versaoPublicadaId], references: [id], onDelete: SetNull)
+  execucoes       AutomacaoExecucao[]
+
+  @@index([orgId, status])
+  @@map("eva_studio_automacoes")
+}
+
+// Definição congelada a cada publicação. Execução fica presa à versão.
+model AutomacaoVersao {
+  id           String   @id @default(uuid())
+  automacaoId  String
+  numero       Int
+  definicao    Json
+  publicadaPor String?
+  createdAt    DateTime @default(now())
+
+  automacao   Automacao           @relation("VersoesDaAutomacao", fields: [automacaoId], references: [id], onDelete: Cascade)
+  publicadaEm Automacao?          @relation("VersaoPublicada")
+  // Versão com execução não se apaga (NoAction); some junto com a automação.
+  execucoes   AutomacaoExecucao[]
+
+  @@unique([automacaoId, numero])
+  @@map("eva_studio_automacao_versoes")
+}
+
+// Barramento de eventos de domínio (outbox): webhooks e automações leem daqui.
+model EventoDeDominio {
+  id           String    @id @default(uuid())
+  orgId        String
+  // contact.created, deal.stage_changed, tag.added... (src/lib/automacoes/catalogo.ts)
+  tipo         String
+  objeto       String
+  objetoId     String
+  dados        Json      @default("{}")
+  // Só o que mudou: { campo: { de, para } }.
+  diff         Json?
+  // { tipo: usuario|automacao|integracao|api|sistema, id?, automacaoId?, execucaoId?, profundidade }
+  ator         Json      @default("{}")
+  processadoEm DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([orgId, tipo, createdAt])
+  @@index([processadoEm, createdAt])
+  @@map("eva_studio_eventos")
+}
+
+model AutomacaoExecucao {
+  id           String    @id @default(uuid())
+  orgId        String
+  automacaoId  String
+  versaoId     String
+  objeto       String
+  objetoId     String
+  eventoId     String?
+  // hash(automação, registro, evento): o mesmo evento nunca inscreve duas vezes.
+  chave        String    @unique
+  // pendente | rodando | esperando | concluida | falhou | cancelada | objetivo | pausada
+  status       String    @default("pendente")
+  noAtual      String?
+  // Espera durável: quando volta a rodar.
+  proximaEm    DateTime?
+  // Lease do executor (FOR UPDATE SKIP LOCKED + prazo).
+  travadaAte   DateTime?
+  // Foto do evento que disparou (gatilho.* nas variáveis).
+  gatilho      Json      @default("{}")
+  // Saídas dos passos, por id do nó (passos.<id>.* nas variáveis).
+  variaveis    Json      @default("{}")
+  profundidade Int       @default(0)
+  teste        Boolean   @default(false)
+  erro         String?
+  iniciadaEm   DateTime?
+  terminadaEm  DateTime?
+  duracaoMs    Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  automacao Automacao        @relation(fields: [automacaoId], references: [id], onDelete: Cascade)
+  versao    AutomacaoVersao    @relation(fields: [versaoId], references: [id], onDelete: NoAction)
+  passos    AutomacaoPasso[]
+  espera    AutomacaoEspera?
+
+  @@index([status, proximaEm])
+  @@index([automacaoId, createdAt])
+  @@index([orgId, objeto, objetoId])
+  @@map("eva_studio_automacao_execucoes")
+}
+
+model AutomacaoPasso {
+  id          String    @id @default(uuid())
+  execucaoId  String
+  noId        String
+  tipo        String
+  rotulo      String    @default("")
+  // rodando | ok | falhou | pulado | esperando
+  status      String
+  tentativa   Int       @default(1)
+  entrada     Json?
+  saida       Json?
+  erro        String?
+  // Saída escolhida (sim, nao, caminho:<id>, esgotou...).
+  caminho     String?
+  iniciadoEm  DateTime  @default(now())
+  terminadoEm DateTime?
+  ms          Int?
+
+  execucao AutomacaoExecucao @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  @@index([execucaoId, iniciadoEm])
+  @@map("eva_studio_automacao_passos")
+}
+
+// "Esperar evento": a execução volta quando chega um evento do tipo esperado no
+// mesmo registro (orgId + tipo + objetoId) ou quando o prazo vence.
+model AutomacaoEspera {
+  id         String   @id @default(uuid())
+  orgId      String
+  execucaoId String   @unique
+  noId       String
+  tipo       String
+  objeto     String
+  objetoId   String
+  expiraEm   DateTime
+  createdAt  DateTime @default(now())
+
+  execucao AutomacaoExecucao @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, tipo, objetoId])
+  @@index([expiraEm])
+  @@map("eva_studio_automacao_esperas")
+}
+
+// Aviso dentro do app para uma pessoa da equipe (ação "Avisar a equipe" das
+// automações; outros módulos podem usar). SQL 2026-10-25-avisos-rodizio.sql.
+model Aviso {
+  id        String    @id @default(uuid())
+  orgId     String
+  userId    String
+  titulo    String
+  texto     String    @default("")
+  // Caminho dentro do contrato (ex.: /negocios/<id>).
+  link      String?
+  objeto    String?
+  objetoId  String?
+  // automacao | sistema
+  origem    String    @default("automacao")
+  lidoEm    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, lidoEm])
+  @@index([orgId, createdAt])
+  @@map("eva_studio_avisos")
+}
+
+// Rodízio de responsável: quantas vezes cada pessoa recebeu, por automação e
+// passo (chave "<automacaoId>:<noId>"). O próximo é quem está mais abaixo da
+// sua cota (igual ou por percentual).
+model Rodizio {
+  chave     String   @id
+  orgId     String
+  contagem  Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_rodizios")
 }

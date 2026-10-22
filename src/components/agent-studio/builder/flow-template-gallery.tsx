@@ -12,7 +12,7 @@ export function FlowTemplateGallery({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6" onClick={onClose}>
       <div
         className="glass-card glass-card-solid w-full max-w-lg rounded-3xl p-5"
         onClick={(e) => e.stopPropagation()}

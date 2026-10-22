@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import { Starburst } from "./starburst";
 import { buttonVariants } from "@/components/ui/button";
 

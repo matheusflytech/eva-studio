@@ -82,7 +82,7 @@ export function ExecutionsPanel({ agentId }: { agentId: string }) {
               >
                 <div className="flex items-center gap-2.5">
                   {exec.status === "success" ? (
-                    <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
+                    <CheckCircle2 size={16} className="shrink-0 text-success" />
                   ) : (
                     <XCircle size={16} className="shrink-0 text-danger" />
                   )}

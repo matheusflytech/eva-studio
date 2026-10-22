@@ -1,0 +1,20 @@
+{
+  "name": "eva-webhook-ingress",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Worker de borda do Eva Studio: recebe webhooks (Meta, Telegram, TikTok), valida, deduplica e enfileira para o app.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p .",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.3.6",
+    "@cloudflare/workers-types": "5.20261001.1",
+    "typescript": "^5",
+    "vitest": "4.1.12",
+    "wrangler": "4.145.0"
+  }
+}

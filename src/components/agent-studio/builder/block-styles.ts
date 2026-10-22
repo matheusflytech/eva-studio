@@ -1,67 +1,57 @@
 import type { IconKey } from "./icon-registry";
+import type { CategoryColor } from "@/lib/design-system/tokens";
+import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 
 export interface BlockStyle {
   badgeBg: string;
   badgeText: string;
+  /** faixa esquerda do cartão */
   border: string;
   dot: string;
 }
 
 // Cor por categoria de bloco — pra ler o canvas de longe sem precisar abrir
-// cada card (mesma ideia do ManyChat/Chatfuel: mensagem é sempre azul, ação
-// é sempre outra cor, em qualquer fluxo).
-export const BLOCK_STYLES: Record<IconKey, BlockStyle> = {
-  start: { badgeBg: "bg-white/10", badgeText: "text-white", border: "border-white/25", dot: "bg-white" },
-  message: { badgeBg: "bg-blue-500/15", badgeText: "text-blue-400", border: "border-blue-500/30", dot: "bg-blue-400" },
-  capture: { badgeBg: "bg-violet-500/15", badgeText: "text-violet-400", border: "border-violet-500/30", dot: "bg-violet-400" },
-  agent: { badgeBg: "bg-accent-soft", badgeText: "text-accent-400", border: "border-accent-500/30", dot: "bg-accent-400" },
-  condition: { badgeBg: "bg-amber-500/15", badgeText: "text-amber-400", border: "border-amber-500/30", dot: "bg-amber-400" },
-  variable: { badgeBg: "bg-slate-400/15", badgeText: "text-slate-300", border: "border-slate-400/30", dot: "bg-slate-300" },
-  webhook: { badgeBg: "bg-cyan-500/15", badgeText: "text-cyan-400", border: "border-cyan-500/30", dot: "bg-cyan-400" },
-  human: { badgeBg: "bg-orange-500/15", badgeText: "text-orange-400", border: "border-orange-500/30", dot: "bg-orange-400" },
-  wait: { badgeBg: "bg-indigo-500/15", badgeText: "text-indigo-400", border: "border-indigo-500/30", dot: "bg-indigo-400" },
-  end: { badgeBg: "bg-danger/15", badgeText: "text-danger", border: "border-danger/30", dot: "bg-danger" },
-  http: { badgeBg: "bg-teal-500/15", badgeText: "text-teal-400", border: "border-teal-500/30", dot: "bg-teal-400" },
-  email: { badgeBg: "bg-rose-500/15", badgeText: "text-rose-400", border: "border-rose-500/30", dot: "bg-rose-400" },
-  "ai-agent": { badgeBg: "bg-purple-500/15", badgeText: "text-purple-400", border: "border-purple-500/30", dot: "bg-purple-400" },
-  "tool-http": { badgeBg: "bg-teal-500/10", badgeText: "text-teal-300", border: "border-teal-500/20", dot: "bg-teal-300" },
-  "tool-knowledge": { badgeBg: "bg-purple-500/10", badgeText: "text-purple-300", border: "border-purple-500/20", dot: "bg-purple-300" },
-  "tool-mcp": { badgeBg: "bg-sky-500/10", badgeText: "text-sky-300", border: "border-sky-500/20", dot: "bg-sky-300" },
-  "crm-deal": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-stage": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-task": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-tag": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-update": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-note": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "crm-lookup": { badgeBg: "bg-amber-500/10", badgeText: "text-amber-300", border: "border-amber-500/20", dot: "bg-amber-300" },
-  "tool-crm": { badgeBg: "bg-orange-500/10", badgeText: "text-orange-300", border: "border-orange-500/20", dot: "bg-orange-300" },
+// cada card (mensagem é sempre azul, decisão é sempre âmbar, em qualquer
+// fluxo). Vem da paleta de "cores de categoria" do design system, que tem
+// variante clara e escura com contraste AA testado; nada de text-violet-400
+// solto, que sumia no tema claro (o Início era branco sobre branco).
+// Violeta fica com a IA, como no resto do produto.
+export const BLOCK_CATEGORY: Record<IconKey, CategoryColor> = {
+  start: "green",
+  message: "blue",
+  capture: "indigo",
+  condition: "amber",
+  variable: "slate",
+  wait: "slate",
+  human: "orange",
+  end: "red",
+  email: "rose",
+  http: "cyan",
+  webhook: "cyan",
+  agent: "purple",
+  "ai-agent": "violet",
+  "tool-http": "purple",
+  "tool-knowledge": "purple",
+  "tool-mcp": "purple",
+  "tool-crm": "purple",
+  "crm-deal": "teal",
+  "crm-stage": "teal",
+  "crm-task": "teal",
+  "crm-tag": "teal",
+  "crm-update": "teal",
+  "crm-note": "teal",
+  "crm-lookup": "teal",
 };
 
-// Mesma cor de `dot` acima, mas em hex — o minimapa do React Flow (nodeColor)
-// não aceita classe Tailwind, só string de cor CSS de verdade.
-export const BLOCK_MINIMAP_COLOR: Record<IconKey, string> = {
-  start: "#ffffff",
-  message: "#60a5fa",
-  capture: "#a78bfa",
-  agent: "#7ba3f5",
-  condition: "#fbbf24",
-  variable: "#cbd5e1",
-  webhook: "#22d3ee",
-  human: "#fb923c",
-  wait: "#818cf8",
-  end: "#f2555a",
-  http: "#2dd4bf",
-  email: "#fb7185",
-  "ai-agent": "#c084fc",
-  "tool-http": "#5eead4",
-  "tool-knowledge": "#d8b4fe",
-  "tool-mcp": "#7dd3fc",
-  "crm-deal": "#fcd34d",
-  "crm-stage": "#fcd34d",
-  "crm-task": "#fcd34d",
-  "crm-tag": "#fcd34d",
-  "crm-update": "#fcd34d",
-  "crm-note": "#fcd34d",
-  "crm-lookup": "#fcd34d",
-  "tool-crm": "#fdba74",
-};
+export const BLOCK_STYLES: Record<IconKey, BlockStyle> = Object.fromEntries(
+  (Object.keys(BLOCK_CATEGORY) as IconKey[]).map((k) => {
+    const c = CATEGORY_CLASSES[BLOCK_CATEGORY[k]];
+    return [k, { badgeBg: c.subtle, badgeText: c.fg, border: c.border, dot: c.solid }];
+  })
+) as Record<IconKey, BlockStyle>;
+
+// Cor CSS (var(--cat-*-solid)) para o minimapa do React Flow, que não aceita
+// classe Tailwind. Acompanha o tema sozinha.
+export const BLOCK_MINIMAP_COLOR: Record<IconKey, string> = Object.fromEntries(
+  (Object.keys(BLOCK_CATEGORY) as IconKey[]).map((k) => [k, CATEGORY_CLASSES[BLOCK_CATEGORY[k]].css])
+) as Record<IconKey, string>;

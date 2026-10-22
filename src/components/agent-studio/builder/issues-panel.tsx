@@ -23,7 +23,7 @@ export function IssuesPanel({
   if (issues.length === 0) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12.5px] text-text-tertiary">
-        <CheckCircle2 size={14} className="text-emerald-400" />
+        <CheckCircle2 size={14} className="text-success" />
         Fluxo completo
       </span>
     );
@@ -34,10 +34,10 @@ export function IssuesPanel({
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400/10 px-3 py-1.5 text-[12.5px] font-medium text-amber-300 transition-colors hover:bg-amber-400/15"
+        className="inline-flex items-center gap-1.5 rounded-xl bg-warning-subtle px-3 py-1.5 text-[12.5px] font-medium text-warning transition-colors hover:bg-hover"
       >
         <AlertTriangle size={14} />
-        {issues.length} {issues.length === 1 ? "bloco incompleto" : "blocos incompletos"}
+        {resumoDasPendencias(issues)}
         <ChevronDown size={13} className={cn("transition-transform", aberto && "rotate-180")} />
       </button>
 
@@ -55,16 +55,36 @@ export function IssuesPanel({
                 }}
                 className="flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-2"
               >
-                <span className="text-[12.5px] font-medium text-text-primary">{issue.label}</span>
+                <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-primary">
+                  <span
+                    className={cn(
+                      "rounded-sm px-1 text-[10px] font-medium",
+                      issue.nivel === "erro" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"
+                    )}
+                  >
+                    {issue.nivel === "erro" ? "não funciona" : "aviso"}
+                  </span>
+                  {issue.label}
+                </span>
                 <span className="text-[11.5px] text-text-tertiary">{issue.motivo}</span>
               </button>
             ))}
           </div>
           <p className="border-t border-border-subtle px-3 pb-1 pt-2 text-[11px] text-text-tertiary">
-            O fluxo continua salvando. Esses blocos é que não vão funcionar quando a conversa passar por eles.
+            O fluxo continua salvando enquanto você monta. O que está marcado como “não funciona” trava a conversa quando ela passar por ali; aviso é só um alerta.
           </p>
         </div>
       )}
     </div>
   );
+}
+
+/** "2 pendências · 1 aviso" — pendência é o que o motor não consegue seguir. */
+function resumoDasPendencias(issues: FlowIssue[]): string {
+  const erros = issues.filter((i) => i.nivel === "erro").length;
+  const avisos = issues.length - erros;
+  const partes = [];
+  if (erros > 0) partes.push(`${erros} ${erros === 1 ? "pendência" : "pendências"}`);
+  if (avisos > 0) partes.push(`${avisos} ${avisos === 1 ? "aviso" : "avisos"}`);
+  return partes.join(" · ");
 }

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { conferirReferencias, erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
+import { cnpjValido, tamanhoDaEmpresa } from "../cnpj";
+import { responderExclusao } from "@/lib/server/lixeira-http";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -20,10 +24,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     include: {
       owner: { select: { id: true, name: true } },
       contacts: {
+        where: { orgId: ctx.orgId },
         select: { id: true, name: true, jobTitle: true, email: true, phone: true },
         orderBy: { name: "asc" },
       },
       deals: {
+        where: { orgId: ctx.orgId },
         include: { stage: { select: { name: true, type: true } }, pipeline: { select: { name: true } } },
         orderBy: { updatedAt: "desc" },
       },
@@ -97,6 +103,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ com
     })),
     tasks: tasks.map((t) => ({
       id: t.id,
+      type: t.type,
       text: t.text,
       dueAt: t.dueAt?.toISOString() ?? null,
       doneAt: t.doneAt?.toISOString() ?? null,
@@ -121,18 +128,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   const company = await prisma.company.findFirst({ where: { id: companyId, orgId: ctx.orgId } });
   if (!company) return NextResponse.json({ error: "Empresa não encontrada." }, { status: 404 });
 
-  const body = await request.json();
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const data: Prisma.CompanyUpdateInput = {};
 
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   for (const campo of ["sector", "website", "phone", "linkedinUrl", "address", "city", "description", "revenue", "zipcode"] as const) {
-    if (typeof body[campo] === "string") data[campo] = body[campo];
+    const valor = body[campo];
+    if (typeof valor === "string") data[campo] = valor;
   }
   if (typeof body.uf === "string") data.uf = body.uf.toUpperCase().slice(0, 2);
-  if (body.size !== undefined) data.size = body.size ? Number(body.size) : null;
+  const size = tamanhoDaEmpresa(body.size);
+  if (size === "invalido") return erro("Número de funcionários inválido.");
+  if (size !== undefined) data.size = size;
+
+  const refErro = await conferirReferencias(ctx.orgId, { ownerId: body.ownerId });
+  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
 
   if (typeof body.cnpj === "string") {
     const cnpj = body.cnpj.replace(/\D/g, "");
+    if (cnpj && !cnpjValido(cnpj)) return erro("CNPJ inválido.");
     // Mesma regra do cadastro: CNPJ preenchido é chave única na organização.
     if (cnpj) {
       const dupe = await prisma.company.findFirst({
@@ -150,7 +165,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   }
 
   if (Object.keys(data).length > 0) {
-    await prisma.company.update({ where: { id: company.id }, data });
+    const antes = await fotoDoRegistro(ctx.orgId, "company", company.id);
+    try {
+      await prisma.company.update({ where: { id: company.id }, data });
+    } catch (e) {
+      return respostaDeErroDoPrisma(e);
+    }
+    await publicarAlteracao(ctx.orgId, "company", company.id, antes);
   }
 
   // Vincular ou desvincular pessoa da conta, sem precisar abrir o contato.
@@ -170,7 +191,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ companyId: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ companyId: string }> }) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { companyId } = await params;
@@ -180,7 +201,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   // Contato e negócio não são apagados junto: a relação é SetNull no schema,
   // e perder o histórico de venda por causa de uma limpeza de cadastro seria
-  // um estrago que ninguém consegue desfazer.
-  await prisma.company.delete({ where: { id: company.id } });
-  return NextResponse.json({ ok: true });
+  // um estrago que ninguém consegue desfazer. Vai para a lixeira (30 dias),
+  // que guarda quem estava ligado para religar ao restaurar.
+  return responderExclusao(request, ctx, "company", company.id);
 }

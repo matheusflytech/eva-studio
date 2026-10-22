@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams, useRouter, usePathname, useContrato } from "@/lib/contrato/navegacao";
+import { apiDoContrato } from "@/lib/contrato/rotas";
 import { CheckCircle2, AtSign, ExternalLink, Lock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input, Label } from "@/components/ui/input";
@@ -15,6 +16,7 @@ interface Connection {
 const INSTAGRAM_APP_ID = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
 
 export function InstagramConnect({ agentId }: { agentId: string }) {
+  const contrato = useContrato();
   const [connection, setConnection] = React.useState<Connection | null | undefined>(undefined);
   const [igBusinessId, setIgBusinessId] = React.useState("");
   const [pageAccessToken, setPageAccessToken] = React.useState("");
@@ -92,7 +94,10 @@ export function InstagramConnect({ agentId }: { agentId: string }) {
 
   // Passa pela rota server-side, que valida sessão/posse do agente e cria o
   // nonce anti-CSRF (state) num cookie httpOnly antes de ir pra Meta.
-  const authorizeUrl = INSTAGRAM_APP_ID ? `/api/instagram/oauth/start?agentId=${encodeURIComponent(agentId)}` : null;
+  // Navegação de página inteira (não passa pelo fetch): o contrato vai na query.
+  const authorizeUrl = INSTAGRAM_APP_ID
+    ? apiDoContrato(contrato, `/api/instagram/oauth/start?agentId=${encodeURIComponent(agentId)}`)
+    : null;
 
   return (
     <div className="flex flex-col gap-3">

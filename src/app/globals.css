@@ -1,34 +1,254 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   Design system do Eva Studio — tokens.
+
+   Documentação: docs/design-system.md. Página viva: /design-system.
+   Espelho em TS (contraste e testes): src/lib/design-system/tokens.ts — um
+   teste compara os dois; mudou valor aqui, mude lá.
+
+   Camadas:
+   1. Escala crua (gray, blue): não muda com o tema. Componente NÃO usa direto.
+   2. Tokens semânticos por tema (surface-*, text-*, border-*, accent-*,
+      status): é isto que os componentes usam.
+   3. Nomes antigos (bg-surface-1, text-accent-400, glass-card...) e a ponte
+      shadcn: apontam para os semânticos, para nenhuma tela quebrar.
+
+   Tema: atributo data-theme="light|dark" no <html>, aplicado antes da
+   primeira pintura pelo script de src/lib/design-system/theme.ts. Também
+   vale num elemento qualquer (ex.: <aside data-theme="dark">).
+   =========================================================================== */
+
 :root {
-  /* matte-black surface scale */
-  --bg-base: #0a0a0a;
-  --bg-surface-1: #121212;
-  --bg-surface-2: #1a1a1a;
-  --bg-surface-3: #232323;
+  /* Identidade da Eva (site oficial evaholdingroup.com.br): escala navy,
+     tinta com leve tom azulado (matiz 215–220) e o azul da marca. */
+  --navy-950: #080d17; /* hsl(220 50% 6%) */
+  --navy-900: #0b1322; /* hsl(220 50% 9%) */
+  --navy-800: #121b2b; /* hsl(220 40% 12%) */
+  --navy-700: #20293c; /* hsl(220 30% 18%) */
+  --navy-600: #303c55; /* hsl(220 28% 26%) */
+  --ink-100: #f1f5f9; /* hsl(210 40% 96%) */
+  --ink-300: #a9b5c6; /* hsl(215 20% 72%) */
+  --ink-500: #7588a3; /* hsl(215 20% 55%) */
+  --ink-d900: #0f1a2e; /* hsl(220 50% 12%): texto no claro */
+  --ink-d500: #5b667b; /* hsl(220 15% 42%): texto secundário no claro */
+  --bg-light: #f5f7fa; /* hsl(220 30% 97%) */
 
-  /* borders */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* escala neutra (levemente azulada, como o site) */
+  --gray-0: #ffffff;
+  --gray-50: #f5f7fa;
+  --gray-100: #eef1f6;
+  --gray-150: #e2e6ee;
+  --gray-200: #d4d8e1;
+  --gray-300: #bbc2cf;
+  --gray-400: #a2aab9;
+  --gray-500: #5e6778;
+  --gray-600: #5b667b;
+  --gray-700: #35425b;
+  --gray-800: #20293c;
+  --gray-850: #121b2b;
+  --gray-900: #0b1322;
+  --gray-950: #080d17;
 
-  /* text */
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --text-tertiary: rgba(255, 255, 255, 0.38);
+  /* acento de marca (único) */
+  --blue-50: #eaf4fd;
+  --blue-300: #99ccff; /* accent-2 do site */
+  --blue-500: #308ce8; /* accent do site: hsl(210 80% 55%) */
+  --blue-600: #519eec;
+  --blue-700: #1361ae;
+}
 
-  /* accent — reserved for primary CTAs only */
-  --accent-400: #7ba3f5;
-  --accent-500: #5b8def;
-  --accent-600: #3f6fd1;
-  --accent-soft: rgba(91, 141, 239, 0.12);
+/* ---- Tema claro (padrão quando não há data-theme) ---- */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
 
-  /* ice-white — used for selection/active states (nav, avatar, chips) */
-  --ice: #f5f7fa;
-  --ice-soft: rgba(245, 247, 250, 0.1);
-  --ice-border: rgba(245, 247, 250, 0.3);
+  --surface-page: #f5f7fa;
+  --surface-panel: #ffffff;
+  --surface-raised: #eef1f6;
+  --surface-hover: #e2e6ee;
+  --surface-overlay: #ffffff;
 
-  --danger: #f2555a;
+  --border-subtle: #e6e8ed;
+  --border-default: #d4d8e1;
+  --border-strong: #bbc2cf;
+
+  --text-primary: #0f1a2e;
+  --text-secondary: #5b667b;
+  --text-tertiary: #5e6778;
+  --text-disabled: #a2aab9;
+  --text-on-danger: #ffffff;
+  --text-on-accent: #080d17;
+
+  --accent-solid: #308ce8;
+  --accent-solid-hover: #519eec;
+  --accent-fg: #1361ae;
+  --accent-subtle: #eaf4fd;
+
+  --success-fg: #17734a;
+  --success-subtle: #e7f5ee;
+  --warning-fg: #935a00;
+  --warning-subtle: #fcf2df;
+  --danger-fg: #c22f2f;
+  --danger-subtle: #fdeded;
+  --danger-solid: #c22f2f;
+  --info-fg: #1f66a8;
+  --info-subtle: #e8f1fa;
+
+  --focus-ring: #308ce8;
+  --inverse-bg: #0b1322;
+  --inverse-fg: #f1f5f9;
+
+  --overlay-backdrop: rgba(8, 13, 23, 0.4);
+  --elevation-overlay: 0 1px 2px rgba(8, 13, 23, 0.06), 0 8px 24px rgba(8, 13, 23, 0.12);
+
+  /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
+     subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
+     src/lib/design-system/tokens.ts (CATEGORY_THEMES). */
+  --cat-slate: #475569;
+  --cat-slate-subtle: #eef1f6;
+  --cat-slate-solid: #64748b;
+  --cat-blue: #1d5fb8;
+  --cat-blue-subtle: #e8f1fc;
+  --cat-blue-solid: #2f7de1;
+  --cat-cyan: #0b6479;
+  --cat-cyan-subtle: #e1f4f9;
+  --cat-cyan-solid: #0a8aa8;
+  --cat-teal: #0b665f;
+  --cat-teal-subtle: #e0f4f1;
+  --cat-teal-solid: #0d8f84;
+  --cat-green: #17734a;
+  --cat-green-subtle: #e7f5ee;
+  --cat-green-solid: #1e9a5c;
+  --cat-amber: #8a5300;
+  --cat-amber-subtle: #fcf2df;
+  --cat-amber-solid: #c27803;
+  --cat-orange: #a3410c;
+  --cat-orange-subtle: #fdeee4;
+  --cat-orange-solid: #dd5a10;
+  --cat-red: #c22f2f;
+  --cat-red-subtle: #fdeded;
+  --cat-red-solid: #d93636;
+  --cat-rose: #b4234f;
+  --cat-rose-subtle: #fdecf1;
+  --cat-rose-solid: #dc2f5f;
+  --cat-violet: #6a3fd1;
+  --cat-violet-subtle: #f1ecfd;
+  --cat-violet-solid: #8257e8;
+  --cat-purple: #8a2fb5;
+  --cat-purple-subtle: #f6eafb;
+  --cat-purple-solid: #a24fd0;
+  --cat-indigo: #4549c9;
+  --cat-indigo-subtle: #eceefd;
+  --cat-indigo-solid: #5f63e8;
+}
+
+/* ---- Tema escuro ---- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-page: #080d17;
+  --surface-panel: #0b1322;
+  --surface-raised: #121b2b;
+  --surface-hover: #20293c;
+  --surface-overlay: #121b2b;
+
+  --border-subtle: #1d273a;
+  --border-default: #263146;
+  --border-strong: #35425b;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #a9b5c6;
+  --text-tertiary: #8d9bb0;
+  --text-disabled: #525e6f;
+  --text-on-danger: #ffffff;
+  --text-on-accent: #080d17;
+
+  --accent-solid: #308ce8;
+  --accent-solid-hover: #519eec;
+  --accent-fg: #99ccff;
+  --accent-subtle: #112642;
+
+  --success-fg: #4cc38a;
+  --success-subtle: #11261b;
+  --warning-fg: #e3a547;
+  --warning-subtle: #2a2010;
+  --danger-fg: #f07575;
+  --danger-subtle: #2d1617;
+  --danger-solid: #c43b3b;
+  --info-fg: #6cb1ef;
+  --info-subtle: #122338;
+
+  --focus-ring: #99ccff;
+  --inverse-bg: #f1f5f9;
+  --inverse-fg: #0b1322;
+
+  --overlay-backdrop: rgba(0, 0, 0, 0.6);
+  --elevation-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
+     subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
+     src/lib/design-system/tokens.ts (CATEGORY_THEMES). */
+  --cat-slate: #b5c0cf;
+  --cat-slate-subtle: #1a2333;
+  --cat-slate-solid: #8c9bb0;
+  --cat-blue: #8ec2fb;
+  --cat-blue-subtle: #10243f;
+  --cat-blue-solid: #4f9cf3;
+  --cat-cyan: #74d3ec;
+  --cat-cyan-subtle: #0d2833;
+  --cat-cyan-solid: #22b8d8;
+  --cat-teal: #6fd8cb;
+  --cat-teal-subtle: #0e2a2a;
+  --cat-teal-solid: #25b5a6;
+  --cat-green: #6fd39f;
+  --cat-green-subtle: #11261b;
+  --cat-green-solid: #38b26f;
+  --cat-amber: #f0bb5c;
+  --cat-amber-subtle: #2a2010;
+  --cat-amber-solid: #e3a23a;
+  --cat-orange: #f9a26c;
+  --cat-orange-subtle: #2e1a10;
+  --cat-orange-solid: #f08240;
+  --cat-red: #f58b8b;
+  --cat-red-subtle: #2d1617;
+  --cat-red-solid: #ec6262;
+  --cat-rose: #f68fab;
+  --cat-rose-subtle: #2e1520;
+  --cat-rose-solid: #ee5f86;
+  --cat-violet: #b9a3fa;
+  --cat-violet-subtle: #1d1838;
+  --cat-violet-solid: #9c80f5;
+  --cat-purple: #d29ff5;
+  --cat-purple-subtle: #251636;
+  --cat-purple-solid: #bb7ff0;
+  --cat-indigo: #a5adfb;
+  --cat-indigo-subtle: #181d3d;
+  --cat-indigo-solid: #7d87f5;
+}
+
+/* ---- Nomes antigos -> tokens novos (compatibilidade; não use em código novo) ---- */
+:root,
+[data-theme] {
+  --bg-base: var(--surface-page);
+  --bg-surface-1: var(--surface-panel);
+  --bg-surface-2: var(--surface-raised);
+  --bg-surface-3: var(--surface-hover);
+
+  /* accent-500 = fundo do botão primário; accent-400 = texto em acento;
+     accent-600 = pressionado. */
+  --accent-400: var(--accent-fg);
+  --accent-500: var(--accent-solid);
+  --accent-600: var(--accent-solid-hover);
+  --accent-soft: var(--accent-subtle);
+
+  /* "ice" era o branco de seleção do tema escuro: vira o par inverso
+     (escuro no tema claro, claro no escuro). */
+  --ice: var(--inverse-bg);
+  --ice-soft: color-mix(in srgb, var(--inverse-bg) 10%, transparent);
+  --ice-border: color-mix(in srgb, var(--inverse-bg) 30%, transparent);
+
+  --danger: var(--danger-fg);
 
   /* ---------------------------------------------------------------------
      Ponte para shadcn/ui.
@@ -39,31 +259,181 @@
      sem fork e sem duas paletas brigando no mesmo app.
 
      Regra: nunca editar valor aqui. Para mudar a aparencia, mexer nos tokens
-     do bloco acima, que sao a fonte de verdade.
+     semânticos acima, que sao a fonte de verdade.
      --------------------------------------------------------------------- */
-  --background: var(--bg-base);
+  --background: var(--surface-page);
   --foreground: var(--text-primary);
-  --card: var(--bg-surface-1);
+  --card: var(--surface-panel);
   --card-foreground: var(--text-primary);
-  --popover: var(--bg-surface-1);
+  --popover: var(--surface-overlay);
   --popover-foreground: var(--text-primary);
-  --primary: var(--accent-500);
-  --primary-foreground: #ffffff;
-  --secondary: var(--bg-surface-2);
+  --primary: var(--accent-solid);
+  --primary-foreground: var(--text-on-accent);
+  --secondary: var(--surface-raised);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--bg-surface-2);
+  --muted: var(--surface-raised);
   --muted-foreground: var(--text-tertiary);
-  --accent: var(--bg-surface-3);
+  --accent: var(--surface-hover);
   --accent-foreground: var(--text-primary);
-  --destructive: var(--danger);
-  --destructive-foreground: #ffffff;
+  --destructive: var(--danger-solid);
+  --destructive-foreground: var(--text-on-accent);
   --border: var(--border-subtle);
   --input: var(--border-default);
-  --ring: var(--accent-500);
-  --radius: 0.75rem;
+  --ring: var(--focus-ring);
+  --radius: 0.5rem;
+}
+
+/* Ponte temporária: telas antigas escrevem status com a paleta crua do
+   Tailwind (text-emerald-400, text-amber-300...), clara demais para fundo
+   branco. Elas passam a usar os tokens de status/categoria do tema. Vale
+   também no escuro de propósito: variável CSS herda já resolvida, então um
+   trecho data-theme="dark" (menu lateral, celular da prévia) dentro da
+   página clara herdaria a cor do claro e sumiria. Redeclarando aqui, cada
+   trecho resolve com o próprio tema. Remover quando as telas forem migradas
+   para text-success/text-warning/text-cat-... */
+[data-theme="light"],
+[data-theme="dark"] {
+  --color-emerald-200: var(--success-fg);
+  --color-emerald-300: var(--success-fg);
+  --color-emerald-400: var(--success-fg);
+  --color-amber-200: var(--warning-fg);
+  --color-amber-300: var(--warning-fg);
+  --color-amber-400: var(--warning-fg);
+  --color-rose-200: var(--danger-fg);
+  --color-rose-300: var(--danger-fg);
+  --color-rose-400: var(--danger-fg);
+  --color-sky-300: var(--info-fg);
+  --color-sky-400: var(--info-fg);
+  --color-blue-300: var(--info-fg);
+  --color-blue-400: var(--info-fg);
+  /* Mesma ponte para as cores sem status: viram a cor de categoria
+     equivalente. Código novo usa text-cat-* direto. */
+  --color-violet-300: var(--cat-violet);
+  --color-violet-400: var(--cat-violet);
+  --color-purple-300: var(--cat-purple);
+  --color-purple-400: var(--cat-purple);
+  --color-teal-300: var(--cat-teal);
+  --color-teal-400: var(--cat-teal);
+  --color-cyan-300: var(--cat-cyan);
+  --color-cyan-400: var(--cat-cyan);
+  --color-orange-300: var(--cat-orange);
+  --color-orange-400: var(--cat-orange);
+  --color-indigo-300: var(--cat-indigo);
+  --color-indigo-400: var(--cat-indigo);
+  --color-slate-300: var(--cat-slate);
+  --color-slate-400: var(--cat-slate);
+}
+
+/* Valores fixos (não mudam com o tema). */
+@theme {
+  /* Escala tipográfica nomeada: text-caption ... text-display. */
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.125rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-title-sm: 1.125rem;
+  --text-title-sm--line-height: 1.625rem;
+  --text-title-sm--font-weight: 600;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--font-weight: 600;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 2rem;
+  --text-heading--font-weight: 600;
+  --text-heading--letter-spacing: -0.01em;
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.375rem;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.015em;
+
+  /* Raios: 4 / 6 / 8, e 12 só em overlay. 2xl/3xl foram achatados para as
+     telas antigas (rounded-2xl em tudo) já ficarem no padrão sem reescrita. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.75rem;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @theme inline {
+  /* tokens semânticos */
+  --color-page: var(--surface-page);
+  --color-panel: var(--surface-panel);
+  --color-raised: var(--surface-raised);
+  --color-hover: var(--surface-hover);
+  --color-overlay: var(--surface-overlay);
+
+  --color-text-disabled: var(--text-disabled);
+  --color-text-on-accent: var(--text-on-accent);
+  --color-text-on-danger: var(--text-on-danger);
+
+  --color-accent-solid: var(--accent-solid);
+  --color-accent-solid-hover: var(--accent-solid-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-subtle: var(--accent-subtle);
+
+  --color-success: var(--success-fg);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning-fg);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-solid: var(--danger-solid);
+  --color-info: var(--info-fg);
+  --color-info-subtle: var(--info-subtle);
+
+  --color-focus: var(--focus-ring);
+  --color-inverse: var(--inverse-bg);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-backdrop: var(--overlay-backdrop);
+
+  --shadow-overlay: var(--elevation-overlay);
+
+  /* cores de categoria: text-cat-blue, bg-cat-blue-subtle, bg-cat-blue-solid */
+  --color-cat-slate: var(--cat-slate);
+  --color-cat-slate-subtle: var(--cat-slate-subtle);
+  --color-cat-slate-solid: var(--cat-slate-solid);
+  --color-cat-blue: var(--cat-blue);
+  --color-cat-blue-subtle: var(--cat-blue-subtle);
+  --color-cat-blue-solid: var(--cat-blue-solid);
+  --color-cat-cyan: var(--cat-cyan);
+  --color-cat-cyan-subtle: var(--cat-cyan-subtle);
+  --color-cat-cyan-solid: var(--cat-cyan-solid);
+  --color-cat-teal: var(--cat-teal);
+  --color-cat-teal-subtle: var(--cat-teal-subtle);
+  --color-cat-teal-solid: var(--cat-teal-solid);
+  --color-cat-green: var(--cat-green);
+  --color-cat-green-subtle: var(--cat-green-subtle);
+  --color-cat-green-solid: var(--cat-green-solid);
+  --color-cat-amber: var(--cat-amber);
+  --color-cat-amber-subtle: var(--cat-amber-subtle);
+  --color-cat-amber-solid: var(--cat-amber-solid);
+  --color-cat-orange: var(--cat-orange);
+  --color-cat-orange-subtle: var(--cat-orange-subtle);
+  --color-cat-orange-solid: var(--cat-orange-solid);
+  --color-cat-red: var(--cat-red);
+  --color-cat-red-subtle: var(--cat-red-subtle);
+  --color-cat-red-solid: var(--cat-red-solid);
+  --color-cat-rose: var(--cat-rose);
+  --color-cat-rose-subtle: var(--cat-rose-subtle);
+  --color-cat-rose-solid: var(--cat-rose-solid);
+  --color-cat-violet: var(--cat-violet);
+  --color-cat-violet-subtle: var(--cat-violet-subtle);
+  --color-cat-violet-solid: var(--cat-violet-solid);
+  --color-cat-purple: var(--cat-purple);
+  --color-cat-purple-subtle: var(--cat-purple-subtle);
+  --color-cat-purple-solid: var(--cat-purple-solid);
+  --color-cat-indigo: var(--cat-indigo);
+  --color-cat-indigo-subtle: var(--cat-indigo-subtle);
+  --color-cat-indigo-solid: var(--cat-indigo-solid);
+
+  /* nomes antigos (compatibilidade) */
   --color-bg-base: var(--bg-base);
   --color-surface-1: var(--bg-surface-1);
   --color-surface-2: var(--bg-surface-2);
@@ -90,7 +460,7 @@
 
   /* Ponte para shadcn/ui: registra no Tailwind os nomes que os componentes de
      terceiros usam (bg-card, text-muted-foreground, border-border...). Os
-     valores vêm dos nossos tokens no :root, então não há paleta duplicada. */
+     valores vêm dos nossos tokens, então não há paleta duplicada. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -111,8 +481,11 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-display: var(--font-plus-jakarta-sans);
+  /* Inter na interface e na tabela; Plus Jakarta Sans (a dos títulos do
+     site da Eva) só em título de página e número grande; JetBrains Mono no
+     rótulo "eyebrow" e em código. */
   --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
   --font-mono: var(--font-jetbrains-mono);
 }
 
@@ -121,31 +494,70 @@ body {
   height: 100%;
 }
 
+/* Rótulo de seção no estilo do site da Eva ("O QUE MOVEMOS"): mono, caixa
+   alta, espaçamento largo, cor do acento. Só para rótulo curto de seção. */
+@utility eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-fg);
+}
+
 body {
-  background: var(--bg-base);
+  background: var(--surface-page);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Elemento com data-theme próprio (ex.: menu lateral sempre escuro) repinta
+   o texto com as variáveis dele. */
+[data-theme]:not(html) {
+  color: var(--text-primary);
 }
 
 * {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.glass-card {
-  background: var(--glass-card-bg, rgba(255, 255, 255, 0.035));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+@layer base {
+  /* Foco visível padrão. Classes de utilitário (outline-none, ring-*) de uma
+     tela vencem esta regra, porque base perde para utilities. */
+  :where(a, button, input, select, textarea, summary, [tabindex], [role="button"]):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
 }
 
-/* Dialogs/overlays need a fully opaque backing (content sitting behind them
-   must not show through). Tailwind's own bg-* utilities can't do this here:
-   they live in Tailwind's utilities @layer, which always loses to this
-   plain (unlayered) .glass-card rule regardless of class order — so a
-   dedicated modifier class is what actually wins the cascade. */
-.glass-card-solid { --glass-card-bg: var(--bg-surface-1); }
+/* Movimento mínimo: quem pediu menos movimento não vê animação nenhuma. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Antes era vidro (blur + sombra pesada). Agora é só um painel com borda
+   fina; a classe continua existindo para as telas que ainda a usam. */
+.glass-card {
+  background: var(--glass-card-bg, var(--surface-panel));
+  border: 1px solid var(--border-subtle);
+}
+
+/* Overlays antigos (menus, diálogos) que usam glass-card-solid. Fica fora de
+   @layer de propósito: precisa vencer o bg-* de utilitário. */
+.glass-card-solid {
+  --glass-card-bg: var(--surface-overlay);
+}
 
 @keyframes aperture-breathe {
   0%, 100% { transform: rotate(0deg); }
@@ -166,17 +578,31 @@ body {
 .animate-mtn-drift-back { animation: mtn-drift-back 22s ease-in-out infinite; }
 .animate-mtn-drift-front { animation: mtn-drift-front 18s ease-in-out infinite; }
 
-/* React Flow — restyled to the matte-black/glass theme, edges kept nearly imperceptible */
+/* Toast e overlays do design system: entrada curta, sem quique. */
+@keyframes ds-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ds-slide-in-right {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ds-pop-in {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+/* React Flow — linhas e controles nos tokens (valem nos dois temas). */
 .react-flow__attribution {
   display: none;
 }
 .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.14) !important;
+  stroke: var(--border-strong) !important;
   stroke-width: 1.5px !important;
 }
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.34) !important;
+  stroke: var(--text-tertiary) !important;
 }
 .react-flow__handle {
   background: var(--border-strong) !important;
@@ -188,36 +614,104 @@ body {
   border: none !important;
 }
 .react-flow__controls-button {
-  background: var(--bg-surface-2) !important;
+  background: var(--surface-raised) !important;
   border: 1px solid var(--border-default) !important;
   color: var(--text-secondary) !important;
-  border-radius: 10px !important;
+  border-radius: 6px !important;
   margin-bottom: 6px !important;
 }
 .react-flow__controls-button:hover {
-  background: var(--bg-surface-3) !important;
+  background: var(--surface-hover) !important;
   color: var(--text-primary) !important;
 }
 .react-flow__controls-button svg {
   fill: currentColor !important;
 }
 
-/* Minimapa — nó colorido igual o bloco real (ver nodeColor no MiniMap), fundo
-   e moldura combinando com o resto do canvas em vez do cinza padrão. */
+/* Minimapa — fundo e moldura combinando com o resto do canvas. */
 .react-flow__minimap {
-  background: var(--bg-surface-2) !important;
-  border-radius: 16px;
+  background: var(--surface-raised) !important;
+  border-radius: 8px;
   overflow: hidden;
 }
 .react-flow__minimap-mask {
-  fill: rgba(0, 0, 0, 0.55) !important;
+  fill: var(--overlay-backdrop) !important;
   stroke: var(--border-strong) !important;
 }
 
-/* subtle ambient texture so glass panels have something to read as "glass" against */
+/* Fundo da casca do app: cor de página lisa (sem brilho radial). */
 .app-backdrop {
-  background:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(245, 247, 250, 0.06), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 100%, rgba(91, 141, 239, 0.05), transparent 60%),
-    var(--bg-base);
+  background: var(--surface-page);
+}
+
+/* ---------------------------------------------------------------------------
+   Impressão (relatório do funil em PDF e dashboard).
+
+   A casca do app (barra lateral, barra do celular) some e a área de conteúdo
+   deixa de ser uma caixa de rolagem de 100dvh: sem isso o navegador imprime
+   só a primeira tela. Imprime sempre no tema claro, porque fundo preto em PDF
+   é ilegível e gasta toner. Os gráficos usam os tokens de texto, então
+   acompanham sozinhos.
+   --------------------------------------------------------------------------- */
+@media print {
+  :root,
+  [data-theme] {
+    --surface-page: #ffffff;
+    --surface-panel: #ffffff;
+    --surface-raised: #f4f4f5;
+    --surface-hover: #ebebee;
+    --surface-overlay: #ffffff;
+    --border-subtle: #dcdce1;
+    --border-default: #c4c4cc;
+    --border-strong: #a1a1aa;
+    --text-primary: #18181b;
+    --text-secondary: #52525b;
+    --text-tertiary: #63636d;
+    --accent-solid: #2f5fd3;
+    --accent-fg: #2a56c4;
+    --accent-subtle: #edf2fd;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    background: #ffffff !important;
+  }
+
+  .app-backdrop {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  .app-backdrop > :not(main) {
+    display: none !important;
+  }
+  .app-backdrop > main {
+    display: block !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+
+  .glass-card {
+    background: #ffffff !important;
+    border: 1px solid #c4c4cc !important;
+    break-inside: avoid;
+  }
+
+  /* Dashboard: grade de duas colunas na folha em pé. */
+  @page { size: A4; margin: 12mm; }
+  .dash-grade {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .dash-grade > .dash-largo { grid-column: span 2 / span 2 !important; }
+  .dash-grade > .dash-estreito { grid-column: span 1 / span 1 !important; }
 }

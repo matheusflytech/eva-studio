@@ -10,8 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { reaisDigitados } from "@/lib/dinheiro";
 import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
+import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
+import { useToast } from "@/components/ui/toast";
+import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
+import { MS_PARA_DESFAZER } from "@/lib/lixeira";
+import { useConcluirTarefa } from "@/components/tarefas/concluir";
 
 interface Stage { id: string; name: string; type: string; probability: number }
 
@@ -84,16 +90,95 @@ export function DealDrawer({
 
   React.useEffect(() => { carregar(); }, [carregar]);
 
-  async function patch(body: Record<string, unknown>) {
+  // Erro da última ação (salvar campo, mover etapa, apagar). Sem isso a tela
+  // recarregava com o valor antigo e parecia que o clique não tinha pegado.
+  const [erro, setErro] = React.useState<string | null>(null);
+
+  async function falhou(res: Response, padrao: string): Promise<boolean> {
+    if (res.ok) return false;
+    setErro((await res.json().catch(() => ({}))).error ?? padrao);
+    return true;
+  }
+
+  async function patch(body: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
-    await fetch(`/api/deals/${dealId}`, {
+    setErro(null);
+    const res = await fetch(`/api/deals/${dealId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     setBusy(false);
+    const falha = await falhou(res, "Não foi possível salvar.");
     await carregar();
     onChanged();
+    return !falha;
+  }
+
+  const toast = useToast();
+  const apagarComDesfazer = useApagarComDesfazer();
+
+  /** Arquivar/desarquivar sem confirmação: o toast desfaz. */
+  async function alternarArquivo(arquivar: boolean) {
+    if (!(await patch({ archived: arquivar }))) return;
+    toast({
+      title: arquivar ? "Negócio arquivado" : "Negócio desarquivado",
+      durationMs: MS_PARA_DESFAZER,
+      action: { label: "Desfazer", onClick: () => void patch({ archived: !arquivar }) },
+    });
+  }
+
+  // Mudança de etapa pelas regras (motivo da perda, "Complete para mover",
+  // Reabrir quando o negócio está fechado): os mesmos modais do quadro.
+  const mudanca = useMudancaDeEtapa({ onErro: setErro });
+  async function moverEtapa(s: { id: string; name: string; type: string }) {
+    if (!deal) return;
+    setBusy(true);
+    setErro(null);
+    const r = await mudanca.mover({
+      dealId,
+      nome: deal.name,
+      pipelineId: deal.pipeline.id,
+      para: s,
+      defs,
+      extra: deal.stage.type !== "open" ? { reabrir: true } : undefined,
+      de: { id: deal.stage.id, name: deal.stage.name, type: deal.stage.type },
+      aoDesfazer: () => {
+        void carregar();
+        onChanged();
+      },
+    });
+    setBusy(false);
+    if (r === "movido") {
+      await carregar();
+      onChanged();
+    }
+  }
+
+  function salvarValor() {
+    const reais = reaisDigitados(form.amount);
+    if (reais === null) {
+      setErro("Valor inválido (máximo R$ 21 milhões).");
+      return;
+    }
+    if (Math.round(reais * 100) !== deal?.amountCents) patch({ amount: reais });
+  }
+
+  // Sem confirmação: vai para a lixeira e o toast desfaz.
+  async function apagar() {
+    setErro(null);
+    const r = await apagarComDesfazer({
+      url: `/api/deals/${dealId}`,
+      titulo: "Negócio apagado",
+      perguntaSemLixeira: "A lixeira ainda não está ativada: apagar este negócio leva junto as tarefas e notas e não tem volta. Apagar mesmo assim?",
+      aoRestaurar: () => onChanged(),
+    });
+    if (!r.ok) {
+      if (r.erro) setErro(r.erro);
+      return;
+    }
+    onChanged();
+    onClose();
   }
 
   async function salvarCampos() {
@@ -115,42 +200,70 @@ export function DealDrawer({
 
   async function criarTarefa() {
     if (!novaTarefa.trim()) return;
-    await fetch("/api/tasks", {
+    setErro(null);
+    const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: novaTarefa.trim(), dealId, due: "+2 dias" }),
     });
+    if (await falhou(res, "Não foi possível criar a tarefa.")) return;
     setNovaTarefa("");
     carregar();
   }
 
   async function criarNota() {
     if (!novaNota.trim()) return;
-    await fetch("/api/notes", {
+    setErro(null);
+    const res = await fetch("/api/notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: novaNota.trim(), dealId }),
     });
+    if (await falhou(res, "Não foi possível registrar a nota.")) return;
     setNovaNota("");
     carregar();
   }
 
-  async function alternarTarefa(id: string, feita: boolean) {
-    await fetch(`/api/tasks/${id}`, {
+  // Concluir passa pelo diálogo (resultado + próximo passo obrigatório);
+  // desmarcar reabre direto.
+  const { abrir: abrirConclusao, dialogo: dialogoDeConclusao } = useConcluirTarefa(() => {
+    carregar();
+    onChanged();
+  });
+
+  async function alternarTarefa(t: { id: string; type: string; text: string }, feita: boolean) {
+    setErro(null);
+    if (!feita) {
+      abrirConclusao(t);
+      return;
+    }
+    const res = await fetch(`/api/tasks/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !feita }),
+      body: JSON.stringify({ done: false }),
     });
+    await falhou(res, "Não foi possível atualizar a tarefa.");
     carregar();
   }
 
   // No servidor nao existe document; o portal so monta depois da hidratacao.
   const [montado, setMontado] = React.useState(false);
   React.useEffect(() => { setMontado(true); }, []);
+
+  // Esc fecha, como todo painel por cima da tela.
+  React.useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      // Com um diálogo aberto por cima (concluir tarefa), o Esc é dele.
+      if (e.key === "Escape" && !document.querySelector("[role='dialog'][data-state='open']")) onClose();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [onClose]);
+
   if (!montado) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-label="Detalhes do negócio">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Detalhes do negócio">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
       {/* glass-card-solid: sem ele o kanban aparece por baixo do painel. */}
       <aside className="glass-card glass-card-solid relative z-10 flex h-full w-full max-w-[520px] flex-col overflow-y-auto rounded-l-3xl">
@@ -178,10 +291,16 @@ export function DealDrawer({
                   )}
                 </div>
               </div>
-              <button onClick={onClose} className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-2 hover:text-text-primary">
+              <button onClick={onClose} aria-label="Fechar" className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-2 hover:text-text-primary">
                 <X size={18} />
               </button>
             </header>
+
+            {erro && (
+              <p role="alert" className="border-b border-border-subtle bg-danger/10 px-6 py-2.5 text-[12.5px] text-danger">
+                {erro}
+              </p>
+            )}
 
             {/* Trilha de etapas. É a ação mais frequente, então vem primeiro. */}
             <section className="border-b border-border-subtle px-6 py-5">
@@ -196,7 +315,7 @@ export function DealDrawer({
                       key={s.id}
                       type="button"
                       disabled={busy}
-                      onClick={() => !atual && patch({ stageId: s.id })}
+                      onClick={() => !atual && moverEtapa(s)}
                       title={`${s.name} · ${s.probability}%`}
                       className={cn(
                         "h-1.5 flex-1 rounded-full transition-colors",
@@ -222,7 +341,7 @@ export function DealDrawer({
                     id="d-valor"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    onBlur={() => patch({ amount: Number(form.amount.replace(/\./g, "").replace(",", ".")) || 0 })}
+                    onBlur={salvarValor}
                   />
                   <p className="mt-1 text-[11px] text-text-tertiary">
                     Ponderado: {money(Math.round((deal.amountCents * deal.probability) / 100))}
@@ -230,6 +349,7 @@ export function DealDrawer({
                 </div>
                 <div>
                   <Label htmlFor="d-data">Previsão de fechamento</Label>
+                  {/* Data sem hora: o servidor grava meio-dia UTC, e o dia é a parte UTC do ISO. */}
                   <Input
                     id="d-data"
                     type="date"
@@ -316,7 +436,7 @@ export function DealDrawer({
               <div className="mt-2 flex flex-col gap-1">
                 {deal.tasks.map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-surface-2">
-                    <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t.id, !!t.doneAt)} />
+                    <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t, !!t.doneAt)} />
                     <span className="min-w-0 flex-1">
                       <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
                         {t.text}
@@ -373,7 +493,7 @@ export function DealDrawer({
             <footer className="mt-auto flex items-center justify-between gap-3 border-t border-border-subtle px-6 py-4">
               <Button
                 variant="ghost"
-                onClick={() => patch({ archived: !deal.archivedAt })}
+                onClick={() => void alternarArquivo(!deal.archivedAt)}
                 disabled={busy}
               >
                 <Archive size={15} /> {deal.archivedAt ? "Desarquivar" : "Arquivar"}
@@ -381,11 +501,7 @@ export function DealDrawer({
               <Button
                 variant="ghost"
                 className="text-danger hover:bg-danger/10"
-                onClick={async () => {
-                  await fetch(`/api/deals/${dealId}`, { method: "DELETE" });
-                  onChanged();
-                  onClose();
-                }}
+                onClick={apagar}
               >
                 <Trash2 size={15} /> Apagar
               </Button>
@@ -398,6 +514,8 @@ export function DealDrawer({
           </>
         )}
       </aside>
+      {mudanca.elementos}
+      {dialogoDeConclusao}
     </div>,
     document.body
   );

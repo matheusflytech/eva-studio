@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { qrDosAgentes } from "@/lib/server/canais/qr";
 import { requirePermission } from "@/lib/server/permissions";
 import { getProvider } from "@/lib/llm-providers";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
+import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { lerEstadoWorker } from "@/lib/server/heartbeat";
 
 // ---------------------------------------------------------------------------
@@ -120,12 +122,15 @@ export async function GET() {
   const nErros = porAgente(erros);
   const nExecucoes = porAgente(execucoes);
 
+  // QR: com os canais do contrato, o estado vem do canal que o agente atende.
+  const qr = await qrDosAgentes(agents.map((a) => a.id));
   const lista = agents.map((agent) => {
     // Canais ligados de verdade. O QR só conta como ligado quando a sessão
     // está conectada: linha existir no banco não significa telefone pareado.
     const canais: { id: string; label: string; detalhe: string }[] = [];
-    if (agent.whatsappConnection?.status === "connected") {
-      canais.push({ id: "whatsapp_qr", label: "WhatsApp", detalhe: agent.whatsappConnection.phoneNumber ?? "via QR" });
+    const sessaoQr = qr.modoCanal ? qr.porAgente.get(agent.id) : agent.whatsappConnection;
+    if (sessaoQr?.status === "connected") {
+      canais.push({ id: "whatsapp_qr", label: "WhatsApp", detalhe: sessaoQr.phoneNumber ?? "via QR" });
     }
     if (agent.metaConnection) {
       canais.push({ id: "whatsapp_meta", label: "WhatsApp oficial", detalhe: agent.metaConnection.displayPhone ?? "" });
@@ -162,11 +167,15 @@ export async function GET() {
       const nodes = (agent.flow.nodes as unknown as Node<FlowNodeData>[]) ?? [];
       const edges = (agent.flow.edges as unknown as Edge[]) ?? [];
       blocos = nodes.length;
-      pendencias = validateFlow(nodes, edges).length;
+      pendencias = validateFlow(nodes, edges).filter((i) => i.nivel === "erro").length;
       for (const n of nodes) {
         if (n.data?.iconKey === "ai-agent") {
-          const p = getProvider(n.data.aiProvider);
-          modelos.add(`${p.label} · ${n.data.aiModel || p.models[0].id}`);
+          if (fonteDaIa(n.data) === "conexao") {
+            modelos.add("Central de IA");
+          } else {
+            const p = getProvider(n.data.aiProvider);
+            modelos.add(`${p.label} · ${n.data.aiModel || p.models[0].id}`);
+          }
         }
       }
     }

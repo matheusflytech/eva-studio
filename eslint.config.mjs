@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Pacote do n8n: lint e build próprios (n8n-nodes-eva/package.json).
+    "n8n-nodes-eva/**",
   ]),
 ]);
 

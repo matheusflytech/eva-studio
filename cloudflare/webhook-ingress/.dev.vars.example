@@ -1,0 +1,7 @@
+# Copie para .dev.vars (ignorado pelo git) só para `wrangler dev` local.
+# Em produção, cada valor entra com `wrangler secret put NOME` — nunca aqui.
+META_APP_SECRET=troque-me
+META_WEBHOOK_VERIFY_TOKEN=troque-me
+TELEGRAM_SECRET_TOKEN=troque-me
+TIKTOK_WEBHOOK_TOKEN=troque-me
+INGRESS_SIGNING_SECRET=troque-me

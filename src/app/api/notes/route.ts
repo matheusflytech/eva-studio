@@ -1,24 +1,29 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/server/permissions";
-import { addNote } from "@/lib/server/crm";
+import { addNote, statusDaReferencia } from "@/lib/server/crm";
+import { JSON_INVALIDO, conferirReferencias, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
 
 // POST { text, contactId?, dealId? }
 export async function POST(request: Request) {
   const ctx = await requirePermission("contacts:manage");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
-  const text = String(body.text ?? "").trim();
-  if (!text) return NextResponse.json({ error: "Escreva a nota." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  const text = texto(body.text, 5000) ?? "";
+  if (!text) return erro("Escreva a nota.");
   if (!body.contactId && !body.dealId) {
-    return NextResponse.json({ error: "A nota precisa estar ligada a um contato ou a um negócio." }, { status: 400 });
+    return erro("A nota precisa estar ligada a um contato ou a um negócio.");
   }
+
+  const erroRef = await conferirReferencias(ctx.orgId, { contactId: body.contactId, dealId: body.dealId });
+  if (erroRef) return erro(erroRef, statusDaReferencia(erroRef));
 
   const note = await addNote({
     orgId: ctx.orgId,
     text,
-    contactId: body.contactId || null,
-    dealId: body.dealId || null,
+    contactId: (body.contactId as string) || null,
+    dealId: (body.dealId as string) || null,
     authorId: ctx.userId,
   });
 

@@ -174,7 +174,7 @@ export function ConversationMode({
                 className={cn(
                   "h-2 w-2 rounded-full",
                   c === "whatsapp"
-                    ? "bg-emerald-400"
+                    ? "bg-success"
                     : "bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-500"
                 )}
               />
@@ -183,7 +183,10 @@ export function ConversationMode({
           ))}
         </div>
 
+        {/* O celular é sempre escuro (como o app de verdade): data-theme="dark"
+            faz os tokens aqui dentro resolverem no esquema escuro em qualquer tema. */}
         <div
+          data-theme="dark"
           className={cn(
             "flex w-full max-w-[420px] flex-col overflow-hidden rounded-[32px] border-[10px] border-[#0b0b0d] shadow-2xl",
             whats ? "bg-[#0b141a]" : "bg-black"
@@ -415,7 +418,7 @@ function ItemDaConversa({
           onClick={onSelect}
           className={cn(
             "inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-            selecionado ? "bg-accent-500 text-white" : "bg-white/10 text-white/65 hover:bg-white/15"
+            selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/10 text-white/65 hover:bg-white/15"
           )}
         >
           <GitBranch size={11} className="shrink-0" />
@@ -431,7 +434,7 @@ function ItemDaConversa({
                 className={cn(
                   "rounded-full px-2.5 py-0.5 text-[10.5px] font-medium transition-colors",
                   (ramoEscolhido || ramos[0]) === r
-                    ? "bg-accent-500/25 text-accent-300 ring-1 ring-accent-500/50"
+                    ? "bg-accent-500/25 text-accent-fg ring-1 ring-accent-500/50"
                     : "bg-white/8 text-white/50 hover:text-white"
                 )}
               >
@@ -454,7 +457,7 @@ function ItemDaConversa({
         onClick={onSelect}
         className={cn(
           "mx-auto my-1 inline-flex max-w-[92%] items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-          selecionado ? "bg-accent-500 text-white" : "bg-white/8 text-white/55 hover:bg-white/14 hover:text-white/80"
+          selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/8 text-white/55 hover:bg-white/14 hover:text-white/80"
         )}
       >
         {React.createElement(especial ?? Icone, { size: 11, className: "shrink-0" })}
@@ -480,7 +483,7 @@ function ItemDaConversa({
         )}
       >
         {daIa && (
-          <span className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-accent-300">
+          <span className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-accent-fg">
             <Sparkles size={10} /> resposta gerada
           </span>
         )}
@@ -511,7 +514,7 @@ function ItemDaConversa({
           {ferramentas.map((f, i) => (
             <span
               key={i}
-              className="rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] text-purple-300"
+              className="rounded-full bg-cat-purple-subtle px-2 py-0.5 text-[10px] text-cat-purple"
             >
               {f.label}
             </span>

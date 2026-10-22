@@ -67,7 +67,7 @@ export interface Contexto {
     pipeline: { id: string; name: string };
     closedAt: string | null;
   }[];
-  tarefas: { id: string; text: string; dueAt: string | null; atrasada: boolean }[];
+  tarefas: { id: string; type: string; text: string; dueAt: string | null; atrasada: boolean }[];
 }
 
 export interface Membro {

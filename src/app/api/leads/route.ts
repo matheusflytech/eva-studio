@@ -1,87 +1,57 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
-import { registrarMensagens } from "@/lib/server/inbox";
+import { requirePermission } from "@/lib/server/permissions";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
+import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
+import { listarLeads, salvarLeadExterno } from "@/lib/server/leads";
 
-// Leads = conversas do canal "website" — tanto as que vieram do widget de
-// chat quanto as adicionadas na mão ou via API (mesmo canal, mesma tabela,
-// só o prefixo do contactId muda: "web_" = widget, "manual_"/"api_" = as
-// outras duas). Não é uma tabela nova, é uma leitura específica de
-// Conversation. Ver docs/CHATBOT_ENGINE.md §13.
+// Leads = contatos com etapa (leadStage), de qualquer canal — ver
+// src/lib/server/leads.ts. Antes da Fase 2 eram as conversas do canal
+// "website"; a resposta agora é o LeadDto (fields/stage/channel/...).
 export async function GET() {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-
-  const rows = await prisma.conversation.findMany({
-    where: { channel: "website", agent: { orgId } },
-    include: {
-      agent: { select: { name: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
-
-  return NextResponse.json({
-    leads: rows.map((c) => ({
-      id: c.id,
-      agentId: c.agentId,
-      agentName: c.agent.name,
-      contactId: c.contactId,
-      variables: c.variables,
-      leadStage: c.leadStage ?? "novo",
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-      lastMessage: c.messages[0] ? { text: c.messages[0].text, role: c.messages[0].role } : null,
-    })),
-  });
+  const ctx = await requirePermission("read");
+  if ("error" in ctx) return erro(ctx.error, ctx.status);
+  return NextResponse.json({ leads: await listarLeads(ctx.orgId) });
 }
 
-// Duas formas de entrar: (1) sessão normal — o botão "+ Novo lead" na
-// própria página, o navegador manda o cookie de sempre; (2) header
-// X-Internal-Secret — pra empurrar lead de fora (n8n, um formulário
-// externo, etc.), mesmo segredo que o worker do WhatsApp já usa
-// (INTERNAL_API_SECRET). Sem cookie de sessão pra saber o orgId nesse
-// segundo caso, então quem chama precisa saber o agentId certo — o
-// segredo em si já prova que pode agir em nome do app.
+// Duas formas de entrar: (1) sessão — botão "+ Novo lead" da tela (exige
+// contacts:manage); (2) header X-Internal-Secret (n8n, formulário externo),
+// mesmo segredo do worker do WhatsApp. No segundo caso a org vem do agente.
+//
+// Corpo: { agentId, fields | variables, stage | leadStage }. `variables` e
+// `leadStage` são os nomes antigos, aceitos como apelido. `contactId`
+// (identificador externo, formato antigo) é aceito mas ignorado.
 export async function POST(request: Request) {
-  const secretHeader = request.headers.get("x-internal-secret");
-  const expectedSecret = process.env.INTERNAL_API_SECRET;
-  const viaSecret = !!expectedSecret && timingSafeEqualStr(secretHeader, expectedSecret);
+  const expected = process.env.INTERNAL_API_SECRET;
+  const viaSecret = !!expected && timingSafeEqualStr(request.headers.get("x-internal-secret"), expected);
 
   let orgId: string | null = null;
   if (!viaSecret) {
-    orgId = await requireOrgId();
-    if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    const ctx = await requirePermission("contacts:manage");
+    if ("error" in ctx) return erro(ctx.error, ctx.status);
+    orgId = ctx.orgId;
   }
 
-  const { agentId, contactId, variables, leadStage } = await request.json();
-  if (!agentId || !variables || typeof variables !== "object") {
-    return NextResponse.json({ error: "agentId e variables são obrigatórios." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  if (body.contactId !== undefined && body.contactId !== null && typeof body.contactId !== "string") {
+    return erro("contactId precisa ser texto.");
+  }
+  const fields = body.fields ?? body.variables;
+  const stageBruto = body.stage ?? body.leadStage;
+  const stage = stageBruto === "" || stageBruto === null ? undefined : stageBruto;
+
+  if (typeof body.agentId !== "string" || !body.agentId.trim()) return erro("agentId é obrigatório.");
+
+  if (viaSecret) {
+    const agent = await prisma.agent.findUnique({ where: { id: body.agentId }, select: { orgId: true } });
+    if (!agent) return erro("Agente não encontrado.", 404);
+    orgId = agent.orgId;
   }
 
-  const agent = viaSecret
-    ? await prisma.agent.findUnique({ where: { id: agentId } })
-    : await prisma.agent.findFirst({ where: { id: agentId, orgId: orgId! } });
-  if (!agent) return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
-
-  const finalContactId = contactId?.trim() || `${viaSecret ? "api" : "manual"}_${randomUUID().slice(0, 12)}`;
-
-  const conversation = await prisma.conversation.create({
-    data: {
-      agentId,
-      channel: "website",
-      contactId: finalContactId,
-      variables,
-      leadStage: leadStage || "novo",
-    },
-  });
-
-  await registrarMensagens(conversation.id, [
-    { role: "bot", text: viaSecret ? "Lead recebido via API." : "Lead adicionado manualmente." },
-  ]);
-
-  return NextResponse.json({ id: conversation.id });
+  const r = await salvarLeadExterno(orgId!, { agentId: body.agentId, fields, stage }, viaSecret ? "api" : "manual");
+  if ("error" in r) {
+    return NextResponse.json({ error: r.error, ...(r.fieldErrors ? { fieldErrors: r.fieldErrors } : {}) }, { status: r.status });
+  }
+  return NextResponse.json({ id: r.contactId });
 }

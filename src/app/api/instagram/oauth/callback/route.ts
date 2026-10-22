@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 import { requireOrgId } from "@/lib/auth/require-org";
 import { prisma } from "@/lib/db/prisma";
 import { encryptSecret } from "@/lib/server/crypto";
+import { assinarEventosInstagram } from "@/lib/server/instagram-subscribe";
+import { ehIdDeContrato, rotaDoContrato } from "@/lib/contrato/rotas";
+import { MODO_CONTRATO, conectarInstagram } from "@/lib/server/canais/conectar";
 
 const STATE_COOKIE = "ig_oauth_state";
 
@@ -21,7 +24,12 @@ export async function GET(request: Request) {
   const cookieStore = await cookies();
   const stateCookie = cookieStore.get(STATE_COOKIE)?.value ?? "";
   const sep = stateCookie.lastIndexOf("|");
-  const agentId = sep > 0 ? stateCookie.slice(0, sep) : "";
+  // "<orgId>:<agentId>|<nonce>" (o formato antigo, sem orgId, ainda vale).
+  const cabeca = sep > 0 ? stateCookie.slice(0, sep) : "";
+  const doisPontos = cabeca.indexOf(":");
+  const prefixo = doisPontos > 0 ? cabeca.slice(0, doisPontos) : null;
+  const contrato = ehIdDeContrato(prefixo) ? prefixo : null;
+  const agentId = doisPontos > 0 ? cabeca.slice(doisPontos + 1) : cabeca;
   const cookieNonce = sep > 0 ? stateCookie.slice(sep + 1) : "";
 
   // Consome o cookie de uma vez (single-use), independente do resultado.
@@ -31,18 +39,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "state inválido (possível CSRF)." }, { status: 400 });
   }
 
-  const redirectBack = new URL(`/agent-studio/${agentId}`, url.origin);
+  // Modo contrato (Configurações → Canais): o canal nasce sem agente.
+  const doContrato = agentId === MODO_CONTRATO;
+  const redirectBack = new URL(
+    rotaDoContrato(contrato, doContrato ? "/configuracoes" : `/agent-studio/${agentId}`),
+    url.origin
+  );
+  if (doContrato) redirectBack.searchParams.set("aba", "canais");
 
   if (errorParam || !code) {
     redirectBack.searchParams.set("instagram_error", errorParam ?? "cancelado");
     return NextResponse.redirect(redirectBack);
   }
 
-  const orgId = await requireOrgId();
+  const orgId = await requireOrgId({ contrato });
   if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 
-  const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
-  if (!agent) return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
+  if (!doContrato) {
+    const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
+    if (!agent) return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
+  }
 
   const appId = process.env.INSTAGRAM_APP_ID;
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
@@ -85,12 +101,29 @@ export async function GET(request: Request) {
       return NextResponse.redirect(redirectBack);
     }
 
+    if (doContrato) {
+      const r = await conectarInstagram(orgId, { igBusinessId, accessToken, username: me?.username ?? null });
+      if (!r.ok) {
+        redirectBack.searchParams.set("instagram_error", r.status === 409 ? "outro_contrato" : "unexpected");
+        return NextResponse.redirect(redirectBack);
+      }
+      if (!r.assinou) redirectBack.searchParams.set("instagram_warning", "subscribe_failed");
+      redirectBack.searchParams.set("instagram", "connected");
+      return NextResponse.redirect(redirectBack);
+    }
+
     const encryptedToken = encryptSecret(accessToken);
     await prisma.instagramConnection.upsert({
       where: { agentId },
       create: { agentId, igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
       update: { igBusinessId, pageAccessToken: encryptedToken, username: me?.username ?? null },
     });
+
+    const assinatura = await assinarEventosInstagram(accessToken);
+    if (!assinatura.ok) {
+      console.error("[instagram/oauth] não assinou os eventos", assinatura.error);
+      redirectBack.searchParams.set("instagram_warning", "subscribe_failed");
+    }
 
     redirectBack.searchParams.set("instagram", "connected");
     return NextResponse.redirect(redirectBack);

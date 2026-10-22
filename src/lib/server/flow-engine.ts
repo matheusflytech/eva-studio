@@ -5,8 +5,16 @@ import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
-import { callLlmWithTools, type LlmTool, type LlmToolCall } from "@/lib/server/llm";
+import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
+import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
+import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
+import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
+import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
+import { enviarEmailDoContrato } from "@/lib/server/email/envio";
+import { passosDaConexao } from "@/lib/server/ia/conexao";
+import { chamarComReserva, type PassoDeIa } from "@/lib/server/ia/reserva";
+import { chavesNoLimite, registrarUso, type RegistroDeUso } from "@/lib/server/ia/uso";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
 import { openMcpSession, type McpSession, type McpToolDef } from "@/lib/server/mcp-client";
@@ -14,6 +22,7 @@ import { decryptSecret } from "@/lib/server/crypto";
 import {
   createDeal,
   moveDealStage,
+  ErroDaMudanca,
   createTask,
   addNote,
   findOpenDealForContact,
@@ -24,10 +33,21 @@ import {
 } from "@/lib/server/crm";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { safeFetch } from "@/lib/server/ssrf";
+import { comAtor, publicarEvento } from "@/lib/server/eventos/barramento";
 import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/server/inbox";
 import { syncContactFromConversation } from "@/lib/server/contacts";
 import { stopEnrollmentsOnReply } from "@/lib/server/sequences";
 import { registerBroadcastReply } from "@/lib/server/outbound";
+import { matchTrigger, podeAvaliarGatilho, type InboundKind } from "@/lib/server/triggers";
+import {
+  validateCapture,
+  isSkip,
+  variavelDaCaptura,
+  MENSAGEM_DE_ERRO,
+  SAIDA_INVALIDA,
+  type CaptureField,
+} from "@/lib/capture-validation";
+import { marcarComoLead } from "@/lib/server/leads";
 
 export interface OutboundMessage {
   text: string;
@@ -58,6 +78,9 @@ export interface AdvanceInput {
   // Id da mensagem do lado de fora (wamid), pra recibo de entrega e pra não
   // gravar a mesma mensagem duas vezes se a Meta reentregar.
   externalId?: string;
+  // Que tipo de evento é (só o Instagram distingue hoje): DM comum, resposta
+  // ou reação a story, menção em story. Sem isso, é DM.
+  event?: { kind: InboundKind; storyId?: string; isReaction?: boolean };
   // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
   // da pergunta para o modelo, mas não é gravado na conversa.
   anexoContexto?: string;
@@ -253,6 +276,47 @@ async function loadConversationHistory(
 }
 
 const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
+const SEGUIR_TOOL = "seguir_fluxo";
+
+// ---------------------------------------------------------------------------
+// Saída dos blocos "Responder com IA" (ai-agent) e "Enviar para meu fluxo"
+// (agent). Comportamento escolhido:
+//   - SEM ligação de saída: a conversa fica com o bloco até o fim (como
+//     sempre foi). Nada muda para quem não ligou nada.
+//   - COM ligação: o bloco responde e, quando TERMINA o trabalho, o fluxo
+//     segue pela ligação NA MESMA RODADA (a resposta sai e, logo atrás, o
+//     que vier depois: uma mensagem, um bloco de CRM, uma pergunta...).
+//     Esperar a próxima mensagem do cliente deixaria a conversa muda depois
+//     de "Perfeito, anotei!".
+//   - "Terminar" é explícito, nunca adivinhado pelo texto:
+//       ai-agent: coletou todos os dados pedidos (collectVars) ou chamou a
+//         ferramenta interna "seguir_fluxo" (só oferecida quando há ligação);
+//       agent: o webhook respondeu { "done": true } junto com a resposta.
+//   - Erro da IA (ou webhook sem resposta) nunca pula a etapa.
+// ---------------------------------------------------------------------------
+
+/** O bloco de IA terminou o trabalho e o fluxo deve seguir pela saída? */
+export function iaTerminou(opts: {
+  temSaida: boolean;
+  erro?: string;
+  pediuParaSeguir: boolean;
+  dadosPedidos: string[];
+  variables: Record<string, unknown>;
+}): boolean {
+  if (!opts.temSaida || opts.erro) return false;
+  if (opts.pediuParaSeguir) return true;
+  return opts.dadosPedidos.length > 0 && opts.dadosPedidos.every((k) => String(opts.variables[k] ?? "").trim() !== "");
+}
+
+/** Tem ligação de saída do fluxo principal (ferramentas e a saída "Erro" não contam). */
+function temSaidaPrincipal(edges: Edge[], nodeId: string): boolean {
+  return edges.some((e) => e.source === nodeId && e.targetHandle !== "tools" && e.sourceHandle !== SAIDA_ERRO);
+}
+
+/** Para onde vai a conversa quando a IA falha; null = fica no bloco (sem ligação em "Erro"). */
+function destinoDoErroDaIa(edges: Edge[], nodeId: string, erro: string | undefined): string | null {
+  return erro ? nextNodeId(edges, nodeId, SAIDA_ERRO) : null;
+}
 
 // Roda o Agente de IA nativo (bloco "ai-agent"): junta as ferramentas
 // conectadas na porta "tools" (tool-http/tool-knowledge), monta a chamada
@@ -387,6 +451,7 @@ async function runCrmTool(
       contactId,
       amountCents,
       description: overCeiling ? "Valor acima do teto configurado — revisar." : "",
+      origem: "fluxo",
     });
 
     if (overCeiling) {
@@ -394,9 +459,10 @@ async function runCrmTool(
         orgId,
         contactId,
         dealId: deal.id,
-        type: "outro",
+        type: "afazer",
         text: `Revisar negócio "${deal.name}" criado pela IA acima do teto.`,
         dueAt: new Date(Date.now() + 86_400_000),
+        origem: "ia",
       });
       return `Negócio criado e marcado para revisão humana (valor acima do teto).`;
     }
@@ -419,7 +485,13 @@ async function runCrmTool(
       return "Não tenho permissão para mover o negócio para essa etapa. Um humano precisa fazer isso.";
     }
 
-    await moveDealStage(deal.id, stage.id);
+    // A IA segue as regras da etapa sem exceção: faltou campo, ela avisa.
+    try {
+      await moveDealStage(deal.id, stage.id, { origem: "fluxo" });
+    } catch (e) {
+      if (e instanceof ErroDaMudanca) return `Não movi: ${e.message}`;
+      throw e;
+    }
     return `Negócio movido para ${stage.name}.`;
   }
 
@@ -496,7 +568,9 @@ async function runCrmTool(
       contactId,
       dealId: deal?.id ?? null,
       text: String(args.texto ?? ""),
+      type: typeof args.tipo === "string" ? args.tipo : undefined,
       dueAt: parseRelativeDue(String(args.prazo ?? "+1 dia")),
+      origem: "ia",
     });
     return "Tarefa criada.";
   }
@@ -531,11 +605,14 @@ function textoParaIA(input: { text?: string; anexoContexto?: string }): string {
 ${input.anexoContexto}`.trim() : texto;
 }
 
+// Sem resposta da IA e sem saída "Erro": a pessoa recebe isto em vez de silêncio
+// (no Playground e na prévia o erro aparece no log, então não manda nada).
 const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
+const CANAIS_DE_TESTE_DA_IA = ["playground", "builder_preview"];
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
-  agentId: string,
+  agente: AgenteParaPrompt & { id: string; orgId: string },
   userMessage: string,
   variables: Variables,
   nodes: Node<FlowNodeData>[],
@@ -544,10 +621,43 @@ async function runAiAgent(
   // Contexto de CRM: quem é a pessoa e em que org. Só é usado quando há um
   // bloco "Ferramenta: CRM" ligado neste agente.
   crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> }
-): Promise<{ text: string | null; error?: string }> {
-  const provider = getProvider(node.data.aiProvider);
-  const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
-  if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.` };
+): Promise<{ text: string | null; error?: string; seguir: boolean }> {
+  // De onde vem a IA: a conexão do contrato (lista com reserva automática)
+  // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
+  let passos: PassoDeIa[];
+  let timeoutMs: number | undefined;
+  if (fonteDaIa(node.data) === "bloco") {
+    const provider = getProvider(node.data.aiProvider);
+    const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
+    if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
+    // Modelos reserva do bloco: mesma chave, outro modelo (o limite por minuto
+    // do provedor vale por modelo).
+    const principal = node.data.aiModel || provider.models[0].id;
+    const modelos = [principal, ...(node.data.aiFallbackModels ?? []).filter((m) => m && m !== principal)];
+    passos = modelos.map((model, i) => ({
+      provider: provider.id as LlmProvider,
+      apiKey,
+      model,
+      origem: i === 0 ? "bloco" : `bloco (reserva ${model})`,
+      credentialId: node.data.aiCredentialId,
+    }));
+  } else {
+    ({ passos, timeoutMs } = await passosDaConexao(agente.orgId));
+    if (passos.length === 0) {
+      return { text: null, error: "O contrato não tem nenhuma chave de IA: cadastre uma em Integrações → Central de IA.", seguir: false };
+    }
+  }
+  // Chave que já gastou o limite do mês sai da fila (a reserva assume).
+  const noLimite = await chavesNoLimite(agente.orgId, passos.map((p) => p.credentialId ?? ""));
+  if (noLimite.size > 0) {
+    passos = passos.filter((p) => !p.credentialId || !noLimite.has(p.credentialId));
+    if (passos.length === 0) {
+      return { text: null, error: "As chaves de IA deste bloco atingiram o limite do mês (Integrações → Central de IA).", seguir: false };
+    }
+  }
+  const consumo: RegistroDeUso[] = [];
+  const temSaida = temSaidaPrincipal(edges, node.id);
+  let pediuParaSeguir = false;
 
   const toolNodes = edges
     .filter((e) => e.target === node.id && e.targetHandle === "tools")
@@ -653,6 +763,7 @@ async function runAiAgent(
             params: [
               { name: "texto", description: "O que precisa ser feito." },
               { name: "prazo", description: 'Prazo relativo, ex: "+2 dias", "3h".', required: false },
+              { name: "tipo", description: "ligar, whatsapp, email, reuniao, visita ou afazer (padrão: ligar).", required: false },
             ],
           },
         },
@@ -716,7 +827,18 @@ async function runAiAgent(
     });
   }
 
-  let systemPrompt = node.data.detail || "Você é um assistente útil.";
+  // Só existe quando o bloco tem para onde ir: é como a IA avisa que acabou
+  // a parte dela (ver iaTerminou). Sem ligação, ela nem vê a ferramenta.
+  if (temSaida) {
+    tools.push({
+      name: SEGUIR_TOOL,
+      description:
+        "Chame quando o objetivo desta etapa da conversa estiver cumprido e o atendimento deve seguir para o próximo passo do fluxo. Responda normalmente ao usuário na mesma vez.",
+      params: [],
+    });
+  }
+
+  let systemPrompt = montarPromptDoAgente(agente, node.data.detail, { usarAgente: node.data.aiUsarAgente });
   if (collectVars.length > 0) {
     const lines = ["", "## Dados que você precisa coletar nesta conversa"];
     if (collectedVars.length) lines.push(`Já coletados: ${collectedVars.map((v) => `${v.key}=${variables[v.key]}`).join(", ")}.`);
@@ -734,17 +856,18 @@ async function runAiAgent(
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
 
   try {
-    const modeloPrincipal = node.data.aiModel || provider.models[0].id;
-    const chamarLlm = (modelo: string = modeloPrincipal) => callLlmWithTools({
-      provider: provider.id as LlmProvider,
-      apiKey,
-      model: modelo,
+    const chamar = () => chamarComReserva(passos, {
       effort: node.data.aiEffort,
+      timeoutMs,
       systemPrompt,
       userMessage,
       history,
       tools,
       executeTool: async (call: LlmToolCall) => {
+        if (call.name === SEGUIR_TOOL) {
+          pediuParaSeguir = true;
+          return "Ok, o atendimento segue para o próximo passo depois desta resposta.";
+        }
         if (call.name === SAVE_SLOTS_TOOL) {
           const saved: string[] = [];
           for (const v of collectVars) {
@@ -781,40 +904,43 @@ async function runAiAgent(
         }
         if (toolNode.data.iconKey === "tool-knowledge") {
           const query = String(call.arguments.consulta ?? userMessage);
-          const chunks = await searchKnowledgeBase(agentId, query, 4);
+          const chunks = await searchKnowledgeBase(agente.id, query, 4);
           return chunks.join("\n\n") || "Nenhum trecho relevante encontrado na base de conhecimento.";
         }
         const result = await performHttpRequest(toolNode.data, { ...variables, ...call.arguments });
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
+    }, undefined, (passo, r, ok) => {
+      consumo.push({
+        orgId: agente.orgId,
+        credentialId: passo.credentialId ?? null,
+        agentId: agente.id,
+        recurso: "fluxo",
+        provider: passo.provider,
+        model: passo.model,
+        inputTokens: r.usage?.entrada ?? 0,
+        outputTokens: r.usage?.saida ?? 0,
+        ok,
+      });
     });
-    const falhou = (e: unknown) =>
-      ({ text: null, error: e instanceof Error ? e.message : String(e) }) as Awaited<ReturnType<typeof callLlmWithTools>>;
-    const noLimite = (r: { text: string | null; error?: string }) => !r.text && !!r.error && /\b429\b/.test(r.error);
-
-    let result = await chamarLlm().catch(falhou);
-    // O limite de tokens por minuto (429) vale por modelo. Se o principal estourou,
-    // tenta os modelos reserva do bloco (mesma conta), cada um com o seu próprio limite.
-    if (noLimite(result)) {
-      for (const reserva of node.data.aiFallbackModels ?? []) {
-        if (!reserva || reserva === modeloPrincipal) continue;
-        const tentativa = await chamarLlm(reserva).catch(falhou);
-        if (tentativa.text || !noLimite(tentativa)) {
-          result = tentativa;
-          break;
-        }
-      }
+    let result = await chamar();
+    // Todas as opções no limite por minuto (429): espera o que o provedor
+    // mandou esperar (no máximo 12 s) e tenta uma vez mais.
+    if (!result.text && result.error && /429/.test(result.error) && !result.executouFerramenta) {
+      const dito = /try again in ([\d.]+)s/i.exec(result.error);
+      await new Promise((r) => setTimeout(r, Math.min(12, (dito ? Number(dito[1]) : 6) + 0.5) * 1000));
+      result = await chamar();
     }
-    // Todos no limite: espera o que o provedor mandou esperar (no máximo 12s) e tenta uma vez mais.
-    if (noLimite(result)) {
-      const dito = /try again in ([\d.]+)s/i.exec(result.error ?? "");
-      const esperar = Math.min(12, (dito ? Number(dito[1]) : 6) + 0.5) * 1000;
-      await new Promise((r) => setTimeout(r, esperar));
-      result = await chamarLlm().catch(falhou);
+    await registrarUso(consumo);
+    if (result.tentativas.length > 0 && !result.error) {
+      console.warn("[ia] respondeu pela reserva", { usado: result.usado?.origem, falharam: result.tentativas.map((t) => t.origem) });
     }
-    return { text: result.text, error: result.error ?? (result.text ? undefined : `${provider.label} não devolveu resposta.`) };
+    const falhas = result.tentativas.map((t) => `${t.origem}: ${t.error}`);
+    const error = result.error ? [...falhas, `${result.usado?.origem ?? "IA"}: ${result.error}`].join(" · ") : undefined;
+    const seguir = iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
+    return { text: result.text, error, seguir };
   } catch (err) {
-    return { text: null, error: err instanceof Error ? err.message : String(err) };
+    return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false };
   }
 }
 
@@ -824,8 +950,8 @@ async function callAgentWebhook(
   conversationId: string,
   variables: Variables,
   lang?: string
-): Promise<string | null> {
-  if (!agent.outboundUrl) return null;
+): Promise<{ reply: string | null; done: boolean }> {
+  if (!agent.outboundUrl) return { reply: null, done: false };
   try {
     const knowledgeBaseContext = await getKnowledgeBaseContext(agent.id);
     // safeFetch: bloqueia SSRF (URL configurada pelo usuário não pode apontar
@@ -849,11 +975,14 @@ async function callAgentWebhook(
         knowledgeBaseContext,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { reply: null, done: false };
     const data = await res.json();
-    return typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
+    const reply = typeof data?.reply === "string" && data.reply.trim() ? data.reply : null;
+    // { "done": true } = o seu fluxo terminou a parte dele; o Builder segue
+    // pela ligação de saída do bloco, se houver.
+    return { reply, done: data?.done === true };
   } catch {
-    return null;
+    return { reply: null, done: false };
   }
 }
 
@@ -912,6 +1041,18 @@ export function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string 
   return edge?.target ?? null;
 }
 
+/** Saída "normal" de um bloco: a aresta sem nome; nunca a de resposta inválida. */
+function nextDefaultNodeId(edges: Edge[], fromId: string): string | null {
+  const semNome = edges.find((e) => e.source === fromId && e.sourceHandle == null);
+  const qualquer = edges.find((e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA && e.sourceHandle !== SAIDA_ERRO);
+  return (semNome ?? qualquer)?.target ?? null;
+}
+
+/** Captura que valida a resposta (tem tipo e não é menu de botões). */
+function capturaValida(data: FlowNodeData): boolean {
+  return (data.options ?? []).length === 0 && !!data.captureField && data.captureField !== "text";
+}
+
 const MAX_HOPS = 25;
 
 // Grava a transcrição real (pra página Conversas) — a mensagem que chegou
@@ -939,7 +1080,35 @@ async function logMessages(
   await registrarMensagens(conversationId, rows);
 }
 
+async function acharGatilho(input: AdvanceInput, kind: InboundKind) {
+  const triggers = await prisma.agentTrigger.findMany({ where: { agentId: input.agentId, active: true } });
+  if (triggers.length === 0) return null;
+  return matchTrigger(triggers, {
+    channel: input.channel,
+    kind,
+    text: input.text,
+    storyId: input.event?.storyId,
+    isReaction: input.event?.isReaction,
+  });
+}
+
+async function contarDisparo(triggerId: string): Promise<void> {
+  try {
+    await prisma.agentTrigger.update({
+      where: { id: triggerId },
+      data: { triggerCount: { increment: 1 }, lastTriggeredAt: new Date() },
+    });
+  } catch (error) {
+    console.error("[flow-engine] falha ao contar disparo do gatilho", error);
+  }
+}
+
+/** O que o agente fizer no CRM (contato, negócio, tarefa) sai com ator "agente". */
 export async function advanceConversation(input: AdvanceInput): Promise<AdvanceResult> {
+  return comAtor({ tipo: "agente", id: input.agentId }, () => avancarConversa(input));
+}
+
+async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
 
@@ -951,7 +1120,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     conversationId: string,
     variables: Record<string, unknown>,
     isInbound: boolean
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
       const contactId = await syncContactFromConversation({
         agentId: input.agentId,
@@ -965,8 +1134,10 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
         await stopEnrollmentsOnReply(contactId);
         await registerBroadcastReply(input.agentId, input.contactId);
       }
+      return contactId;
     } catch (error) {
       console.error("[flow-engine] falha ao sincronizar contato", error);
+      return null;
     }
   }
 
@@ -1010,7 +1181,13 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     if (agentePausado(conversation.status)) {
       return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
     }
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
+    // Menção em story não é pergunta: registra e não acorda o webhook do agente.
+    if (input.event?.kind === "story_mention") {
+      await logMessages(conversation.id, input.text, [], input);
+      await syncContact(conversation.id, {}, true);
+      return { messages: [], status: "active" };
+    }
+    const { reply } = await callAgentWebhook(agent, input.text ?? "", conversationId, {}, input.lang);
     const messages = reply ? [{ text: reply }] : [];
     await logMessages(conversation.id, input.text, messages, input);
     const inboundNoFlow = input.text !== undefined || input.optionId !== undefined;
@@ -1050,6 +1227,9 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   // disso — senão o negócio nasceria sem dono. Memoiza pra não sincronizar
   // duas vezes na mesma rodada.
   let resolvedContactId: string | null = null;
+  // Uma captura validada (nome/e-mail/telefone/campo) nesta rodada: o contato
+  // vira lead no finish(), depois que a ficha foi sincronizada.
+  let virouLead = false;
   async function ensureContactId(): Promise<string | null> {
     if (resolvedContactId) return resolvedContactId;
     if (conversation.contactRecordId) {
@@ -1095,6 +1275,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   const outsideWindow = input.channel === "whatsapp_meta" && !isGenuineInbound && isOutsideWindow(conversation.lastContactMessageAt);
 
   async function finish(): Promise<AdvanceResult> {
+    const passouParaEquipe = status === "waiting_human" && conversation.status !== "waiting_human";
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {
@@ -1106,7 +1287,24 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       },
     });
     await logMessages(conversation.id, inboundText, messages, input);
-    await syncContact(conversation.id, variables, isGenuineInbound);
+    const contatoId = await syncContact(conversation.id, variables, isGenuineInbound);
+    if (passouParaEquipe) {
+      await publicarEvento({
+        orgId: agent!.orgId,
+        tipo: "conversation.waiting_human",
+        objeto: "conversation",
+        objetoId: conversation.id,
+        dados: { agent_id: input.agentId, channel: input.channel, contact_id: contatoId },
+      });
+    }
+    if (virouLead && contatoId) {
+      // Igual ao syncContact: falha no CRM nunca derruba a resposta da conversa.
+      try {
+        await marcarComoLead(contatoId, { agentId: input.agentId, channel: input.channel });
+      } catch (e) {
+        console.error("[flow-engine] falha ao marcar lead", e);
+      }
+    }
     if (steps.length > 0) {
       await prisma.flowExecution.create({
         data: {
@@ -1124,7 +1322,55 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
   // Esperar) usando a mensagem que acabou de chegar, antes de continuar
   // andando pelo fluxo.
   const parkedNode = findNode(nodes, currentId);
-  if (parkedNode?.data.iconKey === "capture") {
+  const inboundKind: InboundKind = input.event?.kind ?? "dm";
+  const gatilho =
+    isGenuineInbound && podeAvaliarGatilho(parkedNode?.data.iconKey ?? null, inboundKind)
+      ? await acharGatilho(input, inboundKind)
+      : null;
+
+  if (gatilho) {
+    await contarDisparo(gatilho.id);
+    steps.push({ nodeId: `trigger:${gatilho.id}`, kind: "trigger", label: gatilho.name, ms: 0 });
+    if (gatilho.replyText) messages.push({ text: interpolate(gatilho.replyText, variables) });
+    const alvo = gatilho.targetNodeId ? findNode(nodes, gatilho.targetNodeId) : null;
+    if (!alvo) return finish(); // só resposta: a conversa fica onde estava
+    delete variables.__wait_until;
+    currentId = alvo.id; // o laço abaixo executa o bloco de destino
+  } else if (inboundKind === "story_mention") {
+    // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
+    return finish();
+  } else if (parkedNode?.data.iconKey === "capture" && capturaValida(parkedNode.data)) {
+    // Captura com tipo (nome/e-mail/telefone/campo do contato): valida, pede de
+    // novo até captureMaxRetries e, se não der, sai por "não respondeu certo".
+    const campo = parkedNode.data.captureField as CaptureField;
+    const tentativas = Number(variables.__capture_tries ?? 0);
+    if (parkedNode.data.captureRequired === false && isSkip(input.text)) {
+      delete variables.__capture_tries;
+      currentId = nextDefaultNodeId(edges, parkedNode.id);
+    } else {
+      const def =
+        campo === "custom"
+          ? (await carregarDefinicoes(agent.orgId, "contact")).find((d) => d.key === parkedNode.data.captureCustomKey)
+          : undefined;
+      const r = validateCapture(campo, input.text ?? "", def);
+      if (r.ok) {
+        setVar(variables, variavelDaCaptura(parkedNode.data), r.value);
+        delete variables.__capture_tries;
+        virouLead = true;
+        currentId = nextDefaultNodeId(edges, parkedNode.id);
+      } else if (tentativas < (parkedNode.data.captureMaxRetries ?? 2)) {
+        variables.__capture_tries = tentativas + 1;
+        messages.push({ text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables) });
+        pushStep(parkedNode, { error: "resposta inválida" });
+        currentId = parkedNode.id;
+        return finish();
+      } else {
+        delete variables.__capture_tries;
+        pushStep(parkedNode, { error: "desistiu depois das tentativas" });
+        currentId = nextNodeId(edges, parkedNode.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, parkedNode.id);
+      }
+    }
+  } else if (parkedNode?.data.iconKey === "capture") {
     const options = parkedNode.data.options ?? [];
     let resolvedOptionId = input.optionId;
     // Se não veio um id de botão (ex: o cliente respondeu em texto livre em
@@ -1158,19 +1404,23 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
     currentId = nextNodeId(edges, parkedNode.id, handle);
   } else if (parkedNode?.data.iconKey === "agent") {
     const conversationId = `${input.channel}:${input.contactId}`;
-    const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
+    const { reply, done } = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
     if (reply) messages.push({ text: reply });
     pushStep(parkedNode, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" });
-    return finish();
+    if (!(reply && done && temSaidaPrincipal(edges, parkedNode.id))) return finish();
+    currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent.id, textoParaIA(input), variables, nodes, edges, conversation.id, {
+    const reply = await runAiAgent(parkedNode, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
+    const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
     if (reply.text) messages.push({ text: reply.text });
-    else if (reply.error && !["playground", "builder_preview"].includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
+    else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
-    return finish();
+    if (seErrou) currentId = seErrou; // falhou: segue pela saída "Erro"
+    else if (!reply.seguir) return finish();
+    else currentId = nextDefaultNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
@@ -1249,6 +1499,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
             contactId,
             amountCents: toCents(node.data.crmDealAmount),
             description: interpolate(node.data.crmDealDescription ?? "", variables),
+            origem: "fluxo",
           });
           // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
           if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
@@ -1279,12 +1530,14 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
           const deal = await findOpenDealForContact(contactId);
           if (!deal) throw new Error("O contato não tem negócio aberto para mover.");
           if (!node.data.crmStageId) throw new Error("Etapa de destino não configurada no bloco.");
-          const moved = await moveDealStage(
-            deal.id,
-            node.data.crmStageId,
-            interpolate(node.data.crmLostReason ?? "", variables)
-          );
-          output = `negócio movido (prob. ${moved.probability}%)`;
+          // Mesmas regras da tela: faltou campo obrigatório (ou motivo da
+          // perda) e o bloco não tem a flag explícita → erro do bloco.
+          const moved = await moveDealStage(deal.id, node.data.crmStageId, {
+            origem: "fluxo",
+            perda: { motivo: interpolate(node.data.crmLostReason ?? "", variables) },
+            ignorarObrigatorios: node.data.crmIgnorarObrigatorios === true,
+          });
+          output = `negócio movido (prob. ${moved?.probability ?? deal.probability}%)`;
         }
 
         if (kind === "crm-task") {
@@ -1297,6 +1550,7 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
             dealId: deal?.id ?? null,
             assignedToId: node.data.crmTaskAssigneeId || null,
             dueAt: parseRelativeDue(node.data.crmTaskDue ?? ""),
+            origem: "automacao",
           });
           output = `tarefa ${task.type}`;
         }
@@ -1388,6 +1642,25 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
       continue;
     }
 
+    if (kind === "email" && fonteDoEmail(node.data) === "contrato") {
+      // Pelo domínio do contrato: modelo da Biblioteca ou texto do bloco (com
+      // as variáveis do fluxo já trocadas); sem "Para", o e-mail do contato.
+      const startedAt = Date.now();
+      const para = interpolate(node.data.emailTo ?? "", variables).trim();
+      const r = await enviarEmailDoContrato(agent.orgId, {
+        contactId: await ensureContactId(),
+        email: para || null,
+        conteudo: node.data.emailModeloId
+          ? { modeloId: node.data.emailModeloId }
+          : { assunto: interpolate(node.data.emailSubject ?? "", variables), corpo: interpolate(node.data.emailBody ?? "", variables), modo: "simples" },
+        origem: "fluxo",
+        refId: node.id,
+      });
+      pushStep(node, r.ok ? { output: "e-mail enviado" } : { error: r.erro }, startedAt);
+      currentId = nextNodeId(edges, node.id);
+      continue;
+    }
+
     if (kind === "email") {
       const startedAt = Date.now();
       const apiKey = node.data.emailCredentialId ? await getCredentialSecret(node.data.emailCredentialId) : null;
@@ -1411,24 +1684,37 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent.id, textoParaIA(input), variables, nodes, edges, conversation.id, {
+      const reply = await runAiAgent(node, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     });
+      const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
       if (reply.text) messages.push({ text: reply.text });
-      else if (reply.error && !["playground", "builder_preview"].includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
+      else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
-      currentId = node.id; // fica "alugado" pra IA nativa até o contato parar de responder
+      if (seErrou) {
+        currentId = seErrou; // falhou: segue pela saída "Erro"
+        continue;
+      }
+      if (reply.seguir) {
+        currentId = nextDefaultNodeId(edges, node.id);
+        continue;
+      }
+      currentId = node.id; // fica com a IA até ela terminar (ou para sempre, sem ligação)
       break;
     }
 
     if (kind === "agent") {
       const startedAt = Date.now();
       const conversationId = `${input.channel}:${input.contactId}`;
-      const reply = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
+      const { reply, done } = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
       if (reply) messages.push({ text: reply });
       pushStep(node, { output: reply ?? undefined, error: reply ? undefined : "sem resposta do webhook" }, startedAt);
-      currentId = node.id; // fica "alugado" pra IA livre até o contato parar de responder
+      if (reply && done && temSaidaPrincipal(edges, node.id)) {
+        currentId = nextNodeId(edges, node.id);
+        continue;
+      }
+      currentId = node.id; // fica com o seu fluxo até ele responder done: true
       break;
     }
 

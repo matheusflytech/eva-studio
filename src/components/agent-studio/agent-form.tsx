@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/contrato/navegacao";
 import { Trash2, Check } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -14,20 +14,25 @@ import { ToolsPicker } from "./tools-picker";
 import { VariablesEditor } from "./variables-editor";
 import { MessageTemplatesEditor } from "./message-templates-editor";
 import { WebhookConfig } from "./webhook-config";
-import { WhatsAppConnect } from "./whatsapp-connect";
-import { MetaWhatsAppConnect } from "./meta-whatsapp-connect";
-import { InstagramConnect } from "./instagram-connect";
-import { TelegramConnect } from "./telegram-connect";
-import { MessengerConnect, TikTokConnect } from "./channel-connect";
 import { CommentAutomationsEditor } from "./comment-automations-editor";
+import { TriggersEditor } from "./triggers-editor";
 import { WidgetConnect } from "./widget-connect";
+import { CanaisDoAgente } from "./canais-do-agente";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { generateId, buildInboundWebhookUrl } from "@/lib/utils";
+import { generateId } from "@/lib/utils";
 import { AGENT_LANGUAGES } from "@/lib/data/types";
 import { CHANNELS } from "@/lib/data/channels";
 import type { Agent, AgentVariable, KnowledgeDoc } from "@/lib/data/types";
 
 export type AbaDoAgente = "resumo" | "comportamento" | "canais" | "avancado";
+
+/*
+ * "Canal principal", "Habilidades" e "Ferramentas do n8n" ficam escondidos:
+ * hoje nada no motor usa esses campos (são decorativos). Os valores
+ * continuam no banco e vão intactos no salvar; a frente F3 (Central de IA)
+ * decide se viram algo de verdade ou se saem.
+ */
+const MOSTRAR_CAMPOS_DECORATIVOS = false;
 
 /**
  * Uma seção do formulário. Fica sempre montada e só some da tela quando não é a
@@ -159,6 +164,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
                   ))}
                 </Select>
               </div>
+              {MOSTRAR_CAMPOS_DECORATIVOS && (
               <div>
                 <Label htmlFor="agent-channel">Canal principal</Label>
                 <Select id="agent-channel" value={primaryChannel} onChange={(e) => setPrimaryChannel(e.target.value)}>
@@ -169,6 +175,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
                   ))}
                 </Select>
               </div>
+              )}
             </div>
           </div>
         </Card>
@@ -227,6 +234,8 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Secao>
       )}
 
+      {MOSTRAR_CAMPOS_DECORATIVOS && (
+      <>
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
@@ -250,6 +259,8 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
           <ToolsPicker tools={tools} onChange={setTools} />
         </Card>
       </Secao>
+      </>
+      )}
 
       <Secao id="avancado" aba={aba}>
         <Card>
@@ -268,64 +279,17 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
             <CardDescription>Opcional. Use se a resposta vem de um workflow seu em vez do Builder.</CardDescription>
           </CardHeader>
           <WebhookConfig
-            inboundUrl={buildInboundWebhookUrl(agentId)}
+            agentId={isEdit ? agentId : null}
             outboundUrl={outboundUrl}
             onOutboundChange={setOutboundUrl}
           />
         </Card>
       </Secao>
 
+      {/* Canais são do contrato (Configurações → Canais); aqui o agente escolhe por onde atende. */}
       {isEdit && (
         <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp oficial (Meta)</CardTitle>
-              <CardDescription>O canal para clientes de verdade: estável, com selo e sem risco de bloqueio.</CardDescription>
-            </CardHeader>
-            <MetaWhatsAppConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp por QR code</CardTitle>
-              <CardDescription>Conecte o número que você já usa, lendo um QR. Bom para testar; para volume alto, prefira o oficial.</CardDescription>
-            </CardHeader>
-            <WhatsAppConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Instagram</CardTitle>
-              <CardDescription>Mensagens diretas do Instagram, pela mesma conta Business ou Creator.</CardDescription>
-            </CardHeader>
-            <InstagramConnect agentId={agentId} />
-          </Card>
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <TelegramConnect agentId={agentId} />
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <MessengerConnect agentId={agentId} />
-        </Secao>
-      )}
-
-      {isEdit && (
-        <Secao id="canais" aba={aba}>
-          <TikTokConnect agentId={agentId} />
+          <CanaisDoAgente agentId={agentId} agentNome={agent?.name ?? name} />
         </Secao>
       )}
 
@@ -349,6 +313,20 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
               <CardDescription>Textos aprovados pela Meta, para falar com o cliente depois das 24 horas sem resposta.</CardDescription>
             </CardHeader>
             <MessageTemplatesEditor agentId={agentId} />
+          </Card>
+        </Secao>
+      )}
+
+      {isEdit && (
+        <Secao id="canais" aba={aba}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Gatilhos</CardTitle>
+              <CardDescription>
+                Palavra-chave na mensagem (todos os canais), resposta a story e menção em story (Instagram).
+              </CardDescription>
+            </CardHeader>
+            <TriggersEditor agentId={agentId} />
           </Card>
         </Secao>
       )}

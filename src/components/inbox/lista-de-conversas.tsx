@@ -77,7 +77,7 @@ export function ListaDeConversas({
           <h1 className="font-display text-[17px] font-semibold text-text-primary">Conversas</h1>
           <div className="flex items-center gap-2">
             {resumo && resumo.naoLidas > 0 && (
-              <span className="rounded-full bg-accent-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+              <span className="rounded-full bg-accent-500 px-2 py-0.5 text-[11px] font-semibold text-text-on-accent">
                 {resumo.naoLidas} {resumo.naoLidas === 1 ? "nova" : "novas"}
               </span>
             )}
@@ -232,7 +232,7 @@ export function ListaDeConversas({
                             : "Sem mensagens"}
                         </span>
                         {naoLida && (
-                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-accent-500 px-1 text-[10.5px] font-semibold text-white">
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-accent-500 px-1 text-[10.5px] font-semibold text-text-on-accent">
                             {c.naoLidas > 99 ? "99+" : c.naoLidas}
                           </span>
                         )}

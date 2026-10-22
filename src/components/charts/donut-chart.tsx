@@ -3,7 +3,8 @@ export interface DonutSegment {
   value: number;
 }
 
-const SHADES = ["rgba(255,255,255,0.85)", "rgba(255,255,255,0.45)", "rgba(255,255,255,0.2)", "rgba(255,255,255,0.1)"];
+// Tons do texto principal: escuro no tema claro, claro no escuro.
+const SHADES = [85, 45, 22, 12].map((p) => `color-mix(in srgb, var(--text-primary) ${p}%, transparent)`);
 
 export function DonutChart({ segments, size = 140 }: { segments: DonutSegment[]; size?: number }) {
   const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
@@ -14,7 +15,7 @@ export function DonutChart({ segments, size = 140 }: { segments: DonutSegment[];
   return (
     <div className="flex items-center gap-5">
       <svg viewBox="0 0 100 100" width={size} height={size}>
-        <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={14} />
+        <circle cx="50" cy="50" r={radius} fill="none" style={{ stroke: "var(--border-subtle)" }} strokeWidth={14} />
         {segments.map((s, i) => {
           const fraction = s.value / total;
           const dash = fraction * circumference;
@@ -25,7 +26,7 @@ export function DonutChart({ segments, size = 140 }: { segments: DonutSegment[];
               cy="50"
               r={radius}
               fill="none"
-              stroke={SHADES[i % SHADES.length]}
+              style={{ stroke: SHADES[i % SHADES.length] }}
               strokeWidth={14}
               strokeDasharray={`${dash} ${circumference - dash}`}
               strokeDashoffset={-offset}

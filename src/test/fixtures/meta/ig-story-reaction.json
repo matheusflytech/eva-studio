@@ -1,0 +1,10 @@
+{
+  "sender": { "id": "IGSID_1" },
+  "recipient": { "id": "IG_1" },
+  "timestamp": 1760000000000,
+  "message": {
+    "mid": "mid.react1",
+    "text": "❤️",
+    "reply_to": { "story": { "id": "STORY_1", "url": "https://lookaside.example/story1" } }
+  }
+}

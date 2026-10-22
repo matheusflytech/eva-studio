@@ -1,76 +1,68 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
-import { createTask, parseRelativeDue } from "@/lib/server/crm";
-import type { Prisma } from "@/generated/prisma/client";
+import { createTask, parseRelativeDue, statusDaReferencia } from "@/lib/server/crm";
+import { JSON_INVALIDO, conferirReferencias, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
+import { listarTarefas } from "@/lib/server/tarefas";
+import { visoesPermitidas } from "@/lib/tarefas/escopo";
+import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
+import { lerPrazoDaTela } from "@/lib/tarefas/conclusao";
 
 // Tarefas da organização.
-//   ?scope=minhas|todas   (padrão: minhas)
+//   ?visao=minhas|equipe|todas  (padrão: minhas; limitado ao escopo de negócios do papel)
+//   ?scope=minhas|todas         (nome antigo, ainda aceito)
 //   ?status=abertas|feitas|todas  (padrão: abertas)
 export async function GET(request: Request) {
-  const ctx = await requirePermission("read");
+  const ctx = await requirePermission("tarefas:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const params = new URL(request.url).searchParams;
-  const scope = params.get("scope") ?? "minhas";
-  const status = params.get("status") ?? "abertas";
-
-  const where: Prisma.TaskWhereInput = { orgId: ctx.orgId };
-  if (scope === "minhas") where.assignedToId = ctx.userId;
-  if (status === "abertas") where.doneAt = null;
-  if (status === "feitas") where.doneAt = { not: null };
-
-  const tasks = await prisma.task.findMany({
-    where,
-    include: {
-      contact: { select: { id: true, name: true, phone: true } },
-      deal: { select: { id: true, name: true } },
-      assignedTo: { select: { id: true, name: true } },
-    },
-    // Sem prazo vai pro fim: tarefa sem data não é urgente por definição.
-    orderBy: [{ doneAt: "asc" }, { dueAt: { sort: "asc", nulls: "last" } }],
-    take: 200,
+  const { visao, tarefas } = await listarTarefas(ctx, {
+    visao: params.get("visao") ?? params.get("scope"),
+    status: params.get("status"),
   });
-
-  return NextResponse.json({
-    tasks: tasks.map((t) => ({
-      id: t.id,
-      type: t.type,
-      text: t.text,
-      dueAt: t.dueAt?.toISOString() ?? null,
-      doneAt: t.doneAt?.toISOString() ?? null,
-      contact: t.contact,
-      deal: t.deal,
-      assignedTo: t.assignedTo,
-      // Atrasada é o único estado que precisa saltar aos olhos numa lista.
-      overdue: !t.doneAt && !!t.dueAt && t.dueAt.getTime() < Date.now(),
-    })),
-  });
+  return NextResponse.json({ visao, visoes: visoesPermitidas(ctx.escopo?.negocios), tasks: tarefas });
 }
 
+// POST { text, type?, dueAt? (ISO | "AAAA-MM-DDTHH:mm" de SP | "AAAA-MM-DD" = dia todo) | due? ("+2 dias"),
+//        diaTodo?, prioridade? (normal|alta), duracaoMin?, contactId?, dealId?, assignedToId? }
 export async function POST(request: Request) {
-  const ctx = await requirePermission("contacts:manage");
+  const ctx = await requirePermission("tarefas:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json();
-  const text = String(body.text ?? "").trim();
-  if (!text) return NextResponse.json({ error: "Descreva a tarefa." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  const text = texto(body.text, 5000) ?? "";
+  if (!text) return erro("Descreva a tarefa.");
+
+  const bruto = body.type === undefined || body.type === null || body.type === "" ? "ligar" : body.type;
+  const type = normalizarTipoDeTarefa(bruto);
+  if (!type) return erro("Tipo de tarefa inválido.");
 
   // Aceita data absoluta (da tela) ou prazo relativo (de automação).
-  const dueAt = body.dueAt
-    ? new Date(body.dueAt)
-    : body.due
-      ? parseRelativeDue(String(body.due))
-      : null;
+  const prazo = lerPrazoDaTela(body.dueAt);
+  if (prazo === "invalida") return erro("Prazo inválido.");
+  let dueAt = prazo?.dueAt ?? null;
+  if (prazo === undefined && body.due) dueAt = parseRelativeDue(String(body.due));
+
+  const erroRef = await conferirReferencias(ctx.orgId, {
+    contactId: body.contactId,
+    dealId: body.dealId,
+    assignedToId: body.assignedToId,
+  });
+  if (erroRef) return erro(erroRef, statusDaReferencia(erroRef));
 
   const task = await createTask({
     orgId: ctx.orgId,
     text,
-    type: String(body.type ?? "ligar"),
-    contactId: body.contactId || null,
-    dealId: body.dealId || null,
-    assignedToId: body.assignedToId || ctx.userId,
-    dueAt: dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt : null,
+    type,
+    contactId: (body.contactId as string) || null,
+    dealId: (body.dealId as string) || null,
+    assignedToId: (body.assignedToId as string) || ctx.userId,
+    dueAt,
+    origem: "manual",
+    diaTodo: body.diaTodo === true || !!prazo?.diaTodo,
+    prioridade: body.prioridade === "alta" ? "alta" : "normal",
+    duracaoMin: typeof body.duracaoMin === "number" && Number.isFinite(body.duracaoMin) ? body.duracaoMin : null,
   });
 
   return NextResponse.json({ task: { id: task.id } });

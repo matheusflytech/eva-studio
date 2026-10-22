@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { enviarEmailDoContrato } from "@/lib/server/email/envio";
 import { deliverToContact } from "@/lib/server/outbound";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 
@@ -229,6 +230,45 @@ export async function processDueEnrollments(limit = 50): Promise<ProcessResult> 
       continue;
     }
 
+    // E-mail: o passo é um modelo da Biblioteca, enviado pelo domínio do
+    // contrato. Não depende de canal de conversa nem de janela de 24h.
+    if (sequence.channel === "email") {
+      const envio = step.templateId
+        ? await enviarEmailDoContrato(contact.orgId, {
+            contactId: contact.id,
+            conteudo: { modeloId: step.templateId },
+            origem: "regua",
+            refId: enrollment.id,
+          })
+        : ({ ok: false, motivo: "sem_modelo", erro: "passo sem modelo de e-mail" } as const);
+      if (!envio.ok) {
+        // Problema da pessoa (sem e-mail, descadastrou, falta dado): para a
+        // régua dela com o motivo. Problema do contrato ou da Resend: tenta de
+        // novo mais tarde, sem pular o passo.
+        if (["sem_email", "suprimido", "faltou_variavel", "sem_modelo"].includes(envio.motivo)) {
+          await prisma.sequenceEnrollment.update({ where: { id: enrollment.id }, data: { status: "stopped", stoppedReason: envio.erro.slice(0, 200) } });
+          result.stopped += 1;
+        } else {
+          result.errors.push(`${sequence.name} passo ${step.order}: ${envio.erro}`);
+          await prisma.sequenceEnrollment.update({ where: { id: enrollment.id }, data: { nextRunAt: new Date(Date.now() + 60 * 60_000) } });
+        }
+        continue;
+      }
+      result.delivered += 1;
+      if (step.applyTagId) {
+        const { applyTag } = await import("@/lib/server/contacts");
+        await applyTag(contact.id, step.applyTagId);
+      }
+      const seguinte = sequence.steps.find((s) => s.order === step.order + 1);
+      await prisma.sequenceEnrollment.update({
+        where: { id: enrollment.id },
+        data: seguinte
+          ? { currentStep: step.order, nextRunAt: new Date(Date.now() + seguinte.delayMinutes * 60_000) }
+          : { currentStep: step.order, status: "done" },
+      });
+      continue;
+    }
+
     // Janela de 24h: no WhatsApp oficial, texto livre fora dela é rejeitado
     // pela Meta. Em vez de gastar a chamada e registrar um erro cru, para a
     // régua com um motivo legível.
@@ -332,4 +372,53 @@ function contactValues(contact: {
     telefone: contact.phone,
     phone: contact.phone,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Regras de validação da régua, extraídas para serem as mesmas em todo lugar
+// (rotas de sequência e o rascunho montado pela IA em src/lib/server/ia/).
+// Os valores espelham exatamente o que as rotas aceitam hoje.
+// ---------------------------------------------------------------------------
+
+export const CANAIS_DE_SEQUENCIA = ["whatsapp_meta", "whatsapp_qr", "instagram", "telegram", "email"] as const;
+export type CanalDeSequencia = (typeof CANAIS_DE_SEQUENCIA)[number];
+
+export const GATILHOS_DE_SEQUENCIA = ["tag", "segment", "stage", "manual"] as const;
+export type GatilhoDeSequencia = (typeof GATILHOS_DE_SEQUENCIA)[number];
+
+export function ehCanalDeSequencia(v: unknown): v is CanalDeSequencia {
+  return typeof v === "string" && (CANAIS_DE_SEQUENCIA as readonly string[]).includes(v);
+}
+
+export function ehGatilhoDeSequencia(v: unknown): v is GatilhoDeSequencia {
+  return typeof v === "string" && (GATILHOS_DE_SEQUENCIA as readonly string[]).includes(v);
+}
+
+export interface PassoLimpo {
+  order: number;
+  delayMinutes: number;
+  text: string;
+  templateId: string | null;
+  applyTagId: string | null;
+}
+
+/**
+ * Mesma limpeza que o PATCH de sequência faz nos passos (espera nunca
+ * negativa, texto aparado, passo sem texto descartado), com a ordem
+ * recalculada depois do filtro para não sobrar buraco.
+ */
+export function limparPassosDeSequencia(
+  steps: { delayMinutes?: unknown; text?: unknown; templateId?: unknown; applyTagId?: unknown }[],
+  canal?: string
+): PassoLimpo[] {
+  return steps
+    .map((s) => ({
+      delayMinutes: Math.max(0, Number(s.delayMinutes ?? 60) || 0),
+      text: String(s.text ?? "").trim(),
+      templateId: typeof s.templateId === "string" && s.templateId ? s.templateId : null,
+      applyTagId: typeof s.applyTagId === "string" && s.applyTagId ? s.applyTagId : null,
+    }))
+    // E-mail: o passo é o modelo da Biblioteca (templateId); o texto é só o nome.
+    .filter((s) => s.text.length > 0 || (canal === "email" && !!s.templateId))
+    .map((s, i) => ({ order: i + 1, ...s }));
 }

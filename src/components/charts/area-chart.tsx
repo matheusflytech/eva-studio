@@ -23,20 +23,21 @@ export function AreaChart({ data, height = 180 }: { data: ChartPoint[]; height?:
       <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-[180px] w-full overflow-visible">
         <defs>
           <linearGradient id="eva-area-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.16)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            <stop offset="0%" style={{ stopColor: "var(--text-primary)", stopOpacity: 0.14 }} />
+            <stop offset="100%" style={{ stopColor: "var(--text-primary)", stopOpacity: 0 }} />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#eva-area-fill)" stroke="none" />
         <path
           d={linePath}
           fill="none"
-          stroke="rgba(255,255,255,0.75)"
+          className="stroke-text-primary"
+          strokeOpacity={0.75}
           strokeWidth={1.5}
           vectorEffect="non-scaling-stroke"
         />
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={1.4} fill="white" vectorEffect="non-scaling-stroke" />
+          <circle key={i} cx={p.x} cy={p.y} r={1.4} className="fill-text-primary" vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
       <div className="mt-2 flex justify-between text-[11px] text-text-tertiary">

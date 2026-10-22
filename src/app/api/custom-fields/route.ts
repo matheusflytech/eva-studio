@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
 import { carregarDefinicoes, gerarChaveUnica, prepararOpcoes, serializarDefinicao } from "@/lib/server/custom-fields";
 import { TIPO_POR_ID, type OpcaoDeCampo } from "@/lib/custom-fields";
 
@@ -31,10 +32,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const body = await request.json().catch(() => ({}));
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const label = String(body.label ?? "").trim().slice(0, 60);
   const entity = body.entity === "contact" ? "contact" : "deal";
   const type = String(body.type ?? "");
@@ -63,21 +65,25 @@ export async function POST(request: Request) {
 
   const key = await gerarChaveUnica(ctx.orgId, entity, label);
 
-  const campo = await prisma.customField.create({
-    data: {
-      orgId: ctx.orgId,
-      entity,
-      pipelineId,
-      key,
-      label,
-      type,
-      options: opcoes as unknown as object,
-      required: body.required === true,
-      helpText: String(body.helpText ?? "").slice(0, 200),
-      showOnCard: entity === "deal" && body.showOnCard === true,
-      position: total,
-    },
-  });
-
-  return NextResponse.json({ field: serializarDefinicao(campo) });
+  try {
+    const campo = await prisma.customField.create({
+      data: {
+        orgId: ctx.orgId,
+        entity,
+        pipelineId,
+        key,
+        label,
+        type,
+        options: opcoes as unknown as object,
+        required: body.required === true,
+        helpText: String(body.helpText ?? "").slice(0, 200),
+        showOnCard: entity === "deal" && body.showOnCard === true,
+        position: total,
+      },
+    });
+    return NextResponse.json({ field: serializarDefinicao(campo) });
+  } catch (e) {
+    // Corrida em gerarChaveUnica (dois campos com o mesmo nome ao mesmo tempo).
+    return respostaDeErroDoPrisma(e);
+  }
 }

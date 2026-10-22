@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { tocarAtividadeDaConversa } from "@/lib/server/atividade-do-negocio";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
 // Caixa de entrada: as regras num lugar só.
@@ -73,6 +75,11 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
   const visiveis = criadas.filter((m) => m.role !== "note");
   const ultima = visiveis[visiveis.length - 1];
   const doContato = visiveis.filter((m) => m.role === "contact");
+  // Antes de atualizar: a conversa já tinha mensagem do contato? (gatilho "primeira mensagem")
+  const jaTinhaDoContato =
+    doContato.length > 0
+      ? !!(await prisma.conversation.findUnique({ where: { id: conversationId }, select: { lastContactMessageAt: true } }).catch(() => null))?.lastContactMessageAt
+      : true;
 
   if (ultima) {
     await prisma.conversation.update({
@@ -86,9 +93,50 @@ export async function registrarMensagens(conversationId: string, mensagens: Nova
         ...(doContato.length > 0 ? { lastContactMessageAt: doContato[doContato.length - 1].createdAt } : {}),
       },
     });
+    // Mensagem entrando ou saindo zera o relógio do "parado" dos negócios
+    // abertos do contato (nota interna não conta: fica fora de `visiveis`).
+    await tocarAtividadeDaConversa(conversationId, ultima.createdAt);
   }
+  if (doContato.length > 0) await emitirMensagensRecebidas(conversationId, doContato, !jaTinhaDoContato);
 
   return criadas;
+}
+
+/** Evento `message.received`: um por mensagem do contato (webhooks e automações). */
+async function emitirMensagensRecebidas(
+  conversationId: string,
+  mensagens: { id: string; text: string; mediaType: string | null; mediaMime: string | null; createdAt: Date }[],
+  primeiraDaConversa: boolean
+) {
+  const conversa = await prisma.conversation
+    .findUnique({
+      where: { id: conversationId },
+      select: { agentId: true, channel: true, contactId: true, contactRecordId: true, agent: { select: { orgId: true } } },
+    })
+    .catch(() => null);
+  if (!conversa?.agent) return;
+  for (const [i, m] of mensagens.entries()) {
+    await publicarEvento({
+      orgId: conversa.agent.orgId,
+      tipo: "message.received",
+      objeto: "conversation",
+      objetoId: conversationId,
+      dados: {
+        id: m.id,
+        conversation_id: conversationId,
+        agent_id: conversa.agentId,
+        channel: conversa.channel,
+        // Id do contato no canal (número, @ do Instagram) e a ficha no CRM.
+        channel_contact_id: conversa.contactId,
+        contact_id: conversa.contactRecordId,
+        text: m.text,
+        media_type: m.mediaType,
+        media_mime: m.mediaMime,
+        created_at: m.createdAt.toISOString(),
+        primeira: primeiraDaConversa && i === 0,
+      },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

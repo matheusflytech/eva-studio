@@ -1,0 +1,151 @@
+{
+  "name": "Eva Studio: o agente pergunta ao n8n e a resposta vem depois",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-eva",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "57094797-a601-4dbe-96f7-9d88ff0b79f6",
+      "name": "Bloco Enviar para o n8n",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { reply: 'Um instante, estou consultando.', done: false } }}",
+        "options": {}
+      },
+      "id": "23d8c504-8643-402a-92c8-a7e7eca44693",
+      "name": "Responder já",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://SEU-SISTEMA/api/pedidos?telefone={{ $('Bloco Enviar para o n8n').item.json.body.conversation_id.split(':')[1] }}",
+        "options": {}
+      },
+      "id": "cab24d1e-6167-4d53-8d03-9db540823977",
+      "name": "Consultar sistema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "texto",
+              "value": "=Seu pedido está: {{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "conversa",
+              "value": "={{ $('Bloco Enviar para o n8n').item.json.body.conversation_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "75036f44-2620-495a-bc44-482643839099",
+      "name": "Montar resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "agent_id": "={{ $('Bloco Enviar para o n8n').item.json.body.agent.id }}",
+        "conversation_id": "={{ $json.conversa }}",
+        "text": "={{ $json.texto }}"
+      },
+      "id": "b8b50565-098b-4ac0-bc7e-eaeb66a4918d",
+      "name": "Mandar pelo agente",
+      "type": "n8n-nodes-eva-studio.evaStudio",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "evaStudioApi": {
+          "id": "",
+          "name": "Eva Studio API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Bloco Enviar para o n8n": {
+      "main": [
+        [
+          {
+            "node": "Responder já",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder já": {
+      "main": [
+        [
+          {
+            "node": "Consultar sistema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar sistema": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar resposta": {
+      "main": [
+        [
+          {
+            "node": "Mandar pelo agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

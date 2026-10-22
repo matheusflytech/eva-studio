@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
+import Link from "@/components/contrato/link";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X } from "lucide-react";
 import { TIPO_POR_ID, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { FlowNodeData } from "./flow-node";
+import { INFO_DO_TIPO, TIPOS_DE_TAREFA, tipoParaExibir } from "@/lib/tarefas/tipos";
 
 // ---------------------------------------------------------------------------
 // Configuração dos blocos de CRM no Inspector.
@@ -142,7 +144,7 @@ function MapaDeCampos({
     return (
       <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
         Você ainda não criou campos {entidade === "deal" ? "do negócio" : "do contato"}.{" "}
-        <a href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</a> para o agente poder preenchê-los.
+        <Link href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</Link> para o agente poder preenchê-los.
       </p>
     );
   }
@@ -311,7 +313,23 @@ export function CrmBlockFields({
             onChange={(e) => onChange({ crmLostReason: e.target.value })}
             placeholder="Preço, prazo, sumiu..."
           />
+          <p className="mt-1 text-[11.5px] text-text-tertiary">
+            Se bater com um motivo do funil, entra como ele; senão vira “Outro” com este texto como nota.
+          </p>
         </div>
+        <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+          <Checkbox
+            checked={data.crmIgnorarObrigatorios === true}
+            onCheckedChange={(v) => onChange({ crmIgnorarObrigatorios: v === true })}
+          />
+          <span className="min-w-0">
+            <span className="block font-medium text-text-primary">Mover mesmo sem os campos obrigatórios da etapa</span>
+            <span className="block text-[11.5px] text-text-tertiary">
+              Desligado, o bloco falha quando faltar algum campo exigido pela etapa (ou o motivo da perda). Ligado, move e
+              registra no histórico que pulou os obrigatórios.
+            </span>
+          </span>
+        </label>
         <p className="text-[11.5px] text-text-tertiary">
           Age no negócio aberto mais recente do contato. Se ele não tiver negócio aberto, o bloco registra o erro
           na aba Execuções e o fluxo continua.
@@ -328,13 +346,14 @@ export function CrmBlockFields({
             <Label htmlFor="node-task-type">Tipo</Label>
             <Select
               id="node-task-type"
-              value={data.crmTaskType ?? "ligar"}
+              value={tipoParaExibir(data.crmTaskType ?? "ligar")}
               onChange={(e) => onChange({ crmTaskType: e.target.value })}
             >
-              <option value="ligar">Ligar</option>
-              <option value="email">E-mail</option>
-              <option value="reuniao">Reunião</option>
-              <option value="outro">Outro</option>
+              {TIPOS_DE_TAREFA.map((t) => (
+                <option key={t} value={t}>
+                  {INFO_DO_TIPO[t].rotulo}
+                </option>
+              ))}
             </Select>
           </div>
           <div>
@@ -407,9 +426,9 @@ export function CrmBlockFields({
           {tags.length === 0 && (
             <p className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-text-tertiary">
               Nenhuma etiqueta ainda. Crie em{" "}
-              <a href="/contatos" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
+              <Link href="/contatos" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
                 Contatos <ExternalLink size={11} />
-              </a>
+              </Link>
             </p>
           )}
         </div>

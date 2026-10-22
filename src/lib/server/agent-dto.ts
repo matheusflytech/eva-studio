@@ -1,5 +1,4 @@
 import type { Agent as PrismaAgent, AgentVariable as PrismaVariable, KnowledgeDoc as PrismaDoc } from "@/generated/prisma/client";
-import { buildInboundWebhookUrl } from "@/lib/utils";
 import type { Agent, AgentLanguage } from "@/lib/data/types";
 
 type FullAgent = PrismaAgent & { variables: PrismaVariable[]; knowledgeBase: PrismaDoc[] };
@@ -25,7 +24,6 @@ export function toAgentDTO(row: FullAgent): Agent {
     tools: row.tools as string[],
     variables: row.variables.map((v) => ({ id: v.id, name: v.name, unit: v.unit })),
     webhook: {
-      inboundUrl: buildInboundWebhookUrl(row.id),
       outboundUrl: row.outboundUrl,
     },
     status: row.status as "active" | "paused",

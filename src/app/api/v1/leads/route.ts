@@ -1,79 +1,49 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { requireApiKeyOrgId } from "@/lib/server/api-keys";
-import { checkRateLimit } from "@/lib/server/rate-limit";
-import { prisma } from "@/lib/db/prisma";
-import { registrarMensagens } from "@/lib/server/inbox";
+import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
+import { buscarLead, isLeadStage, LEAD_STAGES, listarLeads, salvarLeadExterno, serializarLeadPublico } from "@/lib/server/leads";
+import { autenticarApiV1, respostaDeErroDoLead } from "./auth";
 
 // API pública de Leads — /api/v1/leads. Autenticada por "Authorization: Bearer
 // evs_live_...", uma chave por org (ver Integrações → API). Mesmo dado que a
-// tela de Leads mostra (Conversation onde channel="website"), só que pra
-// consumo por fora — igual a API de Contacts do HubSpot/Salesforce.
-
-const VALID_STAGES = ["novo", "contatado", "qualificado", "ganho", "perdido"];
-
-function serializeLead(c: {
-  id: string; agentId: string; contactId: string; variables: unknown; leadStage: string | null; createdAt: Date; updatedAt: Date;
-}) {
-  return {
-    id: c.id,
-    agentId: c.agentId,
-    contactId: c.contactId,
-    stage: c.leadStage ?? "novo",
-    fields: c.variables,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-  };
-}
+// tela de Leads mostra: contatos com etapa de lead, de qualquer canal (ver
+// src/lib/server/leads.ts). Formato da resposta em serializarLeadPublico.
 
 export async function GET(request: Request) {
-  const orgId = await requireApiKeyOrgId(request);
-  if (!orgId) return NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 });
-
-  const rate = await checkRateLimit(`apikey:${orgId}`, 120, 60);
-  if (!rate.allowed) return NextResponse.json({ error: "Limite de requisições excedido. Tente de novo em instantes." }, { status: 429 });
+  const auth = await autenticarApiV1(request);
+  if ("resposta" in auth) return auth.resposta;
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 200);
   const stage = searchParams.get("stage");
+  if (stage && !isLeadStage(stage)) return erro(`stage precisa ser um de: ${LEAD_STAGES.join(", ")}.`);
 
-  const rows = await prisma.conversation.findMany({
-    where: { channel: "website", agent: { orgId }, ...(stage ? { leadStage: stage } : {}) },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-
-  return NextResponse.json({ data: rows.map(serializeLead) });
+  const leads = await listarLeads(auth.orgId, { stage, limit });
+  return NextResponse.json({ data: leads.map(serializarLeadPublico) });
 }
 
+// Corpo: { agentId, fields, stage? }. `variables`/`leadStage` aceitos como
+// apelido. `contactId` (formato antigo) é aceito se for texto, mas ignorado:
+// o lead é deduplicado por e-mail/telefone.
 export async function POST(request: Request) {
-  const orgId = await requireApiKeyOrgId(request);
-  if (!orgId) return NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 });
+  const auth = await autenticarApiV1(request);
+  if ("resposta" in auth) return auth.resposta;
 
-  const rate = await checkRateLimit(`apikey:${orgId}`, 120, 60);
-  if (!rate.allowed) return NextResponse.json({ error: "Limite de requisições excedido. Tente de novo em instantes." }, { status: 429 });
-
-  const { agentId, contactId, fields, stage } = await request.json();
-  if (!agentId || !fields || typeof fields !== "object") {
-    return NextResponse.json({ error: "agentId e fields são obrigatórios." }, { status: 400 });
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
+  if (body.contactId !== undefined && body.contactId !== null && typeof body.contactId !== "string") {
+    return erro("contactId precisa ser texto.");
   }
-  if (stage && !VALID_STAGES.includes(stage)) {
-    return NextResponse.json({ error: `stage precisa ser um de: ${VALID_STAGES.join(", ")}.` }, { status: 400 });
+  const fields = body.fields ?? body.variables;
+  if (typeof body.agentId !== "string" || !body.agentId.trim() || !fields || typeof fields !== "object" || Array.isArray(fields)) {
+    return erro("agentId e fields são obrigatórios.");
   }
+  const stageBruto = body.stage ?? body.leadStage;
+  const stage = stageBruto === "" || stageBruto === null ? undefined : stageBruto;
 
-  const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
-  if (!agent) return NextResponse.json({ error: "agentId não encontrado nessa organização." }, { status: 404 });
+  const r = await salvarLeadExterno(auth.orgId, { agentId: body.agentId, fields, stage }, "api");
+  if ("error" in r) return respostaDeErroDoLead(r);
 
-  const conversation = await prisma.conversation.create({
-    data: {
-      agentId,
-      channel: "website",
-      contactId: contactId?.trim() || `api_${randomUUID().slice(0, 12)}`,
-      variables: fields,
-      leadStage: stage || "novo",
-    },
-  });
-  await registrarMensagens(conversation.id, [{ role: "bot", text: "Lead recebido via API pública." }]);
-
-  return NextResponse.json({ data: serializeLead(conversation) }, { status: 201 });
+  const lead = await buscarLead(auth.orgId, r.contactId);
+  if (!lead) return erro("Lead não encontrado.", 404);
+  return NextResponse.json({ data: serializarLeadPublico(lead) }, { status: 201 });
 }

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { ehAvisoDeSemAgente } from "@/lib/server/canais/sem-agente";
 import { requirePermission } from "@/lib/server/permissions";
 import { lerEstadoWorker } from "@/lib/server/heartbeat";
+import { whereDeParadosDoContrato } from "@/lib/server/filtro-crm";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
@@ -19,8 +21,7 @@ import type { FlowNodeData } from "@/components/agent-studio/builder/flow-node";
 // ---------------------------------------------------------------------------
 
 const DIA = 24 * 60 * 60 * 1000;
-/** Depois disso, negócio parado na mesma etapa vira esquecimento. */
-const DIAS_PARADO = 7;
+// Parado = sem atividade além do prazo da etapa (regras de etapa; padrão 7 dias).
 
 export interface Pendencia {
   id: string;
@@ -31,6 +32,52 @@ export interface Pendencia {
   quantidade?: number;
 }
 
+const HORA = 60 * 60 * 1000;
+
+function nomeDoWebhook(w: { url: string; descricao: string }): string {
+  if (w.descricao) return w.descricao;
+  try {
+    return new URL(w.url).host;
+  } catch {
+    return w.url;
+  }
+}
+
+async function webhooksComProblema(orgId: string, agora: Date): Promise<Pendencia[]> {
+  try {
+    const lista = await prisma.webhookEndpoint.findMany({
+      where: {
+        orgId,
+        OR: [
+          { ativo: false, desativadoPor: { not: null } },
+          { ativo: true, falhandoDesde: { lt: new Date(agora.getTime() - HORA) } },
+        ],
+      },
+      select: { id: true, url: true, descricao: true, ativo: true, desativadoPor: true, falhandoDesde: true },
+    });
+    return lista.map((w) =>
+      w.ativo
+        ? {
+            id: `webhook-falhando-${w.id}`,
+            tipo: "atencao" as const,
+            titulo: `O webhook ${nomeDoWebhook(w)} está falhando`,
+            detalhe: `Os eventos não chegam desde ${w.falhandoDesde!.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. O Eva segue tentando; veja o log de entregas.`,
+            href: "/integracoes/n8n",
+          }
+        : {
+            id: `webhook-desligado-${w.id}`,
+            tipo: "urgente" as const,
+            titulo: `O webhook ${nomeDoWebhook(w)} foi desligado`,
+            detalhe: `${w.desativadoPor} Nenhum evento sai para ele até alguém corrigir e ligar de novo.`,
+            href: "/integracoes/n8n",
+          }
+    );
+  } catch {
+    // Sem a tabela de webhooks: nada a avisar.
+    return [];
+  }
+}
+
 export async function GET() {
   const ctx = await requirePermission("read");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -38,8 +85,8 @@ export async function GET() {
   const agora = new Date();
   const fimDoDia = new Date(agora);
   fimDoDia.setHours(23, 59, 59, 999);
-  const corteParado = new Date(agora.getTime() - DIAS_PARADO * DIA);
 
+  const onde = { parados: await whereDeParadosDoContrato(ctx.orgId, agora) };
   const [esperando, atrasadas, hoje, parados, agentes, worker, conversas7d] = await Promise.all([
     prisma.conversation.count({
       where: { agent: { orgId: ctx.orgId }, status: "waiting_human" },
@@ -55,7 +102,7 @@ export async function GET() {
         orgId: ctx.orgId,
         closedAt: null,
         archivedAt: null,
-        stageSince: { lte: corteParado },
+        AND: [onde.parados],
       },
     }),
     prisma.agent.findMany({
@@ -114,12 +161,37 @@ export async function GET() {
     pendencias.push({
       id: "parados",
       tipo: "atencao",
-      titulo: `${parados} ${parados === 1 ? "negócio parado" : "negócios parados"} há mais de ${DIAS_PARADO} dias`,
-      detalhe: "Mesma etapa desde então. Ou avança, ou fecha como perdido.",
+      titulo: `${parados} ${parados === 1 ? "negócio parado" : "negócios parados"}`,
+      detalhe: "Sem atividade além do prazo da etapa. Ou avança, ou fecha como perdido.",
       href: "/negocios",
       quantidade: parados,
     });
   }
+
+  // Canal do contrato recebendo mensagem sem nenhum agente para responder.
+  let semAgente: { id: string; rotulo: string; detalhe: string | null }[] = [];
+  try {
+    semAgente = await prisma.canal.findMany({
+      where: { orgId: ctx.orgId, agentId: null, status: "atencao" },
+      select: { id: true, rotulo: true, detalhe: true },
+    });
+  } catch {
+    // Sem a tabela de canais (SQL 2026-10-22 não aplicado): nada a avisar.
+  }
+  for (const canal of semAgente.filter((c) => ehAvisoDeSemAgente(c.detalhe))) {
+    pendencias.push({
+      id: `canal-sem-agente-${canal.id}`,
+      tipo: "atencao",
+      titulo: `${canal.rotulo} está recebendo mensagens sem agente`,
+      detalhe: "Ninguém responde nem guarda essas conversas. Escolha um agente para este canal na aba Canais do agente.",
+      href: "/agent-studio",
+    });
+  }
+
+  // Webhook de saída quebrado: a integração para em silêncio (o n8n não
+  // recebe mais nada). Falha recente fica de fora: as novas tentativas
+  // costumam resolver uma queda curta do outro lado.
+  for (const w of await webhooksComProblema(ctx.orgId, agora)) pendencias.push(w);
 
   // Configuração: não é urgente, mas trava o agente de funcionar.
   for (const agente of agentes) {
@@ -135,7 +207,8 @@ export async function GET() {
     }
     const nodes = (agente.flow.nodes as unknown as Node<FlowNodeData>[]) ?? [];
     const edges = (agente.flow.edges as unknown as Edge[]) ?? [];
-    const problemas = validateFlow(nodes, edges).length;
+    // Só erro trava o fluxo; aviso (opção solta, saída "Erro" da IA solta) não.
+    const problemas = validateFlow(nodes, edges).filter((i) => i.nivel === "erro").length;
     if (problemas > 0) {
       pendencias.push({
         id: `blocos-${agente.id}`,

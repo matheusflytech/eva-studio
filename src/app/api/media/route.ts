@@ -13,11 +13,14 @@ import { caminhoDaOrg, urlAssinada } from "@/lib/server/storage";
 //   ?path=<caminho>          abre/mostra
 //   ?path=<caminho>&baixar=1 força download (com ?nome=arquivo.pdf)
 export async function GET(request: Request) {
-  const ctx = await requirePermission("read");
-  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
-
   const sp = new URL(request.url).searchParams;
   const path = sp.get("path") ?? "";
+
+  // <img src> não passa pelo fetch do app (sem cabeçalho do contrato): o
+  // contrato é o dono do arquivo, o prefixo do caminho — e ainda assim só
+  // abre se a pessoa tiver vínculo com ele.
+  const ctx = await requirePermission("read", { contrato: path.split("/")[0] || null });
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   // O prefixo da organização é a única barreira entre um cliente e o arquivo de
   // outro: sem essa checagem, quem conhecesse um caminho abriria qualquer anexo.

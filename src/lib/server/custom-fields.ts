@@ -148,9 +148,11 @@ export function prepararOpcoes(bruto: unknown): OpcaoDeCampo[] {
 export async function mesclarCamposDeContato(
   orgId: string,
   atuais: Record<string, unknown>,
-  entrada: Record<string, unknown>
+  entrada: Record<string, unknown>,
+  /** Definições já carregadas (importação em lote evita uma consulta por linha). */
+  defsCarregadas?: DefinicaoDeCampo[]
 ): Promise<ResultadoDeValores> {
-  const defs = await carregarDefinicoes(orgId, "contact");
+  const defs = defsCarregadas ?? (await carregarDefinicoes(orgId, "contact"));
   const chaves = new Set(defs.map((d) => d.key));
   const definidos: Record<string, unknown> = {};
   const livres: Record<string, unknown> = {};

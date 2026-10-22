@@ -20,11 +20,11 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
   },
   {
     key: "agent",
-    paletteLabel: "Agente de IA",
+    paletteLabel: "Enviar para o n8n",
     data: {
-      label: "Agente de IA",
-      kind: "Delega para o agente",
-      detail: "Responde livremente usando as instruções e a base de conhecimento configuradas no agente.",
+      label: "Enviar para o n8n",
+      kind: "Seu fluxo do n8n responde",
+      detail: "A mensagem vai para o workflow do n8n (URL em Avançado do agente) e a resposta dele volta para a pessoa.",
     },
   },
   {
@@ -62,7 +62,7 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     paletteLabel: "Enviar e-mail",
     data: {
       label: "Enviar e-mail",
-      kind: "Via Resend",
+      kind: "Pelo domínio do contrato",
       detail: "Manda um e-mail usando uma credencial Resend cadastrada em Integrações.",
       emailFrom: "",
       emailTo: "",
@@ -75,9 +75,9 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     paletteLabel: "Agente de IA (nativo)",
     data: {
       label: "Agente de IA",
-      kind: "Responde com IA de verdade (Groq)",
+      kind: "Responde com a Central de IA",
       detail: "Você é um assistente útil e direto.",
-      aiModel: "llama-3.3-70b-versatile",
+      aiFonte: "conexao",
       aiMemoryWindow: 20,
       collectVars: [],
     },

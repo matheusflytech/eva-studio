@@ -27,12 +27,12 @@ export function rascunhoInicial(defs: DefinicaoDeCampo[], guardados: Record<stri
   return r;
 }
 
-/** Rascunho -> o que mandar pra API. Vazio vira null (limpa o campo). */
+/** Rascunho -> o que mandar pra API. Vazio vira null (limpa o campo); caixa desmarcada é "não" (false). */
 export function rascunhoParaEnvio(defs: DefinicaoDeCampo[], r: Rascunho): Record<string, unknown> {
   const saida: Record<string, unknown> = {};
   for (const d of defs) {
     const v = r[d.key];
-    if (d.type === "checkbox") saida[d.key] = v === true ? true : null;
+    if (d.type === "checkbox") saida[d.key] = v === true;
     else if (Array.isArray(v)) saida[d.key] = v.length > 0 ? v : null;
     else saida[d.key] = typeof v === "string" && v.trim() ? v : null;
   }

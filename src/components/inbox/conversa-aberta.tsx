@@ -325,7 +325,7 @@ export function ConversaAberta({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50",
                 conversa.status === "waiting_human"
-                  ? "bg-accent-500 text-white hover:bg-accent-400"
+                  ? "bg-accent-500 text-text-on-accent hover:bg-accent-400"
                   : "bg-surface-2 text-text-primary hover:bg-surface-3"
               )}
             >
@@ -413,7 +413,7 @@ export function ConversaAberta({
               rolarParaOFim(true);
               setNovas(0);
             }}
-            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-accent-500 px-3.5 py-1.5 text-[12px] font-medium text-white shadow-lg transition-colors hover:bg-accent-400"
+            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-accent-500 px-3.5 py-1.5 text-[12px] font-medium text-text-on-accent shadow-lg transition-colors hover:bg-accent-400"
           >
             <ChevronDown size={13} /> {novas === 1 ? "1 mensagem nova" : `${novas} mensagens novas`}
           </button>

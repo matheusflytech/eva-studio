@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { erro, JSON_INVALIDO, lerCorpo, respostaDeErroDoPrisma } from "@/lib/server/api-validacao";
 import { prepararOpcoes, serializarDefinicao } from "@/lib/server/custom-fields";
 import { TIPO_POR_ID, type TipoDeCampo } from "@/lib/custom-fields";
 
@@ -9,14 +10,15 @@ import { TIPO_POR_ID, type TipoDeCampo } from "@/lib/custom-fields";
 // nos negócios e contatos estão guardados por chave, no formato do tipo.
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
   const campo = await prisma.customField.findFirst({ where: { id, orgId: ctx.orgId } });
   if (!campo) return NextResponse.json({ error: "Campo não encontrado." }, { status: 404 });
 
-  const body = await request.json().catch(() => ({}));
+  const body = await lerCorpo(request);
+  if (!body) return erro(JSON_INVALIDO);
   const data: Prisma.CustomFieldUpdateInput = {};
 
   if (body.label !== undefined) {
@@ -46,12 +48,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  const atualizado = await prisma.customField.update({ where: { id }, data });
-  return NextResponse.json({ field: serializarDefinicao(atualizado) });
+  try {
+    const atualizado = await prisma.customField.update({ where: { id }, data });
+    return NextResponse.json({ field: serializarDefinicao(atualizado) });
+  } catch (e) {
+    return respostaDeErroDoPrisma(e);
+  }
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await requirePermission("agents:manage");
+  const ctx = await requirePermission("funis:configurar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 

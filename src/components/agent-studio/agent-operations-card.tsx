@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/contrato/link";
 import {
   Aperture, AlertTriangle, Sparkles, FileText, MessageSquare,
   UserCheck, Activity, ArrowRight, Wrench, PlugZap, PlayCircle, CheckCircle2,
@@ -34,11 +34,11 @@ export interface AgentOverview {
 }
 
 const CANAL_COR: Record<string, string> = {
-  whatsapp_qr: "bg-emerald-400",
-  whatsapp_meta: "bg-emerald-400",
-  instagram: "bg-pink-400",
-  telegram: "bg-sky-400",
-  messenger: "bg-blue-400",
+  whatsapp_qr: "bg-cat-green-solid",
+  whatsapp_meta: "bg-cat-green-solid",
+  instagram: "bg-cat-rose-solid",
+  telegram: "bg-cat-cyan-solid",
+  messenger: "bg-cat-blue-solid",
   tiktok: "bg-text-secondary",
   website: "bg-text-tertiary",
 };
@@ -119,10 +119,10 @@ function proximoPasso(agent: AgentOverview): ProximoPasso {
 }
 
 const TOM: Record<ProximoPasso["tom"], string> = {
-  urgente: "bg-danger/10 text-danger hover:bg-danger/15",
-  atencao: "bg-amber-400/10 text-amber-300 hover:bg-amber-400/15",
+  urgente: "bg-danger-subtle text-danger hover:bg-hover",
+  atencao: "bg-warning-subtle text-warning hover:bg-hover",
   neutro: "bg-surface-2 text-text-secondary hover:bg-surface-3",
-  ok: "bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15",
+  ok: "bg-success-subtle text-success hover:bg-hover",
 };
 
 /**
@@ -140,7 +140,7 @@ export function AgentOperationsCard({ agent }: { agent: AgentOverview }) {
     <div
       className={cn(
         "glass-card group relative flex flex-col rounded-3xl p-5 transition-colors",
-        precisaAtencao ? "ring-1 ring-amber-400/25" : "hover:border-border-strong"
+        precisaAtencao ? "ring-1 ring-warning/30" : "hover:border-border-strong"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -313,7 +313,7 @@ function Metrica({
       <div
         className={cn(
           "flex items-baseline gap-1.5 font-display text-[19px] font-semibold tabular-nums",
-          alerta ? "text-amber-300" : valor === 0 ? "text-text-tertiary" : "text-text-primary"
+          alerta ? "text-warning" : valor === 0 ? "text-text-tertiary" : "text-text-primary"
         )}
       >
         {valor}
@@ -321,7 +321,7 @@ function Metrica({
       <div className="mt-0.5 flex items-center gap-1 text-[11px] text-text-tertiary">
         {icon} {rotulo}
       </div>
-      {sub && <div className="mt-0.5 text-[10.5px] text-amber-300/80">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[10.5px] text-warning">{sub}</div>}
     </div>
   );
 }

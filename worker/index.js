@@ -1,9 +1,10 @@
 // Eva Studio — worker de WhatsApp via QR code (Baileys).
 // Processo separado e sempre ligado (Railway), porque o Baileys mantém um
 // socket aberto com o WhatsApp — isso não roda em função serverless da Vercel.
-// Este worker só fala com o mesmo Postgres do app principal (via tabelas
-// eva_studio_whatsapp_connections / eva_studio_agents), não expõe API própria
-// além de um health check.
+// Este worker só fala com o mesmo Postgres do app principal, não expõe API
+// própria além de um health check. Cada sessão é de um canal do contrato
+// (eva_studio_canais_whatsapp_qr) ou, antes do SQL de canais, de um agente
+// (eva_studio_whatsapp_connections) — ver fonte.js. "chave" = id da sessão.
 
 import http from "node:http";
 import pg from "pg";
@@ -15,6 +16,16 @@ import makeWASocket, {
   downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { loadAuthState } from "./auth-store.js";
+import {
+  agenteDaSessao,
+  detectarModo,
+  gravarEstado,
+  limparSessao,
+  sessaoDoAgente,
+  sessoesConectadas,
+  sessoesPendentes,
+} from "./fonte.js";
+import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -45,7 +56,9 @@ const pool = new pg.Pool({
 });
 const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 
-const sessions = new Map(); // agentId -> { sock }
+const sessions = new Map(); // chave da sessão (canalId ou agentId) -> { sock }
+// "canal" ou "agente": decidido na subida pela existência da tabela nova.
+let MODO = "agente";
 
 function extractText(msg) {
   const m = msg.message;
@@ -128,12 +141,14 @@ function extractOptionId(msg) {
 
 // Fala com o motor de fluxo no app principal (Next.js/Vercel) — o worker não
 // decide mais nada sozinho sobre o que responder, só repassa mensagens.
-async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId }) {
+async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId }) {
   try {
     const res = await fetch(`${EVA_STUDIO_URL}/api/conversations/message`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
-      body: JSON.stringify({ agentId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId }),
+      // canalId vai junto no modo canal: canal sem agente ainda é registrado
+      // no app (Conversas), só não responde.
+      body: JSON.stringify({ agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -144,13 +159,8 @@ async function advanceViaEngine(agentId, contactId, { text, optionId, media, ext
   }
 }
 
-async function setConnectionState(agentId, patch) {
-  const fields = Object.keys(patch);
-  const setClause = fields.map((f, i) => `"${f}" = $${i + 2}`).join(", ");
-  await pool.query(
-    `update eva_studio_whatsapp_connections set ${setClause}, "updatedAt" = now() where "agentId" = $1`,
-    [agentId, ...fields.map((f) => patch[f])]
-  );
+async function setConnectionState(chave, patch) {
+  await gravarEstado(pool, MODO, chave, patch);
 }
 
 // Manda uma mensagem — texto puro, ou com botões nativos do WhatsApp se a
@@ -176,11 +186,11 @@ async function sendReply(sock, jid, message) {
   }
 }
 
-async function startSession(agentId) {
-  if (sessions.has(agentId)) return;
-  sessions.set(agentId, { starting: true });
+async function startSession(chave) {
+  if (sessions.has(chave)) return;
+  sessions.set(chave, { starting: true });
 
-  const { state, saveCreds } = await loadAuthState(pool, agentId);
+  const { state, saveCreds } = await loadAuthState(pool, chave, MODO);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
@@ -190,7 +200,7 @@ async function startSession(agentId) {
     printQRInTerminal: false,
   });
 
-  sessions.set(agentId, { sock });
+  sessions.set(chave, { sock });
 
   sock.ev.on("creds.update", saveCreds);
 
@@ -199,29 +209,26 @@ async function startSession(agentId) {
 
     if (qr) {
       const qrDataUrl = await QRCode.toDataURL(qr);
-      await setConnectionState(agentId, { status: "qr_pending", qrDataUrl });
+      await setConnectionState(chave, { status: "qr_pending", qrDataUrl });
     }
 
     if (connection === "open") {
       const phoneNumber = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
-      await setConnectionState(agentId, { status: "connected", qrDataUrl: null, phoneNumber, lastError: null });
-      logger.info({ agentId, phoneNumber }, "WhatsApp conectado");
+      await setConnectionState(chave, { status: "connected", qrDataUrl: null, phoneNumber, lastError: null });
+      logger.info({ chave, phoneNumber }, "WhatsApp conectado");
     }
 
     if (connection === "close") {
-      sessions.delete(agentId);
+      sessions.delete(chave);
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
       if (loggedOut) {
-        await pool.query(
-          `update eva_studio_whatsapp_connections set status = 'disconnected', "qrDataUrl" = null, "phoneNumber" = null, creds = null, keys = null, "updatedAt" = now() where "agentId" = $1`,
-          [agentId]
-        );
-        logger.info({ agentId }, "WhatsApp desconectado (logout)");
+        await limparSessao(pool, MODO, chave);
+        logger.info({ chave }, "WhatsApp desconectado (logout)");
       } else {
-        await setConnectionState(agentId, { status: "requesting", lastError: "Conexão caiu, tentando de novo..." });
-        setTimeout(() => startSession(agentId), 3000);
+        await setConnectionState(chave, { status: "requesting", lastError: "Conexão caiu, tentando de novo..." });
+        setTimeout(() => startSession(chave), 3000);
       }
     }
   });
@@ -237,9 +244,15 @@ async function startSession(agentId) {
 
       // Foto, áudio, documento: antes o worker ignorava tudo que não fosse
       // texto, e o que o cliente mandava de arquivo sumia sem rastro.
+      // O agente é lido a cada mensagem: no modo canal ele pode ter mudado
+      // (aba Canais do agente) sem a sessão reiniciar.
+      const agentId = await agenteDaSessao(pool, MODO, chave);
+      const canalId = MODO === "canal" ? chave : undefined;
+
       let anexo;
       if (midia && !optionId) {
-        anexo = await guardarMidia(agentId, sock, msg, midia);
+        // Sem agente não há contrato a quem guardar o arquivo: fica só o rótulo.
+        anexo = agentId ? await guardarMidia(agentId, sock, msg, midia) : null;
         const rotulo = ROTULO_DE_MIDIA[midia.tipo] ?? "Anexo";
         text = text || `[${rotulo}]`;
         if (!anexo) text = `${text} (não foi possível baixar o arquivo)`;
@@ -251,6 +264,7 @@ async function startSession(agentId) {
         optionId,
         media: anexo,
         externalId: msg.key.id,
+        canalId,
       });
       for (const reply of replies) {
         await sendReply(sock, remoteJid, reply);
@@ -259,33 +273,28 @@ async function startSession(agentId) {
   });
 }
 
-async function stopSession(agentId) {
-  const session = sessions.get(agentId);
+async function stopSession(chave) {
+  const session = sessions.get(chave);
   if (session?.sock) {
     try {
       await session.sock.logout();
     } catch (err) {
-      logger.warn({ err, agentId }, "Erro ao fazer logout, limpando mesmo assim");
+      logger.warn({ err, chave }, "Erro ao fazer logout, limpando mesmo assim");
     }
   }
-  sessions.delete(agentId);
-  await pool.query(
-    `update eva_studio_whatsapp_connections set status = 'disconnected', "qrDataUrl" = null, "phoneNumber" = null, creds = null, keys = null, "updatedAt" = now() where "agentId" = $1`,
-    [agentId]
-  );
+  sessions.delete(chave);
+  await limparSessao(pool, MODO, chave);
 }
 
 async function pollForWork() {
   try {
-    const { rows } = await pool.query(
-      `select "agentId", status from eva_studio_whatsapp_connections where status in ('requesting', 'logging_out')`
-    );
+    const rows = await sessoesPendentes(pool, MODO);
     for (const row of rows) {
-      if (row.status === "requesting" && !sessions.has(row.agentId)) {
-        startSession(row.agentId).catch((err) => logger.error({ err, agentId: row.agentId }, "Falha ao iniciar sessão"));
+      if (row.status === "requesting" && !sessions.has(row.chave)) {
+        startSession(row.chave).catch((err) => logger.error({ err, chave: row.chave }, "Falha ao iniciar sessão"));
       }
       if (row.status === "logging_out") {
-        stopSession(row.agentId).catch((err) => logger.error({ err, agentId: row.agentId }, "Falha ao encerrar sessão"));
+        stopSession(row.chave).catch((err) => logger.error({ err, chave: row.chave }, "Falha ao encerrar sessão"));
       }
     }
   } catch (err) {
@@ -306,7 +315,8 @@ async function resumeDueWaits() {
          and (variables->>'__wait_until')::timestamptz <= now()`
     );
     for (const row of rows) {
-      const session = sessions.get(row.agentId);
+      const chave = await sessaoDoAgente(pool, MODO, row.agentId);
+      const session = chave ? sessions.get(chave) : null;
       if (!session?.sock) continue;
       const replies = await advanceViaEngine(row.agentId, row.contactId, {});
       for (const reply of replies) {
@@ -318,36 +328,29 @@ async function resumeDueWaits() {
   }
 }
 
-// Se a linha pertence a uma campanha (Disparos), atualiza o contador e
-// fecha a campanha quando todo mundo já foi processado.
-async function bumpBroadcast(broadcastId, field) {
-  await pool.query(`update eva_studio_broadcasts set "${field}" = "${field}" + 1 where id = $1`, [broadcastId]);
-  const { rows } = await pool.query(
-    `select "totalCount", "sentCount", "failedCount" from eva_studio_broadcasts where id = $1`,
-    [broadcastId]
-  );
-  const b = rows[0];
-  if (b && b.sentCount + b.failedCount >= b.totalCount) {
-    await pool.query(`update eva_studio_broadcasts set status = 'done' where id = $1`, [broadcastId]);
-  }
-}
-
 // Drena a fila de saída (respostas manuais de atendente + disparos em
 // massa) pro WhatsApp via QR — o app principal grava aqui porque ele não
 // segura o socket do Baileys (ver eva_studio_outbound_queue no schema).
+// Os itens são reivindicados com FOR UPDATE SKIP LOCKED (ver fila.js), e o
+// placar do disparo/variante é somado aqui, quando sai de verdade — o app só
+// soma o que ele mesmo mandou direto.
+let drenando = false;
 async function drainOutboundQueue() {
+  // setInterval não espera a rodada anterior: sem isto, uma rodada lenta
+  // (mídia grande) se sobreporia à seguinte no mesmo processo.
+  if (drenando) return;
+  drenando = true;
   try {
-    const { rows } = await pool.query(
-      `select id, "agentId", "contactId", text, "broadcastId", "mediaPath", "mediaType", "mediaMime", "mediaName" from eva_studio_outbound_queue where status = 'pending' order by "createdAt" asc limit 20`
-    );
+    await expirarTravados(pool, MINUTOS_TRAVADO);
+    const rows = await reivindicarItens(pool, 20);
+    // O item guarda o agente; a sessão é a do canal QR que ele atende agora.
+    const chaves = new Map();
     for (const row of rows) {
-      const session = sessions.get(row.agentId);
+      if (!chaves.has(row.agentId)) chaves.set(row.agentId, await sessaoDoAgente(pool, MODO, row.agentId));
+      const chave = chaves.get(row.agentId);
+      const session = chave ? sessions.get(chave) : null;
       if (!session?.sock) {
-        await pool.query(
-          `update eva_studio_outbound_queue set status = 'failed', error = 'WhatsApp não conectado' where id = $1`,
-          [row.id]
-        );
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+        await marcarFalha(pool, row, "WhatsApp não conectado");
         continue;
       }
       try {
@@ -376,25 +379,21 @@ async function drainOutboundQueue() {
         } else {
           await session.sock.sendMessage(row.contactId, { text: row.text });
         }
-        await pool.query(`update eva_studio_outbound_queue set status = 'sent', "sentAt" = now() where id = $1`, [row.id]);
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "sentCount");
+        await marcarEnviado(pool, row);
       } catch (err) {
-        await pool.query(`update eva_studio_outbound_queue set status = 'failed', error = $2 where id = $1`, [
-          row.id,
-          String(err?.message ?? err),
-        ]);
-        if (row.broadcastId) await bumpBroadcast(row.broadcastId, "failedCount");
+        await marcarFalha(pool, row, String(err?.message ?? err));
       }
     }
   } catch (err) {
     logger.error({ err }, "Erro ao drenar fila de saída");
+  } finally {
+    drenando = false;
   }
 }
 
 async function resumeConnectedSessions() {
-  const { rows } = await pool.query(`select "agentId" from eva_studio_whatsapp_connections where status = 'connected'`);
-  for (const row of rows) {
-    startSession(row.agentId).catch((err) => logger.error({ err, agentId: row.agentId }, "Falha ao retomar sessão"));
+  for (const chave of await sessoesConectadas(pool, MODO)) {
+    startSession(chave).catch((err) => logger.error({ err, chave }, "Falha ao retomar sessão"));
   }
 }
 
@@ -414,14 +413,19 @@ async function tickScheduler() {
       return;
     }
     const data = await res.json();
-    const entregues = (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0);
+    const entregues =
+      (data.sequences?.delivered ?? 0) + (data.broadcasts?.sent ?? 0) + (data.broadcasts?.queued ?? 0);
     if (entregues > 0) logger.info(data, "Scheduler entregou mensagens");
   } catch (err) {
     logger.error({ err }, "Erro ao chamar o scheduler");
   }
 }
 
-resumeConnectedSessions();
+// Decide o modo antes de qualquer sessão: com a tabela de canais, uma sessão
+// por canal; sem ela, por agente (como antes do SQL 2026-10-22).
+MODO = await detectarModo(pool);
+logger.warn({ modo: MODO }, "Worker do WhatsApp por QR subindo");
+await resumeConnectedSessions();
 setInterval(pollForWork, 4000);
 setInterval(resumeDueWaits, 15000);
 setInterval(drainOutboundQueue, 4000);

@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
 import { advanceConversation, type OutboundMessage } from "@/lib/server/flow-engine";
 import { matchCommentAutomation } from "@/lib/server/comment-automation";
+import { classifyInstagramMessage } from "@/lib/server/instagram-events";
 import { verifyMetaSignature } from "@/lib/server/meta-signature";
 import { decryptSecret } from "@/lib/server/crypto";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
 import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
+import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
 import {
   baixarEGuardar,
   guardarMidiaWhatsApp,
@@ -96,7 +99,13 @@ interface AnexoSocial {
 
 interface InstagramMessagingEvent {
   sender?: { id?: string };
-  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: AnexoSocial[] };
+  message?: {
+    mid?: string;
+    text?: string;
+    is_echo?: boolean;
+    attachments?: AnexoSocial[];
+    reply_to?: { mid?: string; story?: { id?: string; url?: string } };
+  };
 }
 
 interface InstagramCommentValue {
@@ -261,12 +270,14 @@ async function sendPublicCommentReply(commentId: string, accessToken: string, te
 // mandado mensagem antes, e só funciona nas primeiras horas depois do
 // comentário). Depois de enviada, a conversa segue pelo canal "instagram"
 // normal — a resposta do contato entra pelo webhook de mensagens de sempre.
-async function sendPrivateCommentReply(commentId: string, accessToken: string, text: string) {
-  await fetch(`https://graph.facebook.com/v21.0/${commentId}/private_replies`, {
+async function sendPrivateCommentReply(commentId: string, accessToken: string, text: string): Promise<boolean> {
+  const res = await fetch(`https://graph.facebook.com/v21.0/${commentId}/private_replies`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ message: text }),
   });
+  if (!res.ok) console.error("[webhook/meta] private reply falhou", res.status, await res.text().catch(() => ""));
+  return res.ok;
 }
 
 /**
@@ -320,8 +331,20 @@ async function lerEntradaWhatsApp(
 }
 
 async function handleWhatsAppEntries(entries: unknown[]) {
-  for (const entry of entries as { changes?: { value?: MetaValue }[] }[]) {
+  for (const entry of entries as { id?: string; changes?: { field?: string; value?: MetaValue }[] }[]) {
     for (const change of entry.changes ?? []) {
+      // Status/categoria de template: não tem phone_number_id, vem pelo WABA
+      // (entry.id). Tratado antes do filtro de número logo abaixo.
+      if (change.field && CAMPOS_DE_TEMPLATE.has(change.field)) {
+        const evento = lerEventoDeTemplate(change.field, change.value);
+        if (evento && entry.id) {
+          await aplicarEventoDeTemplate(entry.id, evento).catch((e) =>
+            console.error("[webhook/meta] falha ao gravar status de template", e instanceof Error ? e.message : e)
+          );
+        }
+        continue;
+      }
+
       const value: MetaValue = change.value ?? {};
       const phoneNumberId = value.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
@@ -332,7 +355,11 @@ async function handleWhatsAppEntries(entries: unknown[]) {
       if (!value.messages) continue;
 
       const connection = await prisma.metaConnection.findUnique({ where: { phoneNumberId } });
-      if (!connection) continue;
+      if (!connection) {
+        // Número conectado no contrato, mas nenhum agente escolheu ele.
+        await registrarMensagemSemAgente({ tipo: "whatsapp_meta", externalId: phoneNumberId });
+        continue;
+      }
       const token = decryptSecret(connection.accessToken);
       const orgId = await orgDoAgente(connection.agentId);
 
@@ -368,9 +395,8 @@ async function handleWhatsAppEntries(entries: unknown[]) {
 
 // Comentário bateu com uma automação — manda a resposta pública (se tiver),
 // a DM privada, registra a transcrição (pra aparecer em Conversas) e conta
-// o disparo. Nota: a Meta pode reentregar o mesmo evento de webhook mais de
-// uma vez; isso não é deduplicado hoje, então em teoria dá pra mandar a
-// mesma DM duas vezes num reenvio raro — sem impacto prático observado.
+// o disparo — só se a DM saiu de fato. Reentrega do mesmo comentário pela
+// Meta já é barrada antes, em isFirstDelivery(commentId).
 async function handleMatchedComment(
   agentId: string,
   igBusinessId: string,
@@ -385,7 +411,8 @@ async function handleMatchedComment(
   if (publicReply) {
     await sendPublicCommentReply(commentId, accessToken, publicReply).catch(() => {});
   }
-  await sendPrivateCommentReply(commentId, accessToken, dmMessage);
+  const enviada = await sendPrivateCommentReply(commentId, accessToken, dmMessage);
+  if (!enviada) return; // não conta disparo nem registra DM que não saiu
 
   const conversation = await prisma.conversation.upsert({
     where: { agentId_channel_contactId: { agentId, channel: "instagram", contactId: commenterId } },
@@ -424,7 +451,11 @@ async function lerEntradaSocial(
 
   for (const a of anexos) {
     const tipo = tipoDoAnexoSocial(a.type);
-    if (tipo) {
+    if (a.type === "story_mention") {
+      // A URL do story expira em horas: baixa agora pra ficar na conversa.
+      const midia = orgId && a.payload?.url ? await baixarEGuardar(orgId, a.payload.url) : null;
+      lidos.push({ texto: "[Menção no story]", media: midia ?? undefined });
+    } else if (tipo) {
       const midia =
         orgId && a.payload?.url ? await baixarEGuardar(orgId, a.payload.url, { tipoForcado: tipo }) : null;
       lidos.push({ texto: textoDeAnexo(tipo, undefined, !midia), media: midia ?? undefined });
@@ -482,7 +513,10 @@ async function handleMessengerEntries(entries: unknown[]) {
     if (!pageId) continue;
 
     const connection = await prisma.messengerConnection.findUnique({ where: { pageId } });
-    if (!connection) continue;
+    if (!connection) {
+      if (entry.messaging?.length) await registrarMensagemSemAgente({ tipo: "messenger", externalId: pageId });
+      continue;
+    }
     const token = decryptSecret(connection.pageAccessToken);
 
     for (const event of entry.messaging ?? []) {
@@ -532,7 +566,10 @@ async function handleInstagramEntries(entries: unknown[]) {
     if (!igBusinessId) continue;
 
     const connection = await prisma.instagramConnection.findUnique({ where: { igBusinessId } });
-    if (!connection) continue;
+    if (!connection) {
+      if (entry.messaging?.length) await registrarMensagemSemAgente({ tipo: "instagram", externalId: igBusinessId });
+      continue;
+    }
     const igAccessToken = decryptSecret(connection.pageAccessToken);
 
     for (const event of entry.messaging ?? []) {
@@ -546,6 +583,7 @@ async function handleInstagramEntries(entries: unknown[]) {
         const orgId = await orgDoAgente(connection.agentId);
         const entrada = await lerEntradaSocial(event.message ?? {}, orgId);
 
+        const evento = classifyInstagramMessage(event.message ?? {});
         const result = await advanceConversation({
           agentId: connection.agentId,
           channel: "instagram",
@@ -553,6 +591,7 @@ async function handleInstagramEntries(entries: unknown[]) {
           text: entrada.text,
           media: entrada.media,
           externalId: event.message?.mid,
+          event: { kind: evento.kind, storyId: evento.storyId, isReaction: evento.isReaction },
         });
         await registrarAnexosExtras(connection.agentId, "instagram", from, entrada.extras);
         for (const reply of result.messages) {
@@ -589,8 +628,9 @@ async function handleInstagramEntries(entries: unknown[]) {
           match.publicReply || null,
           match.dmMessage
         );
-      } catch {
-        // Falha isolada por comentário não deve derrubar o resto do batch.
+      } catch (e) {
+        // Falha isolada por comentário não derruba o resto do batch, mas fica no log.
+        console.error("[webhook/meta] falha na automação de comentário", e instanceof Error ? e.message : e);
       }
     }
   }

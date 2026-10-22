@@ -1,8 +1,10 @@
 // Estado de autenticação do Baileys (protocolo Signal) persistido no Postgres
 // em vez de arquivos locais — o worker roda no Railway sem disco garantido
 // entre deploys, então perder os creds/keys forçaria escanear o QR de novo
-// toda vez. `creds` e `keys` ficam como JSON na linha de WhatsAppConnection.
+// toda vez. `creds` e `keys` ficam como JSON na linha da sessão: por canal
+// (eva_studio_canais_whatsapp_qr) ou, antes do SQL de canais, por agente.
 import { initAuthCreds, BufferJSON } from "@whiskeysockets/baileys";
+import { MODOS } from "./fonte.js";
 
 function serialize(value) {
   return JSON.parse(JSON.stringify(value, BufferJSON.replacer));
@@ -12,19 +14,17 @@ function deserialize(value) {
   return JSON.parse(JSON.stringify(value), BufferJSON.reviver);
 }
 
-export async function loadAuthState(pool, agentId) {
-  const { rows } = await pool.query(
-    `select creds, keys from eva_studio_whatsapp_connections where "agentId" = $1`,
-    [agentId]
-  );
+export async function loadAuthState(pool, chave, modo = "agente") {
+  const { tabela, coluna } = MODOS[modo];
+  const { rows } = await pool.query(`select creds, keys from ${tabela} where "${coluna}" = $1`, [chave]);
 
   const creds = rows[0]?.creds ? deserialize(rows[0].creds) : initAuthCreds();
   const keyData = rows[0]?.keys ? deserialize(rows[0].keys) : {};
 
   async function persist() {
     await pool.query(
-      `update eva_studio_whatsapp_connections set creds = $2, keys = $3, "updatedAt" = now() where "agentId" = $1`,
-      [agentId, JSON.stringify(serialize(creds)), JSON.stringify(serialize(keyData))]
+      `update ${tabela} set creds = $2, keys = $3, "updatedAt" = now() where "${coluna}" = $1`,
+      [chave, JSON.stringify(serialize(creds)), JSON.stringify(serialize(keyData))]
     );
   }
 

@@ -1,18 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, X, Plus, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { Node } from "@xyflow/react";
-import type { FlowNodeData, MenuOption } from "./flow-node";
+import type { FlowNodeData } from "./flow-node";
 import { VariablePicker } from "./variable-picker";
-import { generateId } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { CredentialSelect } from "./credential-select";
+import { ModeloSelect } from "./modelo-select";
+import { fonteDaIa } from "./fonte-da-ia";
+import { fonteDoEmail } from "./fonte-do-email";
+import { EmailDoContrato } from "./email-do-contrato";
+import { Notice } from "@/components/ui/notice";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
+import { CaptureConfig } from "./capture-config";
 
 import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
 import { ICON_REGISTRY } from "./icon-registry";
@@ -160,7 +166,7 @@ export function NodeInspector({
       <div
         className={cn(
           "flex items-start gap-2 px-4 py-2.5 text-[12px]",
-          pendencia ? "bg-amber-400/10 text-amber-300" : "bg-emerald-500/8 text-emerald-300"
+          pendencia ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success"
         )}
       >
         {pendencia ? (
@@ -233,69 +239,13 @@ export function NodeInspector({
               onChange={(e) => onChange({ conditionExpression: e.target.value })}
             />
             <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-              Conecte a saída <span className="text-emerald-400">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
+              Conecte a saída <span className="text-success">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
               Aceita <code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code> contra texto entre aspas ou número.
             </p>
           </div>
         )}
 
-        {iconKey === "capture" && (
-          <div className="flex flex-col gap-3">
-            <div>
-              <Label htmlFor="node-capture-var">Guardar resposta na variável</Label>
-              <Input
-                id="node-capture-var"
-                placeholder="ex: opcao_escolhida"
-                value={node.data.variableName ?? ""}
-                onChange={(e) => onChange({ variableName: e.target.value })}
-              />
-            </div>
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <Label className="mb-0">Botões (opcional)</Label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange({
-                      options: [...(node.data.options ?? []), { id: generateId(), label: "" }],
-                    })
-                  }
-                  className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
-                >
-                  <Plus size={12} /> Adicionar
-                </button>
-              </div>
-              <p className="mb-2 text-[11.5px] text-text-tertiary">
-                Se tiver botões, o WhatsApp manda como toque (não texto livre) e cada um vira uma saída própria no canvas.
-              </p>
-              <div className="flex flex-col gap-1.5">
-                {(node.data.options ?? []).map((opt: MenuOption, i: number) => (
-                  <div key={opt.id} className="flex items-center gap-1.5">
-                    <Input
-                      value={opt.label}
-                      placeholder={`Opção ${i + 1}`}
-                      onChange={(e) => {
-                        const next = [...(node.data.options ?? [])];
-                        next[i] = { ...next[i], label: e.target.value };
-                        onChange({ options: next });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (node.data.options ?? []).filter((_: MenuOption, idx: number) => idx !== i);
-                        onChange({ options: next });
-                      }}
-                      className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {iconKey === "capture" && <CaptureConfig data={node.data} onChange={onChange} />}
 
         {iconKey === "variable" && (
           <div className="flex flex-col gap-3">
@@ -447,8 +397,18 @@ export function NodeInspector({
           </div>
         )}
 
-        {iconKey === "email" && (
+        {iconKey === "email" && fonteDoEmail(node.data) === "contrato" && (
+          <EmailDoContrato data={node.data} onChange={onChange} />
+        )}
+
+        {iconKey === "email" && fonteDoEmail(node.data) === "credencial" && (
           <div className="flex flex-col gap-3">
+            <Notice tone="info">
+              Este bloco usa uma chave Resend própria (jeito antigo).{" "}
+              <button type="button" className="underline" onClick={() => onChange({ emailModo: "contrato" })}>
+                Passar a enviar pelo domínio do contrato
+              </button>
+            </Notice>
             <CredentialSelect
               type="resend"
               label="Credencial Resend"
@@ -496,58 +456,87 @@ export function NodeInspector({
         {iconKey === "ai-agent" && (
           <div className="flex flex-col gap-3">
             <div>
-              <Label htmlFor="node-ai-provider">Provedor</Label>
+              <Label htmlFor="node-ai-fonte">De onde vem a IA</Label>
               <Select
-                id="node-ai-provider"
-                value={node.data.aiProvider ?? "groq"}
-                onChange={(e) => {
-                  // Trocar de provedor invalida modelo e credencial: o modelo
-                  // não existe no outro, e a chave é de outro serviço.
-                  const next = getProvider(e.target.value);
-                  onChange({
-                    aiProvider: next.id,
-                    aiModel: next.models[0].id,
-                    aiCredentialId: undefined,
-                  });
-                }}
+                id="node-ai-fonte"
+                value={fonteDaIa(node.data)}
+                onChange={(e) => onChange({ aiFonte: e.target.value as "conexao" | "bloco" })}
               >
-                {LLM_PROVIDERS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
+                <option value="conexao">Central de IA do contrato (com reserva automática)</option>
+                <option value="bloco">Escolher chave e modelo só para este bloco</option>
               </Select>
+              {fonteDaIa(node.data) === "conexao" && (
+                <p className="mt-1 text-[11px] text-text-tertiary">
+                  Usa a ordem de chaves e modelos de Integrações → Central de IA. Se a primeira falhar, a próxima responde.
+                </p>
+              )}
             </div>
-            <CredentialSelect
-              type={getProvider(node.data.aiProvider).credentialType}
-              label={`Credencial ${getProvider(node.data.aiProvider).label}`}
-              value={node.data.aiCredentialId}
-              onChange={(id) => onChange({ aiCredentialId: id })}
-            />
-            <div>
-              <Label htmlFor="node-ai-model">Modelo</Label>
-              <Select
-                id="node-ai-model"
-                value={node.data.aiModel ?? getProvider(node.data.aiProvider).models[0].id}
-                onChange={(e) => onChange({ aiModel: e.target.value })}
-              >
-                {getProvider(node.data.aiProvider).models.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </Select>
-            </div>
-            {getProvider(node.data.aiProvider).format === "anthropic" && (
-              <div>
-                <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
-                <Select
-                  id="node-ai-effort"
-                  value={node.data.aiEffort ?? "low"}
-                  onChange={(e) => onChange({ aiEffort: e.target.value as "low" | "medium" | "high" })}
-                >
-                  <option value="low">Baixo — resposta rápida (recomendado para chat)</option>
-                  <option value="medium">Médio</option>
-                  <option value="high">Alto — pensa mais, demora mais</option>
-                </Select>
-              </div>
+            {fonteDaIa(node.data) === "bloco" && (
+              <>
+                <div>
+                  <Label htmlFor="node-ai-provider">Provedor</Label>
+                  <Select
+                    id="node-ai-provider"
+                    value={node.data.aiProvider ?? "groq"}
+                    onChange={(e) => {
+                      // Trocar de provedor invalida modelo e credencial: o modelo
+                      // não existe no outro, e a chave é de outro serviço.
+                      const next = getProvider(e.target.value);
+                      onChange({
+                        aiProvider: next.id,
+                        aiModel: next.models[0].id,
+                        aiCredentialId: undefined,
+                      });
+                    }}
+                  >
+                    {LLM_PROVIDERS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                <CredentialSelect
+                  type={getProvider(node.data.aiProvider).credentialType}
+                  label={`Credencial ${getProvider(node.data.aiProvider).label}`}
+                  value={node.data.aiCredentialId}
+                  onChange={(id) => onChange({ aiCredentialId: id })}
+                />
+                <ModeloSelect
+                  provider={node.data.aiProvider}
+                  credentialId={node.data.aiCredentialId}
+                  value={node.data.aiModel}
+                  onChange={(id) => onChange({ aiModel: id })}
+                />
+                {getProvider(node.data.aiProvider).format === "anthropic" && (
+                  <div>
+                    <Label htmlFor="node-ai-effort">Esforço de raciocínio</Label>
+                    <Select
+                      id="node-ai-effort"
+                      value={node.data.aiEffort ?? "low"}
+                      onChange={(e) => onChange({ aiEffort: e.target.value as "low" | "medium" | "high" })}
+                    >
+                      <option value="low">Baixo — resposta rápida (recomendado para chat)</option>
+                      <option value="medium">Médio</option>
+                      <option value="high">Alto — pensa mais, demora mais</option>
+                    </Select>
+                  </div>
+                )}
+              </>
             )}
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+              <span>
+                <span className="block text-[12.5px] font-medium text-text-primary">Usar o cadastro do agente</span>
+                <span className="block text-[11px] text-text-tertiary">
+                  {node.data.aiUsarAgente === false
+                    ? "Só o texto deste bloco vai para a IA."
+                    : "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."}
+                </span>
+              </span>
+              <Switch
+                checked={node.data.aiUsarAgente !== false}
+                onCheckedChange={(v) => onChange({ aiUsarAgente: v })}
+                aria-label="Usar o cadastro do agente"
+              />
+            </label>
             <div>
               <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
               <Input
@@ -567,7 +556,8 @@ export function NodeInspector({
               valuePlaceholder="descrição — o que é e como reconhecer"
             />
             <p className="text-[11.5px] text-text-tertiary">
-              O texto em &quot;Detalhe / mensagem&quot; acima é o system prompt (instruções) do agente. Conecte blocos
+              O texto em &quot;Detalhe / mensagem&quot; acima diz o que a IA faz nesta etapa; o jeito de falar e as
+              regras gerais vêm do cadastro do agente (aba Agente). Conecte blocos
               de Ferramenta na porta roxa embaixo desse card pra dar ferramentas a ele — ele decide sozinho quando
               usar cada uma. Nas &quot;Variáveis para coletar&quot;, cada linha vira um dado que o agente tenta
               extrair da conversa (o modelo chama uma ferramenta interna sempre que identifica um valor) e pergunta

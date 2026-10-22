@@ -1,21 +1,24 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fieldBase } from "./styles";
 
-export function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative">
-      <select
-        className={cn(
-          "h-11 w-full appearance-none rounded-xl border border-border-default bg-surface-2 px-3.5 pr-9 text-sm text-text-primary outline-none transition-colors",
-          "focus:border-border-strong focus:ring-2 focus:ring-ice/20",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-      <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-    </div>
-  );
-}
+/* Select nativo (melhor no celular e no teclado). Para múltipla escolha com
+   busca, use FilterButton. */
+export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <div className="relative">
+        <select ref={ref} className={cn(fieldBase, "h-8 appearance-none pl-2.5 pr-8", className)} {...props}>
+          {children}
+        </select>
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary"
+        />
+      </div>
+    );
+  }
+);
+Select.displayName = "Select";

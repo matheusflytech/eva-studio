@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { qrConectado } from "@/lib/server/canais/qr";
 import { requirePermission } from "@/lib/server/permissions";
 import { runBroadcast } from "@/lib/server/broadcast-runner";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
+import { validarHorario } from "@/lib/server/agendamento";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Canais que aceitam disparo. Instagram fica de fora de propósito: a Meta
 // encerrou as message tags do Instagram, sobrou só HUMAN_AGENT (que é
 // proibida pra mensagem automatizada), então fora da janela de 24h não existe
 // disparo legítimo por lá — oferecer o botão seria vender erro 100.
-const BROADCAST_CHANNELS = new Set(["whatsapp_qr", "whatsapp_meta", "telegram"]);
+const BROADCAST_CHANNELS = new Set(["whatsapp_qr", "whatsapp_meta", "telegram", "email"]);
 
 const MAX_META_RECIPIENTS = 200;
 
@@ -26,7 +28,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 
   const [broadcasts, tags, segments] = await Promise.all([
     prisma.broadcast.findMany({
-      where: { agentId },
+      // Mensagem avulsa agendada (kind "single") aparece na conversa/ficha, não aqui.
+      where: { agentId, kind: "campaign" },
       include: { variants: true, segment: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 30,
@@ -37,9 +40,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 
   return NextResponse.json({
     channels: {
-      whatsapp_qr: agent.whatsappConnection?.status === "connected",
+      whatsapp_qr: await qrConectado(agent.id, agent.whatsappConnection),
       whatsapp_meta: !!agent.metaConnection,
       telegram: !!agent.telegramConnection,
+      // E-mail: domínio do contrato verificado (não depende do agente).
+      email: await prisma.emailDominio
+        .findUnique({ where: { orgId: ctx.orgId }, select: { status: true } })
+        .then((d) => d?.status === "verified")
+        .catch(() => false),
     },
     tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
     segments: segments.map((s) => ({ id: s.id, name: s.name })),
@@ -53,6 +61,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
       sentCount: b.sentCount,
       failedCount: b.failedCount,
       status: b.status,
+      lastError: b.lastError,
       scheduledAt: b.scheduledAt?.toISOString() ?? null,
       createdAt: b.createdAt.toISOString(),
       variants: b.variants.map((v) => ({
@@ -119,6 +128,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     return NextResponse.json({ error: "Escreva a mensagem ou escolha um modelo." }, { status: 400 });
   }
 
+  // E-mail: cada variante (ou o disparo) é um modelo de e-mail do contrato.
+  if (channel === "email") {
+    const ids = hasAbTest ? variants.map((v) => v.templateId) : [templateId];
+    if (ids.some((id) => !id)) {
+      return NextResponse.json({ error: "Disparo de e-mail precisa de um modelo de e-mail (em cada variante, se for teste A/B)." }, { status: 400 });
+    }
+    const unicos = [...new Set(ids as string[])];
+    const achados = await prisma.emailModelo.count({ where: { orgId: ctx.orgId, id: { in: unicos } } }).catch(() => -1);
+    if (achados === -1) {
+      return NextResponse.json({ error: "O e-mail ainda não foi ativado no banco deste ambiente (SQL 2026-10-22-email.sql)." }, { status: 409 });
+    }
+    if (achados !== unicos.length) return NextResponse.json({ error: "Modelo de e-mail não encontrado neste contrato." }, { status: 404 });
+    const dominio = await prisma.emailDominio.findUnique({ where: { orgId: ctx.orgId } }).catch(() => null);
+    if (dominio?.status !== "verified") {
+      return NextResponse.json({ error: "Verifique o domínio de e-mail do contrato em Integrações → E-mail antes de disparar." }, { status: 400 });
+    }
+  }
+
   // WhatsApp oficial: fora da janela de 24h só passa modelo aprovado, e um
   // disparo é, por definição, fora da janela pra quase todo mundo da lista.
   if (channel === "whatsapp_meta") {
@@ -137,10 +164,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   let segmentId: string | null = null;
   let estimatedCount = 0;
 
+  // No e-mail o público é quem tem e-mail (não um canal de conversa do agente).
+  const alcance = channel === "email" ? { email: { not: "" } } : { channels: { some: { agentId, channel } } };
+
   if (audience === "manual") {
     manualRecipients = Array.isArray(body.contactIds)
       ? body.contactIds.map(String).map((c: string) => c.trim()).filter(Boolean)
       : [];
+    if (channel === "email") {
+      const invalidos = manualRecipients.filter((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+      if (invalidos.length) return NextResponse.json({ error: `E-mail inválido: ${invalidos.slice(0, 3).join(", ")}` }, { status: 400 });
+    }
     if (manualRecipients.length === 0) {
       return NextResponse.json({ error: "Informe pelo menos um contato." }, { status: 400 });
     }
@@ -153,7 +187,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
         orgId: ctx.orgId,
         optIn: true,
         tags: { some: { tagId: { in: tagIds } } },
-        channels: { some: { agentId, channel } },
+        ...alcance,
       },
     });
   } else {
@@ -165,7 +199,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       where: {
         AND: [
           buildSegmentWhere(ctx.orgId, segment.match, parseRules(segment.rules)),
-          { optIn: true, channels: { some: { agentId, channel } } },
+          { optIn: true, ...alcance },
         ],
       },
     });
@@ -182,14 +216,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   }
 
   // Agendamento
+  // A tela manda o instante já convertido do horário de São Paulo (ISO com Z).
   const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
-  if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
-    return NextResponse.json({ error: "Data de agendamento inválida." }, { status: 400 });
+  if (scheduledAt) {
+    const problema = validarHorario(scheduledAt);
+    if (problema) return NextResponse.json({ error: problema }, { status: 400 });
   }
-  const isScheduled = !!scheduledAt && scheduledAt.getTime() > Date.now();
+  const isScheduled = !!scheduledAt;
 
   let resolvedText = text;
-  if (!resolvedText && templateId) {
+  if (channel === "email" && templateId) {
+    const modelo = await prisma.emailModelo.findFirst({ where: { id: templateId, orgId: ctx.orgId }, select: { nome: true } });
+    resolvedText = resolvedText || `E-mail: ${modelo?.nome ?? ""}`;
+  } else if (!resolvedText && templateId) {
     const template = await prisma.messageTemplate.findFirst({ where: { id: templateId, agentId } });
     resolvedText = template?.bodyText ?? "";
   }

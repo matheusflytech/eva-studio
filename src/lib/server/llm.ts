@@ -47,14 +47,39 @@ export interface CallLlmOptions {
   /** Só usado por provedores que expõem controle de esforço (Anthropic). */
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Tempo máximo de cada pedido ao provedor; estourar vira erro (e a reserva entra). Vazio = sem limite. */
+  timeoutMs?: number;
+}
+
+export interface LlmUsage {
+  entrada: number;
+  saida: number;
 }
 
 export interface LlmResult {
   text: string | null;
   error?: string;
+  /** Tokens somados de todas as rodadas do pedido (o que o provedor informou). */
+  usage?: LlmUsage;
+}
+
+/** Soma os tokens de uma resposta, no formato de cada provedor. */
+export function somarUso(total: LlmUsage, data: unknown): void {
+  const d = (data ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  if (d.usage) {
+    // OpenAI e compatíveis: prompt_tokens/completion_tokens; Anthropic: input_tokens/output_tokens.
+    total.entrada += n(d.usage.prompt_tokens) + n(d.usage.input_tokens);
+    total.saida += n(d.usage.completion_tokens) + n(d.usage.output_tokens);
+  } else if (d.usageMetadata) {
+    total.entrada += n(d.usageMetadata.promptTokenCount);
+    total.saida += n(d.usageMetadata.candidatesTokenCount);
+  }
 }
 
 const DEFAULT_MAX_TOKENS = 2048;
+
+const sinalDeTempo = (opts: CallLlmOptions) => (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
 
 function safeJsonParse(raw: string): Record<string, string> {
   try {
@@ -95,6 +120,7 @@ interface OpenAiMessage {
 }
 
 async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Promise<LlmResult> {
+  const usage: LlmUsage = { entrada: 0, saida: 0 };
   const messages: OpenAiMessage[] = [
     { role: "system", content: opts.systemPrompt || "Você é um assistente útil." },
     ...(opts.history ?? []),
@@ -108,6 +134,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${opts.apiKey}` },
       body: JSON.stringify({
         model: opts.model,
@@ -116,11 +143,12 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
         ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
       }),
     });
-    if (!res.ok) return { text: null, error: `${opts.provider} ${res.status}: ${(await res.text()).slice(0, 300)}` };
+    if (!res.ok) return { usage, text: null, error: `${opts.provider} ${res.status}: ${(await res.text()).slice(0, 300)}` };
 
     const data = await res.json();
+    somarUso(usage, data);
     const choice = data?.choices?.[0]?.message;
-    if (!choice) return { text: null, error: "Resposta sem conteúdo." };
+    if (!choice) return { usage, text: null, error: "Resposta sem conteúdo." };
 
     if (choice.tool_calls?.length) {
       messages.push({ role: "assistant", content: choice.content ?? null, tool_calls: choice.tool_calls });
@@ -135,10 +163,10 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
       continue;
     }
 
-    return { text: typeof choice.content === "string" ? choice.content : null };
+    return { usage, text: typeof choice.content === "string" ? choice.content : null };
   }
 
-  return { text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
+  return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +184,7 @@ interface AnthropicBlock {
 type AnthropicContent = string | (AnthropicBlock | Record<string, unknown>)[];
 
 async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<LlmResult> {
+  const usage: LlmUsage = { entrada: 0, saida: 0 };
   const messages: { role: "user" | "assistant"; content: AnthropicContent }[] = [
     ...(opts.history ?? []).map((h) => ({ role: h.role, content: h.content })),
     { role: "user" as const, content: opts.userMessage },
@@ -170,6 +199,7 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/messages`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: {
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
@@ -189,15 +219,16 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
         // Nada de temperature/top_p: a família 4.6+ rejeita esses campos com 400.
       }),
     });
-    if (!res.ok) return { text: null, error: `anthropic ${res.status}: ${(await res.text()).slice(0, 300)}` };
+    if (!res.ok) return { usage, text: null, error: `anthropic ${res.status}: ${(await res.text()).slice(0, 300)}` };
 
     const data = await res.json();
+    somarUso(usage, data);
 
     // Um classificador de segurança pode recusar o pedido com HTTP 200.
     // Precisa ser checado antes de ler o conteúdo, senão vira "resposta vazia"
     // sem explicação nenhuma pra quem está usando.
     if (data?.stop_reason === "refusal") {
-      return { text: null, error: `Pedido recusado pelo modelo (${data?.stop_details?.category ?? "sem categoria"}).` };
+      return { usage, text: null, error: `Pedido recusado pelo modelo (${data?.stop_details?.category ?? "sem categoria"}).` };
     }
 
     const blocks: AnthropicBlock[] = Array.isArray(data?.content) ? data.content : [];
@@ -225,10 +256,10 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
       .map((b) => b.text ?? "")
       .join("")
       .trim();
-    return { text: text || null };
+    return { usage, text: text || null };
   }
 
-  return { text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
+  return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +273,7 @@ interface GeminiPart {
 }
 
 async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmResult> {
+  const usage: LlmUsage = { entrada: 0, saida: 0 };
   const contents: { role: "user" | "model"; parts: GeminiPart[] }[] = [
     ...(opts.history ?? []).map((h) => ({
       // Gemini chama o lado do assistente de "model".
@@ -260,6 +292,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/models/${opts.model}:generateContent`, {
       method: "POST",
+      signal: sinalDeTempo(opts),
       headers: { "Content-Type": "application/json", "x-goog-api-key": opts.apiKey },
       body: JSON.stringify({
         contents,
@@ -268,9 +301,10 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
         ...(functionDeclarations.length > 0 ? { tools: [{ functionDeclarations }] } : {}),
       }),
     });
-    if (!res.ok) return { text: null, error: `google ${res.status}: ${(await res.text()).slice(0, 300)}` };
+    if (!res.ok) return { usage, text: null, error: `google ${res.status}: ${(await res.text()).slice(0, 300)}` };
 
     const data = await res.json();
+    somarUso(usage, data);
     const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
     const calls = parts.filter((p) => p.functionCall);
 
@@ -287,10 +321,10 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
     }
 
     const text = parts.map((p) => p.text ?? "").join("").trim();
-    return { text: text || null };
+    return { usage, text: text || null };
   }
 
-  return { text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
+  return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +340,9 @@ export async function callLlmWithTools(opts: CallLlmOptions): Promise<LlmResult>
     if (provider.format === "google") return await callGoogle(opts, provider.baseUrl);
     return await callOpenAiCompatible(opts, provider.baseUrl);
   } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return { text: null, error: `${provider.label} demorou mais de ${Math.round((opts.timeoutMs ?? 0) / 1000)} s para responder.` };
+    }
     return { text: null, error: err instanceof Error ? err.message : String(err) };
   }
 }

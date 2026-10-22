@@ -13,11 +13,13 @@ export interface RateLimitResult {
   allowed: boolean;
   count: number;
   limit: number;
+  /** Segundos até a janela recomeçar (para os headers RateLimit-Reset/Retry-After). */
+  resetSec: number;
 }
 
 export async function checkRateLimit(key: string, limit: number, windowSec: number): Promise<RateLimitResult> {
   try {
-    const rows = await prisma.$queryRaw<{ count: number }[]>`
+    const rows = await prisma.$queryRaw<{ count: number; windowStart?: Date }[]>`
       INSERT INTO "eva_studio_rate_limits" ("key", "count", "windowStart")
       VALUES (${key}, 1, now())
       ON CONFLICT ("key") DO UPDATE SET
@@ -31,16 +33,18 @@ export async function checkRateLimit(key: string, limit: number, windowSec: numb
           THEN now()
           ELSE "eva_studio_rate_limits"."windowStart"
         END
-      RETURNING "count";
+      RETURNING "count", "windowStart";
     `;
     const count = Number(rows[0]?.count ?? 1);
-    return { allowed: count <= limit, count, limit };
+    const inicio = rows[0]?.windowStart ? new Date(rows[0].windowStart).getTime() : Date.now();
+    const resetSec = Math.max(0, Math.ceil((inicio + windowSec * 1000 - Date.now()) / 1000));
+    return { allowed: count <= limit, count, limit, resetSec };
   } catch (err) {
     // Se a tabela ainda não existir (migração não rodada) ou o banco falhar,
     // não derruba a requisição — apenas não limita. Fail-open é a escolha
     // consciente aqui pra não quebrar o produto por causa do limitador.
     console.error("[rate-limit] falha ao checar limite, liberando:", err);
-    return { allowed: true, count: 0, limit };
+    return { allowed: true, count: 0, limit, resetSec: windowSec };
   }
 }
 

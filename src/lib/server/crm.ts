@@ -1,6 +1,18 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/generated/prisma/client";
+import { conferirReferencias } from "@/lib/server/api-validacao";
 import { aplicarValores, carregarDefinicoes } from "@/lib/server/custom-fields";
+import { registrarMudancaDeEtapa, type OrigemDoMovimento } from "@/lib/server/stage-events";
+import { ErroDaMudanca, conferirMudanca, estadoDoNegocio, gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
+import { tocarAtividade, tocarAtividadeDosContatos } from "@/lib/server/atividade-do-negocio";
+import { resolverPerda, type EntradaDaPerda, type EstadoDoNegocio, type PerdaResolvida } from "@/lib/regras-de-etapa";
+import { TIPOS_ACEITOS, normalizarTipoDeTarefa, type OrigemDaTarefa, type Prioridade } from "@/lib/tarefas/tipos";
+import { gravarDetalhes } from "@/lib/server/tarefas-detalhes";
+import { publicarEvento } from "@/lib/server/eventos/barramento";
+import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
+
+export { ErroDaMudanca };
 
 // ---------------------------------------------------------------------------
 // Ações de CRM (§24 do CHATBOT_ENGINE.md).
@@ -32,22 +44,87 @@ const DEFAULT_STAGES: { name: string; probability: number; type: string }[] = [
  * e org antiga (criada antes disso existir) funciona sem migração.
  */
 export async function ensureDefaultPipeline(orgId: string) {
-  const existing = await prisma.pipeline.findFirst({
+  const existing = await primeiroFunil(prisma, orgId);
+  if (existing) return existing;
+
+  // Duas telas abertas ao mesmo tempo chegam aqui juntas e cada uma criaria
+  // o seu "Vendas". A trava por org serializa; quem chega depois reencontra
+  // o funil que o primeiro criou.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${orgId}))`;
+    const criado = await primeiroFunil(tx, orgId);
+    if (criado) return criado;
+    return tx.pipeline.create({
+      data: {
+        orgId,
+        name: "Vendas",
+        isDefault: true,
+        stages: { create: DEFAULT_STAGES.map((s, i) => ({ ...s, position: i })) },
+      },
+      include: { stages: { orderBy: { position: "asc" } } },
+    });
+  });
+}
+
+function primeiroFunil(db: Prisma.TransactionClient, orgId: string) {
+  return db.pipeline.findFirst({
     where: { orgId },
     include: { stages: { orderBy: { position: "asc" } } },
     orderBy: [{ isDefault: "desc" }, { position: "asc" }],
   });
-  if (existing) return existing;
+}
 
-  return prisma.pipeline.create({
-    data: {
-      orgId,
-      name: "Vendas",
-      isDefault: true,
-      stages: { create: DEFAULT_STAGES.map((s, i) => ({ ...s, position: i })) },
-    },
-    include: { stages: { orderBy: { position: "asc" } } },
-  });
+/**
+ * Erro de entrada nas ações de CRM (id de outra org, etapa de outro funil).
+ * As rotas convertem em resposta HTTP; o motor do fluxo trata como falha do
+ * bloco, como qualquer outro erro.
+ */
+export class ErroDeCrm extends Error {
+  constructor(
+    message: string,
+    public status: 400 | 404 = 400
+  ) {
+    super(message);
+    this.name = "ErroDeCrm";
+  }
+}
+
+/** Status da mensagem de conferirReferencias: id malformado é 400, inexistente na org é 404. */
+export function statusDaReferencia(mensagem: string): 400 | 404 {
+  return mensagem.endsWith("inválido.") ? 400 : 404;
+}
+
+/**
+ * Tipos de tarefa aceitos na entrada (telas, Builder, IA, API v1): os seis
+ * novos + o antigo "outro" (gravado como "afazer"). Ver src/lib/tarefas/tipos.ts.
+ */
+export const TIPOS_DE_TAREFA = TIPOS_ACEITOS;
+
+/**
+ * Etapa onde um negócio novo entra, sempre dentro da org. Sem etapa, cai na
+ * primeira aberta do funil informado (ou do padrão).
+ */
+export async function resolverEtapaDeEntrada(orgId: string, pipelineId?: string, stageId?: string) {
+  if (!stageId) {
+    let funilId = pipelineId;
+    if (funilId) {
+      const funil = await prisma.pipeline.findFirst({ where: { id: funilId, orgId }, select: { id: true } });
+      if (!funil) throw new ErroDeCrm("Funil não encontrado.", 404);
+    } else {
+      funilId = (await ensureDefaultPipeline(orgId)).id;
+    }
+    const stages = await prisma.pipelineStage.findMany({
+      where: { pipelineId: funilId },
+      orderBy: { position: "asc" },
+    });
+    stageId = stages.find((s) => s.type === "open")?.id ?? stages[0]?.id;
+  }
+  if (!stageId) throw new ErroDeCrm("Funil sem etapas configuradas.");
+
+  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId, pipeline: { orgId } } });
+  if (!stage) throw new ErroDeCrm("Etapa não encontrada.", 404);
+  if (pipelineId && stage.pipelineId !== pipelineId) throw new ErroDeCrm("Etapa de outro funil.");
+  return stage;
 }
 
 export interface CreateDealInput {
@@ -64,6 +141,8 @@ export interface CreateDealInput {
   expectedClosingAt?: Date | null;
   /** Valores dos campos personalizados, por chave. Chave desconhecida ou valor inválido é descartado. */
   customFields?: Record<string, unknown>;
+  /** Quem criou, para o histórico de etapas. Padrão: usuario. */
+  origem?: OrigemDoMovimento;
 }
 
 /**
@@ -75,24 +154,16 @@ export interface CreateDealInput {
  * ninguém digitar número.
  */
 export async function createDeal(input: CreateDealInput) {
-  let pipelineId = input.pipelineId;
-  let stageId = input.stageId;
-
-  if (!pipelineId || !stageId) {
-    const pipeline = await ensureDefaultPipeline(input.orgId);
-    pipelineId = pipelineId || pipeline.id;
-    if (!stageId) {
-      const stages = await prisma.pipelineStage.findMany({
-        where: { pipelineId },
-        orderBy: { position: "asc" },
-      });
-      stageId = stages.find((s) => s.type === "open")?.id ?? stages[0]?.id;
-    }
-  }
-  if (!stageId) throw new Error("Funil sem etapas configuradas.");
-
-  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
-  if (!stage) throw new Error("Etapa não encontrada.");
+  // Tudo conferido contra a org aqui dentro, não só na rota: o motor do fluxo
+  // também chama isto, com ids que vieram da configuração do bloco.
+  const stage = await resolverEtapaDeEntrada(input.orgId, input.pipelineId, input.stageId);
+  const stageId = stage.id;
+  const erroRef = await conferirReferencias(input.orgId, {
+    contactId: input.contactId,
+    companyId: input.companyId,
+    ownerId: input.ownerId,
+  });
+  if (erroRef) throw new ErroDeCrm(erroRef, statusDaReferencia(erroRef));
 
   // Campos personalizados: o que não bate com a definição é descartado em vez
   // de derrubar a criação. O motor do fluxo chama isto no meio de uma conversa
@@ -133,21 +204,101 @@ export async function createDeal(input: CreateDealInput) {
     },
   });
 
+  await registrarMudancaDeEtapa({
+    orgId: deal.orgId,
+    dealId: deal.id,
+    pipelineId: deal.pipelineId,
+    fromStageId: null,
+    toStageId: deal.stageId,
+    origem: input.origem,
+  });
+
   return deal;
 }
 
+export interface OpcoesDaMudanca {
+  /** Quem moveu, para o histórico. Padrão: usuario. */
+  origem?: OrigemDoMovimento;
+  /** Ação "Reabrir": só com ela um negócio ganho/perdido muda de etapa. */
+  reabrir?: boolean;
+  /**
+   * Flag explícita de importação/automação para mover sem os campos
+   * obrigatórios (e sem motivo de perda). Fica registrada no DealStageEvent.
+   */
+  ignorarObrigatorios?: boolean;
+  /** Motivo da perda (ao mover para etapa de perda). Texto solto = API antiga/fluxo. */
+  perda?: EntradaDaPerda;
+  /** Follow-up opcional ao perder: tarefa "Retomar contato" em N dias. */
+  followUpDias?: number | null;
+  /** O que a mesma ação vai gravar junto (PATCH com campos + etapa): conta na validação. */
+  pendente?: Partial<EstadoDoNegocio> & { contatosNovos?: number };
+  /** Só valida (lança ErroDaMudanca), sem gravar nada. */
+  simular?: boolean;
+  /**
+   * Ação em massa: em vez de gravar o histórico de etapa na hora, entrega o
+   * evento para quem chamou gravar em lote (registrarMudancasEmLote).
+   */
+  historicoEmLote?: (evento: { orgId: string; dealId: string; pipelineId: string; fromStageId: string | null; toStageId: string }) => void;
+}
+
 /**
- * Move um negócio de etapa. Atualiza probabilidade e, quando a etapa é de
- * fechamento, carimba `closedAt` — sem isso não existe tempo de ciclo nem
- * taxa de conversão.
+ * Move um negócio de etapa — o ÚNICO caminho (quadro, prévia, ficha, PATCH,
+ * API v1, importação, motor do fluxo). Valida as regras da etapa (negócio
+ * fechado só com "Reabrir"; campos obrigatórios da alvo e das puladas que não
+ * podem ser puladas; perdido exige motivo), atualiza probabilidade e, quando a
+ * etapa é de fechamento, carimba `closedAt` — sem isso não existe tempo de
+ * ciclo nem taxa de conversão. Faltou algo: lança ErroDaMudanca e não grava.
  */
-export async function moveDealStage(dealId: string, stageId: string, lostReason?: string) {
-  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId } });
-  if (!stage) throw new Error("Etapa não encontrada.");
+export async function moveDealStage(dealId: string, stageId: string, opcoes: OpcoesDaMudanca = {}) {
+  const origem = opcoes.origem ?? "usuario";
+  const antes = await prisma.deal.findUnique({
+    where: { id: dealId },
+    select: { id: true, stageId: true, orgId: true, pipelineId: true, amountCents: true, expectedClosingAt: true, ownerId: true, companyId: true, customFields: true },
+  });
+  if (!antes) throw new ErroDeCrm("Negócio não encontrado.", 404);
+  // Etapa de outra org nunca: o id pode vir do corpo da requisição ou da
+  // configuração de um bloco.
+  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId, pipeline: { orgId: antes.orgId } } });
+  if (!stage) throw new ErroDeCrm("Etapa não encontrada.", 404);
+  const atual = await prisma.pipelineStage.findUnique({
+    where: { id: antes.stageId },
+    select: { id: true, name: true, type: true, position: true, pipelineId: true },
+  });
+
+  // ---- regras da etapa ----
+  const conferido = await conferirMudanca({
+    orgId: antes.orgId,
+    de: atual,
+    para: { id: stage.id, name: stage.name, type: stage.type, position: stage.position, pipelineId: stage.pipelineId },
+    negocio: await estadoDoNegocio(antes, opcoes.pendente),
+    reabrir: opcoes.reabrir,
+    ignorarObrigatorios: opcoes.ignorarObrigatorios,
+  });
+  if (!conferido.ok) {
+    if (conferido.codigo === "negocio_fechado") throw new ErroDaMudanca(conferido.mensagem, 409, "negocio_fechado");
+    throw new ErroDaMudanca(conferido.mensagem, 422, "campos_obrigatorios", conferido.faltando);
+  }
+  let ignorou = conferido.ignorouObrigatorios;
+
+  let perda: PerdaResolvida | null = null;
+  if (stage.type === "lost" && atual?.id !== stage.id) {
+    const { motivos } = await lerMotivos(stage.pipelineId);
+    const r = resolverPerda(motivos, opcoes.perda ?? {});
+    if (r.ok) perda = r.perda;
+    else if (opcoes.ignorarObrigatorios) {
+      // Automação/importação sem motivo: entra como veio, e o evento registra.
+      const texto = (opcoes.perda?.motivo ?? "").trim().slice(0, 500);
+      perda = texto ? { motivoId: null, rotulo: texto, nota: "" } : null;
+      ignorou = true;
+    } else throw new ErroDaMudanca(r.erro, 422, "motivo_obrigatorio");
+  }
+
+  if (opcoes.simular) return null;
+  if (atual?.id === stage.id) return prisma.deal.findUnique({ where: { id: dealId } });
 
   const closing = stage.type === "won" || stage.type === "lost";
 
-  return prisma.deal.update({
+  const atualizado = await prisma.deal.update({
     where: { id: dealId },
     data: {
       stageId,
@@ -158,9 +309,42 @@ export async function moveDealStage(dealId: string, stageId: string, lostReason?
       // o move e a régua de recuperação nunca dispararia.
       stageSince: new Date(),
       closedAt: closing ? new Date() : null,
-      lostReason: stage.type === "lost" ? lostReason ?? "" : "",
+      // Rótulo do motivo (não a nota): relatório, exportação e dashboard
+      // agrupam por este texto, que bate com o motivo estruturado.
+      lostReason: stage.type === "lost" ? perda?.rotulo ?? "" : "",
     },
   });
+
+  if (stage.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, perda);
+  else if (atual?.type === "lost") await gravarPerda({ dealId, orgId: atualizado.orgId, pipelineId: atualizado.pipelineId }, null);
+
+  if (opcoes.historicoEmLote && !ignorou) {
+    opcoes.historicoEmLote({ orgId: atualizado.orgId, dealId, pipelineId: atualizado.pipelineId, fromStageId: antes.stageId, toStageId: stageId });
+  } else {
+    await registrarMudancaDeEtapa({
+      orgId: atualizado.orgId,
+      dealId,
+      pipelineId: atualizado.pipelineId,
+      fromStageId: antes.stageId,
+      toStageId: stageId,
+      origem,
+      ignorouObrigatorios: ignorou,
+    });
+  }
+
+  if (stage.type === "lost" && opcoes.followUpDias) {
+    await createTask({
+      orgId: atualizado.orgId,
+      dealId,
+      assignedToId: atualizado.ownerId,
+      type: "ligar",
+      text: `Retomar contato (perdido: ${perda?.rotulo || "sem motivo"})`,
+      dueAt: new Date(Date.now() + opcoes.followUpDias * 86_400_000),
+      origem: "automacao",
+    });
+  }
+
+  return atualizado;
 }
 
 /** Negócio aberto mais recente do contato — usado pelos blocos que agem "no negócio da conversa". */
@@ -184,20 +368,40 @@ export interface CreateTaskInput {
   dealId?: string | null;
   assignedToId?: string | null;
   dueAt?: Date | null;
+  /** De onde veio: manual (tela), automacao (fluxo, régua, API), ia. */
+  origem?: OrigemDaTarefa;
+  diaTodo?: boolean;
+  prioridade?: Prioridade;
+  duracaoMin?: number | null;
 }
 
 export async function createTask(input: CreateTaskInput) {
-  return prisma.task.create({
+  const task = await prisma.task.create({
     data: {
       orgId: input.orgId,
       text: input.text,
-      type: input.type ?? "ligar",
+      // Tipo antigo ou apelido vira o id novo ("outro" → "afazer"); sem tipo, ligação.
+      type: normalizarTipoDeTarefa(input.type ?? "ligar") ?? "afazer",
       contactId: input.contactId ?? null,
       dealId: input.dealId ?? null,
       assignedToId: input.assignedToId ?? null,
       dueAt: input.dueAt ?? null,
     },
   });
+  // Detalhes só quando fogem do padrão (manual, normal, duração do tipo, com
+  // hora): a maioria das tarefas não precisa de linha em eva_studio_task_details.
+  const temDetalhe =
+    (input.origem && input.origem !== "manual") || input.diaTodo || input.prioridade === "alta" || (input.duracaoMin ?? 0) > 0;
+  if (temDetalhe) {
+    await gravarDetalhes(task, {
+      origin: input.origem ?? "manual",
+      allDay: !!input.diaTodo,
+      priority: input.prioridade ?? "normal",
+      durationMin: input.duracaoMin && input.duracaoMin > 0 ? Math.min(Math.round(input.duracaoMin), 1440) : null,
+    });
+  }
+  await publicarEvento({ orgId: input.orgId, tipo: "task.created", objeto: "task", objetoId: task.id, dados: { origem: input.origem ?? "manual", type: task.type } });
+  return task;
 }
 
 export async function addNote(input: {
@@ -207,7 +411,7 @@ export async function addNote(input: {
   dealId?: string | null;
   authorId?: string | null;
 }) {
-  return prisma.note.create({
+  const nota = await prisma.note.create({
     data: {
       orgId: input.orgId,
       text: input.text,
@@ -216,6 +420,11 @@ export async function addNote(input: {
       authorId: input.authorId ?? null,
     },
   });
+  // Nota zera o relógio do "parado": a do negócio nele; a só do contato,
+  // nos negócios abertos dele.
+  if (nota.dealId) await tocarAtividade(nota.dealId, nota.createdAt);
+  else if (nota.contactId) await tocarAtividadeDosContatos(nota.contactId, nota.createdAt);
+  return nota;
 }
 
 /**
@@ -272,18 +481,24 @@ export async function preencherCamposDoNegocio(orgId: string, dealId: string, en
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { pipelineId: true, customFields: true } });
   if (!deal) return { aplicados: 0, erros: ["Negócio não encontrado."] };
   const defs = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
-  return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
-    prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } })
-  );
+  return gravarCampos(defs, (deal.customFields ?? {}) as Record<string, unknown>, entrada, async (valores) => {
+    const antes = await fotoDoRegistro(orgId, "deal", dealId);
+    await prisma.deal.update({ where: { id: dealId }, data: { customFields: valores as object } });
+    // Edição de campo zera o relógio do "parado".
+    await tocarAtividade(dealId);
+    await publicarAlteracao(orgId, "deal", dealId, antes);
+  });
 }
 
 export async function preencherCamposDoContato(orgId: string, contactId: string, entrada: Record<string, unknown>) {
   const contato = await prisma.contact.findFirst({ where: { id: contactId, orgId }, select: { customFields: true } });
   if (!contato) return { aplicados: 0, erros: ["Contato não encontrado."] };
   const defs = await carregarDefinicoes(orgId, "contact");
-  return gravarCampos(defs, (contato.customFields ?? {}) as Record<string, unknown>, entrada, (valores) =>
-    prisma.contact.update({ where: { id: contactId }, data: { customFields: valores as object } })
-  );
+  return gravarCampos(defs, (contato.customFields ?? {}) as Record<string, unknown>, entrada, async (valores) => {
+    const antes = await fotoDoRegistro(orgId, "contact", contactId);
+    await prisma.contact.update({ where: { id: contactId }, data: { customFields: valores as object } });
+    await publicarAlteracao(orgId, "contact", contactId, antes);
+  });
 }
 
 async function gravarCampos(

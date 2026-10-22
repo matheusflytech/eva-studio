@@ -136,7 +136,7 @@ export function Balao({ m, onReenviar }: { m: Mensagem; onReenviar: (m: Mensagem
           "max-w-[78%] rounded-2xl px-3.5 py-2.5",
           doContato && "rounded-bl-md bg-surface-3 text-text-primary",
           doAgente && "rounded-br-md bg-[#1f2c44] text-white/95",
-          m.role === "human" && "rounded-br-md bg-accent-500 text-white",
+          m.role === "human" && "rounded-br-md bg-accent-500 text-text-on-accent",
           m.entrega?.status === "failed" && "ring-1 ring-danger/50"
         )}
       >

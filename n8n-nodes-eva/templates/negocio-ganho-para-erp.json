@@ -1,0 +1,141 @@
+{
+  "name": "Eva Studio: negócio ganho vai para o ERP",
+  "nodes": [
+    {
+      "parameters": {
+        "events": [
+          "deal.won"
+        ]
+      },
+      "id": "478a3058-f679-4be4-af45-ec260984bedd",
+      "name": "Negócio ganho",
+      "type": "n8n-nodes-eva-studio.evaStudioTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "evaStudioApi": {
+          "id": "",
+          "name": "Eva Studio API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "nome",
+              "value": "={{ $json.data.name }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "valor",
+              "value": "={{ $json.data.amount_cents / 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "3",
+              "name": "negocio_id",
+              "value": "={{ $json.data.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7a1875c1-7e88-4255-a486-f96a6c877990",
+      "name": "Montar cliente",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU-ERP/api/pedidos",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "ed84d473-6fc6-4e4c-bf7b-5eab55a16f7d",
+      "name": "Enviar ao ERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "note",
+        "operation": "create",
+        "text": "=Enviado ao ERP: {{ $json.id ?? 'ok' }}",
+        "additionalFields": {
+          "deal_id": "={{ $('Montar cliente').item.json.negocio_id }}"
+        }
+      },
+      "id": "d896ada9-fcdf-4d2f-afa2-83d2812c5719",
+      "name": "Anotar no negócio",
+      "type": "n8n-nodes-eva-studio.evaStudio",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "evaStudioApi": {
+          "id": "",
+          "name": "Eva Studio API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Negócio ganho": {
+      "main": [
+        [
+          {
+            "node": "Montar cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar cliente": {
+      "main": [
+        [
+          {
+            "node": "Enviar ao ERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar ao ERP": {
+      "main": [
+        [
+          {
+            "node": "Anotar no negócio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
