@@ -372,3 +372,20 @@ Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado
 - **Cuidado para a parte E:** em gatilho de varredura (parado, agendado, data), a
   reinscrição padrão na tela deve ser "sempre". Com "uma vez", o registro só entra na
   primeira vez.
+
+### SQL aplicado e teste ponta a ponta (21/10/2026)
+- `2026-10-24-automacoes.sql` aplicado em produção: 6 tabelas com RLS (anon vê 0) e as 6
+  chaves estrangeiras certas.
+- **Teste contra o banco de produção**, no contrato do Alfredo. O script temporário foi
+  apagado depois e o banco ficou zerado.
+  - Montagem: um contato de teste com opt-out e duas etiquetas de teste. A automação
+    era: etiqueta A → condição → nota com variável → espera de 1 min → etiqueta B.
+  - Do evento à execução: 1,7 s. Os passos levaram 90–230 ms cada; a espera voltou
+    pelo relógio das automações (`rodarAutomacoes`) e o total ficou em 62 s.
+  - Resultado: a nota saiu "Automação de teste rodou para Teste", e a etiqueta B foi
+    posta com ator `automacao` e profundidade 1. A etiqueta B não reinscreveu
+    ninguém (1 execução).
+- **Visto no caminho:** 2 de 5 rodadas locais caíram com "Connection terminated
+  unexpectedly" do pooler (porta 6543) logo no começo. É rede local ↔ Supavisor, não
+  o motor, mas vale olhar o `idleTimeout` do pool em `src/lib/db/prisma.ts` antes da
+  produção.
