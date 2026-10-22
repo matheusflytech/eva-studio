@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { deliverToContact, type DeliverResult } from "@/lib/server/outbound";
-import { CANAIS_RESPONDIVEIS, janelaDeResposta, registrarMensagens } from "@/lib/server/inbox";
+import { CANAIS_POR_BUSCA, janelaDeResposta, podeResponderNoCanal, registrarMensagens } from "@/lib/server/inbox";
 import { CANAIS_DE_TESTE, INCLUDE_MENSAGEM, serializarMensagens } from "@/lib/server/conversas";
 import { caminhoDaOrg, classificarMime, MAX_MEDIA_BYTES, urlAssinada } from "@/lib/server/storage";
 
@@ -79,7 +79,12 @@ export async function responderComoAtendente(pedido: PedidoDeResposta): Promise<
   if (erroAnexo) return { ok: false, status: 400, error: erroAnexo };
 
   const simulado = CANAIS_DE_TESTE.includes(conversa.channel);
-  if (!simulado && !CANAIS_RESPONDIVEIS.has(conversa.channel)) {
+  // Chat do site: o site busca a mensagem; não há o que enviar daqui.
+  const porBusca = CANAIS_POR_BUSCA.has(conversa.channel);
+  if (porBusca && pedido.attachment) {
+    return { ok: false, status: 400, error: "No chat do site dá para mandar só texto." };
+  }
+  if (!simulado && !podeResponderNoCanal(conversa.channel)) {
     return {
       ok: false,
       status: 400,
@@ -162,11 +167,11 @@ export async function responderComoAtendente(pedido: PedidoDeResposta): Promise<
       mediaMime: pedido.attachment?.mime,
       mediaName: pedido.attachment?.name,
       mediaSize: pedido.attachment?.size,
-      deliveryStatus: simulado ? "sent" : "sending",
+      deliveryStatus: simulado || porBusca ? "sent" : "sending",
     },
   ]);
 
-  if (!simulado) {
+  if (!simulado && !porBusca) {
     const resultado = await enviar(conversa, textoFinal, pedido.attachment, template);
     await prisma.message.update({
       where: { id: criada.id },
