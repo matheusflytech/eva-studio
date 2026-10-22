@@ -357,6 +357,25 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
   de entrada de webhooks pronto (não implantado). Rota
   `/api/internal/webhooks` no app recebe dele.
 
+### Leads por site (pipes) e conversas de site externo
+- **Tela de Leads:** seletor de pipe (um agente por site: "Vendedor Virtual"
+  é o widget da Eva Holding, "Site Drawing Club" é o chat da Renata) e abas
+  **Leads** (kanban filtrado pelo agente do lead) | **Conversas** (conversas do
+  canal `website` do agente, com a transcrição). A escolha fica no
+  `localStorage` (`eva.leads.pipe`, `eva.leads.aba`). Pipes vêm de
+  `GET /api/leads/pipes` (agentes com conversa no canal do site ou com o site
+  como canal principal). `GET /api/conversations` aceita `?agente=ID`.
+- **Site com IA própria** (Drawing Club fala direto com a Groq): manda cada
+  troca para `POST /api/hooks/agentes/{agentId}/{token}/conversa`
+  (`{conversation_id, message, reply, lang, page}`), mesma URL de entrada do
+  agente + `/conversa`. `src/lib/server/conversa-externa.ts` grava a conversa
+  e as mensagens; vira lead quando o visitante deixa e-mail/telefone ou a IA
+  manda o botão de compra (`[[ANUAL]]`/`[[MENSAL]]`).
+- **Drawing Club:** `api/chat.js` lê `EVA_CONVERSAS_URL` (variável no projeto
+  Vercel do site). Sem ela não manda nada; timeout de 2,5 s, nunca quebra o
+  chat. Histórico de antes disso não existe (o chat só guardava no
+  `sessionStorage` do visitante; a Groq não guarda conversas).
+
 ## 10. Próximos passos mapeados
 
 ### Conferência pendente

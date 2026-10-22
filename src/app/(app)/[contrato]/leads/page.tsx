@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useAgentsStore } from "@/lib/stores/agents-store";
+import { ConversasDoPipe } from "@/components/leads/conversas-do-pipe";
 import { cn, formatRelativeDate, generateId } from "@/lib/utils";
 
 // Mesmo formato do LeadDto de src/lib/server/leads.ts (copiado: não dá pra
@@ -674,8 +675,38 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
   );
 }
 
+// Pipe = o site de onde vêm os leads e as conversas (um agente por site: o
+// widget da Eva Holding, o chat do Drawing Club...). A escolha fica no
+// navegador de quem usa.
+interface Pipe {
+  agentId: string;
+  nome: string;
+  conversas: number;
+}
+const CHAVE_DO_PIPE = "eva.leads.pipe";
+const CHAVE_DA_ABA = "eva.leads.aba";
+
+function lerPreferencia(chave: string): string | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage.getItem(chave);
+  } catch {
+    return null;
+  }
+}
+function gravarPreferencia(chave: string, valor: string) {
+  try {
+    window.localStorage.setItem(chave, valor);
+  } catch {
+    // sem armazenamento (aba anônima): só não lembra da escolha
+  }
+}
+
 export default function LeadsPage() {
   const [leads, setLeads] = React.useState<Lead[] | null>(null);
+  const [pipes, setPipes] = React.useState<Pipe[]>([]);
+  // "" = todos os sites
+  const [pipe, setPipeState] = React.useState<string>(() => lerPreferencia(CHAVE_DO_PIPE) ?? "");
+  const [aba, setAbaState] = React.useState<"leads" | "conversas">(() => (lerPreferencia(CHAVE_DA_ABA) === "conversas" ? "conversas" : "leads"));
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [activeDragId, setActiveDragId] = React.useState<string | null>(null);
@@ -689,10 +720,21 @@ export default function LeadsPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const load = React.useCallback(async () => {
-    const res = await fetch("/api/leads");
+    const [res, resPipes] = await Promise.all([fetch("/api/leads"), fetch("/api/leads/pipes")]);
     const data = await res.json();
     setLeads(data.leads ?? []);
+    if (resPipes.ok) setPipes((await resPipes.json()).pipes ?? []);
   }, []);
+
+  function setPipe(v: string) {
+    setPipeState(v);
+    setSelectedIds(new Set());
+    gravarPreferencia(CHAVE_DO_PIPE, v);
+  }
+  function setAba(v: "leads" | "conversas") {
+    setAbaState(v);
+    gravarPreferencia(CHAVE_DA_ABA, v);
+  }
 
   React.useEffect(() => {
     load();
@@ -791,7 +833,11 @@ export default function LeadsPage() {
 
   if (leads === null) return <div className="flex-1 p-8" />;
 
+  // Pipe guardado que não existe mais (agente apagado): volta para todos.
+  const pipeAtivo = pipes.some((p) => p.agentId === pipe) ? pipe : "";
+
   const filtered = leads.filter((l) => {
+    if (pipeAtivo && l.agentId !== pipeAtivo) return false;
     if (sourceFilter !== "all" && leadSource(l) !== sourceFilter) return false;
     if (search.trim() && !`${leadName(l)} ${JSON.stringify(l.fields)}`.toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
@@ -809,7 +855,15 @@ export default function LeadsPage() {
           <p className="mt-1 text-[13px] text-text-secondary">Contatos que viraram lead em qualquer canal (site, WhatsApp, Instagram, formulário, API). Arraste entre colunas pra mudar o estágio.</p>
         </div>
         <div className="flex items-center gap-2">
-          {anySelected && (
+          {pipes.length > 0 && (
+            <Select value={pipeAtivo} onChange={(e) => setPipe(e.target.value)} className="w-[220px]" aria-label="Pipe (site)">
+              <option value="">Todos os sites</option>
+              {pipes.map((p) => (
+                <option key={p.agentId} value={p.agentId}>{p.nome}</option>
+              ))}
+            </Select>
+          )}
+          {aba === "leads" && anySelected && (
             <Button type="button" variant="danger" size="sm" onClick={handleBulkDelete}>
               <Trash2 size={14} /> Remover {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
             </Button>
@@ -851,6 +905,31 @@ export default function LeadsPage() {
         </div>
       )}
 
+      <div role="tablist" className="mb-4 flex items-center gap-1 border-b border-border-subtle">
+        {([
+          ["leads", "Leads", filtered.length],
+          ["conversas", "Conversas", pipeAtivo ? pipes.find((p) => p.agentId === pipeAtivo)?.conversas ?? 0 : pipes.reduce((s, p) => s + p.conversas, 0)],
+        ] as const).map(([id, rotulo, n]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={aba === id}
+            onClick={() => setAba(id)}
+            className={cn(
+              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition-colors",
+              aba === id ? "border-accent-500 text-text-primary" : "border-transparent text-text-tertiary hover:text-text-primary"
+            )}
+          >
+            {rotulo}
+            <Badge variant="neutral" className="text-[10px]">{n}</Badge>
+          </button>
+        ))}
+      </div>
+
+      {aba === "conversas" ? (
+        <ConversasDoPipe agentId={pipeAtivo || null} />
+      ) : (
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
           {STAGES.map((stage) => {
@@ -913,6 +992,7 @@ export default function LeadsPage() {
           )}
         </DragOverlay>
       </DndContext>
+      )}
 
       {opened && (
         <LeadDetail

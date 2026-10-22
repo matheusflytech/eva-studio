@@ -11,6 +11,7 @@ import type { Prisma } from "@/generated/prisma/client";
 //   ?filtro=todas|esperando|minhas|agente|encerradas
 //   ?q=texto              nome, telefone, e-mail ou trecho da última mensagem
 //   ?canal=whatsapp_meta
+//   ?agente=ID            só as de um agente (pipe da tela de Leads)
 //   ?testes=1             inclui Playground e prévia do Builder
 //   ?limite=40&antes=ISO  paginação: as mais antigas que a data
 //   ?desde=ISO            só as que mudaram depois (é o que a tela usa pra
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
   const filtro = params.get("filtro") ?? "todas";
   const q = params.get("q")?.trim() ?? "";
   const canal = params.get("canal") ?? "";
+  const agente = params.get("agente") ?? "";
   const comTestes = params.get("testes") === "1";
   const limite = Math.min(Math.max(Number(params.get("limite")) || 40, 1), 100);
   const antes = params.get("antes");
@@ -34,6 +36,7 @@ export async function GET(request: Request) {
 
   if (!comTestes) e.push({ channel: { notIn: CANAIS_DE_TESTE } });
   if (canal) e.push({ channel: canal });
+  if (agente) e.push({ agentId: agente });
   // Escopo do papel em conversas: só as que eu (ou minha equipe) atendo.
   const escopo = await filtroDeEscopo(ctx, "conversas", "assignedToId");
   if (Object.keys(escopo).length > 0) e.push(escopo);
