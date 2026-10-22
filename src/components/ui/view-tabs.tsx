@@ -7,6 +7,8 @@ import { IconButton } from "./icon-button";
 import { focusRing } from "./styles";
 
 /*
+v5: cápsulas (a ativa preenchida), sem sublinhado.
+ *
  * Abas de visão de uma lista ("Todos os contatos 24.752", "Meus contatos 312")
  * com "+" para criar visão. Setas esquerda/direita navegam entre as abas
  * (padrão tablist com tabindex móvel). Visão salva com alterações não salvas
@@ -55,12 +57,12 @@ export function ViewTabs({
   }
 
   return (
-    <div className={cn("flex shrink-0 items-end gap-1 border-b border-border-subtle", className)}>
-      <div role="tablist" aria-label={label} className="flex min-w-0 items-end gap-5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+    <div className={cn("flex shrink-0 items-center gap-1", className)}>
+      <div role="tablist" aria-label={label} className="flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
         {views.map((v, i) => {
           const ativo = v.id === value;
           return (
-            <span key={v.id} role="presentation" className="flex shrink-0 items-end">
+            <span key={v.id} role="presentation" className="flex shrink-0 items-center">
               <button
                 ref={(el) => {
                   if (el) refs.current.set(v.id, el);
@@ -88,26 +90,26 @@ export function ViewTabs({
                   }
                 }}
                 className={cn(
-                  "-mb-px inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 text-body transition-colors duration-120",
+                  "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-small transition-colors duration-150",
                   ativo
-                    ? "border-text-primary font-medium text-text-primary"
-                    : "border-transparent text-text-secondary hover:text-text-primary",
+                    ? "bg-raised font-medium text-text-primary ring-1 ring-border-subtle"
+                    : "text-text-secondary hover:bg-hover hover:text-text-primary",
                   focusRing
                 )}
               >
                 {v.label}
                 {v.dirty && <span className="size-1.5 rounded-full bg-accent-solid" role="img" aria-label="alterações não salvas" />}
                 {v.count !== undefined && (
-                  <span className="text-small tabular-nums text-text-tertiary">{numero.format(v.count)}</span>
+                  <span className="font-mono text-caption tabular-nums text-text-tertiary">{numero.format(v.count)}</span>
                 )}
               </button>
-              {ativo && v.menu && <span className="mb-1 ml-0.5">{v.menu}</span>}
+              {ativo && v.menu && <span className="ml-0.5">{v.menu}</span>}
             </span>
           );
         })}
       </div>
       {onAdd && (
-        <IconButton aria-label={addLabel} tooltip size="sm" className="mb-1" onClick={onAdd}>
+        <IconButton aria-label={addLabel} tooltip size="sm" onClick={onAdd}>
           <Plus />
         </IconButton>
       )}

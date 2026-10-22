@@ -759,6 +759,9 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 40px 100px rgba(0, 0, 0, 0.7);
   animation: eva-sobe-do-desfoque 0.9s cubic-bezier(0.32, 0.72, 0, 1) 0.25s both;
 }
+@media (max-width: 480px) {
+  .cartao-vidro { border-radius: 26px; padding: 26px 20px 22px; }
+}
 .cartao-vidro input { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.08); height: 44px; border-radius: 14px; }
 @keyframes eva-sobe-do-desfoque {
   from { opacity: 0; transform: translateY(24px) scale(0.97); filter: blur(8px); }

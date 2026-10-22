@@ -35,14 +35,14 @@ export function ModalContent({
 }) {
   return (
     <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
       <Dialog.Content
         // Sem description o Radix avisa no console; o undefined explícito diz
         // que a ausência é intencional.
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col",
-          "rounded-xl border border-border-default bg-overlay text-text-primary shadow-overlay outline-none",
+          "rounded-[22px] border border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none",
           "data-[state=open]:animate-[ds-modal-in_320ms_cubic-bezier(.32,.72,0,1)]",
           larguras[size],
           className

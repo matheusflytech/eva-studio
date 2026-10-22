@@ -33,11 +33,11 @@ export function DrawerContent({
 }) {
   return (
     <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
       <Dialog.Content
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border-default bg-overlay text-text-primary shadow-overlay outline-none",
+          "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden border-l border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none sm:inset-y-3 sm:right-3 sm:rounded-[22px] sm:border",
           "data-[state=open]:animate-[ds-slide-in-right_380ms_cubic-bezier(.32,.72,0,1)]",
           larguras[size],
           className

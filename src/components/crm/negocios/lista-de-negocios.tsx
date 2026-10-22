@@ -241,7 +241,7 @@ export function ListaDeNegocios({
       {dados && dados.avisos.length > 0 && <Notice tone="warning">{dados.avisos.join(" ")}</Notice>}
       {dados?.truncado && <Notice tone="warning">Um filtro por campo personalizado de número ou data olhou só os primeiros 5.000 negócios; a lista pode estar incompleta.</Notice>}
       {acoesEmMassa(total, (dados?.deals.length ?? 0) > 0 && dados!.deals.every((d) => selecao.ids.has(d.id)))}
-      <div className="overflow-hidden rounded-lg border border-border-subtle bg-panel">
+      <div className="overflow-hidden rounded-[18px] border border-border-subtle bg-panel">
         <DataTable
           caption="Negócios"
           columns={colunas}

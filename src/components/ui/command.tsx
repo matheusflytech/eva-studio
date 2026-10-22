@@ -100,7 +100,7 @@ export const CommandItem = React.forwardRef<
     <CommandPrimitive.Item
       ref={ref}
       className={cn(
-        "flex min-h-9 cursor-pointer select-none items-center gap-2.5 rounded-md px-2 py-1.5 text-small text-text-primary outline-none",
+        "flex min-h-9 cursor-pointer select-none items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-small text-text-primary outline-none",
         "transition-colors duration-[120ms] data-[selected=true]:bg-accent-subtle data-[selected=true]:text-accent-fg",
         "data-[disabled=true]:pointer-events-none data-[disabled=true]:text-text-disabled",
         "[&_svg]:shrink-0 [&_svg]:text-text-tertiary data-[selected=true]:[&_svg]:text-accent-fg",

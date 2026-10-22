@@ -59,7 +59,7 @@ export function KanbanColumn({
         {...rest}
         ref={containerRef}
         aria-label={`${title}, ${count} itens (recolhida)`}
-        className={cn("flex w-10 shrink-0 flex-col items-center rounded-lg border py-2 transition-colors duration-120", destaque, className)}
+        className={cn("flex w-10 shrink-0 flex-col items-center rounded-[18px] border py-2 transition-colors duration-120", destaque, className)}
       >
         <button
           type="button"
@@ -80,7 +80,7 @@ export function KanbanColumn({
       {...rest}
       ref={containerRef}
       aria-label={`${title}, ${count} itens`}
-      className={cn("flex w-72 shrink-0 flex-col rounded-lg border transition-colors duration-120", destaque, className)}
+      className={cn("flex w-72 shrink-0 flex-col rounded-[18px] border transition-colors duration-120", destaque, className)}
     >
       <header className="flex h-10 items-center gap-2 border-b border-border-subtle pl-3 pr-1.5">
         <h3 className="min-w-0 flex-1 truncate text-small font-semibold text-text-primary">{title}</h3>
@@ -144,7 +144,7 @@ export function KanbanCard({
     <Tag
       {...(onClick ? { type: "button" as const, onClick } : {})}
       className={cn(
-        "flex w-full flex-col gap-1 rounded-md border border-border-subtle bg-panel px-2.5 py-2 text-left",
+        "flex w-full flex-col gap-1 rounded-[14px] border border-border-subtle bg-panel px-3 py-2.5 text-left",
         onClick && "transition-colors duration-120 hover:border-border-strong",
         onClick && focusRing,
         className

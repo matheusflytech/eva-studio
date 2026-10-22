@@ -27,9 +27,9 @@ export function PageHeader({
     <header className={cn("flex flex-wrap items-end justify-between gap-x-6 gap-y-3", className)}>
       <div className="min-w-0">
         {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
-        {meta && <div className="mb-0.5 text-caption text-text-tertiary">{meta}</div>}
-        <h1 className="font-display text-heading font-bold tracking-tight text-text-primary">{title}</h1>
-        {description && <p className="mt-0.5 text-body text-text-secondary">{description}</p>}
+        {meta && <div className="mb-0.5 font-mono text-caption text-text-tertiary">{meta}</div>}
+        <h1 className="text-heading font-semibold tracking-[-0.025em] text-text-primary">{title}</h1>
+        {description && <p className="mt-0.5 text-small text-text-secondary">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>

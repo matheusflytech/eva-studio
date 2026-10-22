@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * Card mantém a API antiga.
  */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border-subtle bg-panel p-5 print:break-inside-avoid", className)} {...props} />;
+  return <div className={cn("rounded-[18px] border border-border-subtle bg-panel p-5 print:break-inside-avoid", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -34,7 +34,7 @@ export interface PanelProps extends Omit<React.HTMLAttributes<HTMLElement>, "tit
 
 export function Panel({ className, title, actions, flush, as: Tag = "section", children, ...props }: PanelProps) {
   return (
-    <Tag className={cn("rounded-lg border border-border-subtle bg-panel", className)} {...props}>
+    <Tag className={cn("rounded-[18px] border border-border-subtle bg-panel", className)} {...props}>
       {(title || actions) && (
         <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border-subtle px-4 py-2">
           {title && <h2 className="text-body font-semibold text-text-primary">{title}</h2>}
