@@ -43,10 +43,10 @@ function PreviaDaBolha({ texto, opcoes }: { texto: string; opcoes?: { id: string
   if (!texto.trim() && (opcoes ?? []).length === 0) return null;
   return (
     <div className="rounded-xl bg-[#0b141a] p-2.5">
-      <p className="mb-1.5 text-[10px] uppercase tracking-wide text-white/30">o cliente vê</p>
+      <p className="mb-1.5 text-caption uppercase tracking-wide text-white/30">o cliente vê</p>
       <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-[#202c33] px-3 py-2">
-        <p className="whitespace-pre-wrap text-[12.5px] leading-snug text-white/90">
-          {texto.trim() || "..."}
+        <p className="whitespace-pre-wrap text-small leading-snug text-white/90">
+          {texto.trim() || "…"}
         </p>
       </div>
       {(opcoes ?? []).length > 0 && (
@@ -54,7 +54,7 @@ function PreviaDaBolha({ texto, opcoes }: { texto: string; opcoes?: { id: string
           {opcoes!.map((o) => (
             <span
               key={o.id}
-              className="rounded-full border border-white/20 px-2 py-0.5 text-[11px] text-white/70"
+              className="rounded-full border border-white/20 px-2 py-0.5 text-caption text-white/70"
             >
               {o.label || "opção"}
             </span>
@@ -96,7 +96,7 @@ function TemplateSelect({
           </option>
         ))}
       </Select>
-      <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+      <p className="mt-1.5 text-caption text-text-tertiary">
         Se a conversa (no canal WhatsApp oficial) estiver fora da janela de 24h, esse modelo aprovado é usado em vez
         do texto acima. Cadastre modelos na aba do agente, em &quot;Modelos de mensagem&quot;.
       </p>
@@ -133,14 +133,14 @@ export function NodeInspector({
   const daConversa = iconKey === "message" || iconKey === "capture";
 
   return (
-    <div className="glass-card glass-card-solid flex max-h-[calc(100vh-190px)] w-[340px] flex-col overflow-hidden rounded-3xl">
+    <div className="flex max-h-[calc(100vh-190px)] w-[340px] flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-overlay shadow-overlay">
       {/* Cabeçalho: o tipo do bloco primeiro. "Bloco selecionado" não dizia
           nada — a pessoa já sabe que selecionou; o que ela não sabe é o que
           este bloco faz e se está pronto. */}
       <header className="flex items-start gap-3 border-b border-border-subtle p-4">
         <span
           className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]",
             estilo?.badgeBg,
             estilo?.badgeText
           )}
@@ -148,16 +148,16 @@ export function NodeInspector({
           <Icone size={17} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold text-text-primary">
+          <p className="text-body font-semibold text-text-primary">
             {doDicionario?.label ?? iconKey}
           </p>
-          <p className="truncate text-[11.5px] text-text-tertiary">{doDicionario?.hint ?? ""}</p>
+          <p className="truncate text-caption text-text-tertiary">{doDicionario?.hint ?? ""}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Fechar"
-          className="shrink-0 text-text-tertiary transition-colors hover:text-text-primary"
+          className="-mr-1.5 -mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary"
         >
           <X size={15} />
         </button>
@@ -165,7 +165,7 @@ export function NodeInspector({
 
       <div
         className={cn(
-          "flex items-start gap-2 px-4 py-2.5 text-[12px]",
+          "flex items-start gap-2 px-4 py-2.5 text-caption",
           pendencia ? "bg-warning-subtle text-warning" : "bg-success-subtle text-success"
         )}
       >
@@ -188,7 +188,7 @@ export function NodeInspector({
         <div>
           <Label htmlFor="node-label">Nome do bloco</Label>
           <Input id="node-label" value={node.data.label} onChange={(e) => onChange({ label: e.target.value })} />
-          <p className="mt-1 text-[11px] text-text-tertiary">
+          <p className="mt-1 text-caption text-text-tertiary">
             Só aparece no canvas, pra você achar o bloco. O cliente não vê.
           </p>
         </div>
@@ -238,7 +238,7 @@ export function NodeInspector({
               value={node.data.conditionExpression ?? ""}
               onChange={(e) => onChange({ conditionExpression: e.target.value })}
             />
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 text-caption text-text-tertiary">
               Conecte a saída <span className="text-success">Sim</span> e a saída <span className="text-danger">Não</span> a blocos diferentes.
               Aceita <code>==</code>, <code>!=</code>, <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code> contra texto entre aspas ou número.
             </p>
@@ -276,7 +276,7 @@ export function NodeInspector({
                 value={node.data.variableExpression ?? ""}
                 onChange={(e) => onChange({ variableExpression: e.target.value })}
               />
-              <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+              <p className="mt-1.5 text-caption text-text-tertiary">
                 Vazio: só garante que a variável existe. Com soma/subtração de dois números, calcula; qualquer outro
                 texto, concatena as variáveis interpoladas (ex: juntar nome + sobrenome).
               </p>
@@ -289,8 +289,8 @@ export function NodeInspector({
             <Label htmlFor="node-webhook">URL do webhook</Label>
             <Input
               id="node-webhook"
-              placeholder="https://seu-n8n.com/webhook/..."
-              className="font-mono text-[12.5px]"
+              placeholder="https://seu-n8n.com/webhook/…"
+              className="font-mono text-small"
               value={node.data.webhookUrl ?? ""}
               onChange={(e) => onChange({ webhookUrl: e.target.value })}
             />
@@ -307,7 +307,7 @@ export function NodeInspector({
         {(iconKey === "http" || iconKey === "tool-http") && (
           <div className="flex flex-col gap-3">
             {iconKey === "tool-http" && (
-              <p className="text-[11.5px] text-text-tertiary">
+              <p className="text-caption text-text-tertiary">
                 Qualquer <code>{"{parametro}"}</code> usado abaixo que não seja uma variável já capturada vira algo
                 que o próprio Agente de IA decide preencher na hora de chamar essa ferramenta.
               </p>
@@ -332,7 +332,7 @@ export function NodeInspector({
                 <Input
                   id="node-http-url"
                   placeholder="https://api.exemplo.com/recurso"
-                  className="font-mono text-[12.5px]"
+                  className="font-mono text-small"
                   value={node.data.httpUrl ?? ""}
                   onChange={(e) => onChange({ httpUrl: e.target.value })}
                 />
@@ -352,7 +352,7 @@ export function NodeInspector({
               </Select>
               {node.data.httpAuthType && node.data.httpAuthType !== "none" && (
                 <Input
-                  className="mt-1.5 font-mono text-[12.5px]"
+                  className="mt-1.5 font-mono text-small"
                   placeholder={node.data.httpAuthType === "bearer" ? "token" : "Nome-do-Header: valor"}
                   value={node.data.httpAuthValue ?? ""}
                   onChange={(e) => onChange({ httpAuthValue: e.target.value })}
@@ -376,7 +376,7 @@ export function NodeInspector({
               <Textarea
                 id="node-http-body"
                 rows={3}
-                className="font-mono text-[12px]"
+                className="font-mono text-caption"
                 placeholder='{"nome": "{nome_cliente}"}'
                 value={node.data.httpBody ?? ""}
                 onChange={(e) => onChange({ httpBody: e.target.value })}
@@ -466,7 +466,7 @@ export function NodeInspector({
                 <option value="bloco">Escolher chave e modelo só para este bloco</option>
               </Select>
               {fonteDaIa(node.data) === "conexao" && (
-                <p className="mt-1 text-[11px] text-text-tertiary">
+                <p className="mt-1 text-caption text-text-tertiary">
                   Usa a ordem de chaves e modelos de Integrações → Central de IA. Se a primeira falhar, a próxima responde.
                 </p>
               )}
@@ -522,10 +522,10 @@ export function NodeInspector({
                 )}
               </>
             )}
-            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
               <span>
-                <span className="block text-[12.5px] font-medium text-text-primary">Usar o cadastro do agente</span>
-                <span className="block text-[11px] text-text-tertiary">
+                <span className="block text-small font-medium text-text-primary">Usar o cadastro do agente</span>
+                <span className="block text-caption text-text-tertiary">
                   {node.data.aiUsarAgente === false
                     ? "Só o texto deste bloco vai para a IA."
                     : "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."}
@@ -555,7 +555,7 @@ export function NodeInspector({
               keyPlaceholder="nome_variavel"
               valuePlaceholder="descrição — o que é e como reconhecer"
             />
-            <p className="text-[11.5px] text-text-tertiary">
+            <p className="text-caption text-text-tertiary">
               O texto em &quot;Detalhe / mensagem&quot; acima diz o que a IA faz nesta etapa; o jeito de falar e as
               regras gerais vêm do cadastro do agente (aba Agente). Conecte blocos
               de Ferramenta na porta roxa embaixo desse card pra dar ferramentas a ele — ele decide sozinho quando
@@ -577,7 +577,7 @@ export function NodeInspector({
               selectedTools={node.data.mcpTools ?? []}
               onChange={onChange}
             />
-            <p className="text-[11.5px] text-text-tertiary">
+            <p className="text-caption text-text-tertiary">
               Conecte este bloco na porta roxa embaixo de um Agente de IA. O agente lê a descrição de cada
               ferramenta que o servidor anuncia e decide sozinho quando chamar cada uma — você não precisa
               configurar parâmetro nenhum aqui.
@@ -586,7 +586,7 @@ export function NodeInspector({
         )}
 
         {iconKey === "tool-knowledge" && (
-          <p className="text-[11.5px] text-text-tertiary">
+          <p className="text-caption text-text-tertiary">
             Sem configuração — quando conectado a um Agente de IA, ele pode buscar nos documentos já carregados na
             base de conhecimento desse agente sempre que achar relevante. A busca rankeia os trechos mais relevantes
             pra pergunta (não manda o documento inteiro), então funciona bem mesmo com bases maiores.
@@ -628,7 +628,7 @@ export function NodeInspector({
         <button
           type="button"
           onClick={onDelete}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
+          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3 text-small font-medium text-text-tertiary transition-colors hover:bg-danger-subtle hover:text-danger"
         >
           <Trash2 size={13} /> Excluir bloco
         </button>

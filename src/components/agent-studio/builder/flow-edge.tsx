@@ -47,7 +47,7 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
           {edgeData?.rotulo && (
             <span
               className={cn(
-                "max-w-[140px] truncate rounded-sm border border-border-default bg-panel px-1.5 py-0.5 text-[11px] font-medium leading-4",
+                "max-w-[140px] truncate rounded-sm border border-border-default bg-panel px-1.5 py-0.5 text-caption font-medium leading-4",
                 estilo?.texto ?? "text-text-secondary"
               )}
             >
@@ -78,7 +78,7 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
               <div className="nowheel flex max-h-[280px] flex-col gap-1 overflow-y-auto">
                 {GRUPOS_INSERIVEIS.map((grupo) => (
                   <div key={grupo.id} className="flex flex-col gap-0.5">
-                    <p className="px-2 pb-0.5 pt-1 text-[11px] font-medium text-text-tertiary">{grupo.label}</p>
+                    <p className="px-2 pb-0.5 pt-1 text-caption font-medium text-text-tertiary">{grupo.label}</p>
                     {grupo.items.map((item) => {
                       const Icon = ICON_REGISTRY[item.key];
                       const blockStyle = BLOCK_STYLES[item.key];

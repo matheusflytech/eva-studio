@@ -1,9 +1,19 @@
 "use client";
 
-import { Aperture } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { QuadradoDoAgente } from "@/components/inbox/avatar";
 import type { Agent } from "@/lib/data/types";
 
+// Seletor de agente na barra do Playground (v5). A coluna com todos os agentes
+// e descrições saiu da frente: a descrição aparece dentro do menu.
 export function AgentPicker({
   agents,
   activeId,
@@ -13,34 +23,33 @@ export function AgentPicker({
   activeId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const ativo = agents.find((a) => a.id === activeId) ?? agents[0];
+
   return (
-    <div className="glass-card flex w-[260px] shrink-0 flex-col gap-1.5 rounded-3xl p-3">
-      <p className="mb-1 px-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-        Agentes
-      </p>
-      {agents.map((agent) => {
-        const isActive = agent.id === activeId;
-        return (
-          <button
-            key={agent.id}
-            onClick={() => onSelect(agent.id)}
-            className={cn(
-              "flex items-start gap-3 rounded-2xl border p-3 text-left transition-colors",
-              isActive ? "border-border-strong bg-surface-2" : "border-transparent hover:bg-surface-2/60"
-            )}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-text-secondary">
-              <Aperture size={16} />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[13.5px] font-medium text-text-primary">{agent.name}</span>
-              <span className="mt-0.5 line-clamp-2 block text-[12px] text-text-tertiary">
-                {agent.description || "Sem descrição."}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" aria-label={`Agente: ${ativo?.name ?? ""}. Trocar de agente`} className="max-w-[220px] pl-1.5 pr-2.5">
+          {ativo && <QuadradoDoAgente id={ativo.id} nome={ativo.name} tamanho="sm" />}
+          <span className="min-w-0 truncate">{ativo?.name ?? "Agente"}</span>
+          <ChevronsUpDown size={14} aria-hidden="true" className="shrink-0 text-text-tertiary" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel>Testar com</DropdownMenuLabel>
+        {agents.map((agent) => {
+          const isActive = agent.id === ativo?.id;
+          return (
+            <DropdownMenuItem key={agent.id} onSelect={() => onSelect(agent.id)} className="items-start py-1.5">
+              <QuadradoDoAgente id={agent.id} nome={agent.name} className="mt-0.5" />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium text-text-primary">{agent.name}</span>
+                <span className="line-clamp-2 text-caption text-text-tertiary">{agent.description || "Sem descrição."}</span>
               </span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
+              {isActive && <Check size={14} aria-hidden="true" className="mt-1 shrink-0 !text-accent-fg" />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

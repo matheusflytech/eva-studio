@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Aperture, Send, RotateCcw, AlertTriangle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { generateId } from "@/lib/utils";
+import { Send, AlertTriangle } from "lucide-react";
+import { cn, generateId } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { fieldBase } from "@/components/ui/styles";
+import { pulsar } from "@/lib/fundo/eventos";
 import type { Agent } from "@/lib/data/types";
 
 interface ChatMessage {
@@ -97,58 +99,40 @@ export function ChatPanel({ agent }: { agent: Agent }) {
     await send({ optionId });
   }
 
-  function handleReset() {
-    setMessages([greeting(agent)]);
-    conversationIdRef.current = generateId();
-  }
+  // O que já ficou para trás (opções de um menu antigo) fica apagado.
+  const ultimaDoAgente = messages.reduce((idx, m, i) => (m.role === "agent" ? i : idx), -1);
 
   return (
-    <div className="glass-card flex flex-1 flex-col rounded-3xl">
-      <div className="flex items-center justify-between border-b border-border-subtle p-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3 text-text-secondary">
-            <Aperture size={15} />
-          </span>
-          <div>
-            <p className="text-[13.5px] font-medium text-text-primary">{agent.name}</p>
-            <p className="text-[11.5px] text-text-tertiary">Conversa via motor de fluxo</p>
-          </div>
-        </div>
-        <button
-          onClick={handleReset}
-          type="button"
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
-        >
-          <RotateCcw size={13} /> Reiniciar
-        </button>
-      </div>
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
-        <div className="flex flex-col gap-3">
-          {messages.map((m) => (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[680px] flex-col gap-3 px-1 py-4 sm:px-6">
+          {messages.map((m, i) => (
             <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
               <div
                 className={cn(
-                  "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed",
+                  "max-w-[85%] rounded-[18px] px-3.5 py-2 text-body sm:max-w-[66%]",
                   m.role === "user"
-                    ? "bg-accent-500 text-text-on-accent"
+                    ? "rounded-br-md bg-accent-solid text-text-on-accent"
                     : m.isError
-                      ? "flex items-start gap-2 border border-danger/25 bg-danger/10 text-danger"
-                      : "border border-border-subtle bg-surface-2 text-text-primary"
+                      ? "flex items-start gap-2 rounded-bl-md bg-danger-subtle text-danger"
+                      : "rounded-bl-md border border-border-subtle bg-raised text-text-primary"
                 )}
               >
-                {m.isError && <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
+                {m.isError && <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />}
                 <span>{m.text}</span>
               </div>
               {m.options && m.options.length > 0 && (
-                <div className="mt-2 flex max-w-[75%] flex-wrap gap-1.5">
+                <div className={cn("mt-2 flex max-w-[85%] flex-wrap gap-1.5 sm:max-w-[66%]", i < ultimaDoAgente && "opacity-50")}>
                   {m.options.map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => handleOptionClick(opt.id, opt.label)}
+                      onClick={(e) => {
+                        pulsar(e.currentTarget, 1);
+                        handleOptionClick(opt.id, opt.label);
+                      }}
                       disabled={isTyping}
-                      className="rounded-full border border-accent-500/40 bg-accent-soft px-3 py-1.5 text-[12.5px] font-medium text-accent-400 transition-colors hover:bg-accent-500/20 disabled:opacity-40"
+                      className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "text-text-secondary hover:text-text-primary")}
                     >
                       {opt.label}
                     </button>
@@ -158,30 +142,39 @@ export function ChatPanel({ agent }: { agent: Agent }) {
             </div>
           ))}
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex items-center gap-1 rounded-2xl border border-border-subtle bg-surface-2 px-4 py-3">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary [animation-delay:-0.2s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary [animation-delay:0.2s]" />
+            <div className="flex justify-start" aria-label="Digitando">
+              <div className="flex items-center gap-1 rounded-[18px] rounded-bl-md border border-border-subtle bg-raised px-3.5 py-3">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary [animation-delay:-0.2s] motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-text-tertiary [animation-delay:0.2s] motion-reduce:animate-none" />
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-border-subtle p-4">
+      <form
+        onSubmit={(e) => {
+          // Mensagem enviada solta uma onda no fundo, a partir do botão.
+          if (draft.trim() && !isTyping) pulsar(e.currentTarget.querySelector("button[type=submit]"), 1.2);
+          void handleSend(e);
+        }}
+        className="mx-auto flex w-full max-w-[680px] items-center gap-2 px-1 pb-4 pt-2 sm:px-6 sm:pb-6"
+      >
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Digite uma mensagem..."
-          className="h-11 flex-1 rounded-xl border border-border-default bg-surface-2 px-3.5 text-sm text-text-primary placeholder:text-text-tertiary outline-none transition-colors focus:border-border-strong"
+          placeholder="Digite uma mensagem"
+          aria-label="Mensagem para o agente"
+          className={cn(fieldBase, "h-11 flex-1 rounded-full px-[18px]")}
         />
         <button
           type="submit"
+          aria-label="Enviar"
           disabled={!draft.trim() || isTyping}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-40"
+          className={cn(buttonVariants({ variant: "primary" }), "h-11 w-11 shrink-0 px-0")}
         >
-          <Send size={16} />
+          <Send size={16} aria-hidden="true" />
         </button>
       </form>
     </div>

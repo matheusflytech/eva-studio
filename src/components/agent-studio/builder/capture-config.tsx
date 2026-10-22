@@ -67,11 +67,11 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
         <div>
           <Label htmlFor="node-capture-custom">Campo do contato</Label>
           {campos === null ? (
-            <p className="text-[12px] text-text-tertiary">Carregando campos…</p>
+            <p className="text-caption text-text-tertiary">Carregando campos…</p>
           ) : campos.length === 0 ? (
-            <p className="text-[12px] leading-relaxed text-text-tertiary">
+            <p className="text-caption leading-relaxed text-text-tertiary">
               Nenhum campo de contato criado ainda.{" "}
-              <Link href="/negocios/configurar" className="text-accent-400 underline-offset-2 hover:underline">
+              <Link href="/negocios/configurar" className="text-accent-fg underline-offset-2 hover:underline">
                 Criar campos
               </Link>
             </p>
@@ -93,7 +93,7 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
       )}
 
       {(campo === "name" || campo === "email" || campo === "phone") && (
-        <p className="rounded-lg bg-surface-2 px-3 py-2 text-[11.5px] leading-relaxed text-text-tertiary">
+        <p className="rounded-lg bg-raised px-3 py-2 text-caption leading-relaxed text-text-tertiary">
           Guarda em <code className="text-text-secondary">{`{${variavelDaCaptura(data)}}`}</code> e preenche a ficha do contato.
           {campo === "phone" && " O número é salvo no formato +55 com DDD."}
         </p>
@@ -101,10 +101,10 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
 
       {campo !== "text" && (
         <>
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-raised px-3 py-2.5">
             <span>
-              <span className="block text-[12.5px] font-medium text-text-primary">Obrigatório</span>
-              <span className="block text-[11px] text-text-tertiary">
+              <span className="block text-small font-medium text-text-primary">Obrigatório</span>
+              <span className="block text-caption text-text-tertiary">
                 {data.captureRequired === false ? "A pessoa pode responder “pular”." : "Só segue com uma resposta válida."}
               </span>
             </span>
@@ -140,7 +140,7 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
             />
           </div>
 
-          <p className="text-[11.5px] leading-relaxed text-text-tertiary">
+          <p className="text-caption leading-relaxed text-text-tertiary">
             Se não acertar depois das tentativas, segue pela saída <span className="text-warning">Não respondeu certo</span>. Sem
             ela ligada, segue pela saída normal, sem guardar nada.
           </p>
@@ -169,12 +169,12 @@ function TextoLivre({ data, onChange }: { data: FlowNodeData; onChange: (patch: 
           <button
             type="button"
             onClick={() => onChange({ options: [...(data.options ?? []), { id: generateId(), label: "" }] })}
-            className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
+            className="flex items-center gap-1 text-caption font-medium text-accent-fg hover:text-accent-fg"
           >
             <Plus size={12} /> Adicionar
           </button>
         </div>
-        <p className="mb-2 text-[11.5px] text-text-tertiary">
+        <p className="mb-2 text-caption text-text-tertiary">
           Se tiver botões, o WhatsApp manda como toque (não texto livre) e cada um vira uma saída própria no canvas.
         </p>
         <div className="flex flex-col gap-1.5">
@@ -193,7 +193,7 @@ function TextoLivre({ data, onChange }: { data: FlowNodeData; onChange: (patch: 
                 type="button"
                 aria-label={`Remover opção ${i + 1}`}
                 onClick={() => onChange({ options: (data.options ?? []).filter((_: MenuOption, idx: number) => idx !== i) })}
-                className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+                className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-hover hover:text-danger"
               >
                 <Trash2 size={13} />
               </button>

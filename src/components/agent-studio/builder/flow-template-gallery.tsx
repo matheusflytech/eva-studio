@@ -14,31 +14,34 @@ export function FlowTemplateGallery({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6" onClick={onClose}>
       <div
-        className="glass-card glass-card-solid w-full max-w-lg rounded-3xl p-5"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Modelos de fluxo"
+        className="w-full max-w-lg rounded-[18px] border border-border-subtle bg-overlay p-5 shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <LayoutTemplate size={16} className="text-accent-400" />
-            <p className="text-[15px] font-semibold text-text-primary">Modelos de fluxo</p>
+            <LayoutTemplate size={16} aria-hidden="true" className="text-text-tertiary" />
+            <p className="text-title-sm text-text-primary">Modelos de fluxo</p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-tertiary transition-colors hover:text-text-primary">
+          <button type="button" onClick={onClose} aria-label="Fechar" className="grid h-8 w-8 place-items-center rounded-full text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary">
             <X size={16} />
           </button>
         </div>
-        <p className="mb-4 text-[12.5px] text-text-tertiary">
+        <p className="mb-4 text-small text-text-tertiary">
           Substitui o canvas atual por um ponto de partida pronto — você continua editando normalmente depois.
         </p>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col divide-y divide-border-subtle">
           {FLOW_TEMPLATES.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => onPick(t)}
-              className="rounded-2xl border border-border-default bg-surface-2 p-3.5 text-left transition-colors hover:border-border-strong hover:bg-surface-3"
+              className="-mx-2 rounded-[12px] px-2 py-3 text-left transition-colors hover:bg-raised"
             >
-              <p className="text-[13.5px] font-medium text-text-primary">{t.name}</p>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-text-tertiary">{t.description}</p>
+              <p className="text-small font-medium text-text-primary">{t.name}</p>
+              <p className="mt-0.5 text-caption text-text-tertiary">{t.description}</p>
             </button>
           ))}
         </div>

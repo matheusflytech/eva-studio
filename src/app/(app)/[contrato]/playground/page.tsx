@@ -3,18 +3,25 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
-import { PlayCircle } from "lucide-react";
+import { Plus, RotateCcw } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { EmptyState } from "@/components/ui/empty-state";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { AgentPicker } from "@/components/playground/agent-picker";
 import { ChatPanel } from "@/components/playground/chat-panel";
+
+// ---------------------------------------------------------------------------
+// Playground (v5): a conversa ocupa a tela, numa coluna central. Só duas
+// ações na barra: trocar de agente e Reiniciar.
+// ---------------------------------------------------------------------------
 
 export default function PlaygroundPage() {
   const { agents, isLoaded, load } = useAgentsStore();
   const searchParams = useSearchParams();
   const requestedId = searchParams.get("agent");
   const [activeId, setActiveId] = React.useState<string | null>(requestedId);
+  // Reiniciar = montar a conversa de novo: volta a saudação e nasce outro
+  // contato de teste, igual ao antigo botão dentro do painel.
+  const [rodada, setRodada] = React.useState(0);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -27,22 +34,26 @@ export default function PlaygroundPage() {
     setActiveId(agents[0].id);
   }, [activeId, agents]);
 
-  if (!isLoaded) return <div className="flex-1 p-8" />;
+  if (!isLoaded) return <div className="flex-1" />;
+
+  const barra = (extra?: React.ReactNode) => (
+    <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+      <h1 className="text-heading font-semibold tracking-tight text-text-primary">Playground</h1>
+      <span className="font-mono text-caption text-text-tertiary">teste, nada é salvo</span>
+      {extra && <div className="ml-auto flex min-w-0 items-center gap-2">{extra}</div>}
+    </div>
+  );
 
   if (agents.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-10">
-        <EmptyState
-          className="max-w-lg"
-          icon={<PlayCircle size={30} className="text-text-secondary" />}
-          title="Playground"
-          description="Crie um agente no Eva Studio para testar conversas simuladas aqui."
-          action={
-            <Link href="/agent-studio/new" className={buttonVariants({ variant: "solid", size: "md" })}>
-              Criar agente
-            </Link>
-          }
-        />
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+        {barra()}
+        <div className="flex flex-col items-center gap-3 rounded-[18px] border border-border-subtle bg-panel px-6 py-14 text-center">
+          <p className="text-body text-text-secondary">Crie um agente para conversar com ele aqui.</p>
+          <Link href="/agent-studio/new" className={buttonVariants({ variant: "primary", size: "md" })}>
+            <Plus size={15} aria-hidden="true" /> Novo agente
+          </Link>
+        </div>
       </div>
     );
   }
@@ -50,17 +61,16 @@ export default function PlaygroundPage() {
   const activeAgent = agents.find((a) => a.id === activeId) ?? agents[0];
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <div className="mb-5">
-        <h1 className="font-display text-xl font-semibold text-text-primary">Playground</h1>
-        <p className="mt-1 text-[13px] text-text-secondary">
-          Teste seus agentes em uma conversa simulada, sem afetar dados reais.
-        </p>
-      </div>
-      <div className="flex flex-1 gap-5">
-        <AgentPicker agents={agents} activeId={activeAgent.id} onSelect={setActiveId} />
-        <ChatPanel key={activeAgent.id} agent={activeAgent} />
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pt-1 lg:px-6">
+      {barra(
+        <>
+          <AgentPicker agents={agents} activeId={activeAgent.id} onSelect={setActiveId} />
+          <Button variant="secondary" onClick={() => setRodada((r) => r + 1)}>
+            <RotateCcw size={14} aria-hidden="true" /> Reiniciar
+          </Button>
+        </>
+      )}
+      <ChatPanel key={`${activeAgent.id}-${rodada}`} agent={activeAgent} />
     </div>
   );
 }

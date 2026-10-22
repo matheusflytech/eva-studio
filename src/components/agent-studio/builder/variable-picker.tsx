@@ -55,15 +55,15 @@ export function VariablePicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-accent-400 transition-colors hover:bg-accent-soft"
+        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium text-accent-fg transition-colors hover:bg-accent-subtle"
         title="Inserir variável"
       >
         <Braces size={11} /> Variável
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 max-h-48 w-52 overflow-y-auto rounded-xl border border-border-subtle bg-surface-2 p-1.5 shadow-xl">
+        <div className="absolute right-0 top-full z-20 mt-1 max-h-48 w-52 overflow-y-auto rounded-xl border border-border-subtle bg-raised p-1.5 shadow-xl">
           {variables.length === 0 ? (
-            <p className="px-2 py-1.5 text-[11.5px] leading-relaxed text-text-tertiary">
+            <p className="px-2 py-1.5 text-caption leading-relaxed text-text-tertiary">
               Nenhuma variável ainda. Crie uma num bloco de Captura de input, Variável ou Chamar webhook.
             </p>
           ) : (
@@ -72,7 +72,7 @@ export function VariablePicker({
                 key={name}
                 type="button"
                 onClick={() => insert(name)}
-                className="block w-full truncate rounded-lg px-2 py-1.5 text-left font-mono text-[11.5px] text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary"
+                className="block w-full truncate rounded-lg px-2 py-1.5 text-left font-mono text-caption text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
               >
                 {"{" + name + "}"}
               </button>

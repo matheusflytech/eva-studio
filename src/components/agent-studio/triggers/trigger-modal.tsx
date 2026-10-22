@@ -111,13 +111,13 @@ export function TriggerModal({
         className="max-h-[92dvh] max-w-2xl overflow-y-auto p-6 sm:p-7"
       >
         <form onSubmit={salvar} noValidate className="flex flex-col gap-6">
-          <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 ring-1 ring-border-subtle">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-400">
+          <div className="flex items-center gap-3 rounded-[14px] bg-raised p-3 ring-1 ring-border-subtle">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-raised text-text-secondary">
               <Icon size={18} aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-[13.5px] font-medium text-text-primary">{meta.label}</p>
-              <p className="text-[12px] text-text-tertiary">
+              <p className="text-small font-medium text-text-primary">{meta.label}</p>
+              <p className="text-caption text-text-tertiary">
                 {d.kind === "dm_keyword" ? "Vale para os canais que você escolher." : "Só no Instagram."}
               </p>
             </div>
@@ -138,7 +138,7 @@ export function TriggerModal({
 
           {/* ---------- Quando dispara ---------- */}
           <section className="flex flex-col gap-4" aria-labelledby="gatilho-quando">
-            <h3 id="gatilho-quando" className="font-display text-[15px] font-semibold text-text-primary">
+            <h3 id="gatilho-quando" className="text-body-lg font-semibold text-text-primary">
               Quando dispara
             </h3>
 
@@ -152,12 +152,12 @@ export function TriggerModal({
                   onChange={(v) => set("storyId", v)}
                   error={erros.storyId}
                 />
-                <p className="mt-2 text-[12px] text-text-tertiary">Story some em 24h. Depois disso, um gatilho de story específico para de disparar.</p>
+                <p className="mt-2 text-caption text-text-tertiary">Story some em 24h. Depois disso, um gatilho de story específico para de disparar.</p>
               </Field>
             )}
 
             {d.kind === "story_mention" && (
-              <p className="rounded-xl bg-surface-2 px-4 py-3 text-[13px] leading-relaxed text-text-secondary ring-1 ring-border-subtle">
+              <p className="rounded-[14px] bg-raised px-4 py-3 text-small leading-relaxed text-text-secondary ring-1 ring-border-subtle">
                 Toda vez que alguém marcar a sua conta num story. A mídia do story fica salva na conversa, porque o link da
                 Meta expira em poucas horas.
               </p>
@@ -190,10 +190,10 @@ export function TriggerModal({
             )}
 
             {d.kind === "story_reply" && (
-              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-surface-2 px-4 py-3 ring-1 ring-border-subtle">
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-[14px] bg-raised px-4 py-3 ring-1 ring-border-subtle">
                 <span>
-                  <span className="block text-[13px] font-medium text-text-primary">Responder reações com emoji</span>
-                  <span className="block text-[12px] text-text-tertiary">Quando alguém só reage ao story com um emoji, sem escrever nada.</span>
+                  <span className="block text-small font-medium text-text-primary">Responder reações com emoji</span>
+                  <span className="block text-caption text-text-tertiary">Quando alguém só reage ao story com um emoji, sem escrever nada.</span>
                 </span>
                 <Switch checked={d.includeReactions} onCheckedChange={(v) => set("includeReactions", v)} aria-label="Responder reações com emoji" />
               </label>
@@ -208,7 +208,7 @@ export function TriggerModal({
 
           {/* ---------- O que acontece ---------- */}
           <section className="flex flex-col gap-4" aria-labelledby="gatilho-acao">
-            <h3 id="gatilho-acao" className="font-display text-[15px] font-semibold text-text-primary">
+            <h3 id="gatilho-acao" className="text-body-lg font-semibold text-text-primary">
               O que acontece
             </h3>
             <div className="grid gap-4 md:grid-cols-[1fr_minmax(0,0.85fr)]">
@@ -218,7 +218,7 @@ export function TriggerModal({
                 error={erros.replyText}
                 hint={<>Pode ter cupom, link e variáveis como {"{nome}"}.</>}
                 aside={
-                  <span className={cn("text-[11.5px] tabular-nums", restante < 100 ? "text-danger" : "text-text-tertiary")} aria-live="polite">
+                  <span className={cn("text-caption tabular-nums", restante < 100 ? "text-danger" : "text-text-tertiary")} aria-live="polite">
                     {restante}
                   </span>
                 }
@@ -259,13 +259,13 @@ export function TriggerModal({
           </section>
 
           {erros.geral && (
-            <div role="alert" className="rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+            <div role="alert" className="rounded-2xl bg-danger-subtle px-4 py-3 text-small text-danger">
               {erros.geral}
             </div>
           )}
 
-          <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap items-center justify-between gap-3 rounded-b-3xl border-t border-border-subtle bg-surface-1 px-6 py-4 sm:-bottom-7 sm:-mx-7 sm:-mb-7 sm:px-7">
-            <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-text-secondary">
+          <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap items-center justify-between gap-3 rounded-b-3xl border-t border-border-subtle bg-panel px-6 py-4 sm:-bottom-7 sm:-mx-7 sm:-mb-7 sm:px-7">
+            <label className="flex cursor-pointer items-center gap-2.5 text-small text-text-secondary">
               <Switch checked={d.active} onCheckedChange={(v) => set("active", v)} aria-label="Gatilho ativo" />
               {d.active ? "Ativo" : "Pausado"}
             </label>

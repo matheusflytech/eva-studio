@@ -56,10 +56,10 @@ export function SkillsPicker({
               type="button"
               onClick={() => toggle(skill)}
               className={cn(
-                "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                "rounded-full border px-3.5 py-1.5 text-small font-medium transition-colors",
                 active
-                  ? "border-ice-border bg-ice-soft text-ice"
-                  : "border-border-default bg-surface-2 text-text-secondary hover:border-border-strong hover:text-text-primary"
+                  ? "border-transparent bg-inverse text-inverse-fg"
+                  : "border-border-default bg-raised text-text-secondary hover:border-border-strong hover:text-text-primary"
               )}
             >
               {skill}
@@ -73,10 +73,10 @@ export function SkillsPicker({
           {customSkills.map((skill) => (
             <span
               key={skill}
-              className="flex items-center gap-1.5 rounded-full border border-ice-border bg-ice-soft px-3 py-1.5 text-[13px] font-medium text-ice"
+              className="flex items-center gap-1.5 rounded-full border border-transparent bg-inverse px-3 py-1.5 text-small font-medium text-inverse-fg"
             >
               {skill}
-              <button type="button" onClick={() => toggle(skill)} className="text-ice/70 hover:text-ice">
+              <button type="button" onClick={() => toggle(skill)} className="text-inverse-fg/70 hover:text-inverse-fg">
                 <X size={13} />
               </button>
             </span>
@@ -94,7 +94,7 @@ export function SkillsPicker({
               addCustom();
             }
           }}
-          placeholder="Adicionar habilidade personalizada..."
+          placeholder="Adicionar habilidade personalizada…"
         />
       </div>
     </div>

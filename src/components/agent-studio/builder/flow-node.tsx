@@ -131,35 +131,35 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
     const url = data.httpUrl || data.webhookUrl;
     const method = data.httpMethod ?? "POST";
     return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">
+      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
         {data.iconKey !== "webhook" && <span className="font-semibold text-cat-cyan">{method}</span>} {url}
       </p>
     );
   }
   if (data.iconKey === "wait" && data.waitDuration) {
-    return <p className="mt-2 text-[11px] text-text-tertiary">Espera {data.waitDuration} {data.waitUnit ?? "minutos"}</p>;
+    return <p className="mt-2 text-caption text-text-tertiary">Espera {data.waitDuration} {data.waitUnit ?? "minutos"}</p>;
   }
   if ((data.iconKey === "variable" || data.iconKey === "capture") && data.variableName) {
     return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">
+      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
         <span>→ salva em</span> {"{" + data.variableName + "}"}
       </p>
     );
   }
   if (data.iconKey === "condition" && data.conditionExpression) {
     return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">
+      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
         {data.conditionExpression}
       </p>
     );
   }
   if (data.iconKey === "email" && data.emailTo) {
-    return <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">para: {data.emailTo}</p>;
+    return <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">para: {data.emailTo}</p>;
   }
   if (data.iconKey === "ai-agent") {
     const varCount = (data.collectVars ?? []).filter((v) => v.key.trim()).length;
     return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-[10.5px] text-text-tertiary">
+      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
         {fonteDaIa(data) === "conexao" ? "Central de IA" : data.aiModel || "modelo não escolhido"}
         {varCount > 0 && ` · coleta ${varCount} dado${varCount === 1 ? "" : "s"}`}
       </p>
@@ -168,14 +168,14 @@ function ConfigPreview({ data }: { data: FlowNodeData }) {
   if (data.iconKey === "tool-mcp") {
     const count = (data.mcpTools ?? []).length;
     return (
-      <p className="truncate text-[11px] text-text-tertiary">
+      <p className="truncate text-caption text-text-tertiary">
         {count > 0 ? `${count} ferramenta(s) selecionada(s)` : "todas as ferramentas do servidor"}
       </p>
     );
   }
 
   if (data.iconKey === "tool-knowledge") {
-    return <p className="mt-2 text-[11px] text-text-tertiary">Busca na base de conhecimento do agente</p>;
+    return <p className="mt-2 text-caption text-text-tertiary">Busca na base de conhecimento do agente</p>;
   }
   return null;
 }
@@ -198,7 +198,7 @@ function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: str
       ref={ref}
       value={draft}
       rows={1}
-      placeholder="Digite o texto..."
+      placeholder="Digite o texto…"
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => onCommit(draft)}
       // Sem stopPropagation no clique: o bloco precisa ficar selecionado
@@ -208,7 +208,7 @@ function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: str
       // No teclado ele continua: digitar espaco ou delete dentro do campo nao
       // pode acionar atalho do canvas.
       onKeyDown={(e) => e.stopPropagation()}
-      className="nodrag mt-2.5 w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-[12px] leading-relaxed text-text-secondary outline-none transition-colors hover:border-border-subtle focus:border-accent-500/50 focus:bg-surface-3"
+      className="nodrag mt-2.5 w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-caption leading-relaxed text-text-secondary outline-none transition-colors hover:border-border-subtle focus:border-focus focus:bg-hover"
     />
   );
 }
@@ -246,7 +246,7 @@ function LinhaDeSaida({ saida, indice, menu }: { saida: Saida; indice: number; m
     <div className="relative -mr-3.5 pr-3.5">
       {menu ? (
         <div className="flex items-center gap-2 rounded-md border border-border-subtle bg-raised px-2 py-1.5 text-caption text-text-secondary">
-          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-[10px] font-semibold text-accent-fg">
+          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-caption font-semibold text-accent-fg">
             {indice + 1}
           </span>
           <span className="truncate">{saida.rotulo}</span>
@@ -303,7 +303,7 @@ export function FlowNode({
   return (
     <div
       className={cn(
-        "relative w-[230px] cursor-pointer rounded-lg border border-l-[3px] bg-panel p-3.5 transition-colors",
+        "relative w-[230px] cursor-pointer rounded-[14px] border border-l-[3px] bg-panel p-3.5 transition-colors",
         style.border,
         selected ? "border-border-strong ring-2 ring-focus/40" : "border-border-subtle",
         problema && !selected && "ring-1 ring-warning/40",
@@ -316,7 +316,7 @@ export function FlowNode({
         <span
           title={run.error ?? `Rodou em ${run.ms} ms na última execução`}
           className={cn(
-            "absolute -top-2 left-3 inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
+            "absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full border px-1.5 font-mono text-caption tabular-nums",
             run.ok ? "border-success/30 bg-success-subtle text-success" : "border-danger/30 bg-danger-subtle text-danger"
           )}
         >
@@ -327,7 +327,7 @@ export function FlowNode({
         <span
           title={problema}
           aria-label={problema}
-          className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full border border-warning/40 bg-warning-subtle text-[10px] font-semibold text-warning"
+          className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full border border-warning/40 bg-warning-subtle text-caption font-semibold text-warning"
         >
           !
         </span>
@@ -339,7 +339,7 @@ export function FlowNode({
         <Handle type="target" position={Position.Left} aria-label="Entrada" className={cn(HANDLE_DOT, "!left-0")} />
       )}
       <div className="flex items-center gap-2.5">
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", style.badgeBg, style.badgeText)}>
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-[9px]", style.badgeBg, style.badgeText)}>
           <Icon size={15} />
         </span>
         <div className="min-w-0">
@@ -351,7 +351,7 @@ export function FlowNode({
       {editableDetail ? (
         <AutoTextarea value={data.detail ?? ""} onCommit={(text) => onDetailChange!(text)} />
       ) : (
-        data.detail && <p className="mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-secondary">{data.detail}</p>
+        data.detail && <p className="mt-2.5 line-clamp-2 text-caption leading-relaxed text-text-secondary">{data.detail}</p>
       )}
 
       <ConfigPreview data={data} />

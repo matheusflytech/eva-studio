@@ -55,7 +55,7 @@ export function EmailDoContrato({ data, onChange }: { data: FlowNodeData; onChan
           value={data.emailTo ?? ""}
           onChange={(e) => onChange({ emailTo: e.target.value })}
         />
-        <p className="mt-1 text-[11px] text-text-tertiary">Vazio = o e-mail do contato. Ou use uma variável do fluxo, ex.: {"{email_cliente}"}.</p>
+        <p className="mt-1 text-caption text-text-tertiary">Vazio = o e-mail do contato. Ou use uma variável do fluxo, ex.: {"{email_cliente}"}.</p>
       </div>
       <div>
         <Label htmlFor="node-email-modelo">Conteúdo</Label>
@@ -65,7 +65,7 @@ export function EmailDoContrato({ data, onChange }: { data: FlowNodeData; onChan
             <option key={m.id} value={m.id}>{m.nome}</option>
           ))}
         </Select>
-        <p className="mt-1 text-[11px] text-text-tertiary">
+        <p className="mt-1 text-caption text-text-tertiary">
           Modelos ficam na <Link href="/biblioteca?aba=emails" className="underline">Biblioteca → Modelos de e-mail</Link>.
         </p>
       </div>
@@ -78,7 +78,7 @@ export function EmailDoContrato({ data, onChange }: { data: FlowNodeData; onChan
           <div>
             <Label htmlFor="node-email-body">Corpo</Label>
             <Textarea id="node-email-body" rows={6} value={data.emailBody ?? ""} onChange={(e) => onChange({ emailBody: e.target.value })} />
-            <p className="mt-1 text-[11px] text-text-tertiary">
+            <p className="mt-1 text-caption text-text-tertiary">
               **negrito**, [texto](https://link), linhas com &quot;- &quot; viram lista. Variáveis do fluxo: {"{nome}"}. Do contato:{" "}
               {"{{contato.primeiro_nome}}"}. O rodapé de descadastro entra sozinho.
             </p>

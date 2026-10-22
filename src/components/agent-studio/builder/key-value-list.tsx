@@ -27,7 +27,7 @@ export function KeyValueList({
         <button
           type="button"
           onClick={() => onChange([...rows, { id: generateId(), key: "", value: "" }])}
-          className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
+          className="flex items-center gap-1 text-caption font-medium text-accent-fg hover:text-accent-fg"
         >
           <Plus size={12} /> Adicionar
         </button>
@@ -57,7 +57,7 @@ export function KeyValueList({
             <button
               type="button"
               onClick={() => onChange(rows.filter((_, idx) => idx !== i))}
-              className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+              className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-hover hover:text-danger"
             >
               <Trash2 size={13} />
             </button>

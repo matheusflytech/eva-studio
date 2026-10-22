@@ -97,7 +97,7 @@ export function MetaWhatsAppConnect({ agentId }: { agentId: string }) {
 
   if (!APP_ID || !CONFIG_ID) {
     return (
-      <p className="rounded-2xl border border-border-default bg-surface-2 px-4 py-3 text-[12.5px] text-text-tertiary">
+      <p className="rounded-[14px] border border-border-subtle bg-raised px-4 py-3 text-small text-text-tertiary">
         Canal oficial ainda não configurado neste ambiente — falta criar o app Meta e uma configuração de Embedded
         Signup (variáveis <code className="font-mono">NEXT_PUBLIC_META_APP_ID</code> /{" "}
         <code className="font-mono">NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID</code>). Veja o passo a passo no runbook.
@@ -120,10 +120,10 @@ export function MetaWhatsAppConnect({ agentId }: { agentId: string }) {
       />
 
       {status?.connection ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-2 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-[14px] border border-border-subtle bg-raised px-4 py-3">
           <div className="flex items-center gap-2.5 text-text-primary">
-            <CheckCircle2 size={16} className="text-emerald-400" />
-            <span className="text-[13px] font-medium">
+            <CheckCircle2 size={16} className="text-success" />
+            <span className="text-small font-medium">
               Conectado{status.connection.displayPhone ? ` — ${status.connection.displayPhone}` : ""}
             </span>
           </div>
@@ -132,20 +132,20 @@ export function MetaWhatsAppConnect({ agentId }: { agentId: string }) {
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-2 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-[14px] border border-border-subtle bg-raised px-4 py-3">
           <div className="flex items-center gap-2.5 text-text-secondary">
             <ShieldCheck size={16} />
-            <span className="text-[13px]">Nenhum número oficial conectado a este agente.</span>
+            <span className="text-small">Nenhum número oficial conectado a este agente.</span>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={handleConnect} disabled={!sdkReady || isConnecting}>
-            {isConnecting ? "Conectando..." : "Conectar com a Meta"}
+            {isConnecting ? "Conectando…" : "Conectar com a Meta"}
           </Button>
         </div>
       )}
 
-      {error && <p className="text-[12px] text-danger">{error}</p>}
+      {error && <p className="text-caption text-danger">{error}</p>}
 
-      <p className="text-[11.5px] text-text-tertiary">
+      <p className="text-caption text-text-tertiary">
         Login oficial da Meta (Embedded Signup) — o cliente entra com a própria conta Business dele, sem precisar
         de acesso manual à WABA por parte do time. Requer App Review aprovado pra funcionar fora do modo de teste
         (ver runbook).

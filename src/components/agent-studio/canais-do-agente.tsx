@@ -107,7 +107,7 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
       {mensagem && <Notice tone={mensagem.tom} className="mb-3">{mensagem.texto}</Notice>}
 
       {dados === null ? (
-        <p className="text-[12.5px] text-text-tertiary">Carregando...</p>
+        <p className="text-small text-text-tertiary">Carregando…</p>
       ) : (
         <ul className="flex flex-col divide-y divide-border-subtle">
           {CANAIS.map((info) => {
@@ -119,8 +119,8 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
                 <div className="flex flex-wrap items-center gap-3">
                   <LogoDaMarca marca={info.marca} tamanho={32} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13.5px] font-medium text-text-primary">{info.nome}</p>
-                    <p className="truncate text-[12px] text-text-tertiary">
+                    <p className="text-small font-medium text-text-primary">{info.nome}</p>
+                    <p className="truncate text-caption text-text-tertiary">
                       {meu ? meu.rotulo : doTipo.length ? "Não atende por este tipo" : "Nenhum conectado no contrato"}
                     </p>
                   </div>
@@ -159,7 +159,7 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
                   )}
                 </div>
                 {!dados.disponivel && expandido && (
-                  <div className="mt-3 rounded-xl bg-surface-2 p-3.5">
+                  <div className="mt-3 rounded-[14px] bg-raised p-3.5">
                     <ConectarNoAgente tipo={info.tipo} agentId={agentId} />
                   </div>
                 )}

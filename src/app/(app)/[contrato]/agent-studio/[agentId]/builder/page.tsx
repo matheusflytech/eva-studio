@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import {
-  ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, History,
+  ArrowLeft, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate,
 } from "lucide-react";
 import {
   ReactFlow,
@@ -20,8 +20,18 @@ import {
 import type { Connection, Edge, Node, NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { QuadradoDoAgente } from "@/components/inbox/avatar";
 import { cn } from "@/lib/utils";
 import { FlowNode, type FlowNodeData, type NodeRunState } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
@@ -410,141 +420,136 @@ export default function AgentBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowLoaded]);
 
-  if (!isLoaded || !flowLoaded) return <div className="flex-1 p-8" />;
+  if (!isLoaded || !flowLoaded) return <div className="flex-1" />;
 
   if (!agent) {
     return (
-      <div className="flex-1 p-8 text-center">
-        <p className="text-[15px] text-text-secondary">Agente não encontrado.</p>
-        <Link href="/agent-studio" className="mt-3 inline-block text-[13px] font-medium text-text-secondary hover:text-text-primary">
-          Voltar para o Eva Studio
+      <div className="flex flex-1 flex-col items-center gap-3 px-4 py-14 text-center">
+        <p className="text-body text-text-secondary">Agente não encontrado.</p>
+        <Link href="/agent-studio" className="text-small font-medium text-accent-fg hover:underline">
+          Voltar para Agentes de IA
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-1 lg:px-6">
+      {/* Barra do Builder (v5): voltar, agente, modo e, à direita, o estado do
+          fluxo, a IA, Testar e o "…" com o resto (modelos, organizar, última
+          execução, Playground). */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             href={`/agent-studio/${agentId}`}
-            title="Voltar para o agente"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-text-secondary transition-colors hover:text-text-primary"
+            aria-label="Voltar para o agente"
+            className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-1.5 shrink-0" })}
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft aria-hidden="true" />
           </Link>
-          <h1 className="truncate font-display text-lg font-semibold text-text-primary">{agent.name}</h1>
-
-          {/* As abas moram no cabeçalho: uma barra só em vez de duas. */}
-          <div className="flex items-center gap-0.5 rounded-xl bg-surface-2 p-1">
-            {([
-              { key: "editor", label: "Editor" },
-              { key: "conversa", label: "Conversa" },
-              { key: "executions", label: "Execuções" },
-            ] as const).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-                  tab === t.key
-                    ? "bg-surface-3 text-text-primary"
-                    : "text-text-tertiary hover:text-text-primary"
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <QuadradoDoAgente id={agent.id} nome={agent.name} />
+          <h1 className="min-w-0 truncate text-heading font-semibold tracking-tight text-text-primary">{agent.name}</h1>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
+
+        <SegmentedControl
+          label="Modo do Builder"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "editor", label: "Editor" },
+            { value: "conversa", label: "Conversa" },
+            { value: "executions", label: "Execuções" },
+          ]}
+        />
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {tab === "editor" && (
-            <span className="text-[12.5px] text-text-tertiary">
-              {saveState === "pending" && "Salvando..."}
-              {saveState === "saved" && "Salvo."}
+            <span className="font-mono text-caption text-text-tertiary" aria-live="polite">
+              {saveState === "pending" && "salvando…"}
+              {saveState === "saved" && "salvo"}
               {saveState === "error" && (
                 <span className="text-danger" title={erroAoSalvar ?? undefined}>
-                  {erroAoSalvar ? `Não salvou: ${erroAoSalvar}` : "Erro ao salvar."}
+                  {erroAoSalvar ? `não salvou: ${erroAoSalvar}` : "erro ao salvar"}
                 </span>
               )}
             </span>
           )}
+          {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
           {tab === "editor" && (
-            <>
-              <MontarComIa
-                agentId={agentId}
-                nodes={nodes}
-                edges={edges}
-                onAplicar={(novosNos, novasLigacoes) => {
-                  setNodes(novosNos);
-                  setEdges(novasLigacoes);
-                  setSelectedId(null);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowTemplateGallery(true)}
-                title="Começar de um modelo pronto"
-                className={buttonVariants({ variant: "secondary", size: "icon" })}
-              >
-                <LayoutTemplate size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={handleAutoLayout}
-                title="Organizar: arruma os blocos da esquerda para a direita"
-                className={buttonVariants({ variant: "secondary", size: "md" })}
-              >
-                <LayoutGrid size={15} /> Organizar
-              </button>
-              {ultimaExecucao && (
-                <button
-                  type="button"
-                  onClick={() => setMostrarExecucao((v) => !v)}
-                  title={`Última execução em ${new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}`}
-                  className={cn(
-                    buttonVariants({ variant: "secondary", size: "icon" }),
-                    "relative",
-                    mostrarExecucao && "border-accent-500/40 text-text-primary"
-                  )}
-                >
-                  <History size={15} />
-                  {ultimaExecucao.status === "error" && (
-                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger" />
-                  )}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowPreview((v) => !v)}
-                title={showPreview ? "Esconder a prévia" : "Testar a conversa ao vivo"}
-                className={cn(
-                  buttonVariants({ variant: "secondary", size: "icon" }),
-                  showPreview && "border-accent-500/40 text-text-primary"
-                )}
-              >
-                {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-              </button>
-            </>
+            <MontarComIa
+              agentId={agentId}
+              nodes={nodes}
+              edges={edges}
+              onAplicar={(novosNos, novasLigacoes) => {
+                setNodes(novosNos);
+                setEdges(novasLigacoes);
+                setSelectedId(null);
+              }}
+            />
           )}
-          <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
-            <PlayCircle size={15} /> Playground
-          </Link>
+          {tab === "editor" && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowPreview((v) => !v)}
+              aria-pressed={showPreview}
+              title={showPreview ? "Esconder a prévia" : "Testar a conversa ao vivo"}
+            >
+              {showPreview ? <PanelRightClose size={14} aria-hidden="true" /> : <PanelRightOpen size={14} aria-hidden="true" />}
+              <span className="hidden sm:inline">{showPreview ? "Fechar teste" : "Testar"}</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label="Mais: modelos, organizar, última execução, Playground" variant="secondary" className="relative">
+                <Ellipsis />
+                {/* A última execução falhou: o ponto avisa sem ocupar a barra. */}
+                {tab === "editor" && ultimaExecucao?.status === "error" && (
+                  <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger-solid" />
+                )}
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              {tab === "editor" && (
+                <>
+                  <DropdownMenuItem onSelect={() => setShowTemplateGallery(true)}>
+                    <LayoutTemplate aria-hidden="true" /> Começar de um modelo pronto
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleAutoLayout}>
+                    <LayoutGrid aria-hidden="true" /> Organizar os blocos
+                  </DropdownMenuItem>
+                  {ultimaExecucao && (
+                    <DropdownMenuCheckboxItem checked={mostrarExecucao} onCheckedChange={(v) => setMostrarExecucao(v === true)}>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span>Mostrar a última execução</span>
+                        <span className={cn("font-mono text-caption", ultimaExecucao.status === "error" ? "text-danger" : "text-text-tertiary")}>
+                          {new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}
+                          {ultimaExecucao.status === "error" ? " · com erro" : ""}
+                        </span>
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem asChild>
+                <Link href={`/playground?agent=${agentId}`}>
+                  <PlayCircle aria-hidden="true" /> Abrir no Playground
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {tab === "editor" ? (
-        <div className="flex flex-1 gap-3 overflow-hidden">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
           <BlockPalette
             onAdd={handleAddBlock}
             ancora={ancora ? nodes.find((n) => n.id === ancora)?.data.label ?? null : null}
             recolhida={paletaRecolhida}
             onToggle={() => setPaletaRecolhida((v) => !v)}
           />
-          <div data-theme={temaDoCanvas} className="relative flex-1 overflow-hidden rounded-lg border border-border-subtle bg-page">
+          <div data-theme={temaDoCanvas} className="relative flex-1 overflow-hidden rounded-[18px] border border-border-subtle bg-page">
             <ReactFlow
               colorMode={temaDoCanvas}
               isValidConnection={ligacaoValida}
@@ -597,7 +602,7 @@ export default function AgentBuilderPage() {
           {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
         </div>
       ) : tab === "conversa" ? (
-        <div className="flex flex-1 gap-4 overflow-hidden">
+        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
           <ConversationMode
             nodes={nodes}
             edges={edges}

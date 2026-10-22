@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import type { Node, Edge } from "@xyflow/react";
-import { Sparkles, Loader2, AlertTriangle, Undo2, X, ArrowRight, RotateCcw } from "lucide-react";
+import { Loader2, AlertTriangle, Undo2, X, ArrowRight, RotateCcw } from "lucide-react";
+import { MarcaEva } from "@/components/layout/marca-eva";
+import { pulsar } from "@/lib/fundo/eventos";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -187,6 +189,8 @@ export function MontarComIa({
       onAplicar(r.nodes, r.edges);
     }
     setAnterior({ grafo: antes, aviso });
+    // O canvas mudou de uma vez: uma onda no fundo diz que algo aconteceu.
+    pulsar(null, 1.6);
     setAberto(false);
     setRascunho(null);
     setPedido("");
@@ -206,21 +210,23 @@ export function MontarComIa({
       <button
         type="button"
         onClick={() => setAberto(true)}
-        title="Descreva o fluxo e a IA monta um rascunho"
-        className={cn(buttonVariants({ variant: "secondary", size: "md" }), "border-accent-500/30 text-text-primary")}
+        title="Descreva o fluxo e a Eva monta um rascunho"
+        aria-label="Montar com IA"
+        className={buttonVariants({ variant: "secondary", size: "md" })}
       >
-        <Sparkles size={15} className="text-accent-500" /> Montar com IA
+        {/* IA marcada pelo símbolo da Eva, não por brilho nem violeta. */}
+        <MarcaEva size={14} /> <span className="hidden sm:inline">Montar com IA</span>
       </button>
 
       {anterior && (
-        <div className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-accent-500/30 bg-surface-2 px-4 py-3 shadow-2xl">
-          <Sparkles size={15} className="shrink-0 text-accent-500" />
-          <span className="text-[13px] text-text-primary">
+        <div className="fixed bottom-6 left-1/2 z-40 flex w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-[22px] border border-border-subtle bg-overlay/90 px-4 py-3 shadow-overlay backdrop-blur-xl">
+          <MarcaEva size={15} className="shrink-0 text-text-secondary" />
+          <span className="text-small text-text-primary">
             Rascunho da IA no canvas. O construtor salva sozinho, como em qualquer edição: revise os blocos ou desfaça para voltar ao fluxo de antes.
-            {anterior.aviso && <span className="block text-[12px] text-warning">{anterior.aviso}</span>}
+            {anterior.aviso && <span className="block text-caption text-warning">{anterior.aviso}</span>}
           </span>
           <Button variant="secondary" size="sm" onClick={desfazer}>
-            <Undo2 size={14} /> Desfazer
+            <Undo2 size={14} aria-hidden="true" /> Desfazer
           </Button>
           <button
             type="button"
@@ -252,16 +258,16 @@ export function MontarComIa({
                     onChange={(e) => setPedido(e.target.value)}
                     placeholder="Ex.: recebe o lead, pergunta nome e WhatsApp e cria um negócio no funil de vendas."
                   />
-                  <p className="mt-1 text-right text-[11px] text-text-tertiary">{pedido.length}/800</p>
+                  <p className="mt-1 text-right text-caption text-text-tertiary">{pedido.length}/800</p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <span className="text-[12px] text-text-tertiary">Ou comece por um exemplo:</span>
+                  <span className="text-caption text-text-tertiary">Ou comece por um exemplo:</span>
                   {EXEMPLOS.map((ex) => (
                     <button
                       key={ex}
                       type="button"
                       onClick={() => setPedido(ex)}
-                      className="rounded-xl border border-border-subtle bg-surface-2 px-3 py-2 text-left text-[12.5px] text-text-secondary transition-colors hover:border-accent-500/40 hover:text-text-primary"
+                      className="rounded-[14px] border border-border-subtle bg-raised px-3 py-2 text-left text-small text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
                     >
                       {ex}
                     </button>
@@ -271,8 +277,8 @@ export function MontarComIa({
             ) : (
               <>
                 {rascunho.explicacao && (
-                  <div className="rounded-2xl bg-accent-soft px-4 py-3 text-[13px] text-text-primary">
-                    <Sparkles size={13} className="mr-1.5 inline text-accent-500" />
+                  <div className="flex gap-2 rounded-[14px] bg-raised px-4 py-3 text-small text-text-primary">
+                    <MarcaEva size={13} className="mt-0.5 shrink-0 text-text-secondary" />
                     {rascunho.explicacao}
                   </div>
                 )}
@@ -284,18 +290,18 @@ export function MontarComIa({
                     const saidas = rascunho.fluxo.edges.filter((e) => e.source === n.id);
                     const ramifica = saidas.length > 1 || saidas.some((e) => e.sourceHandle);
                     return (
-                      <li key={n.id} className="flex gap-3 rounded-2xl bg-surface-2 px-3.5 py-2.5">
-                        <span className="w-4 pt-1.5 text-right text-[11px] font-semibold text-text-tertiary">{i + 1}</span>
+                      <li key={n.id} className="flex gap-3 rounded-[14px] bg-raised px-3.5 py-2.5">
+                        <span className="w-4 pt-1.5 text-right font-mono text-caption tabular-nums text-text-tertiary">{i + 1}</span>
                         <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", style.badgeBg, style.badgeText)}>
                           <Icon size={14} />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium text-text-primary">{n.data.label}</p>
-                          <p className="text-[12.5px] text-text-secondary">{descrever(n.data, nomes)}</p>
+                          <p className="text-small font-medium text-text-primary">{n.data.label}</p>
+                          <p className="text-small text-text-secondary">{descrever(n.data, nomes)}</p>
                           {ramifica && (
                             <ul className="mt-1 flex flex-col gap-0.5">
                               {saidas.map((e) => (
-                                <li key={e.id} className="flex items-center gap-1.5 text-[11.5px] text-text-tertiary">
+                                <li key={e.id} className="flex items-center gap-1.5 text-caption text-text-tertiary">
                                   <ArrowRight size={11} />
                                   {rotuloDaSaida(n.data, e.sourceHandle) ?? "Segue"}:{" "}
                                   {rascunho.fluxo.nodes.find((x) => x.id === e.target)?.data.label}
@@ -310,12 +316,12 @@ export function MontarComIa({
                 </ol>
 
                 {rascunho.avisos.length > 0 && (
-                  <div className="flex flex-col gap-1.5 rounded-lg border border-border-subtle bg-panel px-4 py-3">
-                    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-warning">
+                  <div className="flex flex-col gap-1.5 rounded-[14px] bg-warning-subtle px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-small font-medium text-warning">
                       <AlertTriangle size={13} /> Vale conferir
                     </span>
                     {rascunho.avisos.map((a) => (
-                      <p key={a} className="text-[12.5px] text-text-secondary">{a}</p>
+                      <p key={a} className="text-small text-text-secondary">{a}</p>
                     ))}
                   </div>
                 )}
@@ -337,7 +343,7 @@ export function MontarComIa({
                       disabled={carregando || ajuste.trim().length < 5}
                       onClick={() => gerar(ajuste.trim(), rascunho.fluxo)}
                     >
-                      {carregando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Ajustar
+                      {carregando ? <Loader2 size={15} className="animate-spin" /> : <MarcaEva size={14} />} Ajustar
                     </Button>
                   </div>
                 </div>
@@ -345,7 +351,7 @@ export function MontarComIa({
             )}
 
             {erro && (
-              <div className="rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+              <div className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">
                 {erro.msg}
                 {erro.semChave && (
                   <Link href="/integracoes" className="ml-1 font-medium underline">
@@ -361,8 +367,8 @@ export function MontarComIa({
               <>
                 <Button variant="ghost" onClick={() => setAberto(false)} disabled={carregando}>Cancelar</Button>
                 <Button onClick={() => gerar(pedido.trim())} disabled={carregando || pedido.trim().length < 5}>
-                  {carregando ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                  {carregando ? "Montando o rascunho..." : "Montar rascunho"}
+                  {carregando ? <Loader2 size={15} className="animate-spin" /> : <MarcaEva size={14} />}
+                  {carregando ? "Montando o rascunho…" : "Montar rascunho"}
                 </Button>
               </>
             ) : (

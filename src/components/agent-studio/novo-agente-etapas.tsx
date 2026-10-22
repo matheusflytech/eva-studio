@@ -55,8 +55,8 @@ function Opcao({
       aria-checked={ativa}
       onClick={onClick}
       className={cn(
-        "flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-colors",
-        ativa ? "border-accent-solid bg-accent-subtle" : "border-border-subtle bg-panel hover:border-border-strong"
+        "flex w-full items-start gap-3 rounded-[14px] border p-3.5 text-left transition-colors",
+        ativa ? "border-accent-solid bg-accent-subtle" : "border-border-subtle bg-raised hover:bg-hover"
       )}
     >
       <span
@@ -69,11 +69,11 @@ function Opcao({
         {ativa && <Check size={11} />}
       </span>
       <span className="min-w-0">
-        <span className="flex items-center gap-2 text-[13.5px] font-medium text-text-primary">
+        <span className="flex items-center gap-2 text-small font-medium text-text-primary">
           {titulo}
-          {selo && <span className="rounded-sm bg-surface-3 px-1.5 py-0.5 text-[10.5px] font-medium text-text-secondary">{selo}</span>}
+          {selo && <span className="font-mono text-caption text-text-tertiary">{selo}</span>}
         </span>
-        <span className="mt-0.5 block text-[12px] text-text-tertiary">{texto}</span>
+        <span className="mt-0.5 block text-caption text-text-tertiary">{texto}</span>
       </span>
     </button>
   );
@@ -192,7 +192,7 @@ export function NovoAgenteEtapas() {
   const ultima = etapa === ETAPAS.length - 1;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 pb-10">
       <ol className="flex items-center gap-2" aria-label="Etapas">
         {ETAPAS.map((t, i) => (
           <li key={t} className="flex flex-1 items-center gap-2">
@@ -202,13 +202,13 @@ export function NovoAgenteEtapas() {
               disabled={i > etapa}
               aria-current={i === etapa ? "step" : undefined}
               className={cn(
-                "flex items-center gap-2 text-[12.5px] font-medium",
+                "flex items-center gap-2 text-small font-medium",
                 i === etapa ? "text-text-primary" : i < etapa ? "text-accent-fg hover:underline" : "text-text-tertiary"
               )}
             >
               <span
                 className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-[11.5px] tabular-nums",
+                  "flex size-6 items-center justify-center rounded-full text-caption tabular-nums",
                   i < etapa ? "bg-accent-solid text-text-on-accent" : i === etapa ? "border border-accent-solid text-accent-fg" : "border border-border-strong"
                 )}
               >
@@ -227,7 +227,7 @@ export function NovoAgenteEtapas() {
             <div>
               <Label htmlFor="na-nome">Nome do agente</Label>
               <Input id="na-nome" autoFocus placeholder="Ex.: Eva, Vendedor da Loja" value={name} onChange={(e) => setName(e.target.value)} />
-              <p className="mt-1 text-[11px] text-text-tertiary">É como ele se apresenta para o cliente.</p>
+              <p className="mt-1 text-caption text-text-tertiary">É como ele se apresenta para o cliente.</p>
             </div>
             <div>
               <Label htmlFor="na-desc">O que ele faz, em uma frase</Label>
@@ -248,8 +248,8 @@ export function NovoAgenteEtapas() {
                     onClick={() => setTone(t)}
                     aria-pressed={tone === t}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-[12px]",
-                      tone === t ? "border-accent-solid bg-accent-subtle text-accent-fg" : "border-border-subtle text-text-secondary hover:border-border-strong"
+                      "h-7 rounded-full border px-3 text-small transition-colors",
+                      tone === t ? "border-transparent bg-inverse font-medium text-inverse-fg" : "border-border-subtle bg-raised text-text-secondary hover:text-text-primary"
                     )}
                   >
                     {t}
@@ -271,7 +271,7 @@ export function NovoAgenteEtapas() {
               <Textarea
                 id="na-instr"
                 rows={4}
-                placeholder="O que ele precisa saber e fazer: produtos, horário, como responder preço, quando passar para a equipe..."
+                placeholder="O que ele precisa saber e fazer: produtos, horário, como responder preço, quando passar para a equipe…"
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
               />
@@ -315,7 +315,7 @@ export function NovoAgenteEtapas() {
                   <Link href="/integracoes" className="underline">Integrações</Link> ou use a Central de IA.
                 </Notice>
               ) : (
-                <div className="grid grid-cols-1 gap-3 rounded-xl bg-surface-2 p-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 rounded-[14px] bg-raised p-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="na-cred">Chave</Label>
                     <Select
@@ -327,7 +327,7 @@ export function NovoAgenteEtapas() {
                         setModel(LLM_PROVIDERS.find((p) => p.credentialType === tipo)?.models[0]?.id ?? "");
                       }}
                     >
-                      <option value="">Escolha a chave...</option>
+                      <option value="">Escolha a chave…</option>
                       {(credenciais ?? []).map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name} · {LLM_PROVIDERS.find((p) => p.credentialType === c.type)?.label ?? c.type}
@@ -353,7 +353,7 @@ export function NovoAgenteEtapas() {
               texto="Dá boas-vindas e a IA conversa usando o que você escreveu. Se a IA falhar, passa para um atendente."
             />
             {inicio === "ia" && (
-              <div className="flex flex-col gap-3 rounded-xl bg-surface-2 p-3">
+              <div className="flex flex-col gap-3 rounded-[14px] bg-raised p-3">
                 <div>
                   <Label htmlFor="na-oi">Mensagem de boas-vindas (opcional)</Label>
                   <Input id="na-oi" value={boasVindas} onChange={(e) => setBoasVindas(e.target.value)} />
@@ -375,15 +375,15 @@ export function NovoAgenteEtapas() {
               <React.Fragment key={t.id}>
                 <Opcao ativa={inicio === t.id} onClick={() => setInicio(t.id)} titulo={t.name} texto={t.description} />
                 {inicio === t.id && MODELOS_COM_N8N.has(t.id) && (
-                  <div className="rounded-xl bg-surface-2 p-3">
+                  <div className="rounded-[14px] bg-raised p-3">
                     <Label htmlFor="na-n8n">URL do webhook do n8n</Label>
                     <Input
                       id="na-n8n"
-                      placeholder="https://seu-n8n.com/webhook/..."
+                      placeholder="https://seu-n8n.com/webhook/…"
                       value={urlDoN8n}
                       onChange={(e) => setUrlDoN8n(e.target.value)}
                     />
-                    <p className="mt-1 text-[11px] text-text-tertiary">
+                    <p className="mt-1 text-caption text-text-tertiary">
                       O nó Webhook do seu workflow. A Eva manda a mensagem e espera {"{ \"reply\": \"...\" }"} de volta;
                       com {"\"done\": true"} o atendimento segue para o Encerramento.
                     </p>
@@ -406,7 +406,7 @@ export function NovoAgenteEtapas() {
           )}
           {ultima ? (
             <Button type="button" onClick={criar} disabled={criando}>
-              {criando ? "Criando..." : "Criar agente e abrir o builder"}
+              {criando ? "Criando…" : "Criar agente e abrir o builder"}
             </Button>
           ) : (
             <Button type="button" onClick={avancar}>

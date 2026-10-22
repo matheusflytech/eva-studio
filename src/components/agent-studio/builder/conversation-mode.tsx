@@ -3,9 +3,10 @@
 import * as React from "react";
 import type { Edge, Node } from "@xyflow/react";
 import {
-  Plus, Check, CheckCheck, GitBranch, Clock, UserCheck, Square, Sparkles,
+  Plus, Check, CheckCheck, GitBranch, Clock, UserCheck, Square,
   ChevronDown, Search, Phone, Video, MoreVertical, Camera, Mic, Smile,
 } from "lucide-react";
+import { MarcaEva } from "@/components/layout/marca-eva";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { cn } from "@/lib/utils";
@@ -159,15 +160,15 @@ export function ConversationMode({
     <div className="flex flex-1 gap-4 overflow-hidden">
       {/* ── Telefone ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col items-center overflow-y-auto pb-6">
-        <div className="mb-4 flex items-center gap-1 rounded-xl bg-surface-2 p-1">
+        <div className="mb-4 flex items-center gap-1 rounded-[14px] bg-raised p-1">
           {(["whatsapp", "instagram"] as const).map((c) => (
             <button
               key={c}
               type="button"
               onClick={() => setCanal(c)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium transition-colors",
-                canal === c ? "bg-surface-3 text-text-primary" : "text-text-secondary hover:text-text-primary"
+                "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-small font-medium transition-colors",
+                canal === c ? "bg-hover text-text-primary" : "text-text-secondary hover:text-text-primary"
               )}
             >
               <span
@@ -203,15 +204,15 @@ export function ConversationMode({
           >
             <span
               className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-caption font-semibold text-white",
                 whats ? "bg-[#2a3942]" : "bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-500"
               )}
             >
               {iniciais(agentName)}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-medium text-white">{agentName}</span>
-              <span className="block text-[11px] text-white/55">{whats ? "online" : "Ativo agora"}</span>
+              <span className="block truncate text-body font-medium text-white">{agentName}</span>
+              <span className="block text-caption text-white/55">{whats ? "online" : "Ativo agora"}</span>
             </span>
             {whats ? (
               <>
@@ -234,7 +235,7 @@ export function ConversationMode({
             )}
           >
             {itens.length === 0 && (
-              <p className="m-auto max-w-[240px] text-center text-[12.5px] text-white/40">
+              <p className="m-auto max-w-[240px] text-center text-small text-white/40">
                 O fluxo está vazio. Adicione o primeiro passo aqui embaixo.
               </p>
             )}
@@ -268,7 +269,7 @@ export function ConversationMode({
               type="button"
               onClick={() => setAbrindoPaleta((v) => !v)}
               className={cn(
-                "flex flex-1 items-center gap-2 rounded-full px-3.5 py-2 text-[12.5px] transition-colors",
+                "flex flex-1 items-center gap-2 rounded-full px-3.5 py-2 text-small transition-colors",
                 whats
                   ? "bg-[#2a3942] text-white/60 hover:text-white"
                   : "border border-white/15 text-white/60 hover:text-white"
@@ -297,10 +298,10 @@ export function ConversationMode({
       </div>
 
       {/* ── O que sobra no sistema ───────────────────────────────────── */}
-      <aside className="glass-card hidden w-[300px] shrink-0 flex-col gap-5 overflow-y-auto rounded-3xl p-5 xl:flex">
+      <aside className="border border-border-subtle bg-panel hidden w-[300px] shrink-0 flex-col gap-5 overflow-y-auto rounded-[18px] p-5 xl:flex">
         <div>
-          <h3 className="font-display text-[15px] font-semibold text-text-primary">Depois desta conversa</h3>
-          <p className="mt-1 text-[12px] text-text-tertiary">
+          <h3 className="text-body-lg font-semibold text-text-primary">Depois desta conversa</h3>
+          <p className="mt-1 text-caption text-text-tertiary">
             O que este caminho deixa registrado. Muda conforme você escolhe os ramos.
           </p>
         </div>
@@ -345,7 +346,7 @@ export function ConversationMode({
           ))}
         </Secao>
 
-        <p className="mt-auto border-t border-border-subtle pt-3 text-[11.5px] text-text-tertiary">
+        <p className="mt-auto border-t border-border-subtle pt-3 text-caption text-text-tertiary">
           {itens.length} passo(s) neste caminho. Clique numa bolha para editar o bloco.
         </p>
       </aside>
@@ -363,9 +364,9 @@ function Secao({
   const temFilhos = React.Children.count(children) > 0;
   return (
     <section>
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">{titulo}</p>
+      <p className="mb-1.5 font-mono text-caption text-text-tertiary">{titulo}</p>
       {temFilhos ? <div className="flex flex-col gap-1">{children}</div> : (
-        <p className="text-[12px] text-text-tertiary/70">{vazio}</p>
+        <p className="text-caption text-text-tertiary/70">{vazio}</p>
       )}
     </section>
   );
@@ -386,11 +387,11 @@ function Linha({
       onClick={onClick}
       className={cn(
         "flex items-start gap-2 rounded-xl px-2.5 py-2 text-left transition-colors",
-        ativo ? "bg-accent-soft text-text-primary" : "hover:bg-surface-2"
+        ativo ? "bg-accent-subtle text-text-primary" : "hover:bg-raised"
       )}
     >
-      <Icone size={13} className={cn("mt-0.5 shrink-0", ativo ? "text-accent-400" : "text-text-tertiary")} />
-      <span className="text-[12px] leading-snug text-text-secondary">{texto}</span>
+      <Icone size={13} className={cn("mt-0.5 shrink-0", ativo ? "text-accent-fg" : "text-text-tertiary")} />
+      <span className="text-caption leading-snug text-text-secondary">{texto}</span>
     </button>
   );
 }
@@ -417,8 +418,8 @@ function ItemDaConversa({
           type="button"
           onClick={onSelect}
           className={cn(
-            "inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-            selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/10 text-white/65 hover:bg-white/15"
+            "inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-caption transition-colors",
+            selecionado ? "bg-accent-solid text-text-on-accent" : "bg-white/10 text-white/65 hover:bg-white/15"
           )}
         >
           <GitBranch size={11} className="shrink-0" />
@@ -432,9 +433,9 @@ function ItemDaConversa({
                 type="button"
                 onClick={() => onEscolherRamo(r)}
                 className={cn(
-                  "rounded-full px-2.5 py-0.5 text-[10.5px] font-medium transition-colors",
+                  "rounded-full px-2.5 py-0.5 text-caption font-medium transition-colors",
                   (ramoEscolhido || ramos[0]) === r
-                    ? "bg-accent-500/25 text-accent-fg ring-1 ring-accent-500/50"
+                    ? "bg-accent-subtle text-accent-fg ring-1 ring-accent-solid/50"
                     : "bg-white/8 text-white/50 hover:text-white"
                 )}
               >
@@ -456,8 +457,8 @@ function ItemDaConversa({
         type="button"
         onClick={onSelect}
         className={cn(
-          "mx-auto my-1 inline-flex max-w-[92%] items-center gap-1.5 rounded-full px-3 py-1 text-[11px] transition-colors",
-          selecionado ? "bg-accent-500 text-text-on-accent" : "bg-white/8 text-white/55 hover:bg-white/14 hover:text-white/80"
+          "mx-auto my-1 inline-flex max-w-[92%] items-center gap-1.5 rounded-full px-3 py-1 text-caption transition-colors",
+          selecionado ? "bg-accent-solid text-text-on-accent" : "bg-white/8 text-white/55 hover:bg-white/14 hover:text-white/80"
         )}
       >
         {React.createElement(especial ?? Icone, { size: 11, className: "shrink-0" })}
@@ -475,16 +476,16 @@ function ItemDaConversa({
         type="button"
         onClick={onSelect}
         className={cn(
-          "max-w-[85%] rounded-2xl px-3 py-2 text-left text-[13px] leading-snug transition-shadow",
+          "max-w-[85%] rounded-2xl px-3 py-2 text-left text-small leading-snug transition-shadow",
           whats
             ? "rounded-bl-md bg-[#202c33] text-white/90"
             : "rounded-bl-md bg-[#262626] text-white/90",
-          selecionado && "ring-2 ring-accent-400"
+          selecionado && "ring-2 ring-accent-solid"
         )}
       >
         {daIa && (
-          <span className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-accent-fg">
-            <Sparkles size={10} /> resposta gerada
+          <span className="mb-1 flex items-center gap-1 font-mono text-caption text-white/60">
+            <MarcaEva size={11} /> resposta gerada
           </span>
         )}
         <span className="whitespace-pre-wrap">{texto}</span>
@@ -494,7 +495,7 @@ function ItemDaConversa({
             {(data.options ?? []).map((o) => (
               <span
                 key={o.id}
-                className="rounded-full border border-white/20 px-2.5 py-0.5 text-[11px] text-white/70"
+                className="rounded-full border border-white/20 px-2.5 py-0.5 text-caption text-white/70"
               >
                 {o.label}
               </span>
@@ -502,10 +503,10 @@ function ItemDaConversa({
           </span>
         )}
 
-        <span className="mt-1 flex items-center justify-end gap-1 text-[10px] text-white/35">
+        <span className="mt-1 flex items-center justify-end gap-1 text-caption text-white/35">
           {data.variableName && <span className="mr-auto font-mono">{`→ {${data.variableName}}`}</span>}
           09:41
-          {whats ? <CheckCheck size={11} className="text-sky-400" /> : <Check size={11} />}
+          {whats ? <CheckCheck size={11} className="text-info" /> : <Check size={11} />}
         </span>
       </button>
 
@@ -514,7 +515,7 @@ function ItemDaConversa({
           {ferramentas.map((f, i) => (
             <span
               key={i}
-              className="rounded-full bg-cat-purple-subtle px-2 py-0.5 text-[10px] text-cat-purple"
+              className="rounded-full bg-raised px-2 py-0.5 text-caption text-text-secondary"
             >
               {f.label}
             </span>
@@ -538,7 +539,7 @@ function PaletaRapida({ onPick, onClose }: { onPick: (k: IconKey) => void; onClo
   return (
     <>
       <span className="fixed inset-0 z-10" onClick={onClose} />
-      <div className="glass-card glass-card-solid absolute bottom-full left-3 right-3 z-20 mb-2 grid grid-cols-2 gap-1 rounded-2xl p-2">
+      <div className="border border-border-subtle bg-overlay absolute bottom-full left-3 right-3 z-20 mb-2 grid grid-cols-2 gap-1 rounded-2xl p-2">
         {comuns.map((k) => {
           const Icone = ICON_REGISTRY[k];
           return (
@@ -546,7 +547,7 @@ function PaletaRapida({ onPick, onClose }: { onPick: (k: IconKey) => void; onClo
               key={k}
               type="button"
               onClick={() => onPick(k)}
-              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[12.5px] text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
+              className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-left text-small text-text-secondary transition-colors hover:bg-raised hover:text-text-primary"
             >
               <Icone size={14} className="shrink-0 text-text-tertiary" />
               {rotulos.get(k) ?? k}

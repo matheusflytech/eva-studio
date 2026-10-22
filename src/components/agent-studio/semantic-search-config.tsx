@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { MarcaEva } from "@/components/layout/marca-eva";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -84,7 +85,7 @@ export function SemanticSearchConfig({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles size={16} className="text-text-tertiary" /> Busca semântica
+              <MarcaEva size={15} className="text-text-secondary" /> Busca semântica
             </CardTitle>
             <CardDescription>
               Encontra na base de conhecimento por sentido, não só por palavra igual.
@@ -124,13 +125,13 @@ export function SemanticSearchConfig({ agentId }: { agentId: string }) {
         )}
 
         {status && enabled && (
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 text-[13px]">
+          <div className="flex flex-wrap items-center gap-3 rounded-[14px] bg-raised px-4 py-3 text-small">
             <span className="text-text-secondary">
               {status.indexedDocCount} de {status.docCount} documento(s) indexado(s) ·{" "}
               {status.chunkCount} trecho(s)
             </span>
             {status.needsReindex && (
-              <span className="inline-flex items-center gap-1.5 text-[12px] text-amber-400">
+              <span className="inline-flex items-center gap-1.5 text-caption text-warning">
                 <AlertTriangle size={13} /> Há documento sem índice
               </span>
             )}
@@ -145,14 +146,14 @@ export function SemanticSearchConfig({ agentId }: { agentId: string }) {
           </div>
         )}
 
-        {error && <p className="text-[13px] text-danger">{error}</p>}
-        {notice && <p className="text-[13px] text-emerald-400">{notice}</p>}
+        {error && <p className="text-small text-danger">{error}</p>}
+        {notice && <p className="text-small text-success">{notice}</p>}
 
         <div className="flex items-center gap-2">
           <Button onClick={() => save(model, credentialId)} disabled={busy || (!!model && !credentialId)}>
             {busy && <Loader2 size={15} className="animate-spin" />} Salvar
           </Button>
-          <p className="text-[11.5px] text-text-tertiary">
+          <p className="text-caption text-text-tertiary">
             Trocar de modelo reindexa tudo: vetores de modelos diferentes não são comparáveis entre si.
           </p>
         </div>
