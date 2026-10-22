@@ -28,16 +28,13 @@ Feito na sessão de 22/10 (noite), tudo no PR #8, branch `feat/redesign-visual`:
   nós quadrados com ícone, fios com brilho, painel "O que vem depois?", barra
   flutuante.
 
-**BUGS ABERTOS (fazer primeiro):**
-1. **Fluxograma abre VAZIO**: os nós ficam no DOM com
-   `transform: translate(0,0); visibility: hidden` (React Flow nunca mede/
-   posiciona). Começou com o visual novo do canvas.tsx. Um subagente estava
-   corrigindo quando a sessão acabou: veja `git status`/`git diff` em
-   `src/components/automacoes/` — pode haver edição pela metade. Conferir no
-   navegador com a automação "Aniversário do contato".
-2. **"salvando…" ao abrir o editor de automação**: suspeita de salvamento
-   automático ao carregar (escreve no banco de PRODUÇÃO). Confirmar a causa em
-   `automacoes/[id]/page.tsx`; abrir a tela não pode alterar a definição.
+**BUGS (corrigidos no fim de 22/10, conferir):**
+1. Fluxograma vazio: nós agora declaram tamanho fixo (88×88 / 56×56) em
+   `canvas.tsx`, sem depender da medição do React Flow. O subagente viu os nós
+   aparecendo; conferir de novo.
+2. "salvando…" ao abrir: era real (PATCH ao abrir/remontar). `automacoes/[id]/page.tsx`
+   agora só salva quando o rascunho difere do que veio do servidor. Conferir
+   que abrir e sair do editor não faz nenhum PATCH (aba Network).
 3. Conferir no navegador: View Transitions + toque com mola, páginas de
    contato/empresa/agente em 2 colunas, Playground com coluna, tudo no claro e
    no escuro, em 1440–1920px.
