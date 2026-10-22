@@ -33,13 +33,13 @@ describe("o site busca o que o atendente escreveu", () => {
     expect(db.message.findMany.mock.calls[0][0].where).toEqual({ conversationId: "cv1", role: "human", createdAt: { gt: new Date("2026-10-22T12:00:00.000Z") } });
   });
 
-  it("sem corte (ou corte inválido): volta uma hora; conversa que não existe: nada", async () => {
+  it("sem corte (ou corte inválido): volta 24 h; conversa que não existe: nada", async () => {
     db.conversation.findUnique.mockResolvedValue({ id: "cv1", status: "active" });
     db.message.findMany.mockResolvedValue([]);
     const antes = Date.now();
     expect(await mensagensDoAtendente("a1", "x", "lixo")).toEqual({ humano: false, messages: [] });
     const corte = db.message.findMany.mock.calls[0][0].where.createdAt.gt as Date;
-    expect(antes - corte.getTime()).toBeGreaterThanOrEqual(60 * 60 * 1000 - 50);
+    expect(antes - corte.getTime()).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 50);
 
     db.conversation.findUnique.mockResolvedValue(null);
     expect(await mensagensDoAtendente("a1", "x", null)).toEqual({ humano: false, messages: [] });
