@@ -227,7 +227,7 @@ function LeadCardContent({
       </div>
 
       {lead.lastMessage && (
-        <p className="line-clamp-2 text-caption text-text-secondary">{lead.lastMessage.text}</p>
+        <p className="line-clamp-2 text-caption text-text-secondary">{semMarcacao(lead.lastMessage.text)}</p>
       )}
     </>
   );
@@ -1083,4 +1083,13 @@ export default function LeadsPage() {
 // o id tiver aspas (ids são cuid, então na prática nunca).
 function escaparSeletor(v: string): string {
   return typeof window !== "undefined" && window.CSS?.escape ? window.CSS.escape(v) : v.replace(/"/g, '\\"');
+}
+
+/** Prévia em texto corrido: tira a marcação de markdown que o agente usa (#, **, _, `). */
+function semMarcacao(texto: string): string {
+  return texto
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, "$2")
+    .replace(/\s+/g, " ")
+    .trim();
 }

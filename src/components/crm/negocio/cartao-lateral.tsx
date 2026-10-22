@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { Loader2, ThumbsUp } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -105,7 +105,7 @@ export function CartaoLateral({
             }}
             className={`ml-auto h-8 ${classeDoGanho}`}
           >
-            {ganhando ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} aria-hidden />} Ganho
+            {ganhando ? <Loader2 size={14} className="animate-spin" /> : null} Ganho
           </Button>
         )}
       </div>

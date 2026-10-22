@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, ThumbsDown, ThumbsUp, UserPlus, type LucideIcon,
+  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, UserPlus, XCircle, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -135,8 +135,8 @@ function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string
     case "contato_criado":
       return { icone: UserPlus, tom: "bg-raised text-text-secondary" };
     case "etapa":
-      if (item.paraTipo === "won") return { icone: ThumbsUp, tom: "bg-success-subtle text-success" };
-      if (item.paraTipo === "lost") return { icone: ThumbsDown, tom: "bg-danger-subtle text-danger" };
+      if (item.paraTipo === "won") return { icone: CheckCircle2, tom: "bg-success-subtle text-success" };
+      if (item.paraTipo === "lost") return { icone: XCircle, tom: "bg-danger-subtle text-danger" };
       return { icone: ArrowRight, tom: "bg-raised text-text-secondary" };
     case "nota":
       return { icone: StickyNote, tom: "bg-raised text-text-secondary" };

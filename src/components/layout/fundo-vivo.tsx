@@ -33,7 +33,8 @@ export function FundoVivo({ className, escuro: forcarEscuro, ...opc }: OpcoesDoC
       anterior = agora;
       acumulado += dt;
       if (acumulado >= 1 / 30) {
-        campo.desenhar(reduz.matches ? 0 : acumulado, escuroRef.current);
+        // Reduzir movimento: as curvas andam a um terço da velocidade, não param.
+        campo.desenhar(reduz.matches ? acumulado * 0.35 : acumulado, escuroRef.current);
         acumulado = 0;
       }
       quadro = requestAnimationFrame(laco);
@@ -49,7 +50,6 @@ export function FundoVivo({ className, escuro: forcarEscuro, ...opc }: OpcoesDoC
       const { x, y, forca: f } = (e as CustomEvent<DetalheDoPulso>).detail;
       const r = canvas.getBoundingClientRect();
       campo.pulsar(x == null ? r.width / 2 : x - r.left, y == null ? r.height / 2 : y - r.top, f);
-      if (reduz.matches) campo.desenhar(0.4, escuroRef.current);
     };
     campo.desenhar(0, escuroRef.current);
     ligar();

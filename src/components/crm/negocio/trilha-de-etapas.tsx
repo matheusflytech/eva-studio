@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Hourglass, Loader2, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Hourglass, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { diasSemAtividade, negocioParado, type RegraDaEtapa } from "@/lib/regras-de-etapa";
@@ -138,7 +138,7 @@ export function TrilhaDeEtapas({
             <span className={cn("flex flex-col gap-1.5 py-1", ganho ? "text-success" : "text-danger")}>
               <span aria-hidden className={cn("block h-1.5 rounded-full", ganho ? "bg-success" : "bg-danger")} />
               <span className="flex items-center gap-1 truncate font-mono text-caption">
-                {ganho ? <ThumbsUp size={11} aria-hidden /> : <ThumbsDown size={11} aria-hidden />}
+                
                 <span className="truncate">{deal.stage.name}</span>
               </span>
             </span>

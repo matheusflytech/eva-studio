@@ -137,25 +137,26 @@ export default function InicioPage() {
       <section className="heroi-iridescente relative flex min-h-[300px] shrink-0 flex-col overflow-hidden rounded-b-[34px] px-7 pb-5 pt-16 text-[#121214]">
         <FundoVivo escuro={false} forca={3.2} niveis={14} className="pointer-events-none absolute inset-0 h-full w-full mix-blend-multiply" />
         <div className="relative flex items-start gap-3">
-          <h1 className="text-[38px] font-light leading-[1.08] tracking-[-0.035em]">
+          <h1 className="min-w-0 text-[30px] font-light leading-[1.08] tracking-[-0.035em] sm:text-[38px]">
             {saudacao(hora)}
             <b className="block font-bold">{primeiroNome ? `${primeiroNome}!` : "bem-vindo!"}</b>
           </h1>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {!semAgente && !comecar && (
               <button
                 type="button"
                 onClick={() => setEditando((v) => !v)}
-                className="inline-flex h-[38px] items-center gap-2 rounded-full bg-[#121214] px-4 text-small font-semibold text-[#f2f2f4]"
+                aria-label={editando ? "Pronto" : "Personalizar"}
+                className="inline-flex h-[38px] items-center gap-2 rounded-full bg-[#121214] px-3 text-small font-semibold text-[#f2f2f4] sm:px-4"
               >
                 {editando ? <Check size={15} /> : <Pencil size={15} />}
-                {editando ? "Pronto" : "Personalizar"}
+                <span className="hidden sm:inline">{editando ? "Pronto" : "Personalizar"}</span>
               </button>
             )}
-            <button type="button" onClick={abrir} aria-label="Buscar" className="grid h-[38px] w-[38px] place-items-center rounded-full bg-[#121214] text-[#f2f2f4]">
+            <button type="button" onClick={abrir} aria-label="Buscar" className="hidden h-[38px] w-[38px] place-items-center rounded-full bg-[#121214] text-[#f2f2f4] sm:grid">
               <Search size={16} />
             </button>
-            <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-white/60 text-small font-semibold">{iniciais(session?.name ?? "") || "?"}</span>
+            <span className="hidden h-[38px] w-[38px] place-items-center rounded-full bg-white/60 text-small font-semibold sm:grid">{iniciais(session?.name ?? "") || "?"}</span>
           </div>
         </div>
 
@@ -164,8 +165,8 @@ export default function InicioPage() {
             <span className="text-small text-[#a8a8ad]">Conversas nos últimos 7 dias</span>
             <b className="self-end text-[34px] font-medium leading-none tracking-[-0.035em] tabular-nums">{dados ? dados.resumo.conversas7d : "—"}</b>
           </div>
-          <div className="flex items-center gap-1.5 rounded-[22px] bg-[#121214]/90 py-2.5 pl-2 pr-5 text-[#f2f2f4]">
-            <OrbeEva falando={falando} className="h-[92px] w-[92px] shrink-0" />
+          <div className="flex items-center gap-1.5 rounded-[22px] bg-[#121214]/90 py-2.5 pl-1 pr-5 text-[#f2f2f4]">
+            <OrbeEva falando={falando} className="-my-4 -mr-2 h-[116px] w-[116px] shrink-0 cursor-pointer" />
             <span className="flex min-w-0 flex-col gap-1">
               <span className="font-mono text-caption text-[#8a8a90]">Eva · resumo do dia</span>
               <span className="text-small leading-snug text-[#d6d6da]">

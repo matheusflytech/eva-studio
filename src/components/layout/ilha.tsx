@@ -79,7 +79,7 @@ export function Ilha({ className }: { className?: string }) {
       style={{ borderRadius: aberta ? 26 : 15 }}
       className={cn(
         "relative z-20 inline-flex items-center overflow-hidden bg-black text-[#f2f2f4] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_6px_20px_rgba(0,0,0,0.25)]",
-        aberta ? "h-[52px] pl-2.5 pr-2" : "h-[30px] pl-3 pr-3.5",
+        aberta ? "h-[48px] max-w-[min(520px,calc(100vw-340px))] pl-2.5 pr-2" : "h-[30px] pl-3 pr-3.5",
         className,
       )}
     >
@@ -88,7 +88,7 @@ export function Ilha({ className }: { className?: string }) {
           <motion.span
             key={`aviso-${aviso.titulo}`}
             {...TROCA}
-            className="flex items-center gap-3"
+            className="flex min-w-0 items-center gap-3"
           >
             {aviso.avatar && (
               <span className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[#2a2a2e] text-[11px] font-semibold">

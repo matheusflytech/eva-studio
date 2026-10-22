@@ -535,14 +535,12 @@ body {
   }
 }
 
-/* Movimento mínimo: quem pediu menos movimento não vê animação nenhuma. */
+/* Reduzir movimento (Windows com "Efeitos de animação" desligado, iOS com
+   "Reduzir movimento"): como a Apple faz, o movimento fica mais calmo em vez
+   de sumir. Deslizes e escalas viram só esmaecer (regras no fim do arquivo);
+   transições de cor continuam. Nada de rolagem suave. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  html {
     scroll-behavior: auto !important;
   }
 }
@@ -767,7 +765,8 @@ body {
   to { opacity: 1; transform: none; filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .feixe-de-luz, .cartao-vidro { animation: none; }
+  .feixe-de-luz { animation: eva-aparece 1.2s ease both; }
+  .cartao-vidro { animation: eva-aparece 0.6s ease 0.15s both; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -780,12 +779,17 @@ body {
   to { opacity: 1; transform: none; filter: none; }
 }
 .entrada-de-tela { animation: eva-entra 0.42s cubic-bezier(0.32, 0.72, 0, 1) both; }
-.entrada-de-tela > * > * { animation: eva-entra 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; }
-.entrada-de-tela > * > *:nth-child(2) { animation-delay: 0.05s; }
-.entrada-de-tela > * > *:nth-child(3) { animation-delay: 0.1s; }
-.entrada-de-tela > * > *:nth-child(4) { animation-delay: 0.15s; }
-.entrada-de-tela > * > *:nth-child(5) { animation-delay: 0.2s; }
-.entrada-de-tela > * > *:nth-child(n + 6) { animation-delay: 0.25s; }
+/* :where() zera a especificidade: um bloco com animação própria (o topo
+   iridescente, o tremor de "Personalizar", esqueletos) mantém a dele. */
+:where(.entrada-de-tela > * > *) { animation: eva-entra 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; }
+:where(.entrada-de-tela > * > *:nth-child(2)) { animation-delay: 0.05s; }
+:where(.entrada-de-tela > * > *:nth-child(3)) { animation-delay: 0.1s; }
+:where(.entrada-de-tela > * > *:nth-child(4)) { animation-delay: 0.15s; }
+:where(.entrada-de-tela > * > *:nth-child(5)) { animation-delay: 0.2s; }
+:where(.entrada-de-tela > * > *:nth-child(n + 6)) { animation-delay: 0.25s; }
+.entrada-de-tela .heroi-iridescente {
+  animation: eva-entra 0.55s cubic-bezier(0.32, 0.72, 0, 1) both, eva-iridescencia 18s ease-in-out infinite alternate;
+}
 @keyframes ds-menu-in {
   from { opacity: 0; transform: scale(0.94) translateY(-4px); filter: blur(4px); }
   to { opacity: 1; transform: none; filter: none; }
@@ -798,4 +802,18 @@ body {
   /* Tailwind v4 centraliza com a propriedade translate; aqui só transform. */
   from { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(6px); }
   to { opacity: 1; transform: none; filter: none; }
+}
+
+/* Reduzir movimento: entradas só com esmaecer, sem deslocamento nem escala. */
+@keyframes eva-aparece {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrada-de-tela { animation-name: eva-aparece; animation-duration: 0.3s; }
+  :where(.entrada-de-tela > * > *) { animation-name: eva-aparece; animation-duration: 0.3s; }
+  .entrada-de-tela .heroi-iridescente { animation: eva-aparece 0.3s ease both, eva-iridescencia 40s ease-in-out infinite alternate; }
+  [data-state="open"][class*="ds-menu-in"],
+  [data-state="open"][class*="ds-modal-in"],
+  [data-state="open"][class*="ds-slide-in-right"] { animation: eva-aparece 0.2s ease both !important; }
 }

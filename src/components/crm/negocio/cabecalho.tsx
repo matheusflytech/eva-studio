@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useRouter } from "@/lib/contrato/navegacao";
-import { Archive, ArchiveRestore, ArrowLeft, Building2, Ellipsis, Link2, Loader2, RotateCcw, ThumbsDown, ThumbsUp, Trash2, User } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Building2, Ellipsis, Link2, Loader2, RotateCcw, Trash2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -152,12 +152,12 @@ export function CabecalhoDoNegocio({
           </DropdownMenu>
           {!fechado && etapaPerdida && (
             <Button variant="secondary" disabled={!!ocupado} onClick={() => decidir("perdido", etapaPerdida)}>
-              {ocupado === "perdido" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsDown size={14} aria-hidden />} Perdido
+              {ocupado === "perdido" ? <Loader2 size={14} className="animate-spin" /> : null} Perdido
             </Button>
           )}
           {!fechado && etapaGanha && (
             <Button variant="secondary" disabled={!!ocupado} onClick={() => decidir("ganho", etapaGanha)} className={classeDoGanho}>
-              {ocupado === "ganho" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} aria-hidden />} Ganho
+              {ocupado === "ganho" ? <Loader2 size={14} className="animate-spin" /> : null} Ganho
             </Button>
           )}
           {fechado && (

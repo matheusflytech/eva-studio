@@ -59,7 +59,7 @@ export function ConteudoDaPrevia({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <span className={cn("inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-caption font-medium", cor.fundo, cor.texto)}>
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-caption font-medium", cor.fundo, cor.texto)}>
           <span className={cn("h-1.5 w-1.5 rounded-full", cor.ponto)} aria-hidden />
           {etapa.name}
         </span>
@@ -91,7 +91,7 @@ export function ConteudoDaPrevia({
       </div>
 
       {temProximo && (
-        <section aria-label="Próximo passo" className="rounded-md border border-border-subtle bg-raised px-3 py-2.5">
+        <section aria-label="Próximo passo" className="rounded-[14px] border border-border-subtle bg-raised px-3 py-2.5">
           <p className="text-caption font-medium text-text-tertiary">Próximo passo</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-caption">
             <SinalDoProximoPasso deal={deal} tipoDaEtapa={etapa.type} agora={agora} prazoParado={etapa.rottingDays} />
@@ -271,7 +271,7 @@ export function PreviaDoNegocio({
       aria-modal="false"
       aria-labelledby={idDoTitulo}
       tabIndex={-1}
-      className="fixed bottom-3 right-3 top-3 z-50 flex w-[380px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-lg border border-border-default bg-overlay shadow-overlay outline-none"
+      className="fixed bottom-3 right-3 top-3 z-50 flex w-[380px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[22px] border border-border-subtle bg-overlay shadow-overlay outline-none animate-[ds-slide-in-right_380ms_cubic-bezier(.32,.72,0,1)]"
     >
       <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-2.5">
         <span className="text-caption font-medium text-text-tertiary">Prévia do negócio</span>
@@ -292,14 +292,14 @@ export function PreviaDoNegocio({
         <div className="mt-5 flex flex-wrap gap-2">
           <Link
             href={`/negocios/${deal.id}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-solid px-3 text-body font-medium text-text-on-accent transition-colors hover:bg-accent-solid-hover"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-accent-solid px-3 text-body font-medium text-text-on-accent transition-colors hover:bg-accent-solid-hover"
           >
             <Maximize2 size={13} aria-hidden /> Abrir ficha completa
           </Link>
           {deal.whatsapp && (
             <Link
               href={`/conversas?c=${deal.whatsapp.conversationId}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-default bg-panel px-3 text-body font-medium text-text-primary transition-colors hover:border-border-strong hover:bg-raised"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border-default bg-panel px-3 text-body font-medium text-text-primary transition-colors hover:border-border-strong hover:bg-raised"
             >
               <span className="relative inline-flex text-success">
                 <MessageCircle size={14} aria-hidden />
@@ -339,17 +339,16 @@ export function PreviaDoNegocio({
           <div className="grid grid-cols-2 gap-2">
             {etapaGanha && (
               <Button
-                variant="secondary"
                 size="sm"
                 disabled={!!movendo}
                 onClick={() => mover(etapaGanha.id)}
-                className="text-success"
+                className="bg-inverse text-inverse-fg hover:bg-inverse/90"
               >
                 <CheckCircle2 size={14} aria-hidden /> Ganho
               </Button>
             )}
             {etapaPerdida && (
-              <Button variant="danger" size="sm" disabled={!!movendo} onClick={() => mover(etapaPerdida.id)}>
+              <Button variant="secondary" size="sm" disabled={!!movendo} onClick={() => mover(etapaPerdida.id)}>
                 <XCircle size={14} aria-hidden /> Perdido
               </Button>
             )}
