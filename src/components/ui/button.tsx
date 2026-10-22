@@ -13,7 +13,7 @@ import { focusRing } from "./styles";
 export const buttonVariants = cva(
   cn(
     "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium select-none",
-    "transition-colors duration-120 ease-standard",
+    "transition-[background-color,color,transform] duration-150 ease-standard active:scale-[0.97] motion-reduce:active:scale-100",
     "disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress",
     focusRing
   ),

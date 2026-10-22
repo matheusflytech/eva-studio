@@ -11,6 +11,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { BuscaGlobal, useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { FundoVivo } from "@/components/layout/fundo-vivo";
 import { Ilha } from "@/components/layout/ilha";
+import { pulsar } from "@/lib/fundo/eventos";
+import { MarcaEva } from "@/components/layout/marca-eva";
 
 // Tudo dentro de /<idDoContrato>/... A URL é a fonte da verdade do contrato:
 // o /api/me recebe o id pelo cabeçalho e confere o vínculo no servidor. Aqui só
@@ -26,6 +28,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // pra outra tela com o menu ainda aberto por cima dela.
   React.useEffect(() => {
     setMenuAberto(false);
+    // Trocou de tela: uma onda curta no fundo vivo, do centro.
+    pulsar(null, 0.9);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -69,8 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <span className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/eva-mark.png" alt="" width={20} height={20} />
+            <MarcaEva size={18} className="text-text-primary" />
             <span className="font-display text-[14px] font-bold text-text-primary">Eva</span>
           </span>
           <BotaoBuscarNoTopo />
@@ -98,7 +101,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="hidden h-11 shrink-0 items-center justify-center lg:flex" data-print-ocultar>
             <Ilha />
           </div>
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</main>
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
+            <div key={pathname} className="entrada-de-tela flex min-h-0 flex-1 flex-col">
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </BuscaGlobal>

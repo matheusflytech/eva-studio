@@ -33,6 +33,7 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 import { ThemeToggle } from "@/components/ui/theme";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
+import { MarcaEva } from "@/components/layout/marca-eva";
 
 interface NavItem {
   href: string;
@@ -175,8 +176,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
       <div className="mb-1 flex items-center justify-between px-1 pb-2">
         {!collapsed && (
           <Link href="/inicio" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/eva-mark.png" alt="" width={22} height={22} />
+            <MarcaEva size={20} className="text-text-primary" />
             <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
           </Link>
         )}

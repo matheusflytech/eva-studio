@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { usePathname } from "@/lib/contrato/navegacao";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export function SidebarNavItem({
@@ -27,13 +28,19 @@ export function SidebarNavItem({
     <Link
       href={href}
       className={cn(
-        "group flex h-[34px] items-center gap-2.5 rounded-[10px] px-2.5 text-small font-medium transition-colors",
-        // Item ativo em cinza preenchido; a cor fica para o dado (contador).
-        isActive
-          ? "bg-hover text-text-primary"
-          : "text-text-secondary hover:bg-raised hover:text-text-primary"
+        "group relative flex h-[34px] items-center gap-2.5 rounded-[10px] px-2.5 text-small font-medium transition-colors",
+        // Item ativo em cinza preenchido (a pílula desliza entre os itens); a
+        // cor fica para o dado (contador).
+        isActive ? "text-text-primary" : "text-text-secondary hover:bg-raised hover:text-text-primary"
       )}
     >
+      {isActive && (
+        <motion.span
+          layoutId="menu-item-ativo"
+          className="absolute inset-0 -z-10 rounded-[10px] bg-hover"
+          transition={{ type: "spring", stiffness: 520, damping: 40, mass: 0.8 }}
+        />
+      )}
       <Icon
         size={17}
         className={cn(

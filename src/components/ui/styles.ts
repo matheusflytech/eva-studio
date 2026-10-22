@@ -23,4 +23,5 @@ export const menuItemBase =
 /** Caixa de overlay (menu, popover). Única superfície com sombra. */
 export const overlayBox =
   "z-50 rounded-[14px] border border-border-subtle bg-overlay p-1.5 text-text-primary shadow-overlay " +
-  "data-[state=open]:animate-[ds-pop-in_160ms_var(--ease-standard)]";
+  "origin-[var(--radix-dropdown-menu-content-transform-origin,var(--radix-popover-content-transform-origin,top))] " +
+  "data-[state=open]:animate-[ds-menu-in_240ms_cubic-bezier(.32,.72,0,1)] data-[state=closed]:animate-[ds-menu-out_140ms_ease-in]";

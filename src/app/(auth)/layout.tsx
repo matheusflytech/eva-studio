@@ -1,60 +1,32 @@
 "use client";
 
 import * as React from "react";
+import { FundoVivo } from "@/components/layout/fundo-vivo";
+import { MarcaEva } from "@/components/layout/marca-eva";
+
+// ---------------------------------------------------------------------------
+// Entrar e criar conta: sempre no escuro. Preto quase puro, um feixe de luz
+// diagonal, as curvas do fundo vivo bem de leve e o formulário num cartão de
+// vidro fosco que sobe do desfoque ao abrir.
+// ---------------------------------------------------------------------------
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  const [showMountains, setShowMountains] = React.useState(false);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setShowMountains(true), 600);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-bg-base px-4">
-      <div
-        className="pointer-events-none absolute inset-0 transition-opacity ease-out"
-        style={{ opacity: showMountains ? 1 : 0, transitionDuration: "2200ms" }}
-      >
-        <svg
-          className="animate-mtn-drift-back absolute bottom-0 left-0 h-[70%] w-full"
-          viewBox="0 0 1200 500"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="mtn-back-fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(210,225,255,0.16)" />
-              <stop offset="100%" stopColor="rgba(210,225,255,0)" />
-            </linearGradient>
-          </defs>
-          <polygon points="0,500 160,220 340,380 560,120 780,360 980,200 1200,500" fill="url(#mtn-back-fade)" />
-          <polygon points="560,120 610,190 510,190" fill="rgba(255,255,255,0.14)" />
-          <polygon points="980,200 1020,250 940,250" fill="rgba(255,255,255,0.14)" />
-        </svg>
-        <svg
-          className="animate-mtn-drift-front absolute bottom-0 left-0 h-[55%] w-full"
-          viewBox="0 0 1200 400"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="mtn-front-fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(225,235,255,0.22)" />
-              <stop offset="100%" stopColor="rgba(225,235,255,0)" />
-            </linearGradient>
-          </defs>
-          <polygon points="0,400 220,260 420,340 620,180 820,330 1020,250 1200,400" fill="url(#mtn-front-fade)" />
-          <polygon points="620,180 655,225 585,225" fill="rgba(255,255,255,0.2)" />
-        </svg>
+    <div data-theme="dark" className="tela-de-entrada relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
+      <FundoVivo escuro forca={2.4} className="pointer-events-none absolute inset-0 h-full w-full" />
+      <span className="feixe-de-luz" aria-hidden="true" />
+      <span className="feixe-de-luz feixe-fino" aria-hidden="true" />
+
+      <span className="absolute left-8 top-7 z-10 text-small font-semibold text-text-secondary">Eva Holding</span>
+
+      <div className="cartao-vidro relative z-10 w-full max-w-[380px]">
+        <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[13px] bg-page ring-1 ring-white/10">
+          <MarcaEva size={22} className="text-[#f2f2f4]" />
+        </span>
+        {children}
       </div>
 
-      <div className="relative z-10 mb-8 flex items-center gap-2.5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/eva-mark.png" alt="" width={28} height={28} />
-        <span className="font-display text-[15px] font-bold uppercase tracking-wide text-text-primary">
-          Eva
-        </span>
-      </div>
-      <div className="relative z-10 w-full max-w-[400px]">{children}</div>
+      <span className="absolute bottom-6 z-10 font-mono text-caption text-text-disabled">evapp.vercel.app</span>
     </div>
   );
 }
