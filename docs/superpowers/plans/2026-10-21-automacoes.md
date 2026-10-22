@@ -389,3 +389,39 @@ Revisão independente achou 24 pontos; todos corrigidos, com um teste por achado
   unexpectedly" do pooler (porta 6543) logo no começo. É rede local ↔ Supavisor, não
   o motor, mas vale olhar o `idleTimeout` do pool em `src/lib/db/prisma.ts` antes da
   produção.
+
+### Parte D: FEITA (21/10/2026, local, SQL novo não aplicado)
+- **Organização:** `src/lib/server/automacoes/acoes/`, com os arquivos `registro.ts`,
+  `pessoas.ts`, `cliente.ts` e `integracao.ts`, mais `comum.ts` e `tipos.ts`. As 20
+  ações do catálogo têm quem as execute, e um teste confere que nenhuma ficou sem.
+- **Registro:**
+  - "Atualizar campos" passa pelas funções da API v1, com as mesmas validações e os
+    mesmos eventos. Aceita campos personalizados, número, booleano e vazio (vazio
+    limpa o campo).
+  - "Mover", "ganho" e "perda" passam pela etapa do funil com origem `automacao` e
+    `ignorarObrigatorios` registrado.
+  - "Criar negócio" respeita "não criar se já tem aberto". "Criar ou atualizar
+    contato" liga o contato ao negócio. Etiqueta e nota completam o grupo.
+- **Pessoas:**
+  - Responsável: fixo, rodízio igual ou por percentual (tabela de contagem com linha
+    travada) ou quem tem menos negócios abertos. Só aceita membro ativo e respeita
+    "só se vazio".
+  - Tarefa com prazo em dias úteis e "concluir as abertas".
+  - "Avisar a equipe": aviso no app (tabela `eva_studio_avisos`) e e-mail pelo domínio
+    do contrato. No teste, o e-mail não sai.
+- **Cliente:**
+  - WhatsApp pela conversa, pelo canal do contato com o agente ou pelo telefone. A
+    janela de 24h segue a escolha do passo: pular ou falhar. Limite de envio e falha
+    de rede tentam de novo.
+  - E-mail por modelo: descadastrado pula; sem domínio é falha definitiva.
+  - Régua: entrar e sair. Conversa: passar para a fila ou para uma pessoa.
+- **Integração:**
+  - n8n: POST com o registro, o contato, a empresa e o gatilho. Com segredo `whsec_`
+    vai assinado no padrão Standard Webhooks; o webhook-id é a chave do passo.
+  - HTTP com cabeçalhos em JSON. Para os dois: 2xx ok, 408/429/5xx tentam de novo
+    (respeitando Retry-After) e URL interna é bloqueada.
+- **SQL novo:** `2026-10-25-avisos-rodizio.sql`, não aplicado.
+- **Fica para depois:**
+  - os avisos não aparecem em lugar nenhum da tela (sino ou Início): é a parte F;
+  - a idempotência do WhatsApp na nova tentativa depende de o passo não ter chegado a
+    enviar (não há conferência no canal).

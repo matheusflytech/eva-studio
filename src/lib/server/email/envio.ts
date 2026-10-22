@@ -25,7 +25,7 @@ export interface PedidoDeEnvio {
   /** Endereço direto (teste, bloco com e-mail digitado). Sem ele, usa o do contato. */
   email?: string | null;
   conteudo: ConteudoDoEmail;
-  origem: "fluxo" | "regua" | "disparo" | "teste";
+  origem: "fluxo" | "regua" | "disparo" | "teste" | "automacao";
   refId?: string | null;
   /** Variáveis de quem chama (ex.: "negocio.nome"). */
   extras?: Record<string, string | null | undefined>;

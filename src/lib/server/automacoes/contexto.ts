@@ -97,6 +97,7 @@ export async function montarContexto(
       channel: c.channel,
       agent_id: c.agentId,
       status: c.status,
+      assigned_to_id: c.assignedToId,
       channel_contact_id: c.contactId,
       contact_id: c.contactRecordId,
       last_message_at: c.lastMessageAt?.toISOString() ?? null,

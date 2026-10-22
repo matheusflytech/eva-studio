@@ -259,6 +259,7 @@ foi conferido depois de cada um.
 | `2026-10-20-indices-listas.sql` | 6 índices de listas (contatos e negócios) | **não aplicado** (base pequena; aplicar CONCURRENTLY quando crescer) |
 | `2026-10-21-conexao-ia.sql` | Central de IA: conexão única com ordem e reserva | **não aplicado** (app funciona sem; usa a escolha automática) |
 | `2026-10-21-uso-ia.sql` | Central de IA: uso por chamada e limite/preço por chave | **não aplicado** (app funciona sem; não conta uso) |
+| `2026-10-25-avisos-rodizio.sql` | Avisos internos da equipe e contagem do rodízio de responsável (RLS ligada) | **não aplicado** (sem ele: aviso só por e-mail e rodízio = primeiro da lista) |
 | `2026-10-24-automacoes.sql` | Automações: automações, versões, barramento de eventos, execuções, passos e esperas (RLS ligada) | **aplicado em 21/10** (tabelas vazias; motor testado ponta a ponta) |
 | `2026-10-23-webhooks.sql` | Webhooks de saída (endpoints + fila de entregas) e URL de entrada do agente, com RLS ligada | **aplicado em 21/10** (tabelas vazias) |
 | `2026-10-22-email.sql` | E-mail: domínio/remetente, modelos, envios e supressão | **não aplicado** (app funciona sem; nenhum e-mail novo sai) |

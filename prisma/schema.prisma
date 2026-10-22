@@ -1920,7 +1920,7 @@ model EmailEnvio {
   resendId   String?   @unique
   // enviado | entregue | atrasado | aberto | clicado | bounce | reclamacao | falhou
   status     String    @default("enviado")
-  // fluxo | regua | disparo | teste
+  // fluxo | regua | disparo | teste | automacao
   origem     String    @default("teste")
   // Id de quem mandou (bloco, régua, disparo), para o relatório.
   refId      String?
@@ -2185,4 +2185,39 @@ model AutomacaoEspera {
   @@index([orgId, tipo, objetoId])
   @@index([expiraEm])
   @@map("eva_studio_automacao_esperas")
+}
+
+// Aviso dentro do app para uma pessoa da equipe (ação "Avisar a equipe" das
+// automações; outros módulos podem usar). SQL 2026-10-25-avisos-rodizio.sql.
+model Aviso {
+  id        String    @id @default(uuid())
+  orgId     String
+  userId    String
+  titulo    String
+  texto     String    @default("")
+  // Caminho dentro do contrato (ex.: /negocios/<id>).
+  link      String?
+  objeto    String?
+  objetoId  String?
+  // automacao | sistema
+  origem    String    @default("automacao")
+  lidoEm    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, lidoEm])
+  @@index([orgId, createdAt])
+  @@map("eva_studio_avisos")
+}
+
+// Rodízio de responsável: quantas vezes cada pessoa recebeu, por automação e
+// passo (chave "<automacaoId>:<noId>"). O próximo é quem está mais abaixo da
+// sua cota (igual ou por percentual).
+model Rodizio {
+  chave     String   @id
+  orgId     String
+  contagem  Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_rodizios")
 }

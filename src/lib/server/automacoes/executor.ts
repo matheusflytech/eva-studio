@@ -258,6 +258,7 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
             orgId: exec.orgId,
             automacaoId: exec.automacaoId,
             execucaoId: id,
+            noId: noAcao.id,
             objeto: exec.objeto as Objeto,
             objetoId: exec.objetoId,
             contexto,

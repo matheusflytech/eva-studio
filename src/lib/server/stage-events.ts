@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { publicarEvento } from "@/lib/server/eventos/barramento";
 
-export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill";
+export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill" | "automacao";
 
 interface Evento {
   orgId: string;
