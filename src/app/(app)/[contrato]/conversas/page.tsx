@@ -9,6 +9,7 @@ import { PainelDoCliente } from "@/components/inbox/painel-do-cliente";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import type { Conversa, IdDoFiltro, Membro, Resumo } from "@/components/inbox/tipos";
 import { cn } from "@/lib/utils";
+import { useAgentsStore } from "@/lib/stores/agents-store";
 
 // ---------------------------------------------------------------------------
 // Atendimento.
@@ -56,6 +57,8 @@ function Conversas() {
   const [busca, setBusca] = React.useState("");
   const [buscaAplicada, setBuscaAplicada] = React.useState("");
   const [canal, setCanal] = React.useState("");
+  const [agente, setAgente] = React.useState("");
+  const { agents, isLoaded: agentesCarregados, load: carregarAgentes } = useAgentsStore();
   const [testes, setTestes] = React.useState(false);
 
   const [itens, setItens] = React.useState<Conversa[]>([]);
@@ -73,8 +76,8 @@ function Conversas() {
   const naoLidasAnterior = React.useRef<number | null>(null);
   const somRef = React.useRef(som);
   somRef.current = som;
-  const filtrosRef = React.useRef({ filtro, buscaAplicada, canal, testes });
-  filtrosRef.current = { filtro, buscaAplicada, canal, testes };
+  const filtrosRef = React.useRef({ filtro, buscaAplicada, canal, agente, testes });
+  filtrosRef.current = { filtro, buscaAplicada, canal, agente, testes };
   const geracao = React.useRef(0);
 
   React.useEffect(() => {
@@ -107,6 +110,7 @@ function Conversas() {
     const p = new URLSearchParams({ filtro: f.filtro, limite: String(TAMANHO_DA_PAGINA), ...extra });
     if (f.buscaAplicada) p.set("q", f.buscaAplicada);
     if (f.canal) p.set("canal", f.canal);
+    if (f.agente) p.set("agente", f.agente);
     if (f.testes) p.set("testes", "1");
     return `/api/conversations?${p}`;
   }, []);
@@ -147,7 +151,11 @@ function Conversas() {
     setTemMais(false);
     setCarregando(true);
     void carregarLista();
-  }, [filtro, buscaAplicada, canal, testes, carregarLista]);
+  }, [filtro, buscaAplicada, canal, agente, testes, carregarLista]);
+
+  React.useEffect(() => {
+    if (!agentesCarregados) void carregarAgentes();
+  }, [agentesCarregados, carregarAgentes]);
 
   const lista = React.useMemo(
     () => [...itens, ...extras.filter((e) => !itens.some((i) => i.id === e.id))],
@@ -233,6 +241,9 @@ function Conversas() {
           onBusca={setBusca}
           canal={canal}
           onCanal={setCanal}
+          agente={agente}
+          onAgente={setAgente}
+          agentes={agents}
           testes={testes}
           onTestes={setTestes}
           resumo={resumo}

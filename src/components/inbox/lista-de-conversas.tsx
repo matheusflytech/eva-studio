@@ -42,7 +42,7 @@ function EstadoDaConversa({ c }: { c: Conversa }) {
 
 export function ListaDeConversas({
   itens, selecionada, onSelecionar,
-  filtro, onFiltro, busca, onBusca, canal, onCanal, testes, onTestes,
+  filtro, onFiltro, busca, onBusca, canal, onCanal, agente, onAgente, agentes, testes, onTestes,
   resumo, carregando, temMais, carregandoMais, onMais, som, onSom, className,
 }: {
   itens: Conversa[];
@@ -54,6 +54,10 @@ export function ListaDeConversas({
   onBusca: (v: string) => void;
   canal: string;
   onCanal: (v: string) => void;
+  /** "" = todos os agentes. Cada site tem o seu (Eva Holding, Drawing Club...). */
+  agente: string;
+  onAgente: (v: string) => void;
+  agentes: { id: string; name: string }[];
   testes: boolean;
   onTestes: (v: boolean) => void;
   resumo: Resumo | null;
@@ -145,6 +149,7 @@ export function ListaDeConversas({
         </div>
 
         <div className="mt-2.5 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
           <select
             value={canal}
             onChange={(e) => onCanal(e.target.value)}
@@ -160,6 +165,20 @@ export function ListaDeConversas({
             <option value="tiktok">TikTok</option>
             <option value="website">Site</option>
           </select>
+          {agentes.length > 1 && (
+            <select
+              value={agente}
+              onChange={(e) => onAgente(e.target.value)}
+              aria-label="Filtrar por agente"
+              className="min-w-0 max-w-[140px] truncate rounded-lg bg-surface-2 px-2 py-1.5 text-[12px] text-text-secondary outline-none"
+            >
+              <option value="">Todos os agentes</option>
+              {agentes.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          )}
+          </div>
           <label className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text-tertiary">
             <input
               type="checkbox"
@@ -240,7 +259,10 @@ export function ListaDeConversas({
 
                       <span className="mt-1.5 flex items-center gap-2">
                         <EstadoDaConversa c={c} />
-                        <span className="text-[10.5px] text-text-tertiary">{NOME_DO_CANAL[c.channel] ?? c.channel}</span>
+                        <span className="truncate text-[10.5px] text-text-tertiary">
+                          {NOME_DO_CANAL[c.channel] ?? c.channel}
+                          {!agente && agentes.length > 1 ? ` · ${c.agentName}` : ""}
+                        </span>
                         {c.negocio && (
                           <span className="truncate rounded-md bg-surface-3 px-1.5 py-0.5 text-[10.5px] text-text-tertiary">
                             {c.negocio.etapa}
