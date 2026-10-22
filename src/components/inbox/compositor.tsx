@@ -178,7 +178,11 @@ export function Compositor({
   const semCanal = !conversa.respondivel && !conversa.simulado;
   const janelaFechada = conversa.janela.restrita && !conversa.janela.aberta && !conversa.simulado;
   const podeModelo = conversa.channel === "whatsapp_meta";
-  const respostaBloqueada = modo === "responder" && (deOutro || semCanal || janelaFechada);
+  // Trava: só escreve para o cliente quem assumiu a conversa. Enquanto ela está
+  // com o agente (ou esperando alguém), o campo fica fechado até clicar em Assumir.
+  const precisaAssumir =
+    !conversa.simulado && !deOutro && !semCanal && !(conversa.status === "human" && conversa.assignedTo?.id === meuId);
+  const respostaBloqueada = modo === "responder" && (deOutro || semCanal || janelaFechada || precisaAssumir);
   const podeAgendar = !conversa.simulado && conversa.respondivel && CANAIS_AGENDAVEIS.has(conversa.channel);
 
   async function aoEscolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
@@ -272,10 +276,22 @@ export function Compositor({
         </div>
       )}
 
-      {modo === "responder" && !deOutro && !semCanal && !janelaFechada && conversa.status === "active" && (
-        <p className="mb-2 flex items-center gap-1.5 px-1 text-[11.5px] text-text-tertiary">
-          <Bot size={12} /> O agente está respondendo. Ao enviar, você assume a conversa e ele fica em silêncio.
-        </p>
+      {modo === "responder" && precisaAssumir && (
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3.5 py-2.5">
+          <p className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+            <Bot size={14} />
+            {conversa.status === "active"
+              ? "O agente está respondendo. Assuma para escrever; ele fica em silêncio até você devolver."
+              : "Assuma a conversa para responder. O agente fica em silêncio até você devolver."}
+          </p>
+          <button
+            type="button"
+            onClick={onAssumir}
+            className="rounded-lg bg-accent-500 px-2.5 py-1 text-[12px] font-medium text-text-on-accent transition-colors hover:bg-accent-600"
+          >
+            Assumir para responder
+          </button>
+        </div>
       )}
 
       <div className="mb-2 flex items-center gap-1">
@@ -394,8 +410,10 @@ export function Compositor({
           placeholder={
             modo === "nota"
               ? "Recado para a equipe. O cliente não vê."
-              : respostaBloqueada
-                ? "Resposta indisponível"
+              : precisaAssumir
+                ? "Assuma a conversa para responder"
+                : respostaBloqueada
+                  ? "Resposta indisponível"
                 : "Escreva uma mensagem"
           }
           className="max-h-40 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-[13.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
