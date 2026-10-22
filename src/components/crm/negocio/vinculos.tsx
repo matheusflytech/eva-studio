@@ -55,7 +55,7 @@ export function VinculosDoNegocio({
   onVerTarefas: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Contatos deal={deal} patch={patch} />
       <Empresa deal={deal} patch={patch} />
       <Conversas conversas={conversas} />
@@ -65,7 +65,7 @@ export function VinculosDoNegocio({
 }
 
 function ErroDaSecao({ erro }: { erro: string | null }) {
-  return erro ? <p role="alert" className="mb-2 text-[12px] text-danger">{erro}</p> : null;
+  return erro ? <p role="alert" className="mb-2 text-caption text-danger">{erro}</p> : null;
 }
 
 function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
@@ -77,6 +77,7 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
   return (
     <Secao
       titulo="Contatos"
+      recolhivel
       contagem={contatos.length}
       acao={
         !buscando && (
@@ -103,25 +104,25 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
         />
       )}
       {contatos.length === 0 ? (
-        !buscando && <p className="text-[12.5px] text-text-tertiary">Nenhum contato vinculado.</p>
+        !buscando && <p className="text-small text-text-tertiary">Nenhum contato vinculado.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {contatos.map((c) => {
             const nome = c.name || c.phone || c.email || "Sem nome";
             return (
-              <li key={c.id} className="group flex items-start gap-2.5 rounded-xl px-2 py-2 hover:bg-surface-2">
+              <li key={c.id} className="group flex items-start gap-2.5 rounded-[14px] px-2 py-2 hover:bg-hover">
                 <Avatar nome={nome} tamanho={28} rotulo="" />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/contatos?abrir=${c.id}`}
-                    className="block truncate rounded text-[13px] font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                    className="block truncate rounded text-small font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     {nome}
                   </Link>
                   {c.phone && (
                     <a
                       href={`tel:${c.phone}`}
-                      className="mt-0.5 flex items-center gap-1.5 truncate rounded text-[12px] text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                      className="mt-0.5 flex items-center gap-1.5 truncate rounded text-caption text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       <Phone size={11} aria-hidden className="shrink-0 text-text-tertiary" /> {c.phone}
                     </a>
@@ -129,7 +130,7 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
                   {c.email && (
                     <a
                       href={`mailto:${c.email}`}
-                      className="mt-0.5 flex items-center gap-1.5 truncate rounded text-[12px] text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                      className="mt-0.5 flex items-center gap-1.5 truncate rounded text-caption text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       <Mail size={11} aria-hidden className="shrink-0 text-text-tertiary" /> <span className="truncate">{c.email}</span>
                     </a>
@@ -144,7 +145,7 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
                     setErro(await patch({ removeContactId: c.id }));
                     setRemovendo(null);
                   }}
-                  className="opacity-100 hover:bg-danger/10 hover:text-danger lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                  className="opacity-100 hover:bg-danger-subtle hover:text-danger lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
                 >
                   <X size={14} />
                 </BotaoDeIcone>
@@ -164,6 +165,8 @@ function Empresa({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
   return (
     <Secao
       titulo="Empresa"
+      recolhivel
+      abertoInicial={false}
       acao={
         !buscando &&
         !deal.company && (
@@ -190,13 +193,13 @@ function Empresa({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
         />
       )}
       {deal.company ? (
-        <div className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-surface-2">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-surface-3 text-text-secondary">
+        <div className="flex items-center gap-2.5 rounded-[14px] px-2 py-2 hover:bg-hover">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-hover text-text-secondary">
             <Building2 size={14} aria-hidden />
           </span>
           <Link
             href={`/empresas/${deal.company.id}`}
-            className="min-w-0 flex-1 truncate rounded text-[13px] font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
+            className="min-w-0 flex-1 truncate rounded text-small font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
           >
             {deal.company.name}
           </Link>
@@ -211,13 +214,13 @@ function Empresa({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
               setErro(null);
               setErro(await patch({ companyId: null }));
             }}
-            className="hover:bg-danger/10 hover:text-danger"
+            className="hover:bg-danger-subtle hover:text-danger"
           >
             <X size={14} />
           </BotaoDeIcone>
         </div>
       ) : (
-        !buscando && <p className="text-[12.5px] text-text-tertiary">Nenhuma empresa vinculada.</p>
+        !buscando && <p className="text-small text-text-tertiary">Nenhuma empresa vinculada.</p>
       )}
     </Secao>
   );
@@ -227,9 +230,9 @@ const AUTOR: Record<string, string> = { bot: "Agente: ", human: "Equipe: ", note
 
 function Conversas({ conversas }: { conversas: ConversaDoNegocio[] }) {
   return (
-    <Secao titulo="Conversas" contagem={conversas.length}>
+    <Secao titulo="Conversas" contagem={conversas.length} recolhivel abertoInicial={false}>
       {conversas.length === 0 ? (
-        <p className="text-[12.5px] text-text-tertiary">Nenhuma conversa com os contatos deste negócio.</p>
+        <p className="text-small text-text-tertiary">Nenhuma conversa com os contatos deste negócio.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {conversas.slice(0, 8).map((c) => (
@@ -237,29 +240,29 @@ function Conversas({ conversas }: { conversas: ConversaDoNegocio[] }) {
               <Link
                 href={`/conversas?c=${c.id}`}
                 aria-label={`Abrir conversa no ${rotuloDoCanal(c.canal)}${c.contato ? ` com ${c.contato.name}` : ""}${c.naoLida ? ", não lida" : ""}`}
-                className="flex gap-2.5 rounded-xl px-2 py-2 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                className="flex gap-2.5 rounded-[14px] px-2 py-2 outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
               >
-                <span className="relative mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-3">
+                <span className="relative mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-hover">
                   <IconeDoCanal canal={c.canal} tamanho={14} />
                   {c.naoLida && (
-                    <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-surface-1 bg-accent-500" />
+                    <span aria-hidden className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-panel bg-accent-solid" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className={cn("truncate text-[13px]", c.naoLida ? "font-semibold text-text-primary" : "font-medium text-text-primary")}>
+                    <span className={cn("truncate text-small", c.naoLida ? "font-semibold text-text-primary" : "font-medium text-text-primary")}>
                       {c.contato?.name || "Sem nome"}
                       <span className="font-normal text-text-tertiary"> · {rotuloDoCanal(c.canal)}</span>
                     </span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">{formatRelativeDate(c.ultimaMensagemEm)}</span>
+                    <span className="shrink-0 text-caption tabular-nums text-text-tertiary">{formatRelativeDate(c.ultimaMensagemEm)}</span>
                   </span>
-                  <span className={cn("mt-0.5 block truncate text-[12px]", c.naoLida ? "text-text-primary" : "text-text-secondary")}>
+                  <span className={cn("mt-0.5 block truncate text-caption", c.naoLida ? "text-text-primary" : "text-text-secondary")}>
                     {c.ultimaMensagem ? (AUTOR[c.ultimoAutor] ?? "") + c.ultimaMensagem : "Sem mensagens"}
                   </span>
                   <span
                     className={cn(
-                      "mt-1 inline-block rounded-md px-1.5 py-px text-[10.5px] font-medium",
-                      c.status === "waiting_human" ? "bg-amber-400/12 text-amber-300" : c.status === "ended" ? "bg-surface-3 text-text-tertiary" : "bg-accent-soft text-accent-400"
+                      "mt-1 inline-block rounded-full px-2 py-px text-caption font-medium",
+                      c.status === "waiting_human" ? "bg-warning-subtle text-warning" : c.status === "ended" ? "bg-hover text-text-tertiary" : "bg-info-subtle text-info"
                     )}
                   >
                     {rotuloDoStatus(c.status)}
@@ -279,19 +282,20 @@ function TarefasAbertas({ deal, agora, onVerTodas }: { deal: NegocioDaFicha; ago
   return (
     <Secao
       titulo="Tarefas abertas"
+      recolhivel
       contagem={abertas.length}
       acao={<BotaoDeSecao onClick={onVerTodas}>{abertas.length > 0 ? "Ver todas" : "Criar tarefa"}</BotaoDeSecao>}
     >
       {abertas.length === 0 ? (
-        <p className="text-[12.5px] text-text-tertiary">Nada pendente.</p>
+        <p className="text-small text-text-tertiary">Nada pendente.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {abertas.slice(0, 4).map((t) => {
             const atrasada = tarefaAtrasada(t, agora);
             return (
               <li key={t.id} className="px-2">
-                <p className="truncate text-[13px] text-text-primary">{t.text}</p>
-                <p className="flex items-center gap-1.5 text-[11.5px] text-text-tertiary">
+                <p className="truncate text-small text-text-primary">{t.text}</p>
+                <p className="flex items-center gap-1.5 text-caption text-text-tertiary">
                   {rotuloDoTipoDeTarefa(t.type)}
                   {t.dueAt && (
                     <span className={cn("inline-flex items-center gap-1", atrasada && "text-danger")}>

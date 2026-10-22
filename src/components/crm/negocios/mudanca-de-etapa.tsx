@@ -23,6 +23,7 @@ import {
   type ValoresDoModal,
 } from "@/lib/regras-de-etapa";
 import { MS_PARA_DESFAZER, corpoParaDesfazer, tituloDaMudanca } from "@/lib/lixeira";
+import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 
 // ---------------------------------------------------------------------------
 // Mudança de etapa na tela, igual em todo lugar (quadro, prévia, ficha):
@@ -33,7 +34,8 @@ import { MS_PARA_DESFAZER, corpoParaDesfazer, tituloDaMudanca } from "@/lib/lixe
 //
 // Com `de` (a etapa de onde sai), depois de mover aparece o toast com
 // "Desfazer": volta para `de` pelo mesmo PATCH (mesmas regras; ganho/perdido
-// reabrem na etapa anterior).
+// reabrem na etapa anterior). Com `naIlha`, o aviso vai para a ilha da casca
+// (v5) e o fundo pulsa a partir do cartão, no lugar do toast.
 // ---------------------------------------------------------------------------
 
 export interface EtapaDoMovimento {
@@ -100,12 +102,21 @@ type Aberto =
  * um modal, espera a pessoa: "movido" se salvou, "erro" se cancelou.
  * `elementos` são os modais (renderize uma vez na tela).
  */
-export function useMudancaDeEtapa({ onErro }: { onErro: (mensagem: string) => void }) {
+export function useMudancaDeEtapa({
+  onErro,
+  naIlha,
+}: {
+  onErro: (mensagem: string) => void;
+  /** Avisa na ilha (com Desfazer) e pulsa o fundo a partir do elemento que esta função devolve. */
+  naIlha?: { elemento: (dealId: string) => Element | null };
+}) {
   const [aberto, setAberto] = React.useState<Aberto | null>(null);
   const toast = useToast();
   const onErroRef = React.useRef(onErro);
+  const naIlhaRef = React.useRef(naIlha);
   React.useEffect(() => {
     onErroRef.current = onErro;
+    naIlhaRef.current = naIlha;
   });
 
   const tentar = React.useCallback(async (pedido: PedidoDeMudanca, corpo: Record<string, unknown>): Promise<ResultadoDaTentativa> => {
@@ -121,6 +132,34 @@ export function useMudancaDeEtapa({ onErro }: { onErro: (mensagem: string) => vo
   const oferecerDesfazer = React.useCallback(
     (pedido: PedidoDeMudanca) => {
       const corpo = corpoParaDesfazer(pedido.de, pedido.para);
+      const ilha = naIlhaRef.current;
+      if (ilha) {
+        // O cartão já está na coluna nova (a tela move antes da resposta).
+        pulsar(ilha.elemento(pedido.dealId), 1.2);
+        const de = pedido.de;
+        avisarNaIlha({
+          titulo: pedido.para.id ? `${pedido.nome} foi para ${pedido.para.name}` : `${pedido.nome} foi reaberto`,
+          detalhe: "por você · agora",
+          duracao: MS_PARA_DESFAZER,
+          acao:
+            corpo && de
+              ? {
+                  rotulo: "Desfazer",
+                  // Volta pela mesma tentativa do mover (mesmo PATCH, mesmas regras e o
+                  // "Complete para mover" se a etapa de volta pedir campo).
+                  aoClicar: async () => {
+                    const volta: PedidoDeMudanca = { ...pedido, para: de, de: pedido.para, extra: undefined };
+                    const r = await tentar(volta, corpo);
+                    if (r !== "movido") return;
+                    pulsar(ilha.elemento(pedido.dealId), 1);
+                    avisarNaIlha({ titulo: `${pedido.nome} voltou para ${de.name}`, detalhe: "por você · agora" });
+                    pedido.aoDesfazer?.();
+                  },
+                }
+              : undefined,
+        });
+        return;
+      }
       if (!corpo) return;
       toast({
         title: tituloDaMudanca(pedido.para),
@@ -139,7 +178,7 @@ export function useMudancaDeEtapa({ onErro }: { onErro: (mensagem: string) => vo
         },
       });
     },
-    [toast]
+    [toast, tentar]
   );
 
   const mover = React.useCallback(

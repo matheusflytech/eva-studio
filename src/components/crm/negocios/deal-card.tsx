@@ -27,7 +27,7 @@ import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { LAYOUT_PADRAO, type CampoDoCartao, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { VozDoQuadro } from "./eva-topo";
 import { sinalHumano } from "./eva-voz";
-import { dinheiro, sinalDoNegocio, tempoNaEtapa, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
+import { dinheiro, estaParado, sinalDoNegocio, tempoNaEtapa, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
 import { blocosDoCartao, ehPersonalizado, textoDoCampo, tituloDoCartao, type ContextoDoCampo } from "./cartao";
 
 /**
@@ -72,24 +72,43 @@ export const TOM_DO_SINAL: Record<SinalDoNegocio["tom"], NonNullable<BadgeProps[
   neu: "neutral",
 };
 
+/** Tom do sinal → cor do texto (cartão v5: sem cápsula, a cor diz o estado). */
+const COR_DO_SINAL: Record<SinalDoNegocio["tom"], string> = {
+  bad: "text-danger",
+  warn: "text-warning",
+  ok: "text-success",
+  neu: "text-text-tertiary",
+};
+
 /** O próximo passo (um sinal só, do mais urgente para o menos). */
 export function SinalDoProximoPasso({
   deal,
   tipoDaEtapa,
   agora,
   prazoParado,
+  variante = "badge",
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
   agora: Date;
   /** Prazo de parado da etapa (null = nunca; ausente = 7). */
   prazoParado?: number | null;
+  /** "texto": só ícone e texto na cor do status (cartão v5); "badge": cápsula (prévia). */
+  variante?: "badge" | "texto";
 }) {
   const humana = React.useContext(VozDoQuadro);
   const sinal = sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado);
   if (!sinal) return null;
   const Icone = ICONE[sinal.icone];
   const texto = humana ? sinalHumano(sinal.texto, sinal.tom) : sinal.texto;
+  if (variante === "texto") {
+    return (
+      <span className={cn("inline-flex min-w-0 items-center gap-1 text-caption font-medium", COR_DO_SINAL[sinal.tom])} title={texto}>
+        <Icone size={13} aria-hidden="true" className="shrink-0" />
+        <span className="truncate">{texto}</span>
+      </span>
+    );
+  }
   return (
     <Badge variant={TOM_DO_SINAL[sinal.tom]} className="min-w-0 max-w-full" title={texto}>
       <Icone size={12} aria-hidden="true" className="shrink-0" />
@@ -105,12 +124,16 @@ const pararArraste = {
   onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
 };
 
+/** Campos que o cartão v5 já mostra do seu jeito (título, valor e chance, sinal, dono, WhatsApp). */
+const FIXOS_DO_CARTAO = new Set<CampoDoCartao>(["empresa", "nome", "valor", "probabilidade", "responsavel", "whatsapp", "proximoPasso"]);
+
 /**
- * Cartão do negócio, montado pelo layout do funil: as informações escolhidas,
- * na ordem escolhida, na densidade escolhida. Fixos: o título é o link da
- * ficha (o resto do cartão abre a prévia), o ícone de WhatsApp não lido e o
- * tempo na etapa no rodapé ("31 minutos nesta etapa", quando o layout não o
- * põe em outro lugar). Superfície neutra; cor só no badge de status.
+ * Cartão do negócio (v5): título, valor com a chance e o sinal do próximo
+ * passo, com o avatar do dono à direita. Empresa, etiquetas e o resto moram
+ * no detalhe; campos além desses que o funil escolheu (previsão, contato,
+ * campos personalizados...) continuam aparecendo, na ordem escolhida.
+ * Parado ganha a borda esquerda âmbar. O título é o link da ficha (o resto
+ * do cartão abre a prévia). Superfície única, sem sombra parada.
  */
 export function DealCard({
   deal,
@@ -134,21 +157,25 @@ export function DealCard({
   comLink?: boolean;
 }) {
   const compacto = layout.densidade === "compacto";
-  const { titulo, subtitulo } = tituloDoCartao(deal, layout.campos);
-  const blocos = blocosDoCartao(layout.campos, layout.densidade);
+  // Título é o nome do negócio; só vira a empresa quando o funil tirou o nome e deixou a empresa.
+  const titulo =
+    layout.campos.includes("empresa") && !layout.campos.includes("nome") ? tituloDoCartao(deal, layout.campos).titulo : deal.name;
+  const extras = layout.campos.filter((c) => !FIXOS_DO_CARTAO.has(c));
+  const blocos = blocosDoCartao(extras, layout.densidade);
   const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs, prazoParado };
   const mostraWhatsapp = layout.campos.includes("whatsapp") && !!deal.whatsapp;
-  const espaco = compacto ? "mt-1" : "mt-2";
+  const aberto = tipoDaEtapa === "open";
+  const parado = estaParado(deal, tipoDaEtapa, agora, prazoParado);
+  const temSinal = !!sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado);
   const tempo = tempoNaEtapa(deal.stageSince, agora);
-  const mostraTempo = tipoDaEtapa === "open" && !layout.campos.includes("naEtapaHa");
 
-  const classeDoTitulo = "min-w-0 truncate text-small font-medium text-text-primary";
+  const classeDoTitulo = "min-w-0 truncate text-small font-semibold text-text-primary";
   const elementoDoTitulo = comLink ? (
     <Link
       href={`/negocios/${deal.id}`}
       {...pararArraste}
       title="Abrir ficha completa"
-      className={cn(classeDoTitulo, "rounded-sm underline-offset-2 hover:text-accent-fg hover:underline", focusRing)}
+      className={cn(classeDoTitulo, "rounded-sm underline-offset-2 hover:underline", focusRing)}
     >
       {titulo}
     </Link>
@@ -159,21 +186,19 @@ export function DealCard({
   return (
     <div
       className={cn(
-        "relative rounded-md border border-border-subtle bg-panel transition-colors duration-120",
+        "relative flex flex-col rounded-[14px] border border-border-subtle bg-panel transition-colors duration-120",
         "group-hover/card:border-border-strong",
-        compacto ? "px-2.5 py-1.5" : "px-2.5 py-2",
+        compacto ? "gap-1 px-3 py-2" : "gap-1.5 px-3 py-2.5",
+        parado && "border-l-[3px] border-l-warning",
         arrastando && "border-border-strong shadow-overlay",
         tipoDaEtapa === "lost" && "opacity-70"
       )}
     >
       <div className="flex items-center gap-2">
-        <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-          {elementoDoTitulo}
-          {compacto && subtitulo && <span className="min-w-0 flex-1 truncate text-caption text-text-tertiary">{subtitulo}</span>}
-        </span>
+        {elementoDoTitulo}
         {mostraWhatsapp && deal.whatsapp && (
           <span
-            className="relative inline-flex shrink-0 text-success transition-opacity group-hover/card:opacity-0"
+            className="relative ml-auto inline-flex shrink-0 text-success transition-opacity group-hover/card:opacity-0"
             title={deal.whatsapp.naoLida ? "Mensagem não lida no WhatsApp" : "Tem conversa no WhatsApp"}
           >
             <MessageCircle size={14} aria-hidden="true" />
@@ -184,47 +209,36 @@ export function DealCard({
             )}
           </span>
         )}
-        {tipoDaEtapa === "lost" && <XCircle size={14} aria-label="Perdido" className="shrink-0 text-danger" />}
+        {tipoDaEtapa === "lost" && <XCircle size={14} aria-label="Perdido" className="ml-auto shrink-0 text-danger" />}
       </div>
 
-      {!compacto && subtitulo && <p className="mt-0.5 truncate text-caption text-text-secondary">{subtitulo}</p>}
+      <div className="flex items-baseline gap-1.5">
+        {deal.amountCents > 0 ? (
+          <span className="text-small font-semibold tabular-nums text-text-primary">{dinheiro(deal.amountCents)}</span>
+        ) : (
+          <span className="text-small text-text-tertiary">Sem valor</span>
+        )}
+        {aberto && (
+          <span className="font-mono text-caption tabular-nums text-text-tertiary" title="Chance de fechar">
+            {deal.probability}%
+          </span>
+        )}
+      </div>
 
       {blocos.map((bloco, i) => {
-        if (bloco.tipo === "metricas") {
-          if (!bloco.campos.some((c) => temMetrica(c, deal, tipoDaEtapa))) return null;
-          return (
-            <div key={i} className={cn(espaco, "flex items-center gap-2")}>
-              {bloco.campos.map((c) => (
-                <Metrica key={c} campo={c} deal={deal} tipoDaEtapa={tipoDaEtapa} />
-              ))}
-            </div>
-          );
-        }
+        if (bloco.tipo === "metricas") return null;
         if (bloco.tipo === "etiquetas") {
           const itens = bloco.campos
             .map((c) => ({ c, def: defs.find((d) => d.key === c.slice(3)), texto: textoDoCampo(c, deal, ctx) }))
             .filter((i) => i.def && i.texto && !(i.def.type === "checkbox" && deal.customFields?.[i.def.key] !== true));
           if (itens.length === 0) return null;
           return (
-            <div key={i} className={cn(espaco, "flex flex-wrap gap-1")}>
+            <div key={i} className="flex flex-wrap gap-1">
               {itens.map(({ c, def, texto }) => (
                 <Badge key={c} title={def!.label} className="max-w-full truncate">
                   {def!.type === "checkbox" ? def!.label : ["select", "multiselect", "text"].includes(def!.type) ? texto : `${def!.label}: ${texto}`}
                 </Badge>
               ))}
-            </div>
-          );
-        }
-        if (bloco.campo === "proximoPasso") {
-          if (!sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado)) return null;
-          return (
-            <div key={i} className={cn(espaco, "flex items-center gap-1.5")}>
-              <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} />
-              {deal.openTasks > 1 && (
-                <span className="text-caption tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
-                  +{deal.openTasks - 1}
-                </span>
-              )}
             </div>
           );
         }
@@ -234,7 +248,7 @@ export function DealCard({
         const def = personalizado ? defs.find((d) => d.key === bloco.campo.slice(3)) : undefined;
         const Icone = personalizado ? Tag : ICONE_DA_LINHA[bloco.campo] ?? Tag;
         return (
-          <p key={i} className={cn(compacto ? "mt-0.5" : "mt-1", "flex min-w-0 items-center gap-1.5 text-caption text-text-secondary")}>
+          <p key={i} className="flex min-w-0 items-center gap-1.5 text-caption text-text-secondary">
             <Icone size={12} aria-hidden="true" className="shrink-0 text-text-tertiary" />
             <span className="truncate">
               {def && <span className="text-text-tertiary">{def.label}: </span>}
@@ -244,53 +258,39 @@ export function DealCard({
         );
       })}
 
-      {mostraTempo && (
-        <p className={cn(compacto ? "mt-0.5" : "mt-1.5", "text-caption text-text-tertiary")}>
-          {tempo === "agora" ? "Entrou agora nesta etapa" : `${tempo} nesta etapa`}
-        </p>
+      {(temSinal || aberto || deal.owner) && (
+        <div className="flex min-h-5 items-center gap-1.5">
+          {temSinal ? (
+            <>
+              <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} variante="texto" />
+              {deal.openTasks > 1 && (
+                <span className="font-mono text-caption tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
+                  +{deal.openTasks - 1}
+                </span>
+              )}
+            </>
+          ) : (
+            aberto && (
+              <span className="font-mono text-caption text-text-tertiary" title="Tempo nesta etapa">
+                {tempo === "agora" ? "entrou agora" : `há ${tempo}`}
+              </span>
+            )
+          )}
+          {deal.owner && (
+            <span className="ml-auto shrink-0">
+              <Avatar nome={deal.owner.name || "Sem nome"} rotulo={`Responsável: ${deal.owner.name || "sem nome"}`} />
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function temMetrica(campo: CampoDoCartao, deal: NegocioKanban, tipoDaEtapa: string): boolean {
-  if (campo === "valor") return true;
-  if (campo === "probabilidade") return tipoDaEtapa === "open";
-  if (campo === "responsavel") return !!deal.owner;
-  return false;
-}
-
-function Metrica({ campo, deal, tipoDaEtapa }: { campo: CampoDoCartao; deal: NegocioKanban; tipoDaEtapa: string }) {
-  if (campo === "valor") {
-    return (
-      <span className="text-small font-medium tabular-nums text-text-primary">
-        {deal.amountCents > 0 ? dinheiro(deal.amountCents) : <span className="font-normal text-text-tertiary">Sem valor</span>}
-      </span>
-    );
-  }
-  if (campo === "probabilidade") {
-    if (tipoDaEtapa !== "open") return null;
-    return (
-      <span className="text-caption tabular-nums text-text-tertiary" title="Chance de fechar">
-        {deal.probability}%
-      </span>
-    );
-  }
-  if (campo === "responsavel") {
-    if (!deal.owner) return null;
-    return (
-      <span className="ml-auto">
-        <Avatar nome={deal.owner.name || "Sem nome"} rotulo={`Responsável: ${deal.owner.name || "sem nome"}`} />
-      </span>
-    );
-  }
-  return null;
-}
-
 /** Ações rápidas que aparecem ao passar o mouse (sem ocupar espaço em repouso). */
 export function AcoesRapidas({ deal }: { deal: NegocioKanban }) {
   const classe = cn(
-    "grid h-6 w-6 place-items-center rounded-sm border border-border-default bg-panel text-text-secondary hover:border-border-strong hover:text-text-primary",
+    "grid h-6 w-6 place-items-center rounded-full border border-border-subtle bg-panel text-text-secondary hover:bg-hover hover:text-text-primary",
     focusRing
   );
   return (

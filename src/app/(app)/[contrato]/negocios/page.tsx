@@ -4,7 +4,24 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato } from "@/lib/contrato/rotas";
-import { ChevronsRightLeft, ChevronsLeftRight, Columns3, Download, FileSpreadsheet, FileText, Handshake, Plus, Rows3, Settings, Upload } from "lucide-react";
+import {
+  ChevronsLeftRight,
+  ChevronsRightLeft,
+  ChevronsUpDown,
+  CircleHelp,
+  Columns3,
+  Ellipsis,
+  FileSpreadsheet,
+  FileText,
+  Handshake,
+  ListFilter,
+  Plus,
+  Rows3,
+  Search,
+  Settings,
+  Sun,
+  Upload,
+} from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -16,9 +33,9 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { AbasDeVisoes, CamposRemovidos, useVisoesDaLista } from "@/components/crm/listas/visoes-salvas";
 import { AcoesEmMassaDeNegocios, SELECAO_VAZIA, type Selecao } from "@/components/crm/listas/acoes-em-massa";
 import { camposRemovidos, configDoEstado, estadoDaConfig, semCamposRemovidos } from "@/lib/visoes/visoes";
@@ -27,7 +44,15 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Notice } from "@/components/ui/notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatMoney } from "@/components/ui/kanban-column";
 import { BarraDeFiltros } from "@/components/crm/listas/barra-de-filtros";
 import { useComAtraso, useEstadoDaLista } from "@/components/crm/listas/use-estado-da-lista";
@@ -40,9 +65,9 @@ import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/
 import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
 import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
 import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
-import { Comemoracao, DiaDeHoje, Momentos, RecadoDaEva, SeletorDeEstilo, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
-import { carimbo, comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type AcaoDoRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
-import { LegendaDoQuadro } from "@/components/crm/negocios/legenda";
+import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
+import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
+import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
 import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
@@ -53,7 +78,8 @@ import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { CAMPOS_DE_NEGOCIO } from "@/lib/filtro-crm";
 import { SEM_VALOR, diaLocal } from "@/lib/consulta";
 import { chaveDasColunas, colunasValidas } from "@/lib/listas/colunas";
-import { montarFiltro, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
+import { montarFiltro, totalAvancado, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
+import { avisarNaIlha } from "@/lib/fundo/eventos";
 import type { FilterOption } from "@/components/ui/filter-button";
 
 // ---------------------------------------------------------------------------
@@ -61,6 +87,10 @@ import type { FilterOption } from "@/components/ui/filter-button";
 // e lista paginada no servidor, com as mesmas visões, barra de filtros e
 // filtros avançados. Arrastar entre etapas (dnd-kit) e as zonas Ganho/Perdido
 // continuam; os estilos "Eva · 1/2/3" mostram a voz da Eva no design system.
+//
+// v5: o quadro é a tela. Filtros moram no botão "Filtros", importar/exportar/
+// configurar no "…", o recado da Eva vai para a ilha e "Seu dia" (desde
+// ontem / pede atenção) abre numa gaveta.
 // ---------------------------------------------------------------------------
 
 const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
@@ -77,6 +107,12 @@ const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
 const PADRAO = { visao: "todos", tamanho: 25 };
 const IDS_DAS_VISOES = VISOES_DE_NEGOCIO.map((v) => v.id as string);
 const POR_ETAPA = 30;
+const ESTILOS: { value: EstiloDaTela; label: string }[] = [
+  { value: "classico", label: "Atual" },
+  { value: "v1", label: "Eva · 1" },
+  { value: "v2", label: "Eva · 2" },
+  { value: "v3", label: "Eva · 3" },
+];
 
 /** Lista de ids guardada no navegador, sem validar (quem usa valida contra as disponíveis). */
 function lerListaDeIds(bruto: string | null): string[] {
@@ -166,6 +202,10 @@ function NegociosConteudo() {
   // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
   const buscaRef = React.useRef<HTMLInputElement>(null);
+  const [buscaAberta, setBuscaAberta] = React.useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = React.useState(false);
+  const [diaAberto, setDiaAberto] = React.useState(false);
+  const [legendaAberta, setLegendaAberta] = React.useState(false);
   const hoje = diaLocal(agora);
 
   const sensors = useSensors(
@@ -199,6 +239,8 @@ function NegociosConteudo() {
       if (e.metaKey || e.ctrlKey || e.altKey || digitando(e.target)) return;
       if (e.key === "/") {
         e.preventDefault();
+        // Fechada, a busca é só a lupa: abrir monta o campo já com foco.
+        setBuscaAberta(true);
         buscaRef.current?.focus();
       } else if (e.key === "n" || e.key === "N") {
         e.preventDefault();
@@ -393,11 +435,19 @@ function NegociosConteudo() {
 
   // ── Voz da Eva (sobre os cartões carregados) ──
   const eva = estilo !== "classico";
-  const [recadoDispensado, setRecadoDispensado] = usePreferencia<string>("eva:negocios:recado", "", [hoje]);
   const recado = React.useMemo(
     () => (carregando || !eva ? null : montarRecado(stages, agora, opcoes.meuNome, gargaloDaConversao(conversao))),
     [carregando, eva, stages, agora, conversao, opcoes.meuNome]
   );
+  // O recado da Eva não ocupa mais a frente do quadro: vai para a ilha uma vez
+  // por visita, com o título sem a saudação e a frase principal como detalhe.
+  const recadoAvisado = React.useRef(false);
+  React.useEffect(() => {
+    if (!recado || recadoAvisado.current) return;
+    recadoAvisado.current = true;
+    const titulo = recado.titulo.replace(/^[^.]*\.\s+/, "") || recado.titulo;
+    avisarNaIlha({ titulo, detalhe: recado.partes.map((p) => p.texto).join("").trim() });
+  }, [recado]);
   const momentosDoFunil = React.useMemo(() => (eva ? momentos(stages, agora) : []), [eva, stages, agora]);
   const atencaoDoDia = React.useMemo(() => listaDeAtencao(stages, agora), [stages, agora]);
   const acontecimentosDoDia = React.useMemo(() => desdeOntem(stages, agora), [stages, agora]);
@@ -410,18 +460,6 @@ function NegociosConteudo() {
     }
     abrirDoQuadro(item.deal);
   }
-  function aoAcaoDoRecado(id: AcaoDoRecado) {
-    if (id === "novo") return setNovoNaEtapa("");
-    if (id === "gargalo") {
-      const g = gargaloDaConversao(conversao);
-      const coluna = g && [...document.querySelectorAll<HTMLElement>("[data-etapa]")].find((el) => el.dataset.etapa === g.de);
-      coluna?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-      return;
-    }
-    // Retornos, não lidas e parados caem todos em "Precisam de atenção".
-    setEstado({ ...estado, visao: "atencao", pagina: 1 });
-  }
-
   // Comemoração: negócio que apareceu na etapa ganha desde a última olhada
   // (arraste, prévia ou outra pessoa) e fechou agora há pouco. Trocar de
   // filtro ou carregar mais cartões revela ganhos antigos: esses não contam.
@@ -444,7 +482,11 @@ function NegociosConteudo() {
   const fecharFesta = React.useCallback(() => setFesta(null), []);
 
   // ── Arrastar ──
-  const mudanca = useMudancaDeEtapa({ onErro: (m) => setErro(m) });
+  // Mudou de etapa: o fundo pulsa a partir do cartão e a ilha oferece Desfazer.
+  const mudanca = useMudancaDeEtapa({
+    onErro: (m) => setErro(m),
+    naIlha: { elemento: (id) => document.querySelector(`[data-deal-id="${CSS.escape(id)}"]`) },
+  });
   const etapaGanha = stages.find((s) => s.type === "won");
   const etapaPerdida = stages.find((s) => s.type === "lost");
 
@@ -512,9 +554,6 @@ function NegociosConteudo() {
   const qtdAbertos = abertas.reduce((s, e) => s + (e.count ?? e.deals.length), 0);
   const totalAberto = abertas.reduce((s, e) => s + e.totalCents, 0);
   const ponderado = abertas.reduce((s, e) => s + e.weightedCents, 0);
-  const descricao = quadro
-    ? `${qtdAbertos.toLocaleString("pt-BR")} ${qtdAbertos === 1 ? "negócio aberto" : "negócios abertos"} · ${formatMoney(totalAberto / 100)} no funil · ${formatMoney(ponderado / 100)} ponderado`
-    : undefined;
 
   // Exportar leva o funil e o MESMO filtro da tela (barra, avançados, visão e
   // busca) pelo motor. Busca/um proprietário/visão de sistema vão junto só
@@ -530,140 +569,192 @@ function NegociosConteudo() {
     return p.toString();
   }, [pipelineId, filtro, estado.busca, estado.listas.responsavel, visaoBase]);
 
-  const linkDeAcao = cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 px-0");
+  // Quantos filtros da barra e avançados estão ligados (contador do "Filtros").
+  const nFiltros =
+    Object.values(estado.listas).filter((v) => v && v.length > 0).length + Object.keys(estado.datas).length + totalAvancado(estado);
+  const mostraBusca = buscaAberta || !!estado.busca;
+  const temDia = eva && !carregando && (acontecimentosDoDia.length > 0 || atencaoDoDia.length > 0 || momentosDoFunil.length > 0);
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
-      <PageHeader
-        title="Negócios"
-        description={descricao}
-        actions={
-          <>
-            {pipelines.length > 1 && (
-              <Select aria-label="Funil" value={pipelineId} onChange={(e) => (setPrevia(null), gravarParametro("funil", e.target.value))} className="w-48">
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-            <SegmentedControl
-              label="Visualização"
-              value={modo}
-              onChange={setModo}
-              options={[
-                { value: "kanban", label: "Quadro", icon: <Columns3 aria-hidden="true" /> },
-                { value: "lista", label: "Lista", icon: <Rows3 aria-hidden="true" /> },
-              ]}
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary">
-                  <Download size={14} aria-hidden="true" />
-                  Exportar
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem asChild>
-                  <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&${consultaDeExportacao}`)} download>
-                    <FileSpreadsheet aria-hidden="true" /> Planilha (CSV)
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&itens=1&${consultaDeExportacao}`)} download>
-                    <FileSpreadsheet aria-hidden="true" /> Planilha de produtos (CSV)
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/negocios/relatorio?imprimir=1&${consultaDeExportacao}`}>
-                    <FileText aria-hidden="true" /> Relatório (PDF)
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuLabel>Leva o funil e todos os filtros da tela.</DropdownMenuLabel>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="secondary" onClick={() => setImportando(true)} disabled={!pipeline}>
-              <Upload size={14} aria-hidden="true" />
-              Importar
-            </Button>
-            <Button variant="primary" onClick={() => setNovoNaEtapa("")} title="Criar negócio (N)">
-              <Plus size={14} aria-hidden="true" />
-              Criar negócio
-            </Button>
-          </>
-        }
-      />
-
-      {eva && recado && recadoDispensado !== hoje && (
-        <RecadoDaEva recado={recado} carimbo={carimbo(agora)} onAcao={aoAcaoDoRecado} onDispensar={() => setRecadoDispensado(hoje)} />
-      )}
-      {eva && <Momentos itens={momentosDoFunil} />}
-      {estilo === "v3" && !carregando && (
-        <DiaDeHoje
-          acontecimentos={acontecimentosDoDia}
-          atencao={atencaoDoDia.slice(0, 4)}
-          total={atencaoDoDia.length}
-          onAcao={aoAcaoDaAtencao}
-          onVerTodos={() => setEstado({ ...estado, visao: "atencao", pagina: 1 })}
+      {/* Barra da tela: título, funil, modo e, à direita, busca, filtros, "…" e a ação principal. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Negócios</h1>
+        {quadro && (
+          <span className="font-mono text-caption tabular-nums text-text-tertiary">
+            {qtdAbertos.toLocaleString("pt-BR")} {qtdAbertos === 1 ? "aberto" : "abertos"}
+          </span>
+        )}
+        <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
+        {pipelines.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" aria-label={`Funil: ${pipeline?.name ?? ""}. Trocar de funil`} className="px-2.5 text-text-primary">
+                <Columns3 size={14} aria-hidden="true" className="text-text-tertiary" />
+                {pipeline?.name ?? "Funil"}
+                <ChevronsUpDown size={14} aria-hidden="true" className="text-text-tertiary" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel>Funis</DropdownMenuLabel>
+              {pipelines.map((p) => (
+                <DropdownMenuCheckboxItem
+                  key={p.id}
+                  checked={p.id === pipelineId}
+                  onCheckedChange={() => {
+                    if (p.id === pipelineId) return;
+                    setPrevia(null);
+                    gravarParametro("funil", p.id);
+                  }}
+                >
+                  {p.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <SegmentedControl
+          label="Visualização"
+          value={modo}
+          onChange={setModo}
+          options={[
+            { value: "kanban", label: "Quadro", icon: <Columns3 aria-hidden="true" /> },
+            { value: "lista", label: "Lista", icon: <Rows3 aria-hidden="true" /> },
+          ]}
         />
-      )}
 
-      <AbasDeVisoes
-        rotulo="Visões de negócios"
-        sistema={VISOES_DE_NEGOCIO}
-        visoes={visoes}
-        estado={estado}
-        onEstado={setEstado}
-        barra={BARRA_DE_NEGOCIOS}
-        contagens={contagens}
-        configAtual={configAtual}
-        equipes={opcoes.equipes}
-        padraoDaLista={PADRAO}
-      />
-
-      <BarraDeFiltros
-        rotulo="Filtros de negócios"
-        barra={BARRA_DE_NEGOCIOS}
-        estado={estado}
-        onEstado={setEstado}
-        opcoes={barraOpcoes}
-        buscaDeOpcoes={{ contato: buscarContatos }}
-        editor={editor}
-        end={
-          <>
+        <div className="ml-auto flex items-center gap-2">
+          {mostraBusca ? (
             <SearchInput
               ref={buscaRef}
               aria-label="Buscar negócios"
               placeholder="Buscar por nome"
               value={estado.busca}
               onValueChange={(q) => setEstado({ ...estado, busca: q, pagina: 1 })}
+              onBlur={() => !estado.busca && setBuscaAberta(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && !estado.busca) setBuscaAberta(false);
+              }}
+              autoFocus={buscaAberta}
               className="w-56"
             />
-            {modo === "kanban" ? (
-              <Button variant="ghost" onClick={() => gravarRecolhidas(tudoRecolhido ? [] : idsDasEtapas)} disabled={!stages.length}>
-                {tudoRecolhido ? <ChevronsLeftRight size={14} aria-hidden="true" /> : <ChevronsRightLeft size={14} aria-hidden="true" />}
-                {tudoRecolhido ? "Expandir tudo" : "Recolher tudo"}
-              </Button>
-            ) : (
-              <Button variant="ghost" onClick={() => setEditandoColunas(true)}>
-                <Columns3 size={14} aria-hidden="true" />
-                Editar colunas
-              </Button>
-            )}
-            <Link
-              href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}
-              aria-label="Configurar o cartão, os funis e os campos"
-              title="Configurar o cartão, os funis e os campos"
-              className={linkDeAcao}
-            >
-              <Settings size={16} aria-hidden="true" />
-            </Link>
-            <LegendaDoQuadro />
-            <SeletorDeEstilo estilo={estilo} onMudar={setEstilo} />
-          </>
-        }
-      />
+          ) : (
+            <IconButton aria-label="Buscar negócios (/)" tooltip="Buscar (/)" onClick={() => setBuscaAberta(true)}>
+              <Search />
+            </IconButton>
+          )}
+          <Button variant="secondary" onClick={() => setFiltrosAbertos(true)} aria-label={nFiltros ? `Filtros, ${nFiltros} ligados` : "Filtros"}>
+            <ListFilter size={14} aria-hidden="true" />
+            Filtros
+            {nFiltros > 0 && <span className="font-mono text-caption tabular-nums text-accent-fg">{nFiltros}</span>}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label="Mais ações: importar, exportar, configurar funil" variant="secondary">
+                <Ellipsis />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuItem onSelect={() => setImportando(true)} disabled={!pipeline}>
+                <Upload aria-hidden="true" /> Importar
+              </DropdownMenuItem>
+              <DropdownMenuLabel>Exportar · leva o funil e todos os filtros da tela</DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&${consultaDeExportacao}`)} download>
+                  <FileSpreadsheet aria-hidden="true" /> Planilha (CSV)
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={apiDoContrato(contrato, `/api/deals/exportar?formato=csv&itens=1&${consultaDeExportacao}`)} download>
+                  <FileSpreadsheet aria-hidden="true" /> Planilha de produtos (CSV)
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/negocios/relatorio?imprimir=1&${consultaDeExportacao}`}>
+                  <FileText aria-hidden="true" /> Relatório (PDF)
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}>
+                  <Settings aria-hidden="true" /> Configurar funil, cartão e campos
+                </Link>
+              </DropdownMenuItem>
+              {modo === "kanban" ? (
+                <DropdownMenuItem onSelect={() => gravarRecolhidas(tudoRecolhido ? [] : idsDasEtapas)} disabled={!stages.length}>
+                  {tudoRecolhido ? <ChevronsLeftRight aria-hidden="true" /> : <ChevronsRightLeft aria-hidden="true" />}
+                  {tudoRecolhido ? "Expandir tudo" : "Recolher tudo"}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onSelect={() => setEditandoColunas(true)}>
+                  <Columns3 aria-hidden="true" /> Editar colunas
+                </DropdownMenuItem>
+              )}
+              {eva && (
+                <DropdownMenuItem onSelect={() => setDiaAberto(true)} disabled={carregando}>
+                  <Sun aria-hidden="true" /> Desde ontem e pede atenção hoje
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => setLegendaAberta(true)}>
+                <CircleHelp aria-hidden="true" /> Como ler o quadro
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* Troca de estilo enquanto comparamos as variações (sai quando uma for escolhida). */}
+              <DropdownMenuLabel>Estilo da tela</DropdownMenuLabel>
+              {ESTILOS.map((e) => (
+                <DropdownMenuCheckboxItem key={e.value} checked={estilo === e.value} onCheckedChange={() => setEstilo(e.value)}>
+                  {e.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="primary" onClick={() => setNovoNaEtapa("")} title="Criar negócio (N)">
+            <Plus size={14} aria-hidden="true" />
+            Novo negócio
+          </Button>
+        </div>
+      </div>
+
+      {/* Abas de visão em cápsula (as visões salvas continuam com menu e "+"), e o total do funil à direita. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div
+          className={cn(
+            "min-w-0 flex-1",
+            "[&_[role=tablist]]:gap-1 [&_[role=tablist]]:pb-0.5 [&_div:has(>[role=tablist])]:border-b-0",
+            "[&_[role=tab]]:mb-0 [&_[role=tab]]:h-8 [&_[role=tab]]:rounded-full [&_[role=tab]]:border-b-0 [&_[role=tab]]:px-3 [&_[role=tab]]:text-small",
+            "[&_[role=tab][aria-selected=true]]:bg-raised [&_[role=tab][aria-selected=true]]:ring-1 [&_[role=tab][aria-selected=true]]:ring-border-subtle",
+            "[&_[role=tab]:hover]:bg-hover [&_[role=tab]>span:last-child]:font-mono [&_[role=tab]>span:last-child]:text-caption"
+          )}
+        >
+          <AbasDeVisoes
+            rotulo="Visões de negócios"
+            sistema={VISOES_DE_NEGOCIO}
+            visoes={visoes}
+            estado={estado}
+            onEstado={setEstado}
+            barra={BARRA_DE_NEGOCIOS}
+            contagens={contagens}
+            configAtual={configAtual}
+            equipes={opcoes.equipes}
+            padraoDaLista={PADRAO}
+          />
+        </div>
+        <div className="flex h-8 shrink-0 items-center gap-3">
+          {temDia && (
+            <Button variant="ghost" size="sm" onClick={() => setDiaAberto(true)} title="Desde ontem e o que pede sua atenção hoje">
+              <Sun size={14} aria-hidden="true" />
+              Seu dia
+              {atencaoDoDia.length > 0 && <span className="font-mono text-caption tabular-nums text-warning">{atencaoDoDia.length}</span>}
+            </Button>
+          )}
+          {quadro && (
+            <p className="font-mono text-caption tabular-nums text-text-tertiary">
+              <span className="text-text-primary">{formatMoney(totalAberto / 100)}</span> no funil ·{" "}
+              <span className="text-text-primary">{formatMoney(ponderado / 100)}</span> ponderado
+            </p>
+          )}
+        </div>
+      </div>
 
       {erro && (
         <Notice tone="danger" onDismiss={() => setErro(null)}>
@@ -725,14 +816,14 @@ function NegociosConteudo() {
       ) : !quadro ? (
         <div className="flex gap-2 overflow-hidden" aria-busy="true" aria-label="Carregando negócios">
           {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-96 w-72 shrink-0 rounded-lg" />
+            <Skeleton key={i} className="h-96 w-64 shrink-0 rounded-[18px]" />
           ))}
         </div>
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [max-height:calc(100dvh-260px)]">
+              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [max-height:calc(100dvh-210px)]">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
@@ -761,6 +852,52 @@ function NegociosConteudo() {
           </DndContext>
         </VozDoQuadro.Provider>
       )}
+
+      {/* Todos os filtros de antes (Contatos, Empresas, Proprietário, Equipes, Tarefas, Etiquetas,
+          Produtos, Criado em, Fechado em e os avançados) moram aqui; um embaixo do outro. */}
+      <Drawer open={filtrosAbertos} onOpenChange={setFiltrosAbertos}>
+        <DrawerContent title="Filtros" description="Valem para o quadro, a lista e a exportação." size="sm">
+          <div className="[&_[role=toolbar]>div:first-child]:flex-col [&_[role=toolbar]>div:first-child]:items-start [&_[role=toolbar]_.w-px]:hidden">
+            <BarraDeFiltros
+              rotulo="Filtros de negócios"
+              barra={BARRA_DE_NEGOCIOS}
+              estado={estado}
+              onEstado={setEstado}
+              opcoes={barraOpcoes}
+              buscaDeOpcoes={{ contato: buscarContatos }}
+              editor={editor}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* "Desde ontem", "Pede sua atenção hoje" e os momentos saíram da frente do quadro: ficam aqui. */}
+      <Drawer open={diaAberto} onOpenChange={setDiaAberto}>
+        <DrawerContent title="Seu dia" description="O que mudou desde ontem e o que pede você hoje." size="md">
+          <div className="flex flex-col gap-4">
+            <Momentos itens={momentosDoFunil} />
+            <DiaDeHoje
+              empilhado
+              acontecimentos={acontecimentosDoDia}
+              atencao={atencaoDoDia.slice(0, 8)}
+              total={atencaoDoDia.length}
+              onAcao={(item) => {
+                setDiaAberto(false);
+                aoAcaoDaAtencao(item);
+              }}
+              onVerTodos={() => {
+                setDiaAberto(false);
+                setEstado({ ...estado, visao: "atencao", pagina: 1 });
+              }}
+            />
+            {acontecimentosDoDia.length === 0 && atencaoDoDia.length === 0 && (
+              <p className="text-small text-text-tertiary">Tudo quieto nas últimas horas e nada pedindo você agora.</p>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <ModalDaLegenda aberto={legendaAberta} onFechar={() => setLegendaAberta(false)} />
 
       {mudanca.elementos}
 
