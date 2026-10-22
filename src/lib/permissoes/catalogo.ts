@@ -19,6 +19,7 @@ export const MODULOS = [
   { id: "disparos", nome: "Disparos", acoes: ["ver", "enviar"] },
   { id: "sequencias", nome: "Sequências", acoes: ["gerenciar"] },
   { id: "agentes", nome: "Agentes de IA", acoes: ["ver", "gerenciar"] },
+  { id: "automacoes", nome: "Automações", acoes: ["ver", "gerenciar"] },
   { id: "funis", nome: "Funis e campos", acoes: ["configurar"] },
   { id: "produtos", nome: "Produtos", acoes: ["gerenciar"] },
   { id: "relatorios", nome: "Relatórios e dashboard", acoes: ["ver"] },
@@ -116,8 +117,10 @@ export const LEGADO_DO_PAPEL: Record<PapelDeSistema, PermissaoLegada[]> = {
  * um papel personalizado com só ela passar no `requirePermission` antigo).
  */
 const EXTRAS_DO_PAPEL: Partial<Record<PapelDeSistema, PermissaoGranular[]>> = {
-  owner: ["lixeira:esvaziar"],
-  admin: ["lixeira:esvaziar"],
+  owner: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar"],
+  admin: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar"],
+  agent: ["automacoes:ver"],
+  viewer: ["automacoes:ver"],
 };
 
 export function permissoesDoPapelDeSistema(papel: PapelDeSistema): PermissaoGranular[] {
