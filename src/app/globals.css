@@ -63,44 +63,44 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --surface-page: #f5f7fa;
+  --surface-page: #f5f5f7;
   --surface-panel: #ffffff;
-  --surface-raised: #eef1f6;
-  --surface-hover: #e2e6ee;
+  --surface-raised: #f0f0f2;
+  --surface-hover: #e8e8eb;
   --surface-overlay: #ffffff;
 
-  --border-subtle: #e6e8ed;
-  --border-default: #d4d8e1;
-  --border-strong: #bbc2cf;
+  --border-subtle: #e5e5ea;
+  --border-default: #d8d8dd;
+  --border-strong: #c4c4ca;
 
-  --text-primary: #0f1a2e;
-  --text-secondary: #5b667b;
-  --text-tertiary: #5e6778;
-  --text-disabled: #a2aab9;
+  --text-primary: #1d1d1f;
+  --text-secondary: #505054;
+  --text-tertiary: #5c5c61;
+  --text-disabled: #a1a1a6;
   --text-on-danger: #ffffff;
-  --text-on-accent: #080d17;
+  --text-on-accent: #ffffff;
 
-  --accent-solid: #308ce8;
-  --accent-solid-hover: #519eec;
-  --accent-fg: #1361ae;
-  --accent-subtle: #eaf4fd;
+  --accent-solid: #1f6fd6;
+  --accent-solid-hover: #1a62c0;
+  --accent-fg: #1a5fbf;
+  --accent-subtle: #eaf1fc;
 
-  --success-fg: #17734a;
-  --success-subtle: #e7f5ee;
-  --warning-fg: #935a00;
-  --warning-subtle: #fcf2df;
-  --danger-fg: #c22f2f;
-  --danger-subtle: #fdeded;
-  --danger-solid: #c22f2f;
-  --info-fg: #1f66a8;
-  --info-subtle: #e8f1fa;
+  --success-fg: #2d6b4f;
+  --success-subtle: #e9f2ed;
+  --warning-fg: #8a5300;
+  --warning-subtle: #f8f0e0;
+  --danger-fg: #c42b2b;
+  --danger-subtle: #fbeaea;
+  --danger-solid: #c42b2b;
+  --info-fg: #1a5fbf;
+  --info-subtle: #eaf1fc;
 
-  --focus-ring: #308ce8;
-  --inverse-bg: #0b1322;
-  --inverse-fg: #f1f5f9;
+  --focus-ring: #1f6fd6;
+  --inverse-bg: #1d1d1f;
+  --inverse-fg: #f5f5f7;
 
-  --overlay-backdrop: rgba(8, 13, 23, 0.4);
-  --elevation-overlay: 0 1px 2px rgba(8, 13, 23, 0.06), 0 8px 24px rgba(8, 13, 23, 0.12);
+  --overlay-backdrop: rgba(0, 0, 0, 0.32);
+  --elevation-overlay: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 16px 40px rgba(0, 0, 0, 0.14);
 
   /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
      subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
@@ -147,44 +147,44 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --surface-page: #080d17;
-  --surface-panel: #0b1322;
-  --surface-raised: #121b2b;
-  --surface-hover: #20293c;
-  --surface-overlay: #121b2b;
+  --surface-page: #0a0a0b;
+  --surface-panel: #121214;
+  --surface-raised: #161618;
+  --surface-hover: #1f1f22;
+  --surface-overlay: #1c1c1f;
 
-  --border-subtle: #1d273a;
-  --border-default: #263146;
-  --border-strong: #35425b;
+  --border-subtle: #1c1c1f;
+  --border-default: #2a2a2e;
+  --border-strong: #3a3a3e;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #a9b5c6;
-  --text-tertiary: #8d9bb0;
-  --text-disabled: #525e6f;
+  --text-primary: #f2f2f4;
+  --text-secondary: #a8a8ad;
+  --text-tertiary: #8e8e94;
+  --text-disabled: #55555b;
   --text-on-danger: #ffffff;
-  --text-on-accent: #080d17;
+  --text-on-accent: #ffffff;
 
-  --accent-solid: #308ce8;
-  --accent-solid-hover: #519eec;
-  --accent-fg: #99ccff;
-  --accent-subtle: #112642;
+  --accent-solid: #1f6fd6;
+  --accent-solid-hover: #1a62c0;
+  --accent-fg: #7ab8ff;
+  --accent-subtle: #13233b;
 
-  --success-fg: #4cc38a;
-  --success-subtle: #11261b;
-  --warning-fg: #e3a547;
-  --warning-subtle: #2a2010;
-  --danger-fg: #f07575;
-  --danger-subtle: #2d1617;
+  --success-fg: #86c4a3;
+  --success-subtle: #121d17;
+  --warning-fg: #e0b062;
+  --warning-subtle: #1f1a10;
+  --danger-fg: #f07a7a;
+  --danger-subtle: #241414;
   --danger-solid: #c43b3b;
-  --info-fg: #6cb1ef;
-  --info-subtle: #122338;
+  --info-fg: #7ab8ff;
+  --info-subtle: #11192a;
 
-  --focus-ring: #99ccff;
-  --inverse-bg: #f1f5f9;
-  --inverse-fg: #0b1322;
+  --focus-ring: #7ab8ff;
+  --inverse-bg: #f2f2f4;
+  --inverse-fg: #111113;
 
-  --overlay-backdrop: rgba(0, 0, 0, 0.6);
-  --elevation-overlay: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --overlay-backdrop: rgba(0, 0, 0, 0.5);
+  --elevation-overlay: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 20px 50px rgba(0, 0, 0, 0.6);
 
   /* Cores de categoria (tipo de bloco, etapa, etiqueta): fg = texto/ícone,
      subtle = fundo de chip, solid = ponto/alça. Espelho e contraste em
@@ -481,12 +481,13 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Inter na interface e na tabela; Plus Jakarta Sans (a dos títulos do
-     site da Eva) só em título de página e número grande; JetBrains Mono no
-     rótulo "eyebrow" e em código. */
-  --font-sans: var(--font-inter);
+  /* Fonte do sistema primeiro (SF Pro no Mac e no iPhone), Inter no resto.
+     Plus Jakarta Sans (a dos títulos do site da Eva) só em título grande;
+     mono do sistema (SF Mono) ou JetBrains Mono em rótulo, número de apoio e
+     código. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta);
-  --font-mono: var(--font-jetbrains-mono);
+  --font-mono: ui-monospace, "SF Mono", var(--font-jetbrains-mono), Menlo, monospace;
 }
 
 html,
@@ -639,7 +640,8 @@ body {
   stroke: var(--border-strong) !important;
 }
 
-/* Fundo da casca do app: cor de página lisa (sem brilho radial). */
+/* Casca do app: cor de página lisa; o fundo vivo (canvas) desenha por cima
+   dela e o menu e o conteúdo ficam por cima do canvas. */
 .app-backdrop {
   background: var(--surface-page);
 }
@@ -690,10 +692,12 @@ body {
     padding: 0 !important;
     background: #ffffff !important;
   }
-  .app-backdrop > :not(main) {
+  .app-backdrop [data-print-ocultar],
+  .app-backdrop > canvas {
     display: none !important;
   }
-  .app-backdrop > main {
+  .app-backdrop .app-conteudo,
+  .app-backdrop main {
     display: block !important;
     overflow: visible !important;
     border-radius: 0 !important;
@@ -714,4 +718,26 @@ body {
   }
   .dash-grade > .dash-largo { grid-column: span 2 / span 2 !important; }
   .dash-grade > .dash-estreito { grid-column: span 1 / span 1 !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   v5: topo iridescente do Início (sempre claro, nos dois temas) e o tremor dos
+   blocos em "Personalizar", como no iPhone.
+   --------------------------------------------------------------------------- */
+.heroi-iridescente {
+  background:
+    radial-gradient(60% 80% at 85% 10%, #eef2b8 0%, transparent 60%),
+    radial-gradient(55% 70% at 20% 30%, #d9dcf6 0%, transparent 65%),
+    radial-gradient(50% 60% at 60% 90%, #cfe7da 0%, transparent 70%),
+    linear-gradient(135deg, #e3e6ef, #c9cfe4);
+  background-size: 140% 140%;
+  animation: eva-iridescencia 18s ease-in-out infinite alternate;
+}
+@keyframes eva-iridescencia {
+  from { background-position: 0% 0%; }
+  to { background-position: 100% 60%; }
+}
+@keyframes eva-tremer {
+  from { transform: rotate(-0.4deg); }
+  to { transform: rotate(0.4deg); }
 }

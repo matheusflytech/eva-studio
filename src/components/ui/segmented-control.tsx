@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({
 }) {
   const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex h-8 items-center rounded-md border border-border-default bg-raised p-0.5", className)}>
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex h-8 items-center rounded-full border border-border-subtle bg-raised p-0.5", className)}>
       {options.map((o, i) => {
         const ativo = o.value === value;
         return (
@@ -53,8 +53,8 @@ export function SegmentedControl<T extends string>({
               refs.current[j]?.focus();
             }}
             className={cn(
-              "inline-flex h-full items-center gap-1.5 rounded-sm px-2.5 text-small transition-colors duration-120 [&_svg]:size-3.5",
-              ativo ? "bg-panel font-medium text-text-primary ring-1 ring-border-subtle" : "text-text-secondary hover:text-text-primary",
+              "inline-flex h-full items-center gap-1.5 rounded-full px-3 text-small transition-colors duration-120 [&_svg]:size-3.5",
+              ativo ? "bg-inverse font-medium text-inverse-fg" : "text-text-secondary hover:text-text-primary",
               focusRing
             )}
           >
