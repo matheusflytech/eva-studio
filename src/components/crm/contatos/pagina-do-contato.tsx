@@ -1,5 +1,6 @@
 "use client";
 
+import { useTelaLarga } from "@/lib/use-tela-larga";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { ArrowLeft, CalendarDays, ChevronRight, Link2, ListTodo, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, RefreshCw, Trash2, TriangleAlert, UserRound } from "lucide-react";
@@ -50,6 +51,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
   const [linha, setLinha] = React.useState<LinhaDoTempo>({ itens: [], conversas: [] });
   const [linhaFalhou, setLinhaFalhou] = React.useState(false);
   const [aba, setAba] = React.useState<AbaDaPagina>("resumo");
+  const largo = useTelaLarga();
   // Botão redondo "Tarefa": vai ao Resumo e abre o campo de nova tarefa.
   const [pedidoDeTarefa, setPedidoDeTarefa] = React.useState(0);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -183,8 +185,10 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
   const abas: { value: AbaDaPagina; label: string }[] = [
     { value: "resumo", label: "Resumo" },
     { value: "atividade", label: linha.itens.length > 0 ? `Atividade ${linha.itens.length}` : "Atividade" },
-    { value: "dados", label: "Dados" },
+    ...(largo ? [] : [{ value: "dados" as const, label: "Dados" }]),
   ];
+  // No desktop largo os dados ficam na coluna da direita, sempre à vista.
+  const abaVisivel: AbaDaPagina = largo && aba === "dados" ? "resumo" : aba;
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-8 pt-2 lg:px-6">
@@ -216,7 +220,8 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
         </DropdownMenu>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[724px] flex-col gap-5">
+      <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="flex min-w-0 flex-col gap-5">
         <header className="flex flex-wrap items-center gap-5">
           <FotoDoContato nome={nome} semente={contato.id} tamanho="xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -257,9 +262,9 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
 
         {erro && <Notice tone="danger">{erro}</Notice>}
 
-        <SegmentedControl label="Seções do contato" options={abas} value={aba} onChange={setAba} className="self-start" />
+        <SegmentedControl label="Seções do contato" options={abas} value={abaVisivel} onChange={setAba} className="self-start" />
 
-        {aba === "resumo" && (
+        {abaVisivel === "resumo" && (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -283,18 +288,27 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
           </div>
         )}
 
-        {aba === "atividade" && (
+        {abaVisivel === "atividade" && (
           <section aria-label="Linha do tempo do contato" className="flex flex-col gap-3">
             <NovaNota vinculo={{ contactId: contato.id }} onCriada={carregar} compacto />
             <LinhaDoTempoView itens={linha.itens} falhou={linhaFalhou} agora={agora} rotulos={{ etapas: "Negócios" }} />
           </section>
         )}
 
-        {aba === "dados" && (
+        {abaVisivel === "dados" && (
           <section aria-label="Dados do contato">
             <DadosDoContato contact={contato} onChanged={mudouContato} />
           </section>
         )}
+      </div>
+      {largo && (
+        <aside aria-label="Dados do contato" className="flex flex-col gap-3 self-start xl:sticky xl:top-2">
+          <h2 className="font-mono text-caption text-text-tertiary">Dados</h2>
+          <div className="rounded-[18px] border border-border-subtle bg-panel p-4">
+            <DadosDoContato contact={contato} onChanged={mudouContato} />
+          </div>
+        </aside>
+      )}
       </div>
     </div>
   );

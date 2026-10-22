@@ -31,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { QuadradoDoAgente } from "@/components/inbox/avatar";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { cn } from "@/lib/utils";
 import { FlowNode, type FlowNodeData, type NodeRunState } from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
@@ -447,7 +447,7 @@ export default function AgentBuilderPage() {
           >
             <ArrowLeft aria-hidden="true" />
           </Link>
-          <QuadradoDoAgente id={agent.id} nome={agent.name} />
+          <OrbeDoAgente agenteId={agent.id} tamanho={28} leve />
           <h1 className="min-w-0 truncate text-heading font-semibold tracking-tight text-text-primary">{agent.name}</h1>
         </div>
 

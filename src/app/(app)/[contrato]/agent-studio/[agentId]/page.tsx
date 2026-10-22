@@ -1,5 +1,6 @@
 "use client";
 
+import { PainelDoAgente } from "@/components/playground/painel-do-agente";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams, useSearchParams } from "@/lib/contrato/navegacao";
@@ -54,8 +55,11 @@ function AgentePagina() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        <AgentOverview agent={agent} />
+      <AgentOverview agent={agent} />
+      {/* Desktop largo: conteúdo à esquerda e a orbe com os dados do agente
+          numa coluna à direita (a mesma do Playground), sem faixa vazia. */}
+      <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex min-w-0 max-w-4xl flex-col gap-4">
 
         {/* Abas em cápsula; a pergunta de cada uma fica no título (passar o mouse). */}
         <nav aria-label="Seções do agente" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
@@ -86,6 +90,8 @@ function AgentePagina() {
             <AgentForm agent={agent} aba={aba === "resumo" ? "comportamento" : aba} />
           </div>
         </div>
+      </div>
+      <PainelDoAgente agent={agent} falando={false} className="hidden self-start xl:sticky xl:top-2 xl:flex" />
       </div>
     </div>
   );

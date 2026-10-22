@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import { useRouter } from "@/lib/contrato/navegacao";
-import { AlertCircle, ArrowLeft, Check, Ellipsis, FlaskConical, Pause, Play, Redo2, Rocket, Settings2, Trash2, Undo2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Ellipsis, Pause, Play, Rocket, Settings2, Trash2 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import { fraseDaAutomacao } from "@/lib/automacoes/frase";
 import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
 import type { Definicao, Ponta, Regra } from "@/lib/automacoes/tipos";
 import { CanvasDaAutomacao, resumoDoPasso, type EstadoDoNo } from "@/components/automacoes/canvas";
-import { SeletorDePasso } from "@/components/automacoes/seletor";
+import { PainelDoProximoPasso } from "@/components/automacoes/seletor";
 import { PainelDeConfiguracoes, PainelDoPasso, type ConfigDaAutomacao } from "@/components/automacoes/painel";
 import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/components/automacoes/comum";
 import { FaixaDeExecucoes } from "@/components/automacoes/faixa-de-execucoes";
@@ -54,6 +55,11 @@ interface PassoDoTeste {
 }
 
 type Salvo = "salvo" | "salvando" | "pendente" | "erro";
+
+/** Mesmo formato nos dois lados da comparação (ordem das chaves fixa). */
+function assinatura(rascunho: Definicao | null, c: ConfigDaAutomacao): string {
+  return JSON.stringify({ rascunho, nome: c.nome, descricao: c.descricao, reinscricao: c.reinscricao, reinscricaoHoras: c.reinscricaoHoras, objetivo: c.objetivo });
+}
 
 function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTerminar }: {
   aberto: boolean;
@@ -192,6 +198,11 @@ export default function EditorDaAutomacao() {
   const [testando, setTestando] = React.useState(false);
   const [estados, setEstados] = React.useState<Record<string, { estado: EstadoDoNo; ms?: number }> | undefined>();
   const carregado = React.useRef(false);
+  // O que está gravado no servidor (rascunho + configurações, serializado).
+  // Só salva quando mudou de verdade: abrir a tela, Fast Refresh ou a corrida
+  // entre o setTimeout de "carregado" e o primeiro render não escrevem no banco.
+  const gravado = React.useRef<string | null>(null);
+  const calmo = useReducedMotion();
   const botaoPublicar = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
@@ -206,6 +217,7 @@ export default function EditorDaAutomacao() {
         setDef(a.rascunho);
         setConfig({ nome: a.nome, descricao: a.descricao, reinscricao: a.reinscricao, reinscricaoHoras: a.reinscricaoHoras, objetivo: a.objetivo as Regra | null });
         if (!a.rascunho?.gatilho) setSelecionado("gatilho");
+        gravado.current = assinatura(a.rascunho, { nome: a.nome, descricao: a.descricao, reinscricao: a.reinscricao, reinscricaoHoras: a.reinscricaoHoras, objetivo: a.objetivo as Regra | null });
         setTimeout(() => (carregado.current = true), 0);
       });
     return () => {
@@ -219,6 +231,8 @@ export default function EditorDaAutomacao() {
   // Salva sozinho ~1 s depois da última mudança.
   React.useEffect(() => {
     if (!carregado.current || !def || !config) return;
+    const agora = assinatura(def, config);
+    if (agora === gravado.current) return;
     setSalvo("pendente");
     const t = setTimeout(async () => {
       setSalvo("salvando");
@@ -229,6 +243,7 @@ export default function EditorDaAutomacao() {
           body: JSON.stringify({ rascunho: def, ...config }),
         });
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "erro");
+        gravado.current = agora;
         setSalvo("salvo");
         setMeta((m) => (m ? { ...m, nome: config.nome, alteracoesNaoPublicadas: true } : m));
       } catch {
@@ -356,12 +371,22 @@ export default function EditorDaAutomacao() {
     ocupado = false;
   }
   const frase = fraseDaAutomacao(def, nomes);
-  const painelAberto = !!selecionado && (selecionado === "config" || selecionado === "gatilho" || !!def.nos[selecionado]);
+  const painelDoPasso = !!selecionado && (selecionado === "config" || selecionado === "gatilho" || !!def.nos[selecionado]);
+  // Um painel por vez à direita: o "O que vem depois?" ou o do passo.
+  const abrirInsercao = (p: Ponta) => {
+    setSelecionado(null);
+    setInserindo(p);
+  };
+  const selecionarPasso = (no: string | null) => {
+    setInserindo(null);
+    setSelecionado(no);
+  };
 
   return (
     <div className="flex min-h-[560px] flex-1 flex-col gap-3 px-4 pb-4 pt-1 lg:px-6">
       {/* Barra do editor: voltar, nome, status e estado do salvamento; à direita
-          desfazer/refazer, pendências, Testar, Publicar e o resto no "…". */}
+          pendências, Publicar e o resto no "…". Testar, zoom e desfazer/refazer
+          moram na barra flutuante do quadro. */}
       <header className="flex flex-col gap-1">
         <div className="flex min-h-10 flex-wrap items-center gap-x-2 gap-y-2">
           <Link
@@ -390,20 +415,11 @@ export default function EditorDaAutomacao() {
             )}
           </span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <IconButton aria-label="Desfazer (Ctrl+Z)" tooltip disabled={!passado.length} onClick={desfazer}>
-              <Undo2 />
-            </IconButton>
-            <IconButton aria-label="Refazer (Ctrl+Shift+Z)" tooltip disabled={!futuro.length} onClick={refazer}>
-              <Redo2 />
-            </IconButton>
             {erros.length > 0 && (
-              <Button type="button" variant="ghost" className="text-danger" onClick={() => setSelecionado(erros[0].no ?? "gatilho")}>
+              <Button type="button" variant="ghost" className="text-danger" onClick={() => selecionarPasso(erros[0].no ?? "gatilho")}>
                 <AlertCircle size={14} aria-hidden="true" /> {erros.length} {erros.length === 1 ? "pendência" : "pendências"}
               </Button>
             )}
-            <Button type="button" variant="secondary" onClick={() => setTestando(true)}>
-              <FlaskConical size={14} aria-hidden="true" /> Testar
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <IconButton aria-label="Mais ações: configurações, pausar, apagar" variant="secondary">
@@ -411,7 +427,7 @@ export default function EditorDaAutomacao() {
                 </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onSelect={() => setSelecionado("config")}>
+                <DropdownMenuItem onSelect={() => selecionarPasso("config")}>
                   <Settings2 aria-hidden="true" /> Configurações
                 </DropdownMenuItem>
                 {meta.versao !== null && (
@@ -436,34 +452,50 @@ export default function EditorDaAutomacao() {
       </header>
       {meta.status === "pausada" && meta.pausadaPor && <Notice tone="warning">{meta.pausadaPor}</Notice>}
 
-      {/* O quadro e o painel do passo dividem o mesmo cartão; no celular o painel cobre o quadro. */}
+      {/* O quadro e o painel da direita dividem o mesmo cartão; no celular o painel cobre o quadro. */}
       <div className="relative flex min-h-[420px] flex-1 overflow-hidden rounded-[18px] border border-border-subtle">
         <div className="min-w-0 flex-1">
-          <CanvasDaAutomacao def={def} nomes={nomes} pendencias={pendencias} selecionado={selecionado} selecionar={setSelecionado} inserir={setInserindo} estados={estados} />
+          <CanvasDaAutomacao
+            def={def}
+            nomes={nomes}
+            pendencias={pendencias}
+            selecionado={selecionado}
+            selecionar={selecionarPasso}
+            inserir={abrirInsercao}
+            inserindo={inserindo}
+            estados={estados}
+            barra={{ testar: () => setTestando(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
+          />
         </div>
-        {painelAberto && selecionado && (
-          <aside className="absolute inset-y-0 right-0 z-10 w-full max-w-[400px] border-l border-border-subtle bg-panel lg:static lg:w-[380px] lg:max-w-none lg:shrink-0">
-            {selecionado === "config" ? (
+        {(inserindo || (painelDoPasso && selecionado)) && (
+          <motion.aside
+            // Troca de conteúdo (outro passo, outro "+") entra de novo, curta e da direita.
+            key={inserindo ? `inserir:${inserindo.de}:${inserindo.saida}` : selecionado}
+            initial={calmo ? { opacity: 0 } : { opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.8 }}
+            className="absolute inset-y-0 right-0 z-10 w-full max-w-[400px] border-l border-border-subtle bg-panel lg:static lg:w-[380px] lg:max-w-none lg:shrink-0"
+          >
+            {inserindo ? (
+              <PainelDoProximoPasso
+                objeto={def.objeto}
+                ocupado={ocupado}
+                fechar={() => setInserindo(null)}
+                escolher={(no, seguintesPor) => {
+                  aplicar({ op: "inserir", ponta: inserindo, no, ...(seguintesPor ? { seguintesPor } : {}) });
+                  setInserindo(null);
+                }}
+              />
+            ) : selecionado === "config" ? (
               <PainelDeConfiguracoes def={def} config={config} mudar={(c) => setConfig({ ...config, ...c })} opcoes={opcoes} fechar={() => setSelecionado(null)} />
             ) : (
-              <PainelDoPasso def={def} selecionado={selecionado} aplicar={aplicar} opcoes={opcoes} nomes={nomes} pendencias={pendencias} fechar={() => setSelecionado(null)} />
+              <PainelDoPasso def={def} selecionado={selecionado!} aplicar={aplicar} opcoes={opcoes} nomes={nomes} pendencias={pendencias} fechar={() => setSelecionado(null)} />
             )}
-          </aside>
+          </motion.aside>
         )}
       </div>
 
       <FaixaDeExecucoes automacaoId={id} versao={meta.versao} />
-
-      <SeletorDePasso
-        aberto={!!inserindo}
-        fechar={() => setInserindo(null)}
-        objeto={def.objeto}
-        ocupado={ocupado}
-        escolher={(no, seguintesPor) => {
-          if (inserindo) aplicar({ op: "inserir", ponta: inserindo, no, ...(seguintesPor ? { seguintesPor } : {}) });
-          setInserindo(null);
-        }}
-      />
 
       <Modal open={confirmar} onOpenChange={setConfirmar}>
         <ModalContent
@@ -485,7 +517,7 @@ export default function EditorDaAutomacao() {
               <Notice tone="danger">
                 <span className="block font-medium">Corrija antes de publicar:</span>
                 {erros.slice(0, 8).map((p, i) => (
-                  <button key={i} type="button" className="block text-left underline-offset-2 hover:underline" onClick={() => { setConfirmar(false); setSelecionado(p.no ?? "gatilho"); }}>
+                  <button key={i} type="button" className="block text-left underline-offset-2 hover:underline" onClick={() => { setConfirmar(false); selecionarPasso(p.no ?? "gatilho"); }}>
                     • {p.mensagem}
                   </button>
                 ))}

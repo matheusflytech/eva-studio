@@ -1,5 +1,54 @@
 # Plano v6 do front do EvaApp (para a próxima sessão)
 
+## >>> COMECE AQUI: status em 22/10/2026, fim do dia <<<
+
+Feito na sessão de 22/10 (noite), tudo no PR #8, branch `feat/redesign-visual`:
+- Tema separado do canvas: editor de automação respeita "canvas sempre
+  escuro" (conferido no navegador).
+- Negócios fixo em "Eva · 3" (seletor de estilo removido). Conferido em v5.
+- Largura no desktop: Insights, Integrações (e API), Aprovações sem coluna
+  centralizada; páginas de contato e de empresa em 2 colunas no ≥1280px
+  (dados à direita); página do agente em 2 colunas com o painel da orbe.
+- Animações: toque com mola em todo botão/aba (globals.css, fim do arquivo);
+  View Transitions ligada (`experimental.viewTransition` em next.config.ts +
+  `<ViewTransition>` no layout do contrato): a tela antiga sai com desfoque.
+  NÃO conferido visualmente ainda.
+- Calendário: aba "Calendário" em Tarefas (`components/tarefas/calendario*.ts*`),
+  conferido no navegador. Itens vêm como `EventoDoCalendario` com `origem`
+  ("tarefa" | "agenda") — pronto para receber Google Agenda depois. Limite:
+  `/api/tasks` traz no máx. 300 e não filtra por data.
+- Tarefas: tela em largura total + coluna à direita (`coluna-do-dia.tsx`)
+  no ≥1280px.
+- Orbe por agente: `components/agent-studio/orbe-do-agente.tsx`,
+  `cor-do-agente.ts` (cor no localStorage `eva.agente.cor.<id>`),
+  `cor-da-orbe.tsx` (paleta + RGB). Na lista, página do agente, builder e
+  Playground (coluna lateral `playground/painel-do-agente.tsx`). Conferido.
+- Fluxograma novo de automações (`components/automacoes/canvas.tsx`,
+  `seletor.tsx`, `automacoes/[id]/page.tsx`, `lib/automacoes/layout.ts`):
+  nós quadrados com ícone, fios com brilho, painel "O que vem depois?", barra
+  flutuante.
+
+**BUGS ABERTOS (fazer primeiro):**
+1. **Fluxograma abre VAZIO**: os nós ficam no DOM com
+   `transform: translate(0,0); visibility: hidden` (React Flow nunca mede/
+   posiciona). Começou com o visual novo do canvas.tsx. Um subagente estava
+   corrigindo quando a sessão acabou: veja `git status`/`git diff` em
+   `src/components/automacoes/` — pode haver edição pela metade. Conferir no
+   navegador com a automação "Aniversário do contato".
+2. **"salvando…" ao abrir o editor de automação**: suspeita de salvamento
+   automático ao carregar (escreve no banco de PRODUÇÃO). Confirmar a causa em
+   `automacoes/[id]/page.tsx`; abrir a tela não pode alterar a definição.
+3. Conferir no navegador: View Transitions + toque com mola, páginas de
+   contato/empresa/agente em 2 colunas, Playground com coluna, tudo no claro e
+   no escuro, em 1440–1920px.
+
+**DEPOIS (ainda não feito):** visual do fluxograma também no builder de
+agentes; orbe dos agentes na Caixa de entrada; fundo "gelo" (ref. 05, mostrar
+proposta antes); integração Google Agenda (conversar antes: OAuth, banco);
+decidir gravar a cor da orbe no banco (hoje só navegador); revisão completa
+tela a tela; merge do PR #8 só com ok do dono (main = produção).
+
+
 Escrito em 22/10/2026, no fim da sessão que aplicou a v5 no app inteiro.
 Quem pegar isto: leia este arquivo inteiro antes de mexer em código. Ele traz
 o pedido do dono do produto, o estado do código e o passo a passo.
@@ -114,6 +163,13 @@ Corrigido nesta última passada (ainda não verificado no navegador):
    reuniões, próximos passos, fechamentos previstos). Perguntar ao dono onde
    entra (tela própria no menu ou visão dentro de Tarefas) e quais dados
    mostrar, antes de construir. Usar só dados que já existem nas APIs.
+   **Integração de agenda (pedido 22/10):** espelhar dentro do calendário a
+   agenda da pessoa (Google Agenda, Outlook), "de forma bonita, bem
+   profissional, luxo". Recurso novo: precisa OAuth Google, tabela de
+   conexões/eventos e sincronização; conversar com o dono antes (escopo,
+   leitura só ou também criar evento, privacidade). O componente do
+   calendário já recebe uma lista genérica de eventos com `origem`, para a
+   agenda externa entrar como outra fonte. Skill útil: crm-tasks-agenda.
 7. **Fluxograma de automações novo** (ref. `03-fluxograma-automacao.png`): o
    editor atual (`components/automacoes/canvas.tsx`, layout em
    `src/lib/automacoes/layout.ts`) ainda é o de antes. Refazer o visual no

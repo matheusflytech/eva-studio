@@ -125,7 +125,7 @@ function Integracoes() {
         <SegmentedControl label="Integrações" value={aba} onChange={(v) => router.replace(`${pathname}?aba=${v}`)} options={ABAS} />
       </div>
 
-      <div className="w-full max-w-4xl pt-2">
+      <div className="w-full pt-2">
         {aba === "ia" && (
           <CentralDeIa
             novaAberta={novaAberta}

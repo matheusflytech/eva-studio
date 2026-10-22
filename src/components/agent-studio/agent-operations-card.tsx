@@ -6,7 +6,7 @@ import {
   AlertTriangle, ArrowRight, ChevronRight, PencilLine, PlayCircle, PlugZap, UserCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { QuadradoDoAgente } from "@/components/inbox/avatar";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { cn } from "@/lib/utils";
 
 export interface AgentOverview {
@@ -122,7 +122,7 @@ const TOM: Record<ProximoPasso["tom"], string> = {
 };
 
 /**
- * Linha de um agente na lista (v5): quatro coisas só. Inicial, nome com o
+ * Linha de um agente na lista (v5): quatro coisas só. Orbe (leve), nome com o
  * próximo passo, conversas da semana e status. Modelo, blocos, canais,
  * execuções e erros ficam no Resumo do agente.
  *
@@ -141,7 +141,7 @@ export function LinhaDoAgente({ agent }: { agent: AgentOverview }) {
         aria-label={`Abrir ${agent.name}`}
         className="absolute inset-0 rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       />
-      <QuadradoDoAgente id={agent.id} nome={agent.name} className="h-[38px] w-[38px] rounded-[11px] text-body-lg" />
+      <OrbeDoAgente agenteId={agent.id} tamanho={36} leve className="mx-px" />
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-body font-medium text-text-primary">{agent.name}</span>

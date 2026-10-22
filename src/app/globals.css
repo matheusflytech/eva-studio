@@ -820,3 +820,28 @@ body {
   [data-state="open"][class*="ds-modal-in"],
   [data-state="open"][class*="ds-slide-in-right"] { animation: eva-aparece 0.2s ease both !important; }
 }
+
+/* Troca de tela (View Transitions): só o conteúdo anima; o resto da página
+   (menu, ilha, fundo) não faz o crossfade padrão do navegador. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
+::view-transition-old(.eva-tela-sai) {
+  animation: eva-tela-sai 0.16s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes eva-tela-sai {
+  to { opacity: 0; transform: translateY(-6px) scale(0.99); filter: blur(4px); }
+}
+
+/* Toque: tudo que é botão afunda um pouco com mola ao clicar e volta solto.
+   :where() deixa as classes de cada componente vencerem. */
+:where(button, [role="button"], [role="tab"], [role="menuitemcheckbox"], [role="menuitemradio"], summary):not(:disabled):active {
+  transform: scale(0.97);
+}
+:where(button, [role="button"], [role="tab"], summary) {
+  transition-property: transform, background-color, color, border-color, opacity, box-shadow;
+  transition-duration: 0.22s;
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], [role="tab"], summary):not(:disabled):active { transform: scale(0.99); }
+}

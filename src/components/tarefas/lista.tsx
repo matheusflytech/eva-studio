@@ -28,6 +28,9 @@ import type { TarefaDaTela } from "@/lib/tarefas/tela";
 import { LinhaDeTarefa } from "./linha";
 import { useConcluirTarefa } from "./concluir";
 import type { Moldura } from "./pecas";
+import { FilaDeTrabalho } from "./fila";
+import { ColunaDoDia, itensDaFila, useMeuDia } from "./coluna-do-dia";
+import type { ItemDoDiaDaTela } from "@/lib/tarefas/tela";
 
 // Lista de tarefas (skill crm-tasks-agenda, E7): Atrasadas · Hoje · Amanhã ·
 // Esta semana · Depois · Sem data · Concluídas (recolhida). Minhas / Equipe /
@@ -39,11 +42,12 @@ interface Membro {
   name: string;
 }
 
-type Resposta =
+export type Resposta =
   | { ok: true; dados: { tasks?: TarefaDaTela[]; visoes?: VisaoDeTarefas[]; visao?: VisaoDeTarefas } }
   | { ok: false; erro: string };
 
-async function buscarTarefas(visao: VisaoDeTarefas): Promise<Resposta> {
+/** Mesma busca serve à lista e ao Calendário (a rota não filtra por data: traz até 300, abertas primeiro). */
+export async function buscarTarefas(visao: VisaoDeTarefas): Promise<Resposta> {
   try {
     const res = await fetch(`/api/tasks?visao=${visao}&status=todas`);
     const dados = await res.json().catch(() => ({}));
@@ -64,6 +68,9 @@ export function ListaDeTarefas({ versao, onMudou, moldura }: { versao: number; o
   const [membros, setMembros] = React.useState<Membro[]>([]);
   const [concluirEmMassa, setConcluirEmMassa] = React.useState(false);
   const [agora, setAgora] = React.useState(() => new Date());
+  // Coluna da direita (desktop largo): capacidade, filas e compromissos do Meu dia.
+  const dia = useMeuDia(versao);
+  const [fila, setFila] = React.useState<{ titulo: string; itens: ItemDoDiaDaTela[] } | null>(null);
 
   // Busca sem mexer em estado; o estado só muda no .then (o efeito apenas
   // sincroniza com o servidor).
@@ -153,35 +160,16 @@ export function ListaDeTarefas({ versao, onMudou, moldura }: { versao: number; o
   }
 
   // Filtros: hoje só "de quem" (Minhas, Equipe, Todas), dentro do botão.
-  const nFiltros = visao !== "minhas" ? 1 : 0;
-  const lateral =
-    visoes.length > 1 ? (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="secondary" size="sm" aria-label={nFiltros ? `Filtros, ${nFiltros} ligado` : "Filtros"}>
-            <ListFilter size={14} aria-hidden="true" />
-            Filtros
-            {nFiltros > 0 && <span className="font-mono text-caption tabular-nums text-accent-fg">{nFiltros}</span>}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel>De quem</DropdownMenuLabel>
-          {visoes.map((v) => (
-            <DropdownMenuCheckboxItem
-              key={v}
-              checked={v === visao}
-              onCheckedChange={() => {
-                if (v === visao) return;
-                setSelecao(new Set());
-                setVisao(v);
-              }}
-            >
-              {ROTULO_DA_VISAO[v]}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ) : null;
+  const lateral = (
+    <FiltroDeQuem
+      visoes={visoes}
+      visao={visao}
+      onEscolher={(v) => {
+        setSelecao(new Set());
+        setVisao(v);
+      }}
+    />
+  );
 
   const contagem =
     tarefas === null ? null : (
@@ -196,9 +184,36 @@ export function ListaDeTarefas({ versao, onMudou, moldura }: { versao: number; o
       </>
     );
 
+  if (fila) {
+    return moldura({
+      contagem,
+      conteudo: (
+        <FilaDeTrabalho
+          titulo={fila.titulo}
+          itens={fila.itens}
+          onMudou={onMudou}
+          onSair={() => {
+            setFila(null);
+            carregar();
+          }}
+        />
+      ),
+    });
+  }
+
   return moldura({
     contagem,
     lateral,
+    coluna: dia ? (
+      <ColunaDoDia
+        dia={dia}
+        agora={agora}
+        onAbrirFila={(titulo, ids) => {
+          const itens = itensDaFila(dia, ids);
+          if (itens.length) setFila({ titulo, itens });
+        }}
+      />
+    ) : null,
     conteudo: (
       <div className="flex flex-col gap-4">
         {selecao.size > 0 && (
@@ -336,6 +351,45 @@ export function ListaDeTarefas({ versao, onMudou, moldura }: { versao: number; o
       </div>
     ),
   });
+}
+
+/** "De quem" (Minhas, Equipe, Todas, até o teto do papel) dentro do botão Filtros. Só aparece com mais de uma opção. */
+export function FiltroDeQuem({
+  visoes,
+  visao,
+  onEscolher,
+}: {
+  visoes: VisaoDeTarefas[];
+  visao: VisaoDeTarefas;
+  onEscolher: (v: VisaoDeTarefas) => void;
+}) {
+  if (visoes.length <= 1) return null;
+  const nFiltros = visao !== "minhas" ? 1 : 0;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" size="sm" aria-label={nFiltros ? `Filtros, ${nFiltros} ligado` : "Filtros"}>
+          <ListFilter size={14} aria-hidden="true" />
+          Filtros
+          {nFiltros > 0 && <span className="font-mono text-caption tabular-nums text-accent-fg">{nFiltros}</span>}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel>De quem</DropdownMenuLabel>
+        {visoes.map((v) => (
+          <DropdownMenuCheckboxItem
+            key={v}
+            checked={v === visao}
+            onCheckedChange={() => {
+              if (v !== visao) onEscolher(v);
+            }}
+          >
+            {ROTULO_DA_VISAO[v]}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function ConcluirEmMassa({

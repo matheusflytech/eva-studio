@@ -17,6 +17,7 @@ import { AcaoRapida, BotaoConcluir, IconeDoTipo, RotuloDaOrigem, TituloDeGrupo, 
 import { MenuDeAdiar, pedirAdiamento } from "./adiar";
 import { useConcluirTarefa } from "./concluir";
 import { FilaDeTrabalho } from "./fila";
+import { ColunaDoDia } from "./coluna-do-dia";
 
 // "Meu dia" — a home do vendedor (skill crm-tasks-agenda, §6). Em destaque só
 // o que fazer agora; depois os compromissos com hora e uma fila curta, e o
@@ -200,7 +201,8 @@ export function MeuDia({ versao, onMudou, moldura }: { versao: number; onMudou: 
   // Capacidade em uma frase: o que sobra até as 18h, ou quanto passa.
   const lateral = vazio ? null : (
     <span
-      className={cn("font-mono text-caption tabular-nums", excedentes > 0 ? "text-warning" : "text-text-tertiary")}
+      // No desktop largo a capacidade mora na coluna da direita.
+      className={cn("font-mono text-caption tabular-nums xl:hidden", excedentes > 0 ? "text-warning" : "text-text-tertiary")}
       title={`Cabe hoje ${textoDeMinutos(livres)} (até as 18h, menos compromissos e 15% de folga) · planejado ${textoDeMinutos(planejados)}`}
     >
       {excedentes > 0 ? `passa ${textoDeMinutos(excedentes)} do seu dia` : `sobram ${textoDeMinutos(Math.max(0, livres - planejados))} até 18h`}
@@ -227,6 +229,7 @@ export function MeuDia({ versao, onMudou, moldura }: { versao: number; onMudou: 
     contagem,
     acoes,
     lateral,
+    coluna: <ColunaDoDia dia={dia} agora={agora} onAbrirFila={abrirFila} />,
     conteudo: (
       <div className="flex flex-col gap-6">
         {destaque && <Agora item={destaque} agora={agora} onConcluir={concluir} onMudou={mudou} />}

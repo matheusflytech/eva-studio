@@ -79,7 +79,7 @@ export default function ApiDocsPage() {
         </p>
       </div>
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         <Link href="/integracoes/api/referencia" className="block rounded-[18px] border border-border-subtle bg-panel p-5 transition-colors hover:border-border-strong">
           <p className="mb-1 font-mono text-caption text-text-tertiary">Novo · API do CRM v1</p>
           <p className="text-small leading-relaxed text-text-secondary">

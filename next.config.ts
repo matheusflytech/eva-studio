@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Troca de tela com a View Transitions API (a tela antiga sai com desfoque,
+  // a nova entra em cascata). Ver docs/design/PLANO-v6.md.
+  experimental: {
+    viewTransition: true,
+  },
 };
 
 export default nextConfig;

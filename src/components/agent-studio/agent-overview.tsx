@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowLeft, Ellipsis, MessageSquare, PlayCircle, Workflow } from "lucide-react";
+import { ArrowLeft, Ellipsis, MessageSquare, Palette, PlayCircle, Workflow } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { QuadradoDoAgente } from "@/components/inbox/avatar";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
+import { BotaoCorDaOrbe } from "@/components/agent-studio/cor-da-orbe";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 import type { Agent } from "@/lib/data/types";
@@ -47,7 +48,16 @@ export function AgentOverview({ agent }: { agent: Agent }) {
         >
           <ArrowLeft aria-hidden="true" />
         </Link>
-        <QuadradoDoAgente id={agent.id} nome={agent.name} className="h-8 w-8 rounded-[9px] text-small" />
+        {/* A orbe é o botão "Cor da orbe" (paleta + RGB num popover). */}
+        <BotaoCorDaOrbe agenteId={agent.id} className="group/orbe relative -my-2 shrink-0">
+          <OrbeDoAgente agenteId={agent.id} tamanho={56} />
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border-subtle bg-overlay text-text-secondary shadow-overlay transition-colors group-hover/orbe:text-text-primary"
+          >
+            <Palette size={11} />
+          </span>
+        </BotaoCorDaOrbe>
         <h1 className="min-w-0 truncate text-heading font-semibold tracking-tight text-text-primary">{agent.name}</h1>
         <Badge variant={isActive ? "success" : "neutral"} dot={isActive}>
           {isActive ? "Respondendo" : "Pausado"}

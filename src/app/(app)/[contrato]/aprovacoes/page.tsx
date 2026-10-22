@@ -251,7 +251,7 @@ export default function AprovacoesPage() {
         />
       )}
 
-      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-7 pt-2">
+      <div className="flex w-full flex-col gap-7 pt-2">
         {aviso && (
           <Notice tone="info" onDismiss={() => setAviso(null)}>
             {aviso}

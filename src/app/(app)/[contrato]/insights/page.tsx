@@ -100,7 +100,7 @@ export default function InsightsPage() {
       </div>
 
       {carregando && !dados ? (
-        <div className="flex w-full max-w-[820px] flex-col gap-4" aria-busy="true">
+        <div className="flex w-full flex-col gap-4" aria-busy="true">
           <div className="grid gap-3 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-[92px] animate-pulse rounded-[18px] bg-raised motion-reduce:animate-none" />
@@ -111,7 +111,7 @@ export default function InsightsPage() {
           ))}
         </div>
       ) : semNada ? (
-        <div className="w-full max-w-[820px] rounded-[18px] border border-border-subtle bg-panel px-5 py-10 text-center">
+        <div className="w-full rounded-[18px] border border-border-subtle bg-panel px-5 py-10 text-center">
           <p className="text-body font-medium text-text-primary">Nenhuma conversa nos últimos {dias} dias.</p>
           <p className="mx-auto mt-1 max-w-md text-small text-text-secondary">
             Assim que um agente atender alguém, pelo canal ou pelo Playground, os números aparecem aqui.
@@ -121,7 +121,7 @@ export default function InsightsPage() {
           </Link>
         </div>
       ) : (
-        <div className={cn("flex w-full max-w-[820px] flex-col gap-5 transition-opacity", carregando && "opacity-60")}>
+        <div className={cn("flex w-full flex-col gap-5 transition-opacity", carregando && "opacity-60")}>
           {/* Três números, sem legenda longa. */}
           <div className="grid gap-3 sm:grid-cols-3">
             <Numero

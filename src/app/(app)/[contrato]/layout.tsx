@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ViewTransition } from "react";
 import NextLink from "next/link";
 import { useRouter, usePathname, useParams } from "next/navigation";
 import { Menu, X, ShieldOff, Search } from "lucide-react";
@@ -103,9 +104,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
-            <div key={pathname} className="entrada-de-tela flex min-h-0 flex-1 flex-col">
-              {children}
-            </div>
+            <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
+              <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>
+            </ViewTransition>
           </main>
         </div>
       </div>

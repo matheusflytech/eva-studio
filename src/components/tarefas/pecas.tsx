@@ -135,6 +135,60 @@ export interface PartesDaTela {
   /** À direita da sub-barra, ao lado das abas. */
   lateral?: React.ReactNode;
   conteudo: React.ReactNode;
+  /** Coluna fixa à direita no desktop largo (≥1280px); abaixo disso some (o mesmo dado mora na sub-barra e no "…"). */
+  coluna?: React.ReactNode;
+}
+
+/**
+ * Compromisso com hora: faixa de cor à esquerda, hora em mono e o título.
+ * Serve à coluna do Meu dia e ao painel do dia do Calendário (inclusive,
+ * no futuro, para eventos da agenda espelhada).
+ */
+export function BlocoDeHorario({
+  hora,
+  fim,
+  titulo,
+  detalhe,
+  tipo,
+  tom = "normal",
+  faixa,
+  className,
+}: {
+  hora: string;
+  fim?: string | null;
+  titulo: string;
+  detalhe?: string | null;
+  tipo?: string | null;
+  tom?: "normal" | "atrasada" | "feita";
+  /** Classe de fundo da faixa (cor de dado, ex.: CATEGORY_CLASSES.blue.solid); padrão: pelo tom. */
+  faixa?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative flex min-h-12 items-center gap-3 overflow-hidden rounded-[14px] bg-raised py-2 pl-4 pr-3 transition-colors duration-200 hover:bg-hover",
+        className
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-2 left-1.5 w-[3px] rounded-full",
+          faixa ?? (tom === "atrasada" ? "bg-danger-solid" : tom === "feita" ? "bg-border-strong" : "bg-accent-solid")
+        )}
+      />
+      <span className="flex w-11 shrink-0 flex-col font-mono text-caption tabular-nums leading-tight">
+        <span className={cn(tom === "atrasada" ? "text-danger" : "text-text-primary")}>{hora}</span>
+        {fim && <span className="text-text-tertiary">{fim}</span>}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className={cn("truncate text-small font-medium text-text-primary", tom === "feita" && "font-normal text-text-tertiary line-through")}>{titulo}</span>
+        {detalhe && <span className="truncate text-caption text-text-tertiary">{detalhe}</span>}
+      </span>
+      {tipo && <IconeDoTipo tipo={tipo} className="size-3.5" />}
+    </div>
+  );
 }
 
 export type Moldura = (partes: PartesDaTela) => React.ReactNode;

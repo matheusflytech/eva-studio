@@ -1,5 +1,6 @@
 "use client";
 
+import { useTelaLarga } from "@/lib/use-tela-larga";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { ArrowLeft, Building2, ChevronRight, Clock, Globe, Link2, Loader2, MoreHorizontal, Phone, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
@@ -74,6 +75,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
   const [dealAberto, setDealAberto] = React.useState<string | null>(null);
   const [form, setForm] = React.useState<Partial<Company>>({});
   const [aba, setAba] = React.useState<AbaDaPagina>("resumo");
+  const largo = useTelaLarga();
 
   const carregar = React.useCallback(async () => {
     try {
@@ -221,8 +223,37 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
     { value: "resumo", label: "Resumo" },
     { value: "pessoas", label: contacts.length > 0 ? `Pessoas ${contacts.length}` : "Pessoas" },
     { value: "negocios", label: deals.length > 0 ? `Negócios ${deals.length}` : "Negócios" },
-    { value: "dados", label: "Dados" },
+    ...(largo ? [] : [{ value: "dados" as const, label: "Dados" }]),
   ];
+  // No desktop largo os dados ficam na coluna da direita, sempre à vista.
+  const abaVisivel: AbaDaPagina = largo && aba === "dados" ? "resumo" : aba;
+  const dadosDaEmpresa = (
+          <section aria-label="Dados da empresa" className="grid gap-4 sm:grid-cols-2">
+            <Campo label="CNPJ" value={form.cnpj ?? ""} onChange={(v) => setForm({ ...form, cnpj: v })} onSave={(v) => patch({ cnpj: v })} />
+            <Campo label="Setor" value={form.sector ?? ""} onChange={(v) => setForm({ ...form, sector: v })} onSave={(v) => patch({ sector: v })} />
+            <Campo label="Site" value={form.website ?? ""} onChange={(v) => setForm({ ...form, website: v })} onSave={(v) => patch({ website: v })} />
+            <Campo label="Telefone" value={form.phone ?? ""} onChange={(v) => setForm({ ...form, phone: v })} onSave={(v) => patch({ phone: v })} />
+            <Campo label="LinkedIn" value={form.linkedinUrl ?? ""} onChange={(v) => setForm({ ...form, linkedinUrl: v })} onSave={(v) => patch({ linkedinUrl: v })} />
+            <Campo label="Faturamento" value={form.revenue ?? ""} onChange={(v) => setForm({ ...form, revenue: v })} onSave={(v) => patch({ revenue: v })} />
+            <Campo label="Endereço" value={form.address ?? ""} onChange={(v) => setForm({ ...form, address: v })} onSave={(v) => patch({ address: v })} />
+            <div className="grid grid-cols-[1fr_88px] gap-3">
+              <Campo label="Cidade" value={form.city ?? ""} onChange={(v) => setForm({ ...form, city: v })} onSave={(v) => patch({ city: v })} />
+              <Campo label="UF" value={form.uf ?? ""} onChange={(v) => setForm({ ...form, uf: v })} onSave={(v) => patch({ uf: v })} />
+            </div>
+            <Field label="Descrição" className="sm:col-span-2">
+              <Textarea
+                rows={4}
+                value={form.description ?? ""}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onBlur={() => form.description !== company.description && patch({ description: form.description })}
+              />
+            </Field>
+            <p className="font-mono text-caption text-text-tertiary sm:col-span-2">
+              Cadastrada {formatRelativeDate(company.createdAt)}
+              {company.owner ? ` · responsável ${company.owner.name}` : ""}
+            </p>
+          </section>
+  );
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-8 pt-1 lg:px-6">
@@ -255,7 +286,8 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
         </DropdownMenu>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[724px] flex-col gap-5">
+      <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="flex min-w-0 flex-col gap-5">
         <header className="flex flex-wrap items-center gap-5">
           <LogoDaEmpresa nome={nome} semente={company.id} tamanho="xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -303,9 +335,9 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
           />
         </dl>
 
-        <SegmentedControl label="Seções da empresa" options={abas} value={aba} onChange={setAba} className="self-start tabular-nums" />
+        <SegmentedControl label="Seções da empresa" options={abas} value={abaVisivel} onChange={setAba} className="self-start tabular-nums" />
 
-        {aba === "resumo" && (
+        {abaVisivel === "resumo" && (
           <div className="grid gap-6 md:grid-cols-2">
             <section aria-labelledby="tarefas-da-conta" className="flex min-w-0 flex-col gap-2">
               <h2 id="tarefas-da-conta" className="font-mono text-caption uppercase tracking-wider text-text-tertiary">
@@ -366,7 +398,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
           </div>
         )}
 
-        {aba === "pessoas" &&
+        {abaVisivel === "pessoas" &&
           (contacts.length === 0 ? (
             <p className="text-small text-text-tertiary">Nenhum contato nesta empresa. Vincule pela ficha do contato, na tela de Contatos.</p>
           ) : (
@@ -388,7 +420,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
             </ul>
           ))}
 
-        {aba === "negocios" &&
+        {abaVisivel === "negocios" &&
           (deals.length === 0 ? (
             <p className="text-small text-text-tertiary">Nenhum negócio nesta conta ainda.</p>
           ) : (
@@ -426,33 +458,14 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
             </ul>
           ))}
 
-        {aba === "dados" && (
-          <section aria-label="Dados da empresa" className="grid gap-4 sm:grid-cols-2">
-            <Campo label="CNPJ" value={form.cnpj ?? ""} onChange={(v) => setForm({ ...form, cnpj: v })} onSave={(v) => patch({ cnpj: v })} />
-            <Campo label="Setor" value={form.sector ?? ""} onChange={(v) => setForm({ ...form, sector: v })} onSave={(v) => patch({ sector: v })} />
-            <Campo label="Site" value={form.website ?? ""} onChange={(v) => setForm({ ...form, website: v })} onSave={(v) => patch({ website: v })} />
-            <Campo label="Telefone" value={form.phone ?? ""} onChange={(v) => setForm({ ...form, phone: v })} onSave={(v) => patch({ phone: v })} />
-            <Campo label="LinkedIn" value={form.linkedinUrl ?? ""} onChange={(v) => setForm({ ...form, linkedinUrl: v })} onSave={(v) => patch({ linkedinUrl: v })} />
-            <Campo label="Faturamento" value={form.revenue ?? ""} onChange={(v) => setForm({ ...form, revenue: v })} onSave={(v) => patch({ revenue: v })} />
-            <Campo label="Endereço" value={form.address ?? ""} onChange={(v) => setForm({ ...form, address: v })} onSave={(v) => patch({ address: v })} />
-            <div className="grid grid-cols-[1fr_88px] gap-3">
-              <Campo label="Cidade" value={form.city ?? ""} onChange={(v) => setForm({ ...form, city: v })} onSave={(v) => patch({ city: v })} />
-              <Campo label="UF" value={form.uf ?? ""} onChange={(v) => setForm({ ...form, uf: v })} onSave={(v) => patch({ uf: v })} />
-            </div>
-            <Field label="Descrição" className="sm:col-span-2">
-              <Textarea
-                rows={4}
-                value={form.description ?? ""}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                onBlur={() => form.description !== company.description && patch({ description: form.description })}
-              />
-            </Field>
-            <p className="font-mono text-caption text-text-tertiary sm:col-span-2">
-              Cadastrada {formatRelativeDate(company.createdAt)}
-              {company.owner ? ` · responsável ${company.owner.name}` : ""}
-            </p>
-          </section>
-        )}
+        {abaVisivel === "dados" && dadosDaEmpresa}
+      </div>
+      {largo && (
+        <aside aria-label="Dados da empresa" className="flex flex-col gap-3 self-start xl:sticky xl:top-2">
+          <h2 className="font-mono text-caption text-text-tertiary">Dados</h2>
+          <div className="rounded-[18px] border border-border-subtle bg-panel p-4 [&>section]:grid-cols-1 [&_.sm\:col-span-2]:col-span-1">{dadosDaEmpresa}</div>
+        </aside>
+      )}
       </div>
 
       {dealAberto && <DealDrawer dealId={dealAberto} onClose={() => setDealAberto(null)} onChanged={carregar} />}
