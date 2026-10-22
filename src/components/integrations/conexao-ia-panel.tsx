@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Notice } from "@/components/ui/notice";
 import { IconButton } from "@/components/ui/icon-button";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ModeloSelect } from "@/components/agent-studio/builder/modelo-select";
 import { LLM_PROVIDERS } from "@/lib/llm-providers";
 
@@ -30,8 +30,10 @@ const TEMPOS = [10, 15, 25, 40, 60];
 // modelo em ordem de preferência; se a primeira falhar ou passar do tempo
 // limite, a próxima responde na mesma hora. Blocos de IA marcados com
 // "Conexão do contrato" (o padrão de bloco novo) usam esta lista.
+// v5: mora na gaveta "Fila de resposta" de Integrações → IA; a lista de
+// chaves na frente só mostra a posição de cada uma.
 // ---------------------------------------------------------------------------
-export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: number }) {
+export function ConexaoIaPanel({ credenciaisVersao = 0, aoSalvar }: { credenciaisVersao?: number; aoSalvar?: () => void }) {
   const [credenciais, setCredenciais] = React.useState<Credencial[] | null>(null);
   const [passos, setPassos] = React.useState<Passo[]>([]);
   const [timeoutMs, setTimeoutMs] = React.useState(25000);
@@ -96,6 +98,7 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
       setTimeoutMs(data.timeoutMs);
       setSujo(false);
       setMensagem({ tom: "info", texto: "Conexão salva. Os agentes já usam esta ordem na próxima mensagem." });
+      aoSalvar?.();
     } catch (err) {
       setMensagem({ tom: "danger", texto: err instanceof Error ? err.message : "Não deu para salvar." });
     } finally {
@@ -104,16 +107,13 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
   }
 
   return (
-    <div className="mb-8">
-      <div className="mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Central de IA</p>
-        <p className="mt-1 max-w-2xl text-[12.5px] text-text-secondary">
-          A conexão que os agentes usam para responder. A primeira linha responde; se ela falhar, recusar a chave ou
-          demorar mais que o tempo limite, a próxima entra na mesma hora, sem a pessoa perceber.
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-small text-text-secondary">
+        A primeira linha responde; se ela falhar, recusar a chave ou demorar mais que o tempo limite, a próxima entra na
+        mesma hora, sem a pessoa perceber.
+      </p>
 
-      <div className="glass-card flex flex-col gap-4 rounded-2xl p-4">
+      <div className="flex flex-col gap-3">
         {!disponivel && (
           <Notice tone="warning">
             A Central de IA ainda não foi ativada no banco deste ambiente. Enquanto isso, os agentes usam sozinhos a
@@ -122,17 +122,17 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
         )}
 
         {!carregado ? (
-          <p className="text-[12.5px] text-text-tertiary">Carregando...</p>
+          <div className="h-24 animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" aria-hidden="true" />
         ) : !disponivel ? null : credenciais && credenciais.length === 0 ? (
-          <p className="text-[12.5px] text-text-tertiary">
-            Cadastre abaixo a chave de pelo menos um provedor de IA (OpenAI, Google, Anthropic, Groq...) para montar a
+          <p className="text-small text-text-tertiary">
+            Cadastre a chave de pelo menos um provedor de IA (OpenAI, Google, Anthropic, Groq...) para montar a
             conexão.
           </p>
         ) : (
           <>
             {passos.length === 0 && (
-              <p className="flex items-center gap-2 text-[12.5px] text-text-tertiary">
-                <Sparkles size={14} aria-hidden />
+              <p className="flex items-start gap-2 text-small text-text-tertiary">
+                <Sparkles size={14} aria-hidden className="mt-0.5 shrink-0" />
                 Nenhuma ordem definida: os agentes usam a chave de IA mais adequada do contrato. Adicione linhas para
                 escolher a ordem e as reservas.
               </p>
@@ -141,8 +141,8 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
             {passos.map((p, i) => {
               const cred = credencial(p.credentialId);
               return (
-                <div key={`${i}-${p.credentialId}`} className="grid grid-cols-1 items-start gap-3 rounded-xl bg-surface-2 p-3 sm:grid-cols-[2rem_1fr_1fr_auto]">
-                  <span className="pt-7 text-[12px] font-semibold tabular-nums text-text-tertiary">
+                <div key={`${i}-${p.credentialId}`} className="grid grid-cols-1 items-start gap-3 rounded-[14px] bg-raised p-3 sm:grid-cols-[2rem_1fr_1fr_auto]">
+                  <span className="font-mono text-caption tabular-nums text-text-tertiary sm:pt-7">
                     {i === 0 ? "1º" : `${i + 1}º`}
                   </span>
                   <div>
@@ -176,7 +176,7 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
                       mudar(novo);
                     }}
                   />
-                  <div className="flex gap-1 pt-6">
+                  <div className="flex gap-1 sm:pt-6">
                     <IconButton aria-label="Subir" tooltip size="sm" disabled={i === 0} onClick={() => mover(i, -1)}>
                       <ArrowUp size={14} />
                     </IconButton>
@@ -192,15 +192,10 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
             })}
 
             <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="flex items-end gap-3">
-                <button
-                  type="button"
-                  onClick={adicionar}
-                  disabled={passos.length >= 6}
-                  className="flex items-center gap-1 pb-2 text-[12px] font-medium text-accent-fg hover:underline disabled:opacity-50"
-                >
-                  <Plus size={13} /> {passos.length === 0 ? "Definir a chave principal" : "Adicionar reserva"}
-                </button>
+              <div className="flex flex-wrap items-end gap-3">
+                <Button type="button" variant="secondary" onClick={adicionar} disabled={passos.length >= 6}>
+                  <Plus size={14} aria-hidden="true" /> {passos.length === 0 ? "Definir a chave principal" : "Adicionar reserva"}
+                </Button>
                 <div>
                   <Label htmlFor="ia-tempo">Tempo limite por tentativa</Label>
                   <Select
@@ -217,14 +212,9 @@ export function ConexaoIaPanel({ credenciaisVersao = 0 }: { credenciaisVersao?: 
                   </Select>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={salvar}
-                disabled={!sujo || salvando}
-                className={buttonVariants({ variant: "solid", size: "sm" })}
-              >
+              <Button type="button" onClick={salvar} disabled={!sujo || salvando}>
                 {salvando ? "Salvando..." : "Salvar conexão"}
-              </button>
+              </Button>
             </div>
           </>
         )}

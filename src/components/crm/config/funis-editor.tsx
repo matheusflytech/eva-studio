@@ -115,7 +115,7 @@ export function FunisEditor() {
     executar(chamar(`/api/pipelines/${funil.id}/stages/reorder`, "POST", { ids: nova.map((e) => e.id) }));
   }
 
-  if (carregando) return <p className="text-[14px] text-text-tertiary">Carregando...</p>;
+  if (carregando) return <p className="text-body text-text-tertiary">Carregando...</p>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,15 +126,15 @@ export function FunisEditor() {
             type="button"
             onClick={() => setSelecionado(f.id)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] ring-1 transition-colors",
+              "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-small ring-1 transition-colors",
               f.id === selecionado
-                ? "bg-accent-500/15 text-text-primary ring-accent-500/50"
-                : "bg-surface-2 text-text-secondary ring-border-subtle hover:text-text-primary"
+                ? "bg-accent-subtle text-text-primary ring-accent-solid"
+                : "bg-raised text-text-secondary ring-border-subtle hover:text-text-primary"
             )}
           >
-            {f.isDefault && <Star size={12} className="text-amber-400" />}
+            {f.isDefault && <Star size={12} className="text-warning" />}
             {f.name}
-            <span className="text-[11.5px] text-text-tertiary">{f.dealCount}</span>
+            <span className="text-caption text-text-tertiary">{f.dealCount}</span>
           </button>
         ))}
         <Button variant="ghost" onClick={() => setNovoFunil(true)}>
@@ -142,10 +142,10 @@ export function FunisEditor() {
         </Button>
       </div>
 
-      {erro && <div className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{erro}</div>}
+      {erro && <div className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">{erro}</div>}
 
       {funil && (
-        <section className="glass-card rounded-3xl p-5 sm:p-6">
+        <section className="rounded-[18px] border border-border-subtle bg-panel p-5 sm:p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-[220px] flex-1">
               <Label htmlFor="nome-funil">Nome do funil</Label>
@@ -166,7 +166,7 @@ export function FunisEditor() {
                 </Button>
               )}
               {funis.length > 1 && (
-                <Button variant="ghost" onClick={() => setExcluindoFunil(true)} className="text-danger hover:bg-danger/10">
+                <Button variant="ghost" onClick={() => setExcluindoFunil(true)} className="text-danger hover:bg-danger-subtle">
                   <Trash2 size={14} /> Excluir funil
                 </Button>
               )}
@@ -174,8 +174,8 @@ export function FunisEditor() {
           </div>
 
           <div className="mt-6">
-            <h3 className="text-[13px] font-medium text-text-secondary">Etapas</h3>
-            <p className="mb-3 mt-0.5 text-[12.5px] text-text-tertiary">
+            <h3 className="text-small font-medium text-text-secondary">Etapas</h3>
+            <p className="mb-3 mt-0.5 text-small text-text-tertiary">
               Arraste pela alça para mudar a ordem. O tipo diz ao sistema o que a etapa significa: &quot;Ganho&quot; e &quot;Perdido&quot; encerram o negócio e entram nas contas de conversão.
             </p>
             <ListaOrdenavel itens={funil.stages} onReordenar={reordenarEtapas}>
@@ -210,8 +210,8 @@ export function FunisEditor() {
           </div>
 
           <div className="mt-8">
-            <h3 className="text-[13px] font-medium text-text-secondary">Motivos de perda</h3>
-            <p className="mb-3 mt-0.5 text-[12.5px] text-text-tertiary">
+            <h3 className="text-small font-medium text-text-secondary">Motivos de perda</h3>
+            <p className="mb-3 mt-0.5 text-small text-text-tertiary">
               A lista que aparece ao marcar um negócio deste funil como perdido, nesta ordem. &quot;Pede nota&quot; obriga a explicar (ex.: Outro).
             </p>
             {regrasDoFunil && !regrasDoFunil.dados.disponivel && (
@@ -228,7 +228,7 @@ export function FunisEditor() {
                 onSalvo={recarregarRegras}
               />
             ) : (
-              <p className="text-[13px] text-text-tertiary">Carregando...</p>
+              <p className="text-small text-text-tertiary">Carregando...</p>
             )}
           </div>
         </section>
@@ -326,14 +326,14 @@ function LinhaDeEtapa({
   const fechada = etapa.type !== "open";
 
   return (
-    <div className="rounded-2xl bg-surface-2 p-2.5 ring-1 ring-border-subtle">
+    <div className="rounded-[14px] bg-raised p-2.5 ring-1 ring-border-subtle">
       <div className="flex flex-wrap items-center gap-2">
         {alca}
         <button
           type="button"
           onClick={() => setCorAberta((v) => !v)}
           aria-label="Escolher a cor da etapa"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-surface-3"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-hover"
         >
           <span className={cn("h-3 w-3 rounded-full", cor.ponto)} />
         </button>
@@ -355,7 +355,7 @@ function LinhaDeEtapa({
             ))}
           </Select>
         </div>
-        <label className="flex items-center gap-1.5 text-[12px] text-text-tertiary" title="Chance de fechar: usada na previsão ponderada">
+        <label className="flex items-center gap-1.5 text-caption text-text-tertiary" title="Chance de fechar: usada na previsão ponderada">
           <Input
             key={etapa.id + etapa.probability + etapa.type}
             type="number"
@@ -372,7 +372,7 @@ function LinhaDeEtapa({
           />
           %
         </label>
-        <span className="w-[54px] text-right text-[11.5px] text-text-tertiary">{etapa.dealCount} neg.</span>
+        <span className="w-[54px] text-right text-caption text-text-tertiary">{etapa.dealCount} neg.</span>
         <Button
           variant="ghost"
           size="sm"
@@ -388,7 +388,7 @@ function LinhaDeEtapa({
           onClick={aoExcluir}
           disabled={!podeExcluir}
           aria-label="Excluir etapa"
-          className="rounded-lg p-2 text-text-tertiary hover:bg-danger/10 hover:text-danger disabled:pointer-events-none disabled:opacity-30"
+          className="rounded-lg p-2 text-text-tertiary hover:bg-danger-subtle hover:text-danger disabled:pointer-events-none disabled:opacity-30"
         >
           <Trash2 size={15} />
         </button>
@@ -401,12 +401,12 @@ function LinhaDeEtapa({
               type="button"
               aria-label={`Cor ${c}`}
               onClick={() => { aoMudar({ color: c }); setCorAberta(false); }}
-              className={cn("flex h-7 w-7 items-center justify-center rounded-full ring-offset-2 ring-offset-surface-2", COR_DA_ETAPA[c].ponto, etapa.color === c && "ring-2 ring-text-primary")}
+              className={cn("flex h-7 w-7 items-center justify-center rounded-full ring-offset-2 ring-offset-raised", COR_DA_ETAPA[c].ponto, etapa.color === c && "ring-2 ring-text-primary")}
             >
               {etapa.color === c && <Check size={13} className="text-black/70" />}
             </button>
           ))}
-          <button type="button" onClick={() => { aoMudar({ color: "" }); setCorAberta(false); }} className="text-[12px] text-text-tertiary hover:text-text-primary">
+          <button type="button" onClick={() => { aoMudar({ color: "" }); setCorAberta(false); }} className="text-caption text-text-tertiary hover:text-text-primary">
             Cor padrão
           </button>
         </div>
@@ -491,15 +491,15 @@ function NovoFunilModal({
                 onClick={() => setModelo(i)}
                 className={cn(
                   "rounded-2xl px-4 py-3 text-left ring-1 transition-colors",
-                  modelo === i ? "bg-accent-500/12 ring-accent-500/50" : "bg-surface-2 ring-border-subtle hover:ring-border-strong"
+                  modelo === i ? "bg-accent-subtle ring-accent-solid" : "bg-raised ring-border-subtle hover:ring-border-strong"
                 )}
               >
-                <div className="text-[13.5px] font-medium text-text-primary">{m.nome}</div>
-                <div className="mt-0.5 text-[12px] text-text-tertiary">{m.etapas.join("  >  ")}</div>
+                <div className="text-small font-medium text-text-primary">{m.nome}</div>
+                <div className="mt-0.5 text-caption text-text-tertiary">{m.etapas.join("  >  ")}</div>
               </button>
             ))}
           </div>
-          {erro && <p className="text-[13px] text-danger">{erro}</p>}
+          {erro && <p className="text-small text-danger">{erro}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={aoFechar}>Cancelar</Button>
             <Button onClick={criar} disabled={busy || !nome.trim()}>

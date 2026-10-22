@@ -206,11 +206,11 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
   }
 
   if (erroDeCarga && !dados) {
-    return <div className="rounded-2xl bg-danger/10 px-4 py-3 text-[13.5px] text-danger">{erroDeCarga}</div>;
+    return <div className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">{erroDeCarga}</div>;
   }
   if (!funis || !dados) {
     return (
-      <p className="inline-flex items-center gap-2 text-[14px] text-text-tertiary">
+      <p className="inline-flex items-center gap-2 text-body text-text-tertiary">
         <Loader2 size={14} className="animate-spin" aria-hidden /> Carregando...
       </p>
     );
@@ -219,15 +219,15 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <p className="max-w-[600px] text-[13.5px] text-text-secondary">
+        <p className="max-w-[600px] text-small text-text-secondary">
           Escolha o que cada cartão do quadro mostra e o que aparece na prévia ao clicar nele. Vale para todo mundo que usa este funil.
         </p>
         {funis.length > 1 && (
           <div className="w-[220px]">
-            <label htmlFor="cartao-funil" className="mb-1 block text-[12px] text-text-tertiary">
+            <label htmlFor="cartao-funil" className="mb-1 block text-caption text-text-tertiary">
               Funil
             </label>
-            <Select id="cartao-funil" value={funilId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-[13px]">
+            <Select id="cartao-funil" value={funilId} onChange={(e) => trocarDeFunil(e.target.value)} className="h-9 text-small">
               {funis.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
@@ -252,14 +252,14 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
-          <section aria-labelledby="cartao-densidade" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-1/70 p-4 ring-1 ring-border-subtle">
+          <section aria-labelledby="cartao-densidade" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-panel/70 p-4 ring-1 ring-border-subtle">
             <div>
-              <h3 id="cartao-densidade" className="text-[14px] font-semibold text-text-primary">
+              <h3 id="cartao-densidade" className="text-body font-semibold text-text-primary">
                 Densidade
               </h3>
-              <p className="mt-0.5 text-[12.5px] text-text-tertiary">Compacto cabe mais negócios na tela; confortável dá mais respiro.</p>
+              <p className="mt-0.5 text-small text-text-tertiary">Compacto cabe mais negócios na tela; confortável dá mais respiro.</p>
             </div>
-            <div role="radiogroup" aria-labelledby="cartao-densidade" className="inline-flex rounded-lg border border-border-subtle bg-surface-2 p-0.5">
+            <div role="radiogroup" aria-labelledby="cartao-densidade" className="inline-flex rounded-lg border border-border-subtle bg-raised p-0.5">
               {(
                 [
                   ["confortavel", "Confortável", Rows2],
@@ -274,8 +274,8 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
                   disabled={!podeEditar}
                   onClick={() => mudar({ densidade: valor as Densidade })}
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:cursor-not-allowed",
-                    rascunho.densidade === valor ? "bg-surface-3 text-text-primary" : "text-text-tertiary hover:text-text-primary"
+                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-small outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed",
+                    rascunho.densidade === valor ? "bg-hover text-text-primary" : "text-text-tertiary hover:text-text-primary"
                   )}
                 >
                   <Icone size={14} aria-hidden /> {rotulo}
@@ -311,20 +311,20 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
           </div>
 
           {podeEditar && (
-            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-surface-1/95 px-4 py-3 backdrop-blur">
-              <div aria-live="polite" className="min-w-0 flex-1 text-[12.5px]">
+            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-panel/95 px-4 py-3 backdrop-blur">
+              <div aria-live="polite" className="min-w-0 flex-1 text-small">
                 {aviso ? (
                   <span
                     className={cn(
                       "inline-flex items-center gap-1.5",
-                      aviso.tom === "ok" ? "text-emerald-400" : aviso.tom === "erro" ? "text-danger" : "text-text-secondary"
+                      aviso.tom === "ok" ? "text-success" : aviso.tom === "erro" ? "text-danger" : "text-text-secondary"
                     )}
                   >
                     {aviso.tom === "ok" ? <Check size={14} aria-hidden /> : aviso.tom === "erro" ? <CircleAlert size={14} aria-hidden /> : <Info size={14} aria-hidden />}
                     {aviso.texto}
                   </span>
                 ) : sujo ? (
-                  <span className="text-amber-300">Alterações não salvas</span>
+                  <span className="text-warning">Alterações não salvas</span>
                 ) : (
                   <span className="text-text-tertiary">{dados.salvo ? "Layout salvo para este funil." : "Este funil usa o cartão padrão."}</span>
                 )}
@@ -349,18 +349,18 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
 
         <aside aria-label="Prévia ao vivo" className="flex flex-col gap-4 xl:sticky xl:top-4 xl:self-start">
           <div>
-            <p className="mb-2 text-[11.5px] font-medium uppercase tracking-wide text-text-tertiary">Cartão no quadro</p>
-            <div className="rounded-xl border border-border-subtle bg-surface-1 p-2">
+            <p className="mb-2 font-mono text-caption text-text-tertiary">Cartão no quadro</p>
+            <div className="rounded-xl border border-border-subtle bg-panel p-2">
               <DealCard deal={exemplo} tipoDaEtapa={etapaDeExemplo.type} defs={defs} agora={agora} layout={rascunho} />
             </div>
           </div>
           <div>
-            <p className="mb-2 text-[11.5px] font-medium uppercase tracking-wide text-text-tertiary">Prévia ao clicar</p>
-            <div className="rounded-2xl border border-border-default bg-surface-1 p-4">
+            <p className="mb-2 font-mono text-caption text-text-tertiary">Prévia ao clicar</p>
+            <div className="rounded-2xl border border-border-default bg-panel p-4">
               <ConteudoDaPrevia deal={exemplo} etapa={etapaDeExemplo} layout={rascunho} defs={defs} agora={agora} />
             </div>
           </div>
-          <p className="text-[12px] text-text-tertiary">Dados fictícios, só para mostrar como fica.</p>
+          <p className="text-caption text-text-tertiary">Dados fictícios, só para mostrar como fica.</p>
         </aside>
       </div>
     </div>
@@ -372,8 +372,8 @@ function Faixa({ tom, icone: Icone, children }: { tom: "info" | "aviso"; icone: 
     <div
       role={tom === "aviso" ? "alert" : undefined}
       className={cn(
-        "flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[13px]",
-        tom === "aviso" ? "bg-amber-400/10 text-amber-200 ring-1 ring-amber-400/25" : "bg-surface-2 text-text-secondary ring-1 ring-border-subtle"
+        "flex items-start gap-2.5 rounded-2xl px-4 py-3 text-small",
+        tom === "aviso" ? "bg-warning-subtle text-warning ring-1 ring-transparent" : "bg-raised text-text-secondary ring-1 ring-border-subtle"
       )}
     >
       <Icone size={15} aria-hidden className="mt-0.5 shrink-0" />
@@ -411,14 +411,14 @@ function ListaDeCampos({
   const cheio = itens.length >= max;
 
   const linha = (campo: CampoDoCartao, alca: React.ReactNode | null) => (
-    <div className="flex items-center gap-2 rounded-xl bg-surface-2 py-1.5 pl-1.5 pr-2 ring-1 ring-border-subtle">
+    <div className="flex items-center gap-2 rounded-[14px] bg-raised py-1.5 pl-1.5 pr-2 ring-1 ring-border-subtle">
       {alca ?? <span className="w-1.5" aria-hidden />}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-text-primary">{rotuloDoCampo(campo, rotulos)}</span>
-          {ehPersonalizado(campo) && <Badge className="px-2 py-0.5 text-[11px]">Personalizado</Badge>}
+          <span className="truncate text-small font-medium text-text-primary">{rotuloDoCampo(campo, rotulos)}</span>
+          {ehPersonalizado(campo) && <Badge className="px-2 py-0.5 text-caption">Personalizado</Badge>}
         </div>
-        {comDicas && DICA[campo] && <p className="mt-0.5 truncate text-[11.5px] text-text-tertiary">{DICA[campo]}</p>}
+        {comDicas && DICA[campo] && <p className="mt-0.5 truncate text-caption text-text-tertiary">{DICA[campo]}</p>}
       </div>
       {podeEditar && (
         <button
@@ -426,7 +426,7 @@ function ListaDeCampos({
           onClick={() => onChange(itens.filter((c) => c !== campo))}
           aria-label={`Tirar "${rotuloDoCampo(campo, rotulos)}" de ${titulo.toLowerCase()}`}
           title="Tirar"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-tertiary outline-none hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
         >
           <X size={14} aria-hidden />
         </button>
@@ -435,21 +435,21 @@ function ListaDeCampos({
   );
 
   return (
-    <section aria-labelledby={`${id}-titulo`} className="flex flex-col gap-3 rounded-2xl bg-surface-1/70 p-4 ring-1 ring-border-subtle">
+    <section aria-labelledby={`${id}-titulo`} className="flex flex-col gap-3 rounded-2xl bg-panel/70 p-4 ring-1 ring-border-subtle">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h3 id={`${id}-titulo`} className="text-[14px] font-semibold text-text-primary">
+          <h3 id={`${id}-titulo`} className="text-body font-semibold text-text-primary">
             {titulo}
           </h3>
-          <p className="mt-0.5 text-[12.5px] text-text-tertiary">{descricao}</p>
+          <p className="mt-0.5 text-small text-text-tertiary">{descricao}</p>
         </div>
-        <span className={cn("shrink-0 text-[12px] tabular-nums", cheio ? "text-amber-300" : "text-text-tertiary")} title={`Máximo de ${max}`}>
+        <span className={cn("shrink-0 text-caption tabular-nums", cheio ? "text-warning" : "text-text-tertiary")} title={`Máximo de ${max}`}>
           {itens.length}/{max}
         </span>
       </header>
 
       {itens.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center text-[12.5px] text-text-tertiary">
+        <p className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center text-small text-text-tertiary">
           Nada aqui ainda{podeEditar ? ": adicione abaixo." : "."}
         </p>
       ) : podeEditar ? (
@@ -477,7 +477,7 @@ function ListaDeCampos({
               const c = e.target.value as CampoDoCartao;
               if (c) onChange([...itens, c]);
             }}
-            className="h-9 text-[13px]"
+            className="h-9 text-small"
           >
             <option value="">
               {cheio ? `Limite de ${max} atingido` : restantes.length === 0 ? "Todas as informações já estão aqui" : "+ Adicionar informação"}

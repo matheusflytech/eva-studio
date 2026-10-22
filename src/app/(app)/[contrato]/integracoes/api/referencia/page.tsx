@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
 
 // Referência da API do CRM v1, montada a partir do /api/v1/openapi.json (a
 // mesma fonte que quem integra usa para gerar cliente). Os exemplos curl saem
@@ -66,58 +67,58 @@ export default function ReferenciaApiPage() {
   const base = doc?.servers[0]?.url ?? "/api/v1";
 
   return (
-    <div className="flex-1 p-8">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 lg:px-6">
       <Link
         href="/integracoes/api"
-        className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary"
+        className="mb-2 inline-flex items-center gap-1.5 self-start text-small font-medium text-text-secondary hover:text-text-primary"
       >
         <ArrowLeft size={15} /> API pública
       </Link>
-      <div className="mb-6">
-        <h1 className="font-display text-xl font-semibold text-text-primary">API do CRM · v1</h1>
-        {doc && <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-text-secondary">{doc.info.description}</p>}
-        <p className="mt-2 text-[12.5px] text-text-tertiary">
+      <div className="mb-5">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">API do CRM · v1</h1>
+        {doc && <p className="mt-0.5 max-w-3xl text-small leading-relaxed text-text-tertiary">{doc.info.description}</p>}
+        <p className="mt-2 text-small text-text-tertiary">
           OpenAPI 3.1: <a className="font-mono text-text-primary underline" href="/api/v1/openapi.json">/api/v1/openapi.json</a>
         </p>
       </div>
 
-      {erro && <p className="text-[13px] text-danger">Não foi possível carregar a referência.</p>}
+      {erro && <p className="text-small text-danger">Não foi possível carregar a referência.</p>}
 
       {tags.length > 0 && (
-        <div className="mb-5 flex flex-wrap gap-2">
-          {["", ...tags].map((t) => (
-            <button
-              key={t || "todos"}
-              type="button"
-              onClick={() => setTag(t)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-[12px]",
-                tag === t ? "border-border-strong bg-surface-3 text-text-primary" : "border-border-default text-text-secondary"
-              )}
-            >
-              {t || "Todos"}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-56">
+            <Select aria-label="Recurso" value={tag} onChange={(e) => setTag(e.target.value)}>
+              <option value="">Todos os recursos</option>
+              {tags.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <span className="font-mono text-caption tabular-nums text-text-tertiary">
+            {visiveis.length} {visiveis.length === 1 ? "endpoint" : "endpoints"}
+          </span>
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle">
         {visiveis.map(({ caminho, metodo, op }) => (
-          <details key={`${metodo} ${caminho}`} className="glass-card rounded-3xl p-5">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2.5">
-              <span className={cn("rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold", COR[metodo])}>{metodo}</span>
-              <code className="font-mono text-[13px] text-text-primary">/api/v1{caminho}</code>
-              <span className="text-[13px] text-text-secondary">{op.summary}</span>
-              <span className="ml-auto font-mono text-[11px] text-text-tertiary">{op["x-scope"]}</span>
+          <details key={`${metodo} ${caminho}`} className="group px-1 py-3">
+            <summary className="flex min-h-8 cursor-pointer list-none flex-wrap items-center gap-2.5 rounded-[10px] outline-none focus-visible:ring-2 focus-visible:ring-focus">
+              <span className={cn("rounded-full px-2 py-0.5 font-mono text-caption font-semibold", COR[metodo])}>{metodo}</span>
+              <code className="font-mono text-small text-text-primary">/api/v1{caminho}</code>
+              <span className="text-small text-text-secondary">{op.summary}</span>
+              <span className="ml-auto font-mono text-caption text-text-tertiary">{op["x-scope"]}</span>
             </summary>
             <div className="mt-4">
-              {op.description && <p className="mb-3 text-[13px] text-text-secondary">{op.description}</p>}
+              {op.description && <p className="mb-3 text-small text-text-secondary">{op.description}</p>}
               {op.parameters && op.parameters.length > 0 && (
                 <div className="mb-3">
                   {op.parameters.map((p) => (
                     <div key={`${p.in}-${p.name}`} className="flex gap-3 border-b border-border-subtle py-1.5 last:border-0">
-                      <code className="w-[160px] shrink-0 font-mono text-[12px] text-text-primary">{p.name}</code>
-                      <span className="text-[12px] text-text-tertiary">
+                      <code className="w-[160px] shrink-0 font-mono text-caption text-text-primary">{p.name}</code>
+                      <span className="text-caption text-text-tertiary">
                         {p.in}
                         {p.required ? " · obrigatório" : ""} {p.description ? `— ${p.description}` : ""}
                       </span>
@@ -125,7 +126,7 @@ export default function ReferenciaApiPage() {
                   ))}
                 </div>
               )}
-              <pre className="overflow-x-auto rounded-xl border border-border-default bg-surface-3 p-3.5 font-mono text-[12px] leading-relaxed text-text-secondary">
+              <pre className="overflow-x-auto rounded-[14px] bg-raised p-3.5 font-mono text-caption leading-relaxed text-text-secondary">
                 {curl(base, metodo, caminho, op)}
               </pre>
             </div>

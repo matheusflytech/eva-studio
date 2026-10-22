@@ -1,12 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown, ChevronRight, Copy, Eye, KeyRound, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Ellipsis, Eye, KeyRound, ListChecks, Plus, Power, RotateCcw, Send, Trash2 } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EVENTOS, OBJETOS_DOS_EVENTOS, nomeDoEvento } from "@/lib/webhooks/eventos";
 import { cn } from "@/lib/utils";
 
@@ -82,17 +89,17 @@ function EscolherEventos({ valor, mudar }: { valor: string[]; mudar: (v: string[
   const grupos = Object.entries(OBJETOS_DOS_EVENTOS).map(([objeto, nome]) => ({ objeto, nome, eventos: EVENTOS.filter((e) => e.objeto === objeto) }));
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex items-center gap-2 text-[12.5px] text-text-primary">
+      <label className="flex items-center gap-2 text-small text-text-primary">
         <input type="checkbox" checked={todos} onChange={(e) => mudar(e.target.checked ? ["*"] : [])} /> Todos os eventos (inclusive os que vierem depois)
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         {grupos.map((g) => (
-          <div key={g.objeto} className="rounded-xl border border-border-subtle p-2.5">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">{g.nome}</p>
+          <div key={g.objeto} className="rounded-[14px] bg-raised p-2.5">
+            <p className="mb-1.5 font-mono text-caption text-text-tertiary">{g.nome}</p>
             {g.eventos.map((e) => (
-              <label key={e.tipo} className="flex items-center gap-2 py-0.5 text-[12.5px] text-text-secondary">
+              <label key={e.tipo} className="flex items-center gap-2 py-0.5 text-small text-text-secondary">
                 <input type="checkbox" checked={marcado(e.tipo)} onChange={() => alternar(e.tipo)} />
-                {e.nome} <code className="font-mono text-[10.5px] text-text-tertiary">{e.tipo}</code>
+                {e.nome} <code className="font-mono text-caption text-text-tertiary">{e.tipo}</code>
               </label>
             ))}
           </div>
@@ -124,16 +131,16 @@ function LogDeEntregas({ webhookId, versao }: { webhookId: string; versao: numbe
     setRecarregar((n) => n + 1);
   }
 
-  if (!entregas) return <p className="text-[12px] text-text-tertiary">Carregando entregas...</p>;
-  if (entregas.length === 0) return <p className="text-[12px] text-text-tertiary">Nenhuma entrega ainda. Use &quot;Enviar teste&quot; para conferir a ligação.</p>;
+  if (!entregas) return <p className="text-caption text-text-tertiary">Carregando entregas...</p>;
+  if (entregas.length === 0) return <p className="text-caption text-text-tertiary">Nenhuma entrega ainda. Use &quot;Enviar teste&quot; para conferir a ligação.</p>;
   return (
-    <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+    <div className="divide-y divide-border-subtle rounded-[14px] border border-border-subtle">
       {entregas.map((e) => {
         const s = STATUS_DA_ENTREGA[e.status] ?? { rotulo: e.status, variant: "neutral" as const };
         const aberto = aberta === e.id;
         return (
-          <div key={e.id} className="text-[12px]">
-            <button type="button" className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-2" onClick={() => setAberta(aberto ? null : e.id)} aria-expanded={aberto}>
+          <div key={e.id} className="text-caption">
+            <button type="button" className="flex w-full items-center gap-2.5 px-3 py-2 text-left outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus" onClick={() => setAberta(aberto ? null : e.id)} aria-expanded={aberto}>
               {aberto ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               <span className="w-[88px] shrink-0 text-text-tertiary">{quando(e.createdAt)}</span>
               <span className="min-w-0 flex-1 truncate text-text-primary">{nomeDoEvento(e.tipo)}</span>
@@ -142,15 +149,15 @@ function LogDeEntregas({ webhookId, versao }: { webhookId: string; versao: numbe
               <Badge variant={s.variant}>{s.rotulo}</Badge>
             </button>
             {aberto && (
-              <div className="flex flex-col gap-2 bg-surface-2/50 px-3 pb-3 pt-1">
+              <div className="flex flex-col gap-2 bg-raised px-3 pb-3 pt-1">
                 <p className="text-text-tertiary">
                   Tentativas: {e.tentativas}
                   {e.proximaEm ? ` · próxima ${quando(e.proximaEm)}` : ""} · webhook-id <code className="font-mono">{e.eventoId}</code>
                 </p>
                 <p className="font-medium text-text-secondary">Enviado</p>
-                <pre className="max-h-48 overflow-auto rounded-lg bg-surface-3 p-2.5 font-mono text-[11px] text-text-secondary">{JSON.stringify(e.payload, null, 2)}</pre>
+                <pre className="max-h-48 overflow-auto rounded-[12px] bg-hover p-2.5 font-mono text-caption text-text-secondary">{JSON.stringify(e.payload, null, 2)}</pre>
                 <p className="font-medium text-text-secondary">Resposta</p>
-                <pre className="max-h-32 overflow-auto rounded-lg bg-surface-3 p-2.5 font-mono text-[11px] text-text-secondary">{e.ultimaResposta || "(vazia)"}</pre>
+                <pre className="max-h-32 overflow-auto rounded-[12px] bg-hover p-2.5 font-mono text-caption text-text-secondary">{e.ultimaResposta || "(vazia)"}</pre>
                 <div>
                   <Button type="button" size="sm" variant="secondary" onClick={() => void reenviar(e.id)}>
                     <RotateCcw size={13} /> Reenviar
@@ -210,13 +217,13 @@ function CartaoDoWebhook({ w, mudou, removido }: { w: Webhook; mudou: (w: Webhoo
       : { rotulo: "Ligado", variant: "success" as const };
 
   return (
-    <div className="glass-card flex flex-col gap-3 rounded-2xl p-4">
+    <div className="flex flex-col gap-3 rounded-[18px] border border-border-subtle bg-panel p-4">
       <div className="flex flex-wrap items-center gap-2.5">
-        <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-text-primary" title={w.url}>{w.url}</code>
+        <code className="min-w-0 flex-1 truncate font-mono text-small text-text-primary" title={w.url}>{w.url}</code>
         <Badge variant={situacao.variant}>{situacao.rotulo}</Badge>
         {w.source === "api" && <Badge variant="neutral">criado pelo n8n</Badge>}
       </div>
-      <p className="text-[12px] text-text-secondary">
+      <p className="text-caption text-text-secondary">
         {w.description ? `${w.description} · ` : ""}
         {w.events.includes("*") ? "Todos os eventos" : w.events.map(nomeDoEvento).join(", ")}
         {w.last_success_at ? ` · última entrega ${quando(w.last_success_at)}` : ""}
@@ -224,9 +231,9 @@ function CartaoDoWebhook({ w, mudou, removido }: { w: Webhook; mudou: (w: Webhoo
       {w.disabled_reason && <Notice tone="warning">Desligado sozinho: {w.disabled_reason} Corrija o endereço e ligue de novo.</Notice>}
       {msg && <Notice tone={msg.tom}>{msg.texto}</Notice>}
       {segredo && (
-        <div className="flex items-center gap-2 rounded-xl border border-border-subtle bg-surface-2 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-[12px] bg-raised px-3 py-2">
           <KeyRound size={13} className="shrink-0 text-text-tertiary" />
-          <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-text-primary">{segredo}</code>
+          <code className="min-w-0 flex-1 truncate font-mono text-caption text-text-primary">{segredo}</code>
           <Copiar texto={segredo} rotulo="Copiar segredo" />
         </div>
       )}
@@ -245,46 +252,68 @@ function CartaoDoWebhook({ w, mudou, removido }: { w: Webhook; mudou: (w: Webhoo
           </div>
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
+      {/* v5: duas ações à vista; segredo, eventos, ligar/desligar e apagar no "…". */}
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="secondary" disabled={ocupado || !w.active} onClick={() => void testar()}>
-          <Send size={13} /> Enviar teste
+          <Send size={13} aria-hidden="true" /> Enviar teste
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setLog((v) => !v)}>
           {log ? "Esconder entregas" : "Ver entregas"}
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={ocupado} onClick={async () => {
-          if (segredo) return setSegredo(null);
-          const r = await chamar(`/api/integracoes/webhooks/${w.id}/segredo`, { method: "POST", body: JSON.stringify({ acao: "mostrar" }) });
-          if (r) setSegredo(r.secret);
-        }}>
-          <Eye size={13} /> {segredo ? "Esconder segredo" : "Mostrar segredo"}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={ocupado} onClick={async () => {
-          if (!confirm("Trocar o segredo? Quem confere a assinatura precisa receber o novo, senão passa a recusar os eventos.")) return;
-          const r = await chamar(`/api/integracoes/webhooks/${w.id}/segredo`, { method: "POST", body: JSON.stringify({ acao: "trocar" }) });
-          if (r) {
-            setSegredo(r.secret);
-            setMsg({ tom: "info", texto: "Segredo trocado. Atualize onde ele é conferido." });
-          }
-        }}>
-          <RotateCcw size={13} /> Trocar segredo
-        </Button>
-        {!editando && (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setEditando(true)}>Eventos</Button>
-        )}
-        <Button type="button" size="sm" variant="ghost" disabled={ocupado} onClick={async () => {
-          const r = await chamar(`/api/integracoes/webhooks/${w.id}`, { method: "PATCH", body: JSON.stringify({ active: !w.active }) });
-          if (r) mudou(r.webhook);
-        }}>
-          {w.active ? "Desligar" : "Ligar"}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="ml-auto" disabled={ocupado} onClick={async () => {
-          if (!confirm("Apagar este webhook? Os eventos param de chegar nele e o log some.")) return;
-          const r = await chamar(`/api/integracoes/webhooks/${w.id}`, { method: "DELETE" });
-          if (r) removido();
-        }}>
-          <Trash2 size={13} /> Apagar
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton size="sm" className="ml-auto" aria-label="Mais ações do webhook" disabled={ocupado}>
+              <Ellipsis />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+              onSelect={async () => {
+                if (segredo) return setSegredo(null);
+                const r = await chamar(`/api/integracoes/webhooks/${w.id}/segredo`, { method: "POST", body: JSON.stringify({ acao: "mostrar" }) });
+                if (r) setSegredo(r.secret);
+              }}
+            >
+              <Eye /> {segredo ? "Esconder segredo" : "Mostrar segredo"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={async () => {
+                if (!confirm("Trocar o segredo? Quem confere a assinatura precisa receber o novo, senão passa a recusar os eventos.")) return;
+                const r = await chamar(`/api/integracoes/webhooks/${w.id}/segredo`, { method: "POST", body: JSON.stringify({ acao: "trocar" }) });
+                if (r) {
+                  setSegredo(r.secret);
+                  setMsg({ tom: "info", texto: "Segredo trocado. Atualize onde ele é conferido." });
+                }
+              }}
+            >
+              <RotateCcw /> Trocar segredo
+            </DropdownMenuItem>
+            {!editando && (
+              <DropdownMenuItem onSelect={() => setEditando(true)}>
+                <ListChecks /> Eventos
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onSelect={async () => {
+                const r = await chamar(`/api/integracoes/webhooks/${w.id}`, { method: "PATCH", body: JSON.stringify({ active: !w.active }) });
+                if (r) mudou(r.webhook);
+              }}
+            >
+              <Power /> {w.active ? "Desligar" : "Ligar"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              tone="danger"
+              onSelect={async () => {
+                if (!confirm("Apagar este webhook? Os eventos param de chegar nele e o log some.")) return;
+                const r = await chamar(`/api/integracoes/webhooks/${w.id}`, { method: "DELETE" });
+                if (r) removido();
+              }}
+            >
+              <Trash2 /> Apagar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {log && <LogDeEntregas webhookId={w.id} versao={versao} />}
     </div>
@@ -346,7 +375,7 @@ export function WebhooksPanel() {
         <Notice tone="info">
           <span className="block">Webhook criado. Este é o segredo para conferir a assinatura (dá para ver de novo em &quot;Mostrar segredo&quot;):</span>
           <span className="mt-1.5 flex items-center gap-1.5">
-            <code className="break-all font-mono text-[12px]">{criado.secret}</code>
+            <code className="break-all font-mono text-caption">{criado.secret}</code>
             <Copiar texto={criado.secret} rotulo="Copiar segredo" />
           </span>
         </Notice>
@@ -362,7 +391,7 @@ export function WebhooksPanel() {
       ))}
 
       {novo ? (
-        <div className="glass-card flex flex-col gap-3 rounded-2xl p-4">
+        <div className="flex flex-col gap-3 rounded-[18px] border border-border-subtle bg-panel p-4">
           {erro && <Notice tone="danger">{erro}</Notice>}
           <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
             <div>
@@ -384,7 +413,7 @@ export function WebhooksPanel() {
         </div>
       ) : (
         <div className={cn(lista.length > 0 && "pt-1")}>
-          <Button type="button" variant="secondary" disabled={!disponivel} onClick={() => { setCriado(null); setNovo({ url: "", description: "", events: ["deal.stage_changed", "deal.won"] }); }}>
+          <Button type="button" disabled={!disponivel} onClick={() => { setCriado(null); setNovo({ url: "", description: "", events: ["deal.stage_changed", "deal.won"] }); }}>
             <Plus size={14} /> Novo webhook
           </Button>
         </div>

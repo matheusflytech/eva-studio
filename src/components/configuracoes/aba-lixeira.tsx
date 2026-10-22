@@ -1,13 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { ListFilter, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
 import { Field, Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
-import { Toolbar } from "@/components/ui/toolbar";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SearchInput } from "@/components/ui/search-input";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -16,6 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatRelativeDate } from "@/lib/utils";
 import { DIAS_NA_LIXEIRA, ROTULO_DA_ENTIDADE, diasRestantes, ehEntidadeDaLixeira, textoDeExpiracao } from "@/lib/lixeira";
 import { restaurarItem } from "@/components/crm/lixeira/use-apagar-com-desfazer";
+import { CabecalhoDaSecao } from "./secao";
 
 interface Item {
   id: string;
@@ -158,33 +164,42 @@ export function AbaLixeira() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-title-sm text-text-primary">Lixeira</h2>
-        <p className="mt-0.5 text-small text-text-secondary">
-          Negócios, contatos e empresas apagados ficam aqui por {DIAS_NA_LIXEIRA} dias, com tarefas, notas e vínculos. Depois disso somem de vez.
-        </p>
-      </div>
+      {/* v5: busca + "Filtros" com contador; o filtro de tipo mora dentro do botão. */}
+      <CabecalhoDaSecao
+        className="pb-2"
+        titulo="Lixeira"
+        descricao={`Negócios, contatos e empresas apagados ficam aqui por ${DIAS_NA_LIXEIRA} dias, com tarefas, notas e vínculos. Depois disso somem de vez.`}
+        acoes={
+          <>
+            <SearchInput aria-label="Buscar na lixeira" placeholder="Buscar pelo nome" value={busca} onValueChange={setBusca} className="w-full sm:w-56" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" aria-label={tipo ? "Filtros, 1 ligado" : "Filtros"}>
+                  <ListFilter size={14} aria-hidden="true" />
+                  Filtros
+                  {tipo && <span className="font-mono text-caption tabular-nums text-accent-fg">1</span>}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>Tipo</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem checked={!tipo} onCheckedChange={() => setTipo("")}>
+                  Todos os tipos
+                </DropdownMenuCheckboxItem>
+                {tipos.map((t) => (
+                  <DropdownMenuCheckboxItem key={t} checked={tipo === t} onCheckedChange={() => setTipo(t)}>
+                    {ROTULO_DA_ENTIDADE[t]}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
 
       {dados && !dados.disponivel && (
         <Notice tone="warning">A lixeira ainda não está ativada neste contrato. Até lá, apagar é definitivo (a tela pede confirmação).</Notice>
       )}
       {erro && <Notice tone="danger">{erro}</Notice>}
-
-      <Toolbar
-        label="Filtros da lixeira"
-        end={
-          <SearchInput aria-label="Buscar na lixeira" placeholder="Buscar pelo nome" value={busca} onValueChange={setBusca} className="w-56" />
-        }
-      >
-        <Select aria-label="Tipo" value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-40">
-          <option value="">Todos os tipos</option>
-          {tipos.map((t) => (
-            <option key={t} value={t}>
-              {ROTULO_DA_ENTIDADE[t]}
-            </option>
-          ))}
-        </Select>
-      </Toolbar>
 
       <DataTable
         caption="Itens na lixeira"

@@ -227,9 +227,9 @@ function ModalAgendar({
       >
         <div className="flex flex-col gap-4">
           {destinos === null ? (
-            <p className="text-[13px] text-text-tertiary">Procurando os canais do contato...</p>
+            <p className="text-small text-text-tertiary">Procurando os canais do contato...</p>
           ) : destinos.length === 0 ? (
-            <div className="rounded-2xl bg-surface-2 px-4 py-4 text-[13px] text-text-secondary">
+            <div className="rounded-[14px] bg-raised px-4 py-4 text-small text-text-secondary">
               Nenhum contato deste negócio falou ainda por WhatsApp ou Telegram com um agente. Sem um canal, não há
               para onde mandar.
             </div>
@@ -259,7 +259,7 @@ function ModalAgendar({
               </div>
 
               {ehMeta && (
-                <div className={cn("rounded-xl px-3.5 py-2.5 text-[12.5px]", decisao && !decisao.ok ? "bg-amber-400/10 text-amber-200" : "bg-surface-2 text-text-secondary")}>
+                <div className={cn("rounded-xl px-3.5 py-2.5 text-small", decisao && !decisao.ok ? "bg-warning-subtle text-warning" : "bg-raised text-text-secondary")}>
                   {janelaFecha
                     ? instante && janelaFecha.getTime() > instante.getTime()
                       ? <>A janela de 24h fica aberta até <strong>{formatarSaoPaulo(janelaFecha)}</strong>: na hora marcada dá para mandar texto livre.</>
@@ -276,7 +276,7 @@ function ModalAgendar({
                     {modelos.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </Select>
                   {templateId && (
-                    <p className="mt-1.5 whitespace-pre-wrap rounded-xl bg-surface-2 px-3 py-2 text-[12px] text-text-secondary">
+                    <p className="mt-1.5 whitespace-pre-wrap rounded-[14px] bg-raised px-3 py-2 text-caption text-text-secondary">
                       {modelos.find((m) => m.id === templateId)?.bodyText}
                     </p>
                   )}
@@ -293,17 +293,17 @@ function ModalAgendar({
                     placeholder="Oi {nome}, passando para lembrar da nossa conversa de ontem."
                     onChange={(e) => setTexto(e.target.value)}
                   />
-                  <p className="mt-1 text-[11.5px] text-text-tertiary">{"{nome}"} e {"{email}"} são trocados pelos dados do contato.</p>
+                  <p className="mt-1 text-caption text-text-tertiary">{"{nome}"} e {"{email}"} são trocados pelos dados do contato.</p>
                 </div>
               )}
 
               {decisao && !decisao.ok && (texto.trim() || templateId) && (
-                <p className="flex items-start gap-1.5 text-[12.5px] text-amber-300">
+                <p className="flex items-start gap-1.5 text-small text-warning">
                   <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {decisao.erro}
                 </p>
               )}
-              {erro && <p className="text-[12.5px] text-danger">{erro}</p>}
-              {aviso && <p className="text-[12.5px] text-emerald-400">{aviso}</p>}
+              {erro && <p className="text-small text-danger">{erro}</p>}
+              {aviso && <p className="text-small text-success">{aviso}</p>}
 
               <Button type="button" disabled={salvando || !instante || !decisao?.ok} onClick={salvar}>
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : <CalendarClock size={14} />} Agendar
@@ -313,29 +313,29 @@ function ModalAgendar({
 
           {(proximas.length > 0 || passadas.length > 0) && (
             <div className="border-t border-border-subtle pt-4">
-              <p className="mb-2 text-[12.5px] font-medium text-text-secondary">Agendadas</p>
+              <p className="mb-2 text-small font-medium text-text-secondary">Agendadas</p>
               <div className="flex flex-col gap-1.5">
                 {[...proximas, ...passadas].map((a) => (
-                  <div key={a.id} className="flex items-start justify-between gap-3 rounded-xl bg-surface-2 px-3.5 py-2.5">
+                  <div key={a.id} className="flex items-start justify-between gap-3 rounded-[14px] bg-raised px-3.5 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-[12px] text-text-tertiary">
+                      <p className="text-caption text-text-tertiary">
                         {a.scheduledAt ? formatarSaoPaulo(a.scheduledAt) : ""} · {CANAL[a.channel] ?? a.channel}
                       </p>
-                      <p className="line-clamp-2 text-[12.5px] text-text-primary">{a.text}</p>
+                      <p className="line-clamp-2 text-small text-text-primary">{a.text}</p>
                       {a.status === "done" && a.failedCount > 0 && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[11.5px] text-danger"><XCircle size={11} /> {a.lastError ?? "Não saiu."}</p>
+                        <p className="mt-0.5 flex items-center gap-1 text-caption text-danger"><XCircle size={11} /> {a.lastError ?? "Não saiu."}</p>
                       )}
                       {a.status === "done" && a.failedCount === 0 && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[11.5px] text-emerald-400"><CheckCircle2 size={11} /> Enviada</p>
+                        <p className="mt-0.5 flex items-center gap-1 text-caption text-success"><CheckCircle2 size={11} /> Enviada</p>
                       )}
-                      {a.status === "sending" && <p className="mt-0.5 text-[11.5px] text-text-tertiary">Enviando...</p>}
-                      {a.status === "canceled" && <p className="mt-0.5 text-[11.5px] text-text-tertiary">Cancelada</p>}
+                      {a.status === "sending" && <p className="mt-0.5 text-caption text-text-tertiary">Enviando...</p>}
+                      {a.status === "canceled" && <p className="mt-0.5 text-caption text-text-tertiary">Cancelada</p>}
                     </div>
                     {a.status === "scheduled" && (
                       <button
                         type="button"
                         onClick={() => cancelar(a.id)}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-text-tertiary hover:bg-danger/10 hover:text-danger"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-caption text-text-tertiary hover:bg-danger-subtle hover:text-danger"
                       >
                         <Ban size={12} /> Cancelar
                       </button>

@@ -55,10 +55,10 @@ export function ConfirmarExclusao({
             </div>
           )}
           {extra}
-          {erro && <p className="text-[13px] text-danger">{erro}</p>}
+          {erro && <p className="text-small text-danger">{erro}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onCancelar}>Cancelar</Button>
-            <Button onClick={confirmar} disabled={busy || (!!destinos && !destino)} className="bg-danger text-white hover:bg-danger/90">
+            <Button variant="danger" onClick={confirmar} disabled={busy || (!!destinos && !destino)}>
               {busy && <Loader2 size={15} className="animate-spin" />} Excluir
             </Button>
           </div>

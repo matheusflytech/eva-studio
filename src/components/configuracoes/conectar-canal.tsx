@@ -4,7 +4,7 @@ import * as React from "react";
 import Script from "next/script";
 import { Loader2, QrCode, RefreshCw } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { useContrato } from "@/lib/contrato/navegacao";
 import { apiDoContrato } from "@/lib/contrato/rotas";
@@ -70,14 +70,14 @@ function ConectarTelegram({ aoConectar }: { aoConectar: AoConectar }) {
   const { enviando, erro, enviar } = useEnvio();
   return (
     <div className="flex flex-col gap-3">
-      <ol className="list-decimal pl-5 text-[12.5px] text-text-secondary">
+      <ol className="list-decimal space-y-0.5 pl-5 text-small text-text-secondary">
         <li>No Telegram, fale com @BotFather e mande /newbot.</li>
         <li>Escolha um nome e um usuário para o bot.</li>
         <li>Copie o token que ele devolve e cole aqui.</li>
       </ol>
       <div>
         <Label htmlFor="tg-token">Token do bot</Label>
-        <Input id="tg-token" placeholder="123456789:AAE..." value={token} onChange={(e) => setToken(e.target.value)} className="font-mono text-[12px]" />
+        <Input id="tg-token" placeholder="123456789:AAE..." value={token} onChange={(e) => setToken(e.target.value)} className="font-mono text-caption" />
       </div>
       {erro && <Notice tone="danger">{erro}</Notice>}
       <div>
@@ -105,7 +105,7 @@ function ConectarMessenger({ aoConectar }: { aoConectar: AoConectar }) {
         </div>
         <div>
           <Label htmlFor="fb-token">Token de acesso da Página</Label>
-          <Input id="fb-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} className="font-mono text-[12px]" />
+          <Input id="fb-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} className="font-mono text-caption" />
         </div>
       </div>
       {erro && <Notice tone="danger">{erro}</Notice>}
@@ -135,7 +135,7 @@ function ConectarTikTok({ aoConectar }: { aoConectar: AoConectar }) {
     return (
       <div className="flex flex-col gap-2">
         <Notice tone="info">Conta salva. Cole esta URL como callback de mensagens no portal do TikTok:</Notice>
-        <code className="break-all rounded-lg bg-surface-3 px-3 py-2 font-mono text-[11.5px] text-text-primary">{webhook}</code>
+        <code className="break-all rounded-lg bg-hover px-3 py-2 font-mono text-caption text-text-primary">{webhook}</code>
         <div>
           <Button type="button" variant="secondary" onClick={() => aoConectar(null)}>Pronto</Button>
         </div>
@@ -173,12 +173,12 @@ function ConectarInstagram() {
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[12.5px] text-text-secondary">
+      <p className="text-small text-text-secondary">
         Abre o Instagram, você escolhe a conta profissional e volta para cá. Nenhuma senha passa pelo Eva Studio.
       </p>
       <div>
         {/* Navegação de página inteira: o servidor guarda o state anti-CSRF num cookie. */}
-        <a href={apiDoContrato(contrato, "/api/instagram/oauth/start?modo=contrato")} className="inline-flex h-8 items-center rounded-md bg-accent-solid px-3 text-body font-medium text-text-on-accent hover:bg-accent-solid-hover">
+        <a href={apiDoContrato(contrato, "/api/instagram/oauth/start?modo=contrato")} className={buttonVariants({ variant: "primary" })}>
           Conectar com Instagram
         </a>
       </div>
@@ -263,7 +263,7 @@ function ConectarWhatsAppOficial({ aoConectar }: { aoConectar: AoConectar }) {
           window.fbAsyncInit();
         }}
       />
-      <p className="text-[12.5px] text-text-secondary">Entre com a conta Business da empresa (BM), escolha o número e volte.</p>
+      <p className="text-small text-text-secondary">Entre com a conta Business da empresa (BM), escolha o número e volte.</p>
       {erro && <Notice tone="danger">{erro}</Notice>}
       <div>
         <Button type="button" disabled={!pronto || enviando} onClick={entrar}>
@@ -313,7 +313,7 @@ function ConectarWhatsAppQr({ aoConectar }: { aoConectar: AoConectar }) {
   if (!canalId) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-[12.5px] text-text-secondary">
+        <p className="text-small text-text-secondary">
           Bom para testar; para volume alto prefira o oficial. Precisa do worker do WhatsApp ligado.
         </p>
         {erro && <Notice tone="danger">{erro}</Notice>}
@@ -333,13 +333,13 @@ function ConectarWhatsAppQr({ aoConectar }: { aoConectar: AoConectar }) {
     <div className="flex flex-col items-start gap-3">
       {estado?.qrDataUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={estado.qrDataUrl} alt="QR code do WhatsApp" width={220} height={220} className="rounded-lg bg-white p-2" />
+        <img src={estado.qrDataUrl} alt="QR code do WhatsApp" width={220} height={220} className="rounded-[12px] bg-white p-2" /* QR precisa de fundo branco para o celular ler */ />
       ) : (
-        <p className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+        <p className="flex items-center gap-2 text-small text-text-secondary">
           <Loader2 size={14} className="animate-spin" /> Esperando o worker gerar o QR...
         </p>
       )}
-      <p className="text-[12px] text-text-tertiary">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho.</p>
+      <p className="text-caption text-text-tertiary">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho.</p>
       {estado?.lastError && <Notice tone="warning">{estado.lastError}</Notice>}
       <Button type="button" variant="ghost" size="sm" onClick={() => void fetch(`/api/canais/${canalId}/qr`, { method: "POST" })}>
         <RefreshCw size={14} /> Gerar outro QR
