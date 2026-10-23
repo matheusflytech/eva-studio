@@ -150,20 +150,6 @@ const OPCOES_DE_TEMA: Opcao<ThemePreference>[] = [
       </>
     ),
   },
-  {
-    valor: "system",
-    rotulo: "Seguir o sistema",
-    // Metade clara, metade escura, cortadas na diagonal.
-    desenho: (
-      <>
-        <MiniaturaDoApp tema="light" />
-        <span className="absolute inset-0 [clip-path:polygon(100%_0,100%_100%,0_100%)]">
-          <MiniaturaDoApp tema="dark" />
-        </span>
-        <Bolinhas />
-      </>
-    ),
-  },
 ];
 
 const OPCOES_DE_CANVAS: Opcao<CanvasPreference>[] = [
@@ -171,7 +157,7 @@ const OPCOES_DE_CANVAS: Opcao<CanvasPreference>[] = [
   { valor: "escuro", rotulo: "Sempre escuro", desenho: <MiniaturaDoCanvas tema="dark" /> },
 ];
 
-/** Claro, Escuro ou Seguir o sistema (Configurações → Sua conta). */
+/** Claro ou Escuro (Configurações → Sua conta). */
 export function EscolhaDeTema() {
   const { preference } = useTheme();
   // A revelação do tema novo nasce da miniatura clicada (é ela que está com o foco).

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import {
   CANVAS_STORAGE_KEY,
   PREFERENCIA_PADRAO,
@@ -24,12 +24,11 @@ import { Switch } from "./switch";
 
 /*
  * Tema no cliente. O <head> já aplicou data-theme antes da pintura (ver
- * THEME_INIT_SCRIPT); aqui só lemos/gravamos a preferência e reagimos à troca
- * de tema do sistema operacional quando a preferência é "system".
+ * THEME_INIT_SCRIPT); aqui só lemos/gravamos a preferência. O tema do sistema
+ * operacional não entra: vale o que a pessoa escolheu (claro por padrão).
  */
 
 const EVENTO = "eva-theme-change";
-const MIDIA = "(prefers-color-scheme: dark)";
 
 function lerPreferencia(): ThemePreference {
   try {
@@ -39,32 +38,21 @@ function lerPreferencia(): ThemePreference {
   }
 }
 
-function sistemaEscuro(): boolean {
-  return typeof window !== "undefined" && !!window.matchMedia?.(MIDIA).matches;
-}
-
 function aplicar(pref: ThemePreference) {
-  document.documentElement.setAttribute("data-theme", resolveTheme(pref, sistemaEscuro()));
+  document.documentElement.setAttribute("data-theme", resolveTheme(pref));
 }
 
 function subscribe(avisar: () => void) {
-  const midia = window.matchMedia?.(MIDIA);
-  const aoMudarSistema = () => {
-    if (lerPreferencia() === "system") aplicar("system");
-    avisar();
-  };
   window.addEventListener(EVENTO, avisar);
   window.addEventListener("storage", avisar);
-  midia?.addEventListener("change", aoMudarSistema);
   return () => {
     window.removeEventListener(EVENTO, avisar);
     window.removeEventListener("storage", avisar);
-    midia?.removeEventListener("change", aoMudarSistema);
   };
 }
 
 // Snapshot como string: useSyncExternalStore compara por ===.
-const snapshot = () => `${lerPreferencia()}|${resolveTheme(lerPreferencia(), sistemaEscuro())}`;
+const snapshot = () => `${lerPreferencia()}|${resolveTheme(lerPreferencia())}`;
 const snapshotServidor = () => `${PREFERENCIA_PADRAO}|light`;
 
 export function setThemePreference(pref: ThemePreference) {
@@ -86,7 +74,7 @@ export function setThemePreference(pref: ThemePreference) {
 export function trocarTema(pref: ThemePreference, origem?: { x: number; y: number }) {
   const doc = document as Document & { startViewTransition?: (cb: () => void) => { ready: Promise<void> } };
   const antes = document.documentElement.getAttribute("data-theme");
-  const depois = resolveTheme(pref, sistemaEscuro());
+  const depois = resolveTheme(pref);
   if (!doc.startViewTransition || antes === depois) return setThemePreference(pref);
   const calmo = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   document.documentElement.classList.add("trocando-tema");
@@ -125,23 +113,22 @@ export function useTheme(): {
   return { preference: pref, resolved, setPreference: setThemePreference };
 }
 
-/** Montado uma vez em Providers: mantém o tema "system" em dia com o SO. */
+/** Montado uma vez em Providers: mantém a preferência em dia entre abas. */
 export function ThemeSync() {
   useTheme();
   return null;
 }
 
 const ROTULO: Record<ThemePreference, string> = {
-  system: "Tema: segue o sistema",
   light: "Tema: claro",
   dark: "Tema: escuro",
 };
 
-/** Botão que alterna sistema → claro → escuro. */
+/** Botão que alterna claro ↔ escuro. */
 export function ThemeToggle({ className }: { className?: string }) {
   const { preference } = useTheme();
   const calmo = useReducedMotion();
-  const Icone = preference === "light" ? Sun : preference === "dark" ? Moon : Monitor;
+  const Icone = preference === "dark" ? Moon : Sun;
   return (
     <IconButton
       aria-label={`${ROTULO[preference]}. Clique para trocar.`}
@@ -170,7 +157,6 @@ export function ThemeToggle({ className }: { className?: string }) {
 const OPCOES_DE_TEMA: { value: ThemePreference; label: string; icon: React.ReactNode }[] = [
   { value: "light", label: "Claro", icon: <Sun /> },
   { value: "dark", label: "Escuro", icon: <Moon /> },
-  { value: "system", label: "Seguir o sistema", icon: <Monitor /> },
 ];
 
 /** Escolha explícita do tema (Configurações → Sua conta). */
