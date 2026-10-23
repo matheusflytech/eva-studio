@@ -199,6 +199,21 @@ describe("executor", () => {
     expect(estado.passos.find((p) => p.noId === "tarefa")!.saida).toMatchObject({ simulado: true });
   });
 
+  it("teste de verdade: as ações rodam de verdade e a espera de 2 dias vira 10 s", async () => {
+    novaExecucao(exemploProposta(), { teste: true, variaveis: { __testeReal: { telefone: "5547999990000" } } });
+    const enviou = vi.fn(ok);
+    const r1 = await executarExecucao("x1", { manipuladores: manip({ "whatsapp.send": enviou }), agora: () => QUARTA_10H });
+    expect(r1).toEqual({ status: "esperando" });
+    expect((estado.exec!.proximaEm as Date).getTime()).toBe(QUARTA_10H.getTime() + 10_000);
+    // a espera venceu: continua e roda as ações de verdade
+    estado.exec!.status = "esperando";
+    const depois = new Date(QUARTA_10H.getTime() + 11_000);
+    const r2 = await executarExecucao("x1", { manipuladores: manip({ "whatsapp.send": enviou }), agora: () => depois });
+    expect(r2).toEqual({ status: "concluida" });
+    expect(enviou).toHaveBeenCalledTimes(1);
+    expect(estado.passos.find((p) => p.noId === "tarefa")!.saida).not.toMatchObject({ simulado: true });
+  });
+
   it("registro apagado: cancela; ação que ainda não existe: falha clara", async () => {
     estado.contexto = null;
     novaExecucao(semEspera());

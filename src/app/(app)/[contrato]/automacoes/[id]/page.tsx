@@ -5,7 +5,7 @@ import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import { useRouter } from "@/lib/contrato/navegacao";
 import { AlertCircle, ArrowLeft, Check, Ellipsis, Pause, Play, Rocket, Settings2, Trash2 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { PainelDoProximoPasso } from "@/components/automacoes/seletor";
 import { PainelDeConfiguracoes, PainelDoPasso, type ConfigDaAutomacao } from "@/components/automacoes/painel";
 import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/components/automacoes/comum";
 import { FaixaDeExecucoes } from "@/components/automacoes/faixa-de-execucoes";
+import { TesteDeVerdade } from "@/components/automacoes/teste-de-verdade";
 
 // ---------------------------------------------------------------------------
 // Editor da automação. Sempre se edita o rascunho (salvo sozinho); a versão
@@ -202,6 +203,8 @@ export default function EditorDaAutomacao() {
   const [publicando, setPublicando] = React.useState(false);
   const [confirmar, setConfirmar] = React.useState(false);
   const [testando, setTestando] = React.useState(false);
+  // Testar de verdade: painel flutuante sobre o quadro (o fluxo fica à vista).
+  const [testeAberto, setTesteAberto] = React.useState(false);
   const [estados, setEstados] = React.useState<Record<string, { estado: EstadoDoNo; ms?: number }> | undefined>();
   const carregado = React.useRef(false);
   // O que está gravado no servidor (rascunho + configurações, serializado).
@@ -470,8 +473,26 @@ export default function EditorDaAutomacao() {
             inserir={abrirInsercao}
             inserindo={inserindo}
             estados={estados}
-            barra={{ testar: () => setTestando(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
+            barra={{ testar: () => setTesteAberto(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
           />
+          {/* No canto de cima: o fluxo fica à vista enquanto o teste anda. */}
+          <div className="pointer-events-none absolute right-4 top-4 z-20">
+            <AnimatePresence>
+              {testeAberto && (
+                <TesteDeVerdade
+                  automacaoId={id}
+                  def={def}
+                  nomeDoPasso={(noId) => (def.nos[noId] ? resumoDoPasso(def, def.nos[noId], nomes).titulo : noId === "gatilho" ? "Gatilho" : noId)}
+                  aoMudarEstados={setEstados}
+                  fechar={() => setTesteAberto(false)}
+                  simular={() => {
+                    setTesteAberto(false);
+                    setTestando(true);
+                  }}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </div>
         {(inserindo || (painelDoPasso && selecionado)) && (
           <motion.aside

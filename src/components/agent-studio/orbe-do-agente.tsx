@@ -141,6 +141,8 @@ export function OrbeDoAgente({
     const aoMover = (e: PointerEvent) => {
       const r = cv.getBoundingClientRect();
       const raio = Math.min(r.width, r.height) * 0.3;
+      // Orbe escondida (largura 0): dividir por zero deixaria o cursor infinito para sempre.
+      if (raio < 1) return;
       const x = (e.clientX - (r.left + r.width / 2)) / raio;
       const y = (e.clientY - (r.top + r.height / 2)) / raio;
       alvo.x = x;
