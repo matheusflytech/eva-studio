@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { KeyRound, Mail, Trash2 } from "lucide-react";
+import { LogoOficial, marcaDoProvedorDeIa } from "@/components/ui/logo-oficial";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -156,7 +157,7 @@ export function CentralDeIa({
               return (
                 <ItemDeConfig
                   key={c.id}
-                  icone={ia ? <KeyRound /> : <Mail />}
+                  icone={ia ? <IconeDaChave tipo={c.type} /> : <Mail />}
                   titulo={c.name}
                   detalhe={[TYPE_LABEL[c.type] ?? c.type, modelo].filter(Boolean).join(" · ")}
                   onClick={() => setAberta(c.id)}
@@ -281,4 +282,15 @@ export function CentralDeIa({
       </Drawer>
     </div>
   );
+}
+
+/**
+ * Ícone da chave de IA: o logo oficial do provedor quando houver (OpenAI,
+ * Groq, Google), senão a chave genérica. O Groq é um logotipo comprido: fica
+ * mais largo que o quadrado de 16px que a linha impõe aos ícones.
+ */
+function IconeDaChave({ tipo }: { tipo: string }) {
+  const marca = marcaDoProvedorDeIa(tipo);
+  if (!marca) return <KeyRound />;
+  return <LogoOficial marca={marca} tamanho={marca === "groq" ? 26 : 16} className={marca === "groq" ? "!h-auto !w-[26px]" : undefined} />;
 }

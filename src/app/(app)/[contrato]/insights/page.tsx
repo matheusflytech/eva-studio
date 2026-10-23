@@ -7,7 +7,8 @@ import { BarChart } from "@/components/charts/bar-chart";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { focusRing } from "@/components/ui/styles";
 import { MarcaEva } from "@/components/layout/marca-eva";
-import { ICON_REGISTRY, type IconKey } from "@/components/agent-studio/builder/icon-registry";
+import { IconeDoBloco } from "@/components/agent-studio/builder/icone-do-bloco";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -36,8 +37,8 @@ const CANAL_LABEL: Record<string, string> = {
   website: "Site",
 };
 
-/** Blocos de IA levam o símbolo da Eva no lugar do ícone do bloco. */
-const BLOCOS_DE_IA = new Set(["agent", "ai-agent"]);
+/** Bloco de IA leva o símbolo da Eva no lugar do ícone do bloco (o do n8n leva o logo do n8n). */
+const BLOCOS_DE_IA = new Set(["ai-agent"]);
 
 /** Quantas linhas aparecem antes do "Ver os N". */
 const PRIMEIROS = 4;
@@ -281,11 +282,10 @@ function OndePara({ itens }: { itens: Payload["ondePara"] }) {
     <Grupo titulo="Último bloco de cada conversa">
       <ul>
         {visiveis.map((p, i) => {
-          const Icone = ICON_REGISTRY[p.kind as IconKey] ?? MessageSquare;
           return (
             <LinhaDeBarra
               key={`${p.label}-${i}`}
-              icone={BLOCOS_DE_IA.has(p.kind) ? <MarcaEva size={15} className="text-text-secondary" /> : <Icone size={16} strokeWidth={1.5} />}
+              icone={BLOCOS_DE_IA.has(p.kind) ? <MarcaEva size={15} className="text-text-secondary" /> : <IconeDoBloco iconKey={p.kind} reserva={MessageSquare} size={16} strokeWidth={1.5} />}
               rotulo={p.label}
               apoio={p.erros > 0 ? `${p.erros} com erro` : undefined}
               apoioTom="danger"
@@ -341,6 +341,12 @@ function Termos({ termos }: { termos: Payload["termos"] }) {
   );
 }
 
+/** Logo oficial do canal; o site não tem marca e fica sem. */
+function iconeDoCanal(canal: string) {
+  const marca = marcaDoCanal(canal);
+  return marca ? <LogoOficial marca={marca} tamanho={16} /> : undefined;
+}
+
 function Canais({ canais }: { canais: Payload["porCanal"] }) {
   const [tudo, setTudo] = React.useState(false);
   if (canais.length === 0) return <Vazio texto="Sem conversas no período." />;
@@ -352,6 +358,7 @@ function Canais({ canais }: { canais: Payload["porCanal"] }) {
         {visiveis.map((c) => (
           <LinhaDeBarra
             key={c.label}
+            icone={iconeDoCanal(c.label)}
             rotulo={CANAL_LABEL[c.label] ?? c.label}
             apoio={c.escalou > 0 ? `${c.escalou} para atendente` : undefined}
             apoioTom="warning"

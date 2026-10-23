@@ -6,6 +6,7 @@ import {
   Download, X, Plus, Trash2, Code2, MessageCircle, MoreHorizontal, Zap, ChevronDown, ChevronRight,
   ListFilter, SquareKanban,
 } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "framer-motion";
@@ -153,6 +154,12 @@ function leadSource(lead: Lead): LeadSource {
       return "outro";
   }
 }
+/** Origem que é um canal com marca (WhatsApp, Instagram...) leva o logo oficial; as outras, nada. */
+function LogoDaOrigem({ origem, tamanho }: { origem: LeadSource; tamanho: number }) {
+  const marca = marcaDoCanal(origem);
+  return marca ? <LogoOficial marca={marca} tamanho={tamanho} /> : null;
+}
+
 const SOURCE_LABEL: Record<LeadSource, string> = {
   chat: "Chat do site",
   form: "Formulário",
@@ -405,7 +412,12 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
             <div className="flex flex-col gap-3">
               <Dado rotulo="E-mail">{email || <span className="text-text-tertiary">—</span>}</Dado>
               <Dado rotulo="Telefone"><PhoneNumber value={phone} /></Dado>
-              <Dado rotulo="Origem">{SOURCE_LABEL[leadSource(lead)]}</Dado>
+              <Dado rotulo="Origem">
+                <span className="inline-flex items-center gap-1.5">
+                  <LogoDaOrigem origem={leadSource(lead)} tamanho={14} />
+                  {SOURCE_LABEL[leadSource(lead)]}
+                </span>
+              </Dado>
             </div>
 
             <p className="mb-2 mt-5 font-mono text-caption text-text-tertiary">
@@ -931,6 +943,7 @@ export default function LeadsPage() {
               </DropdownMenuCheckboxItem>
               {(Object.keys(SOURCE_LABEL) as LeadSource[]).map((s) => (
                 <DropdownMenuCheckboxItem key={s} checked={sourceFilter === s} onSelect={(e) => { e.preventDefault(); setSourceFilter(s); }}>
+                  <LogoDaOrigem origem={s} tamanho={14} />
                   {SOURCE_LABEL[s]}
                 </DropdownMenuCheckboxItem>
               ))}

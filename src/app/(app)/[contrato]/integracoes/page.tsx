@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio, Workflow } from "lucide-react";
+import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -20,6 +20,7 @@ import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 import { useContrato, usePathname, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato } from "@/lib/contrato/rotas";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 
 // ---------------------------------------------------------------------------
 // Integrações.
@@ -92,7 +93,7 @@ function Integracoes() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/integracoes/n8n">
-                  <Workflow /> n8n e webhooks
+                  <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> n8n e webhooks
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, ImageOff, X } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { normalizeText, TRIGGER_LIMITS } from "@/lib/server/triggers";
 import type { StoryOption } from "./trigger-kinds";
@@ -225,7 +226,8 @@ export function ChannelChips({
             onClick={() => onChange(on ? value.filter((x) => x !== c.id) : [...value, c.id])}
             className={chip(on)}
           >
-            {on && <Check size={13} aria-hidden />} {c.label}
+            {on && <Check size={13} aria-hidden />}
+            {marcaDoCanal(c.id) && <LogoOficial marca={marcaDoCanal(c.id)!} tamanho={13} />} {c.label}
           </button>
         );
       })}

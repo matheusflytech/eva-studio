@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { CircleHelp, Clock, MessageCircle } from "lucide-react";
+import { CircleHelp, Clock } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ function ListaDaLegenda() {
       <Linha exemplo={<span className="text-caption text-text-tertiary">3 dias</span>}>
         Há quanto tempo o negócio está na etapa (minutos, horas ou dias).
       </Linha>
-      <Linha exemplo={<MessageCircle size={16} aria-hidden="true" className="text-success" />}>
+      <Linha exemplo={<LogoOficial marca="whatsapp" tamanho={16} />}>
         Conversa no WhatsApp. O ponto indica mensagem do cliente ainda não lida.
       </Linha>
       <Linha exemplo={<span className="text-caption text-text-tertiary">arrastar</span>}>

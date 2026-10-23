@@ -12,7 +12,7 @@ import { Textarea, Label } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { FlowNodeData } from "./flow-node";
 import { ICON_REGISTRY } from "./icon-registry";
-import { BLOCK_STYLES } from "./block-styles";
+import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
 import { acrescentarAoFluxo } from "./ia-aplicar";
 
 // ---------------------------------------------------------------------------
@@ -285,15 +285,14 @@ export function MontarComIa({
 
                 <ol className="flex flex-col gap-2">
                   {ordem.map((n, i) => {
-                    const Icon = ICON_REGISTRY[n.data.iconKey] ?? ICON_REGISTRY.message;
-                    const style = BLOCK_STYLES[n.data.iconKey] ?? BLOCK_STYLES.message;
+                    const chave = ICON_REGISTRY[n.data.iconKey] ? n.data.iconKey : "message";
                     const saidas = rascunho.fluxo.edges.filter((e) => e.source === n.id);
                     const ramifica = saidas.length > 1 || saidas.some((e) => e.sourceHandle);
                     return (
                       <li key={n.id} className="flex gap-3 rounded-[14px] bg-raised px-3.5 py-2.5">
                         <span className="w-4 pt-1.5 text-right font-mono text-caption tabular-nums text-text-tertiary">{i + 1}</span>
-                        <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", style.badgeBg, style.badgeText)}>
-                          <Icon size={14} />
+                        <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", seloDoBloco(chave))}>
+                          <IconeDoBloco iconKey={chave} size={14} />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="text-small font-medium text-text-primary">{n.data.label}</p>

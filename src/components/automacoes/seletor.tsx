@@ -7,7 +7,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { acoesDoObjeto, configPadrao, EVENTOS_DE_ESPERA, type GrupoDeAcao } from "@/lib/automacoes/catalogo";
 import { novoId, saidaPrincipal, saidasDe, type No, type Objeto } from "@/lib/automacoes/tipos";
-import { visualDoPasso } from "./comum";
+import { IconeDoPasso, visualDoPasso, type VisualDoPasso } from "./comum";
 
 // ---------------------------------------------------------------------------
 // O "+" do canvas abre o painel "O que vem depois?" à direita: busca no topo
@@ -85,6 +85,7 @@ const MOLA: Transition = { type: "spring", stiffness: 420, damping: 32, mass: 0.
 
 function Linha({
   icone: Icone,
+  visual,
   corDoIcone,
   nome,
   descricao,
@@ -94,6 +95,8 @@ function Linha({
   indice,
 }: {
   icone: LucideIcon;
+  /** Passo do catálogo: com marca, mostra o logo oficial no lugar do ícone. */
+  visual?: VisualDoPasso;
   corDoIcone?: string;
   nome: string;
   descricao: string;
@@ -116,7 +119,11 @@ function Linha({
         className="group flex w-full items-center gap-3 rounded-[14px] px-2.5 py-2 text-left transition-colors duration-150 hover:bg-raised disabled:pointer-events-none disabled:opacity-45"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-border-subtle bg-raised">
-          <Icone size={16} aria-hidden="true" className={corDoIcone ?? "text-text-secondary"} />
+          {visual ? (
+            <IconeDoPasso visual={visual} tamanho={16} className={corDoIcone ?? "text-text-secondary"} />
+          ) : (
+            <Icone size={16} aria-hidden="true" className={corDoIcone ?? "text-text-secondary"} />
+          )}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-small font-medium text-text-primary">{nome}</span>
@@ -272,6 +279,7 @@ export function PainelDoProximoPasso({
                         key={o.chave}
                         indice={i}
                         icone={v.icone}
+                        visual={v}
                         corDoIcone={CATEGORY_CLASSES[v.cor].fg}
                         nome={o.nome}
                         descricao={o.descricao}

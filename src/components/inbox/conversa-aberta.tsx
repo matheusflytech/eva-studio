@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { AvatarDoContato } from "./avatar";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { Balao } from "./balao";
 import { Compositor, type AnexoPreparado } from "./compositor";
 import { useSondagem } from "./use-sondagem";
@@ -315,6 +316,7 @@ export function ConversaAberta({
               </span>
             )}
             {encerrada && <span className="shrink-0">Encerrada</span>}
+            {marcaDoCanal(conversa.channel) && <LogoOficial marca={marcaDoCanal(conversa.channel)!} tamanho={12} />}
             <span className="truncate">
               {NOME_DO_CANAL[conversa.channel] ?? conversa.channel} · {conversa.agentName}
             </span>

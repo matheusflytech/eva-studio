@@ -17,7 +17,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Switch } from "@/components/ui/switch";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { SeletorDeAgente } from "@/components/biblioteca/seletor-de-agente";
-import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
@@ -195,11 +195,12 @@ function StatusDaCampanha({ status }: { status: string }) {
 }
 
 function IconeDoCanal({ canal }: { canal: string }) {
-  const whats = canal.startsWith("whatsapp");
-  const Icone = canal === "email" ? Mail : canal === "telegram" ? Send : MessageCircle;
+  // Canal com marca (WhatsApp, Telegram...) mostra o logo oficial; e-mail e o resto, o ícone genérico.
+  const marca = marcaDoCanal(canal);
+  const Icone = canal === "email" ? Mail : MessageCircle;
   return (
     <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-border-subtle bg-raised">
-      <Icone size={15} aria-hidden="true" className={whats ? CATEGORY_CLASSES.green.fg : "text-text-secondary"} />
+      {marca ? <LogoOficial marca={marca} tamanho={16} /> : <Icone size={15} aria-hidden="true" className="text-text-secondary" />}
     </span>
   );
 }
@@ -302,9 +303,12 @@ function DetalheDaCampanha({ b, agentId, onMudou }: { b: BroadcastRow; agentId: 
 
       <section className="flex flex-col gap-2">
         <p className="font-mono text-caption text-text-tertiary">Para quem</p>
-        <p className="text-small text-text-secondary">
-          {CHANNEL_LABEL[b.channel] ?? b.channel} · {AUDIENCE_LABEL[b.audience] ?? b.audience}
-          {b.segmentName ? `: ${b.segmentName}` : ""}
+        <p className="flex flex-wrap items-center gap-x-1.5 text-small text-text-secondary">
+          {marcaDoCanal(b.channel) && <LogoOficial marca={marcaDoCanal(b.channel)!} tamanho={14} />}
+          <span>
+            {CHANNEL_LABEL[b.channel] ?? b.channel} · {AUDIENCE_LABEL[b.audience] ?? b.audience}
+            {b.segmentName ? `: ${b.segmentName}` : ""}
+          </span>
         </p>
       </section>
 
@@ -655,6 +659,7 @@ export default function DisparosPage() {
                 </Pilula>
                 {canaisNaLista.map((c) => (
                   <Pilula key={c} ativa={filtroCanal === c} onClick={() => setFiltroCanal(c)}>
+                    {marcaDoCanal(c) && <LogoOficial marca={marcaDoCanal(c)!} tamanho={13} />}
                     {CHANNEL_LABEL[c] ?? c}
                   </Pilula>
                 ))}

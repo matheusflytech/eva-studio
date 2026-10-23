@@ -21,8 +21,7 @@ import { CrmBlockFields } from "./crm-block-fields";
 import { CaptureConfig } from "./capture-config";
 
 import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
-import { ICON_REGISTRY } from "./icon-registry";
-import { BLOCK_STYLES } from "./block-styles";
+import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { validateNode } from "./block-validation";
 import { cn } from "@/lib/utils";
@@ -124,8 +123,6 @@ export function NodeInspector({
   const conditionRef = React.useRef<HTMLTextAreaElement>(null);
   const variableExpressionRef = React.useRef<HTMLTextAreaElement>(null);
 
-  const Icone = ICON_REGISTRY[iconKey];
-  const estilo = BLOCK_STYLES[iconKey];
   const doDicionario = DICIONARIO.get(iconKey);
   // O que impede este bloco de funcionar — a mesma regra do aviso no canvas,
   // dita aqui dentro, onde tem o campo pra resolver.
@@ -141,11 +138,10 @@ export function NodeInspector({
         <span
           className={cn(
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]",
-            estilo?.badgeBg,
-            estilo?.badgeText
+            seloDoBloco(iconKey)
           )}
         >
-          <Icone size={17} />
+          <IconeDoBloco iconKey={iconKey} size={17} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-body font-semibold text-text-primary">

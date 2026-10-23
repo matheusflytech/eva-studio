@@ -18,6 +18,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useContrato, useRouter } from "@/lib/contrato/navegacao";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, Kbd } from "@/components/ui/command";
@@ -428,7 +429,7 @@ function CorpoDaPaleta(p: {
       <CommandGroup heading="Contatos">
         {contatos.map((c) => (
           <CommandItem key={c.id} value={`whatsapp:${c.id}`} onSelect={() => p.onWhatsApp(c)}>
-            <MessageCircle size={16} aria-hidden />
+            <LogoOficial marca="whatsapp" tamanho={16} />
             <TituloESubtitulo titulo={c.titulo} subtitulo={c.subtitulo} />
           </CommandItem>
         ))}
@@ -529,7 +530,7 @@ function LinhaDoItem({ item }: { item: ItemDaPaleta }) {
     const Icone = ICONE_DA_ACAO[item.acao];
     return (
       <>
-        <Icone size={16} aria-hidden />
+        {item.acao === "enviar-whatsapp" ? <LogoOficial marca="whatsapp" tamanho={16} /> : <Icone size={16} aria-hidden />}
         <span className="truncate">{item.rotulo}</span>
       </>
     );
@@ -571,9 +572,11 @@ function LinhaDoItem({ item }: { item: ItemDaPaleta }) {
     );
   }
   const Icone = item.trecho.tipo === "nota" ? StickyNote : MessageCircle;
+  // Mensagem: o título começa pelo canal ("WhatsApp · Maria"); com marca, mostra o logo oficial.
+  const marca = item.trecho.tipo === "mensagem" ? marcaDoCanal(item.trecho.titulo.split(" · ")[0]) : null;
   return (
     <>
-      <Icone size={16} aria-hidden />
+      {marca ? <LogoOficial marca={marca} tamanho={16} /> : <Icone size={16} aria-hidden />}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-caption text-text-tertiary">{item.trecho.titulo}</span>
         <span className="truncate">

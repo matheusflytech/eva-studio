@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "@/lib/contrato/navegacao";
 import { Trash2, Check } from "lucide-react";
+import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -251,7 +252,9 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
-            <CardTitle>Ferramentas do n8n</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> Ferramentas do n8n
+            </CardTitle>
             <CardDescription>
               Só para quem usa um fluxo no n8n. O agente de IA do Builder usa as ferramentas que você liga a ele lá.
             </CardDescription>
@@ -275,7 +278,9 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
-            <CardTitle>Ligar a um fluxo do n8n</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> Ligar a um fluxo do n8n
+            </CardTitle>
             <CardDescription>Opcional. Use se a resposta vem de um workflow seu em vez do Builder.</CardDescription>
           </CardHeader>
           <WebhookConfig

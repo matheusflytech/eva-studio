@@ -32,7 +32,7 @@ import { layoutDaAutomacao, NO_ALTURA, PASSO_X, VAZIO_ALTURA } from "@/lib/autom
 import { EVENTOS_DE_ESPERA } from "@/lib/automacoes/catalogo";
 import type { Definicao, No, Ponta } from "@/lib/automacoes/tipos";
 import type { Pendencia } from "@/lib/automacoes/validar";
-import { visualDoPasso } from "./comum";
+import { IconeDoPasso, visualDoPasso } from "./comum";
 
 // ---------------------------------------------------------------------------
 // Canvas da automação: layout automático da esquerda para a direita (puro, em
@@ -119,7 +119,6 @@ const LUZ_DE_CIMA = "linear-gradient(180deg, color-mix(in srgb, var(--text-prima
 const CartaoDoPasso = React.memo(function CartaoDoPasso({ data }: NodeProps<Node<DadosDoPasso>>) {
   const calmo = useReducedMotion();
   const v = visualDoPasso(data.tipo, data.acao);
-  const Icone = v.icone;
   const gatilho = data.tipo === "gatilho";
   const aceso = data.estado === "ok" || data.estado === "rodando";
   const entrada = { ...MOLA, delay: data.atraso };
@@ -155,7 +154,7 @@ const CartaoDoPasso = React.memo(function CartaoDoPasso({ data }: NodeProps<Node
             transition={{ duration: calmo ? 3.2 : 1.4, repeat: Infinity, ease: "easeInOut" }}
           />
         )}
-        <Icone size={30} strokeWidth={1.6} aria-hidden="true" className={CATEGORY_CLASSES[v.cor].fg} />
+        <IconeDoPasso visual={v} tamanho={30} strokeWidth={1.6} className={CATEGORY_CLASSES[v.cor].fg} />
 
         {/* Canto: X se falhou, marcador se falta algo, check discreto se está pronto. */}
         {data.estado === "falhou" ? (

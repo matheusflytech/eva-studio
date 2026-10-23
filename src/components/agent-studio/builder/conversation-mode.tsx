@@ -7,6 +7,7 @@ import {
   ChevronDown, Search, Phone, Video, MoreVertical, Camera, Mic, Smile,
 } from "lucide-react";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { cn } from "@/lib/utils";
@@ -171,14 +172,7 @@ export function ConversationMode({
                 canal === c ? "bg-hover text-text-primary" : "text-text-secondary hover:text-text-primary"
               )}
             >
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  c === "whatsapp"
-                    ? "bg-success"
-                    : "bg-gradient-to-tr from-amber-400 via-rose-500 to-purple-500"
-                )}
-              />
+              <LogoOficial marca={c} tamanho={14} />
               {c === "whatsapp" ? "WhatsApp" : "Instagram"}
             </button>
           ))}

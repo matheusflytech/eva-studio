@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, ListTodo, Mail, Maximize2, MessageCircle, MoreHorizontal, Phone, Trash2, UserRound, X, MapPin } from "lucide-react";
+import { CalendarDays, ListTodo, Mail, Maximize2, MoreHorizontal, Phone, Trash2, UserRound, X, MapPin } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import Link from "@/components/contrato/link";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -192,7 +193,7 @@ function CorpoDaFicha({
               <Phone aria-hidden />
             </BotaoRedondo>
             <BotaoRedondo rotulo="WhatsApp" href={whatsapp} externo>
-              <MessageCircle aria-hidden />
+              <LogoOficial marca="whatsapp" tamanho={14} />
             </BotaoRedondo>
             <BotaoRedondo rotulo="E-mail" href={contact.email ? `mailto:${contact.email}` : null}>
               <Mail aria-hidden />

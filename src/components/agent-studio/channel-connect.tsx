@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Music2, Check, Loader2, Unplug, Copy, AlertTriangle } from "lucide-react";
+import { Check, Loader2, Unplug, Copy, AlertTriangle } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export function MessengerConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-text-tertiary" /> Messenger
+              <LogoOficial marca="messenger" tamanho={16} /> Messenger
             </CardTitle>
             <CardDescription>
               Mensagens da sua Página do Facebook, pelo mesmo webhook já usado no WhatsApp e no Instagram.
@@ -187,7 +188,7 @@ export function TikTokConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Music2 size={16} className="text-text-tertiary" /> TikTok
+              <LogoOficial marca="tiktok" tamanho={16} /> TikTok
             </CardTitle>
             <CardDescription>
               Mensagens diretas de uma conta TikTok Business, pela Business Messaging API.

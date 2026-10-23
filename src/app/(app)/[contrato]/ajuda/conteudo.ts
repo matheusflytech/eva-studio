@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { Marca } from "@/components/ui/logo-oficial";
 import {
   Compass, LayoutGrid, Blocks, Radio, ArrowDownToLine, ArrowUpFromLine,
   Code2, Repeat, Database, ShieldAlert, ShieldCheck, MessagesSquare, SlidersHorizontal, Sparkles,
@@ -28,6 +29,8 @@ export interface Item {
   /** Verbos e caminho, para as seções de API. */
   metodo?: string;
   caminho?: string;
+  /** Item sobre um serviço de fora: o logo oficial vai antes do título. */
+  marca?: Marca;
 }
 
 export interface Secao {
@@ -264,12 +267,12 @@ export const SECOES: Secao[] = [
     intro:
       "Por onde o agente fala. Cada canal se conecta na aba do agente, e o mesmo fluxo atende todos eles.",
     itens: [
-      { titulo: "WhatsApp via QR code", resumo: "Conecta lendo um QR, como no WhatsApp Web.", nota: "Rápido para validar, mas não é o caminho oficial da Meta. Depende do worker estar no ar." },
-      { titulo: "WhatsApp oficial (Cloud API)", resumo: "Canal oficial da Meta, recomendado para volume e cliente de verdade.", nota: "Fora da janela de 24 horas, só sai mensagem com modelo aprovado. O bloco de mensagem deixa você escolher qual." },
-      { titulo: "Instagram Direct", resumo: "Mensagens diretas, pela conta Business ou Creator.", nota: "Precisa de um app da Meta configurado na instalação. Sem ele, o botão de conectar não aparece." },
-      { titulo: "Messenger", resumo: "Mensagens da sua Página do Facebook, pelo mesmo webhook do WhatsApp e do Instagram." },
-      { titulo: "Telegram", resumo: "Bot do Telegram, conectado com o token do BotFather." },
-      { titulo: "TikTok", resumo: "Mensagens da conta business do TikTok." },
+      { marca: "whatsapp", titulo: "WhatsApp via QR code", resumo: "Conecta lendo um QR, como no WhatsApp Web.", nota: "Rápido para validar, mas não é o caminho oficial da Meta. Depende do worker estar no ar." },
+      { marca: "whatsapp", titulo: "WhatsApp oficial (Cloud API)", resumo: "Canal oficial da Meta, recomendado para volume e cliente de verdade.", nota: "Fora da janela de 24 horas, só sai mensagem com modelo aprovado. O bloco de mensagem deixa você escolher qual." },
+      { marca: "instagram", titulo: "Instagram Direct", resumo: "Mensagens diretas, pela conta Business ou Creator.", nota: "Precisa de um app da Meta configurado na instalação. Sem ele, o botão de conectar não aparece." },
+      { marca: "messenger", titulo: "Messenger", resumo: "Mensagens da sua Página do Facebook, pelo mesmo webhook do WhatsApp e do Instagram." },
+      { marca: "telegram", titulo: "Telegram", resumo: "Bot do Telegram, conectado com o token do BotFather." },
+      { marca: "tiktok", titulo: "TikTok", resumo: "Mensagens da conta business do TikTok." },
       { titulo: "Widget do site", resumo: "Uma caixinha de chat no seu site, com um script para colar.", onde: "Aba do agente → Widget", nota: "Quem chega por aqui aparece na tela de Leads." },
     ],
   },
@@ -365,6 +368,7 @@ export const SECOES: Secao[] = [
         href: "/integracoes",
       },
       {
+        marca: "n8n",
         titulo: "Delegar para o seu n8n",
         resumo: "O bloco “Enviar para meu fluxo” manda a conversa para um webhook seu e usa a resposta.",
         nota: "Para quem já tem automação montada fora e não quer refazer aqui.",

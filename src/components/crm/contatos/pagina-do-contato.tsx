@@ -3,7 +3,8 @@
 import { useTelaLarga } from "@/lib/use-tela-larga";
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowLeft, CalendarDays, ChevronRight, Link2, ListTodo, Mail, MapPin, MessageCircle, MoreHorizontal, Phone, RefreshCw, Trash2, TriangleAlert, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronRight, Link2, ListTodo, Mail, MapPin, MoreHorizontal, Phone, RefreshCw, Trash2, TriangleAlert, UserRound } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Notice } from "@/components/ui/notice";
@@ -239,8 +240,9 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
             <EtiquetasDoContato contact={contato} tags={tags} onChanged={mudouContato} className="mt-1.5" />
           </div>
           <div className="flex shrink-0 gap-3.5">
-            <AcaoRedonda rotulo="WhatsApp" href={whatsapp} externo destaque>
-              <MessageCircle aria-hidden />
+            {/* Sem o círculo de destaque (acento): o logo oficial já tem a cor dele. */}
+            <AcaoRedonda rotulo="WhatsApp" href={whatsapp} externo>
+              <LogoOficial marca="whatsapp" tamanho={16} />
             </AcaoRedonda>
             <AcaoRedonda rotulo="Ligar" href={contato.phone ? linkDeLigar(contato.phone) : null}>
               <Phone aria-hidden />

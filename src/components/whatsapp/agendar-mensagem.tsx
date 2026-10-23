@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CalendarClock, Loader2, Ban, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -318,8 +319,11 @@ function ModalAgendar({
                 {[...proximas, ...passadas].map((a) => (
                   <div key={a.id} className="flex items-start justify-between gap-3 rounded-[14px] bg-raised px-3.5 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-caption text-text-tertiary">
-                        {a.scheduledAt ? formatarSaoPaulo(a.scheduledAt) : ""} · {CANAL[a.channel] ?? a.channel}
+                      <p className="flex items-center gap-1.5 text-caption text-text-tertiary">
+                        {marcaDoCanal(a.channel) && <LogoOficial marca={marcaDoCanal(a.channel)!} tamanho={12} />}
+                        <span>
+                          {a.scheduledAt ? formatarSaoPaulo(a.scheduledAt) : ""} · {CANAL[a.channel] ?? a.channel}
+                        </span>
                       </p>
                       <p className="line-clamp-2 text-small text-text-primary">{a.text}</p>
                       {a.status === "done" && a.failedCount > 0 && (

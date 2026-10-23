@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CalendarClock, CheckCircle2, MessageCircle, Phone, TrendingUp, X } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -217,7 +218,11 @@ export function DiaDeHoje({
                     <p className="truncate text-caption text-text-secondary">{item.motivo}</p>
                   </div>
                   <Button variant="secondary" size="sm" onClick={() => onAcao(item)}>
-                    <Icone size={14} aria-hidden="true" className={item.acao === "retorno" ? "text-danger" : "text-text-tertiary"} />
+                    {item.acao === "whatsapp" ? (
+                      <LogoOficial marca="whatsapp" tamanho={14} />
+                    ) : (
+                      <Icone size={14} aria-hidden="true" className={item.acao === "retorno" ? "text-danger" : "text-text-tertiary"} />
+                    )}
                     {item.rotulo}
                   </Button>
                 </li>

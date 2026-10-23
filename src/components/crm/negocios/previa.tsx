@@ -3,7 +3,8 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Link from "@/components/contrato/link";
-import { CheckCircle2, Loader2, Maximize2, MessageCircle, RotateCcw, X, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Maximize2, RotateCcw, X, XCircle } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import type { PedidoDeMudanca, ResultadoDaTentativa } from "./mudanca-de-etapa";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -302,7 +303,7 @@ export function PreviaDoNegocio({
               className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border-default bg-panel px-3 text-body font-medium text-text-primary transition-colors hover:border-border-strong hover:bg-raised"
             >
               <span className="relative inline-flex text-success">
-                <MessageCircle size={14} aria-hidden />
+                <LogoOficial marca="whatsapp" tamanho={14} />
                 {deal.whatsapp.naoLida && (
                   <span className="absolute -right-0.5 -top-0.5 h-[7px] w-[7px] rounded-full border-2 border-panel bg-success" />
                 )}

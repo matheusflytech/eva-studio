@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Globe, Loader2, MessageCircle, MessagesSquare, Search, Send, X, type LucideIcon } from "lucide-react";
+import { ChevronRight, Globe, Loader2, MessagesSquare, Search, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 
 // Peças pequenas que a ficha usa em mais de uma coluna.
 
@@ -101,15 +102,14 @@ export function BotaoDeIcone({
 }
 
 const ICONE_DO_CANAL: Record<string, { icone: LucideIcon; cor: string }> = {
-  whatsapp_meta: { icone: MessageCircle, cor: "text-success" },
-  whatsapp_qr: { icone: MessageCircle, cor: "text-success" },
-  telegram: { icone: Send, cor: "text-cat-blue" },
   website: { icone: Globe, cor: "text-text-secondary" },
   webchat: { icone: Globe, cor: "text-text-secondary" },
 };
 
-/** Ícone do canal. Sem marca de terceiros: só a cor lembra o WhatsApp. */
+/** Ícone do canal: o logo oficial (WhatsApp, Telegram, Instagram...); o site, que não tem marca, fica com o globo. */
 export function IconeDoCanal({ canal, tamanho = 15 }: { canal: string; tamanho?: number }) {
+  const marca = marcaDoCanal(canal);
+  if (marca) return <LogoOficial marca={marca} tamanho={tamanho} />;
   const { icone: Icone, cor } = ICONE_DO_CANAL[canal] ?? { icone: MessagesSquare, cor: "text-text-secondary" };
   return <Icone size={tamanho} aria-hidden className={cn("shrink-0", cor)} />;
 }

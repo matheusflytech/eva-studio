@@ -2,6 +2,7 @@ import * as React from "react";
 import { UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
+import { LogoOficial, NOME_DA_MARCA, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { corPorHash, iniciais } from "./tipos";
 
 const TAMANHOS = {
@@ -33,6 +34,23 @@ export function AvatarDoContato({
       )}
     >
       {iniciais(nome) || <UserRound />}
+    </span>
+  );
+}
+
+/**
+ * Selo do canal no canto do avatar: círculo neutro com o logo oficial dentro.
+ * Canal sem marca (site, teste) não ganha selo. Quem usa posiciona (absolute).
+ */
+export function SeloDoCanal({ canal, className }: { canal: string; className?: string }) {
+  const marca = marcaDoCanal(canal);
+  if (!marca) return null;
+  return (
+    <span
+      title={NOME_DA_MARCA[marca]}
+      className={cn("flex h-4 w-4 items-center justify-center rounded-full bg-panel ring-2 ring-page", className)}
+    >
+      <LogoOficial marca={marca} tamanho={10} />
     </span>
   );
 }

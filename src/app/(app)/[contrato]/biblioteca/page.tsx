@@ -8,8 +8,9 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Notice } from "@/components/ui/notice";
 import { FLOW_TEMPLATES } from "@/components/agent-studio/builder/flow-templates";
-import { ICON_REGISTRY, type IconKey } from "@/components/agent-studio/builder/icon-registry";
-import { BLOCK_STYLES } from "@/components/agent-studio/builder/block-styles";
+import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
+import { IconeDoBloco, seloDoBloco } from "@/components/agent-studio/builder/icone-do-bloco";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { saveFlow } from "@/lib/data/flows";
 import { pulsar } from "@/lib/fundo/eventos";
@@ -33,10 +34,11 @@ import { SeletorDeAgente } from "@/components/biblioteca/seletor-de-agente";
 
 type Template = (typeof FLOW_TEMPLATES)[number];
 
-/** Modelo com bloco de IA leva o símbolo da Eva; o do n8n, o do webhook. */
+/** Modelo com bloco de IA leva o símbolo da Eva; o do n8n, o logo do n8n; o de webhook, o do webhook. */
 function iconeDoModelo(chaves: IconKey[]) {
   if (chaves.includes("ai-agent")) return "eva" as const;
-  if (chaves.includes("agent") || chaves.includes("webhook")) return Webhook;
+  if (chaves.includes("agent")) return "n8n" as const;
+  if (chaves.includes("webhook")) return Webhook;
   return Workflow;
 }
 
@@ -114,7 +116,13 @@ function ModelosDeFluxo({ agentId, agenteNome, semAgentes }: { agentId: string; 
                   Icone === "eva" ? "text-text-primary" : "text-text-secondary"
                 )}
               >
-                {Icone === "eva" ? <MarcaEva size={16} title="Usa IA" /> : <Icone size={15} aria-hidden="true" />}
+                {Icone === "eva" ? (
+                  <MarcaEva size={16} title="Usa IA" />
+                ) : Icone === "n8n" ? (
+                  <LogoOficial marca="n8n" tamanho={19} titulo="Usa n8n" />
+                ) : (
+                  <Icone size={15} aria-hidden="true" />
+                )}
               </span>
               {/* Clicar no nome abre a ordem completa dos blocos antes de aplicar. */}
               <button type="button" onClick={() => setAberto(tpl)} className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-[10px] text-left">
@@ -163,14 +171,12 @@ function ModelosDeFluxo({ agentId, agenteNome, semAgentes }: { agentId: string; 
             <ol className="flex flex-wrap items-center gap-1.5">
               {blocosDoAberto.map((n, i) => {
                 const k = n.data.iconKey as IconKey;
-                const Ic = ICON_REGISTRY[k];
-                const estilo = BLOCK_STYLES[k];
                 return (
                   <li key={n.id} className="flex items-center gap-1.5">
                     {i > 0 && <ArrowRight size={12} aria-hidden="true" className="text-text-tertiary" />}
                     <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border-subtle bg-raised pl-1 pr-2.5 text-small text-text-primary">
-                      <span className={cn("flex h-5 w-5 items-center justify-center rounded-full", estilo?.badgeBg, estilo?.badgeText)}>
-                        {Ic && <Ic size={11} aria-hidden="true" />}
+                      <span className={cn("flex h-5 w-5 items-center justify-center rounded-full", seloDoBloco(k))}>
+                        <IconeDoBloco iconKey={k} size={11} />
                       </span>
                       {String(n.data.label ?? "")}
                     </span>

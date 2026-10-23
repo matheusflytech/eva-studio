@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Clock, StickyNote, MessageSquare, Repeat, Plus, ChevronRight } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import Link from "@/components/contrato/link";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -294,7 +295,11 @@ export function ContactActivity({
               href={`/conversas?c=${c.id}`}
               className={cn(bloco, "group flex min-h-11 items-center gap-2.5 py-2 transition-colors duration-120 hover:bg-hover", focusRing)}
             >
-              <MessageSquare size={14} aria-hidden className="shrink-0 text-text-tertiary" />
+              {marcaDoCanal(c.channel) ? (
+                <LogoOficial marca={marcaDoCanal(c.channel)!} tamanho={14} />
+              ) : (
+                <MessageSquare size={14} aria-hidden className="shrink-0 text-text-tertiary" />
+              )}
               <span className="min-w-0 flex-1 truncate text-small text-text-primary">{CHANNEL_LABEL[c.channel] ?? c.channel}</span>
               <span className="shrink-0 text-caption text-text-tertiary">{formatRelativeDate(c.updatedAt)}</span>
               <ChevronRight size={14} aria-hidden className="shrink-0 text-text-tertiary opacity-0 transition-opacity group-hover:opacity-100" />

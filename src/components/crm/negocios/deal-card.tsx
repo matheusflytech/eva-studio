@@ -11,7 +11,6 @@ import {
   ListTodo,
   Mail,
   Maximize2,
-  MessageCircle,
   Package,
   Phone,
   Tag,
@@ -20,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Avatar as AvatarDS } from "@/components/ui/avatar";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { focusRing } from "@/components/ui/styles";
@@ -201,7 +201,7 @@ export function DealCard({
             className="relative ml-auto inline-flex shrink-0 text-success transition-opacity group-hover/card:opacity-0"
             title={deal.whatsapp.naoLida ? "Mensagem não lida no WhatsApp" : "Tem conversa no WhatsApp"}
           >
-            <MessageCircle size={14} aria-hidden="true" />
+            <LogoOficial marca="whatsapp" tamanho={14} />
             {deal.whatsapp.naoLida && (
               <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-success ring-2 ring-panel">
                 <span className="sr-only">Mensagem não lida</span>
@@ -297,7 +297,7 @@ export function AcoesRapidas({ deal }: { deal: NegocioKanban }) {
     <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 flex gap-1 opacity-0 transition-opacity duration-120 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
       {deal.whatsapp && (
         <Link href={`/conversas?c=${deal.whatsapp.conversationId}`} {...pararArraste} aria-label="Abrir conversa no WhatsApp" title="Abrir conversa" className={classe}>
-          <MessageCircle size={13} aria-hidden="true" />
+          <LogoOficial marca="whatsapp" tamanho={13} />
         </Link>
       )}
       <Link href={`/negocios/${deal.id}`} {...pararArraste} aria-label="Abrir ficha completa" title="Abrir ficha completa" className={classe}>

@@ -14,7 +14,8 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
-import { AvatarDoContato, QuadradoDoAgente } from "./avatar";
+import { AvatarDoContato, QuadradoDoAgente, SeloDoCanal } from "./avatar";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import {
   NOME_DO_CANAL, horaCurta,
   type Conversa, type IdDoFiltro, type Resumo,
@@ -266,6 +267,7 @@ function BotaoDeFiltros({
             onCheckedChange={() => onCanal(c.valor)}
             onSelect={manterAberto}
           >
+            {marcaDoCanal(c.valor) && <LogoOficial marca={marcaDoCanal(c.valor)!} tamanho={14} />}
             {c.rotulo}
           </DropdownMenuCheckboxItem>
         ))}
@@ -318,9 +320,11 @@ function LinhaDeConversa({
 
         <span className="relative mt-0.5 shrink-0">
           <AvatarDoContato chave={c.contactId} nome={c.nome} />
+          {/* Canal da conversa: logo oficial no canto de baixo à direita. */}
+          <SeloDoCanal canal={c.channel} className="absolute -bottom-0.5 -right-0.5" />
           {/* Em "Todas as caixas", de qual agente é a conversa: só a cor, o nome fica no title. */}
           {mostrarAgente && (
-            <span className="absolute -bottom-0.5 -right-0.5 rounded-[5px] ring-2 ring-page" title={c.agentName}>
+            <span className="absolute -bottom-0.5 -left-0.5 rounded-[5px] ring-2 ring-page" title={c.agentName}>
               <QuadradoDoAgente id={c.agentId} nome={c.agentName} tamanho="xs" />
             </span>
           )}

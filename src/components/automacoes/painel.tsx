@@ -15,7 +15,7 @@ import { saidasDe, UNIDADES, type Definicao, type No, type Regra } from "@/lib/a
 import type { Pendencia } from "@/lib/automacoes/validar";
 import { camposDeData, FormularioDoCatalogo, variaveisDisponiveis } from "./campos";
 import { EditorDeRegra } from "./regra";
-import { visualDoPasso, type Opcoes } from "./comum";
+import { IconeDoPasso, visualDoPasso, type Opcoes } from "./comum";
 
 // ---------------------------------------------------------------------------
 // Painel à direita: configura o passo escolhido no canvas (ou o gatilho, ou as
@@ -50,11 +50,15 @@ export interface ConfigDaAutomacao {
 
 function Cabecalho({ tipo, acao, titulo, descricao, fechar }: { tipo: string; acao?: string; titulo: string; descricao?: string; fechar: () => void }) {
   const v = visualDoPasso(tipo, acao);
-  const Icone = v.icone;
   return (
     <div className="flex items-start gap-3 border-b border-border-subtle px-4 py-3.5">
-      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-        <Icone size={16} aria-hidden="true" />
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]",
+          v.marca ? "border border-border-subtle bg-raised" : [CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg]
+        )}
+      >
+        <IconeDoPasso visual={v} tamanho={16} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-mono text-caption text-text-tertiary">{v.categoria}</p>

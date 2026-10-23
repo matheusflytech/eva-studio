@@ -6,6 +6,7 @@ import Link from "@/components/contrato/link";
 import { buttonVariants } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { acaoDeUmClique, tipoParaExibir, type OrigemDaTarefa, type TipoDeTarefa } from "@/lib/tarefas/tipos";
 
@@ -23,6 +24,8 @@ export const ICONE_DO_TIPO: Record<TipoDeTarefa, LucideIcon> = {
 };
 
 export function IconeDoTipo({ tipo, className }: { tipo: string; className?: string }) {
+  // Tarefa de WhatsApp leva o logo oficial (o tamanho vem do className, quando houver).
+  if (tipoParaExibir(tipo) === "whatsapp") return <LogoOficial marca="whatsapp" tamanho={16} className={className} />;
   const Icone = ICONE_DO_TIPO[tipoParaExibir(tipo)];
   return <Icone size={16} strokeWidth={1.5} aria-hidden className={cn("shrink-0 text-text-tertiary", className)} />;
 }
@@ -66,7 +69,7 @@ export function AcaoRapida({
   const classe = buttonVariants({ variant: "secondary", size: tamanho });
   const conteudo = (
     <>
-      <Icone size={14} aria-hidden />
+      {tipoParaExibir(tipo) === "whatsapp" ? <LogoOficial marca="whatsapp" tamanho={14} /> : <Icone size={14} aria-hidden />}
       {/* Na linha, no celular, só o ícone: o título da tarefa precisa do espaço. */}
       <span className={tamanho === "sm" ? "max-sm:sr-only" : undefined}>{acao.rotulo}</span>
     </>

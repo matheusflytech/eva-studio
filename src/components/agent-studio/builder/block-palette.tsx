@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { Search, ChevronDown, X, CornerDownRight, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
-import { ICON_REGISTRY, type IconKey } from "./icon-registry";
-import { BLOCK_STYLES } from "./block-styles";
+import { type IconKey } from "./icon-registry";
+import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
 import { PALETTE_GROUPS, searchable, type PaletteItem } from "./palette-groups";
 import { cn } from "@/lib/utils";
 import { fieldBase } from "@/components/ui/styles";
@@ -13,9 +13,6 @@ function normalize(value: string): string {
 }
 
 function ItemButton({ item, onAdd }: { item: PaletteItem; onAdd: (key: IconKey) => void }) {
-  const Icon = ICON_REGISTRY[item.key];
-  const style = BLOCK_STYLES[item.key];
-
   return (
     <button
       type="button"
@@ -32,11 +29,10 @@ function ItemButton({ item, onAdd }: { item: PaletteItem; onAdd: (key: IconKey) 
       <span
         className={cn(
           "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-          style.badgeBg,
-          style.badgeText
+          seloDoBloco(item.key)
         )}
       >
-        <Icon size={14} />
+        <IconeDoBloco iconKey={item.key} size={14} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-small text-text-secondary transition-colors group-hover:text-text-primary">

@@ -2,20 +2,18 @@
 
 import * as React from "react";
 import {
-  AtSign,
   ChevronsUpDown,
   CircleHelp,
   Clock,
   GripVertical,
   Mail,
-  MessageCircle,
   Plus,
   Repeat,
-  Send,
   Trash2,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -85,11 +83,9 @@ const CHANNEL_LABEL: Record<string, string> = {
 };
 
 // Ícone do canal na linha: o canal é identidade, então é o único lugar com cor.
+// WhatsApp, Telegram e Instagram usam o logo oficial (marcaDoCanal); aqui fica
+// só o que não tem marca.
 const CHANNEL_ICON: Record<string, { Icone: LucideIcon; cor: string }> = {
-  whatsapp_meta: { Icone: MessageCircle, cor: "text-success" },
-  whatsapp_qr: { Icone: MessageCircle, cor: "text-success" },
-  telegram: { Icone: Send, cor: "text-info" },
-  instagram: { Icone: AtSign, cor: "text-text-secondary" },
   email: { Icone: Mail, cor: "text-text-secondary" },
 };
 
@@ -406,7 +402,11 @@ export default function SequenciasPage() {
                       title={CHANNEL_LABEL[s.channel] ?? s.channel}
                       className={cn("flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-border-subtle bg-raised", canal.cor)}
                     >
-                      <canal.Icone size={15} aria-hidden="true" />
+                      {marcaDoCanal(s.channel) ? (
+                        <LogoOficial marca={marcaDoCanal(s.channel)!} tamanho={16} />
+                      ) : (
+                        <canal.Icone size={15} aria-hidden="true" />
+                      )}
                     </span>
                     <span className={cn("min-w-0 flex-1 truncate text-body font-medium", s.active ? "text-text-primary" : "text-text-tertiary")}>
                       {s.name}

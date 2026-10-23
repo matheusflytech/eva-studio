@@ -7,6 +7,7 @@ import { AlertCircle, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
+import { IconeDoBloco } from "./icone-do-bloco";
 import { BLOCK_CATEGORY } from "./block-styles";
 import { validateNode } from "./block-validation";
 import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
@@ -295,7 +296,6 @@ export function FlowNode({
   atraso?: number;
 }) {
   const calmo = useReducedMotion();
-  const Icon = ICON_REGISTRY[data.iconKey] ?? ICON_REGISTRY.message;
   const cor = CATEGORY_CLASSES[BLOCK_CATEGORY[data.iconKey as IconKey] ?? "blue"];
   const isAiAgent = data.iconKey === "ai-agent";
   const isTool = ehFerramenta(data.iconKey);
@@ -362,7 +362,7 @@ export function FlowNode({
                   : "border-border-default hover:border-border-strong"
           )}
         >
-          <Icon size={30} strokeWidth={1.6} aria-hidden="true" className={cor.fg} />
+          <IconeDoBloco iconKey={data.iconKey} reserva={ICON_REGISTRY.message} size={30} strokeWidth={1.6} className={cor.fg} />
 
           {/* Canto: X se falhou na última execução, marcador se falta algo,
               check discreto se está pronto. */}

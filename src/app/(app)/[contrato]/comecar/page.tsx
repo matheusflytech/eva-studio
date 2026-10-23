@@ -5,8 +5,9 @@ import Link from "@/components/contrato/link";
 import { useRouter } from "@/lib/contrato/navegacao";
 import {
   Sun, Building2, HeartPulse, ShoppingBag, Briefcase, GraduationCap, Sparkles,
-  ArrowRight, ArrowLeft, Check, ChevronRight, MessageSquare, Handshake, PlayCircle,
+  ArrowRight, ArrowLeft, Check, ChevronRight, Handshake, PlayCircle,
 } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Input, Field } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -240,7 +241,7 @@ export default function ComecarPage() {
                 como a única ação principal; os outros são caminhos de volta. */}
             <Passo
               href={`/agent-studio/${resumo.agenteId}?aba=canais`}
-              icone={<MessageSquare size={17} aria-hidden />}
+              icone={<LogoOficial marca="whatsapp" tamanho={18} />}
               titulo="Conectar o WhatsApp"
               texto="Leia o QR code com o número da empresa. É o que faz o atendimento começar a valer."
               destaque

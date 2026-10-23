@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink,
-  MoreHorizontal, PauseCircle, PlugZap, Plus, RefreshCw, XCircle, type LucideIcon,
+  AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock,
+  MoreHorizontal, PauseCircle, Plus, RefreshCw, XCircle, type LucideIcon,
 } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -215,7 +216,7 @@ export default function AprovacoesPage() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <ExternalLink aria-hidden /> Gerenciador da Meta
+                    <LogoOficial marca="meta" tamanho={16} /> Gerenciador da Meta
                   </a>
                 </DropdownMenuItem>
               )}
@@ -269,7 +270,7 @@ export default function AprovacoesPage() {
           </div>
         ) : !dados?.conectado ? (
           <EmptyState
-            icon={<PlugZap />}
+            icon={<LogoOficial marca="whatsapp" tamanho={18} />}
             title="Este agente não tem o WhatsApp oficial conectado"
             description="Template aprovado é coisa da Cloud API da Meta: sem a conexão oficial não há o que aprovar."
             action={

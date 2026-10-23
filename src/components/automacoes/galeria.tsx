@@ -11,7 +11,7 @@ import { MODELOS } from "@/lib/automacoes/modelos";
 import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
 import { fraseDaAutomacao } from "@/lib/automacoes/frase";
 import { OBJETOS, type Objeto } from "@/lib/automacoes/tipos";
-import { ICONE_DO_OBJETO, visualDoPasso } from "./comum";
+import { ICONE_DO_OBJETO, IconeDoPasso, visualDoPasso } from "./comum";
 
 // Galeria antes da tela em branco: modelos prontos (o que depende do contrato
 // fica para escolher no editor) ou "Em branco" escolhendo o tipo de registro.
@@ -57,7 +57,6 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
                   const d = m.definicao();
                   const primeiro = d.inicio ? d.nos[d.inicio] : null;
                   const v = visualDoPasso(primeiro?.tipo ?? "gatilho", primeiro?.tipo === "acao" ? primeiro.acao : undefined);
-                  const Icone = v.icone;
                   return (
                     <button
                       key={m.id}
@@ -69,8 +68,13 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
                         ocupado === m.id && "border-accent-solid ring-1 ring-accent-solid"
                       )}
                     >
-                      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-                        <Icone size={16} aria-hidden="true" />
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]",
+                          v.marca ? "border border-border-subtle bg-raised" : [CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg]
+                        )}
+                      >
+                        <IconeDoPasso visual={v} tamanho={16} />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-small font-medium text-text-primary">{m.nome}</span>

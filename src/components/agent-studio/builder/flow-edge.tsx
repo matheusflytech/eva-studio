@@ -4,8 +4,8 @@ import * as React from "react";
 import { Plus } from "lucide-react";
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { ICON_REGISTRY, type IconKey } from "./icon-registry";
-import { BLOCK_STYLES } from "./block-styles";
+import type { IconKey } from "./icon-registry";
+import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { ESTILO_DA_SAIDA } from "./saida-estilo";
 import type { TipoDeSaida } from "./saidas";
@@ -118,8 +118,6 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
                   <div key={grupo.id} className="flex flex-col gap-0.5">
                     <p className="px-2 pb-0.5 pt-1 text-caption font-medium text-text-tertiary">{grupo.label}</p>
                     {grupo.items.map((item) => {
-                      const Icon = ICON_REGISTRY[item.key];
-                      const blockStyle = BLOCK_STYLES[item.key];
                       return (
                         <button
                           key={item.key}
@@ -130,8 +128,8 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
                           }}
                           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-small text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
                         >
-                          <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-md", blockStyle.badgeBg, blockStyle.badgeText)}>
-                            <Icon size={12} />
+                          <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-md", seloDoBloco(item.key))}>
+                            <IconeDoBloco iconKey={item.key} size={12} />
                           </span>
                           {item.label}
                         </button>

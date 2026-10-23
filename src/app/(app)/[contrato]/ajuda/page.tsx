@@ -10,8 +10,8 @@ import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { focusRing } from "@/components/ui/styles";
 import { PALETTE_GROUPS } from "@/components/agent-studio/builder/palette-groups";
-import { ICON_REGISTRY } from "@/components/agent-studio/builder/icon-registry";
-import { BLOCK_STYLES } from "@/components/agent-studio/builder/block-styles";
+import { IconeDoBloco, seloDoBloco } from "@/components/agent-studio/builder/icone-do-bloco";
+import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 import { FONTES } from "@/lib/analytics-catalog";
 import { SECOES, type Item } from "./conteudo";
 import { cn } from "@/lib/utils";
@@ -274,6 +274,7 @@ function LinhaDeItem({ item }: { item: Item }) {
   const corpo = (
     <>
       <span className="flex flex-wrap items-center gap-2">
+        {item.marca && <LogoOficial marca={item.marca} tamanho={ladoDoLogo(item.marca, 15)} />}
         <span className="text-body font-medium text-text-primary">{item.titulo}</span>
         {item.metodo &&
           item.metodo.split(" · ").map((m) => (
@@ -331,8 +332,6 @@ function Blocos({ termo }: { termo: string }) {
             <p className="mb-1 px-2 font-mono text-caption uppercase tracking-wider text-text-tertiary">{grupo.label}</p>
             <ul className="grid sm:grid-cols-2 sm:gap-x-4">
               {itens.map((item) => {
-                const Icone = ICON_REGISTRY[item.key];
-                const estilo = BLOCK_STYLES[item.key];
                 return (
                   <li
                     key={item.key}
@@ -343,8 +342,8 @@ function Blocos({ termo }: { termo: string }) {
                     )}
                   >
                     {/* A cor do ícone é a do bloco no builder (dado), não enfeite. */}
-                    <span className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[10px]", estilo?.badgeBg, estilo?.badgeText)}>
-                      <Icone size={13} aria-hidden />
+                    <span className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[10px]", seloDoBloco(item.key))}>
+                      <IconeDoBloco iconKey={item.key} size={13} />
                     </span>
                     <span className="min-w-0">
                       <span className="block text-small text-text-primary">{item.label}</span>

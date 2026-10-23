@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Send, Check, Loader2, Unplug, ExternalLink } from "lucide-react";
+import { Check, Loader2, Unplug, ExternalLink } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Send size={16} className="text-text-tertiary" /> Telegram
+              <LogoOficial marca="telegram" tamanho={16} /> Telegram
             </CardTitle>
             <CardDescription>
               Canal sem aprovação: crie um bot no @BotFather, cole o token e o agente já responde.

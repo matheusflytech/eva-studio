@@ -3,7 +3,8 @@
 import * as React from "react";
 import { CheckCircle2, XCircle, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ICON_REGISTRY, type IconKey } from "./icon-registry";
+import { ICON_REGISTRY } from "./icon-registry";
+import { IconeDoBloco } from "./icone-do-bloco";
 
 interface FlowStep {
   nodeId: string;
@@ -108,12 +109,11 @@ export function ExecutionsPanel({ agentId }: { agentId: string }) {
           </div>
           <div className="flex flex-col gap-2">
             {selected.steps.map((step, i) => {
-              const Icon = ICON_REGISTRY[step.kind as IconKey] ?? ICON_REGISTRY.message;
               return (
                 <div key={`${step.nodeId}-${i}`} className="rounded-[14px] bg-raised p-2.5">
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-hover text-text-secondary">
-                      <Icon size={12} />
+                      <IconeDoBloco iconKey={step.kind} reserva={ICON_REGISTRY.message} size={12} />
                     </span>
                     <p className="truncate text-small font-medium text-text-primary">{step.label}</p>
                     <span className="ml-auto shrink-0 font-mono text-caption tabular-nums text-text-tertiary">{step.ms}ms</span>
