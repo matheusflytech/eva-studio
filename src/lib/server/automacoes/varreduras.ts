@@ -22,6 +22,8 @@ import { executarExecucao } from "./executor";
 
 const POR_AUTOMACAO = 200;
 const RETENCAO_DIAS = 90;
+/** Teste esquecido (janela fechada no meio) para sozinho depois disto: não fica mandando WhatsApp. */
+export const TESTE_MAX_MS = 30 * 60_000;
 
 type Ativa = AutomacaoParaInscrever & { definicao: Definicao };
 
@@ -173,7 +175,11 @@ export async function rodarAutomacoes(opcoes: { orcamentoMs?: number; agora?: Da
       }
     }
 
-    // 3. Execuções vencidas.
+    // 3. Execuções vencidas. Antes, para os testes esquecidos.
+    await prisma.automacaoExecucao.updateMany({
+      where: { teste: true, status: { in: ["pendente", "esperando"] }, createdAt: { lt: new Date(agora.getTime() - TESTE_MAX_MS) } },
+      data: { status: "cancelada", erro: "Teste parado sozinho: passou de 30 minutos.", proximaEm: null, terminadaEm: agora },
+    });
     const vencidas = await prisma.automacaoExecucao.findMany({
       where: { status: { in: ["pendente", "esperando"] }, proximaEm: { lte: agora } },
       orderBy: { proximaEm: "asc" },

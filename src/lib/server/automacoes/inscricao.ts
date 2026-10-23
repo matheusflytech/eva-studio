@@ -39,6 +39,8 @@ export async function inscrever(
     profundidade?: number;
     intervaloMin?: number;
     teste?: boolean;
+    /** Variáveis iniciais (o teste de verdade grava as dele na mesma escrita). */
+    variaveis?: Record<string, unknown>;
     status?: "pendente" | "cancelada";
     erro?: string;
   }
@@ -79,6 +81,7 @@ export async function inscrever(
         gatilho: (d.gatilho ?? {}) as object,
         profundidade: d.profundidade ?? 0,
         teste: !!d.teste,
+        ...(d.variaveis ? { variaveis: d.variaveis as object } : {}),
         proximaEm: new Date(),
         ...(d.status === "cancelada" ? { terminadaEm: new Date(), duracaoMs: 0 } : {}),
       },

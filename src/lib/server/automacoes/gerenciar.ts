@@ -5,7 +5,10 @@ import { validar, podePublicar, type Pendencia } from "@/lib/automacoes/validar"
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { inscrever } from "./inscricao";
 import { executarExecucao } from "./executor";
-import { apagarDadosDoTeste, conferirCondicoes, criarRegistroDeTeste } from "./teste-real";
+import { apagarCriadosNoTeste, apagarDadosDoTeste, conferirCondicoes, criarRegistroDeTeste, type CriadoNoTeste } from "./teste-real";
+
+/** Segundos que o "Apagar dados do teste" espera um passo em andamento soltar. */
+const ESPERA_DO_PASSO_RODANDO = 10;
 import { planoDoTeste } from "@/lib/automacoes/teste";
 
 // ---------------------------------------------------------------------------
@@ -18,7 +21,9 @@ export class ErroDaAutomacao extends Error {
   constructor(
     message: string,
     public status: number,
-    public pendencias?: Pendencia[]
+    public pendencias?: Pendencia[],
+    /** Para a tela reagir a um caso específico (ex.: "contato_existente"). */
+    public codigo?: string
   ) {
     super(message);
   }
@@ -119,7 +124,36 @@ export function telefoneDoTeste(bruto: unknown): string | null {
  * para o telefone do teste. Roda até terminar ou parar numa espera (curta);
  * a tela chama `continuarTeste` quando a espera vence.
  */
-export async function testarDeVerdade(orgId: string, id: string, contato: { telefone?: unknown; email?: unknown }, userId: string | null) {
+/**
+ * Contato de verdade com esse telefone ou e-mail. O WhatsApp e o e-mail do teste
+ * saem de verdade: com o número de um cliente, ele receberia o teste.
+ */
+export async function contatoComOsDadosDoTeste(orgId: string, telefone: string | null, email: string): Promise<string | null> {
+  const ou: object[] = [];
+  // Telefones podem estar gravados com ou sem DDI e pontuação: busca pelo fim.
+  if (telefone) ou.push({ phone: { contains: telefone.slice(-8) } });
+  if (email) ou.push({ email: { equals: email, mode: "insensitive" } });
+  if (!ou.length) return null;
+  const achados = await prisma.contact.findMany({
+    where: { orgId, source: { not: "teste" }, OR: ou },
+    select: { name: true, phone: true, email: true },
+    take: 20,
+  });
+  const digitos = (v: string) => v.replace(/\D/g, "");
+  const mesmo = achados.find(
+    (c) =>
+      (email && c.email.toLowerCase() === email.toLowerCase()) ||
+      (telefone && digitos(c.phone).length >= 8 && (telefone.endsWith(digitos(c.phone)) || digitos(c.phone).endsWith(telefone.slice(2))))
+  );
+  return mesmo ? mesmo.name || "um contato" : null;
+}
+
+export async function testarDeVerdade(
+  orgId: string,
+  id: string,
+  contato: { telefone?: unknown; email?: unknown; confirmarContatoExistente?: unknown },
+  userId: string | null
+) {
   const a = await carregar(orgId, id);
   const def = a.rascunho as unknown as Definicao;
   // Só pede o que o fluxo usa: sem passo de WhatsApp, o contato de teste fica sem telefone.
@@ -128,6 +162,17 @@ export async function testarDeVerdade(orgId: string, id: string, contato: { tele
   if (plano.precisaWhatsApp && !telefone) throw new ErroDaAutomacao("Este fluxo manda WhatsApp: informe o número do teste com DDD (ex.: 47 99999-9999).", 400);
   const email = typeof contato.email === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contato.email.trim()) ? contato.email.trim() : "";
   if (plano.precisaEmail && !email) throw new ErroDaAutomacao("Este fluxo manda e-mail: informe o e-mail que recebe o teste.", 400);
+  if (contato.confirmarContatoExistente !== true) {
+    const dono = await contatoComOsDadosDoTeste(orgId, plano.precisaWhatsApp ? telefone : null, plano.precisaEmail ? email : "");
+    if (dono) {
+      throw new ErroDaAutomacao(
+        `Esse número ou e-mail é de ${dono}, um contato do CRM. O teste manda mensagem de verdade para ele. Use um número seu de teste ou confirme.`,
+        409,
+        undefined,
+        "contato_existente"
+      );
+    }
+  }
   const erros = validar(def).filter((p) => p.nivel === "erro" && p.no !== "gatilho" && !/falta /.test(p.mensagem));
   if (erros.length) throw new ErroDaAutomacao("Corrija a estrutura antes de testar.", 422, erros);
   const versao = await prisma.automacaoVersao.upsert({
@@ -135,14 +180,31 @@ export async function testarDeVerdade(orgId: string, id: string, contato: { tele
     create: { automacaoId: id, numero: VERSAO_DE_TESTE, definicao: def as object, publicadaPor: userId },
     update: { definicao: def as object, publicadaPor: userId },
   });
-  const registro = await criarRegistroDeTeste(orgId, id, def, { telefone: telefone ?? "", email });
-  const conferido = await conferirCondicoes(orgId, def, registro.objetoId);
-  const x = await inscrever({ ...a, versaoPublicadaId: versao.id }, registro.objetoId, { origem: "teste-real", teste: true, gatilho: { ...registro.gatilho, por: userId } });
-  if (!x.inscrita) throw new ErroDaAutomacao(`Não deu para testar: ${x.motivo}.`, 409);
-  await prisma.automacaoExecucao.update({
-    where: { id: x.execucaoId },
-    data: { variaveis: { passos: {}, __testeReal: { telefone: telefone ?? "", email, criados: registro.criados, ...conferido } } as object },
-  });
+  const inicio = new Date();
+  const criados: CriadoNoTeste[] = [];
+  let x: Awaited<ReturnType<typeof inscrever>>;
+  let registro: Awaited<ReturnType<typeof criarRegistroDeTeste>>;
+  let conferido: Awaited<ReturnType<typeof conferirCondicoes>>;
+  try {
+    registro = await criarRegistroDeTeste(orgId, id, def, { telefone: telefone ?? "", email }, criados);
+    conferido = await conferirCondicoes(orgId, def, registro.objetoId);
+    // As variáveis do teste vão na mesma escrita que cria a execução: a
+    // varredura pode pegá-la antes de qualquer update e rodaria como simulada.
+    x = await inscrever({ ...a, versaoPublicadaId: versao.id }, registro.objetoId, {
+      origem: "teste-real",
+      teste: true,
+      gatilho: { ...registro.gatilho, por: userId },
+      variaveis: { passos: {}, __testeReal: { telefone: telefone ?? "", email, criados: registro.criados, ...conferido } },
+    });
+  } catch (e) {
+    // O que já foi criado não fica solto (sem execução, o "Apagar" não alcança).
+    await apagarCriadosNoTeste(orgId, { criados, telefone: telefone ?? "", desde: inicio }).catch(() => 0);
+    throw e;
+  }
+  if (!x.inscrita) {
+    await apagarCriadosNoTeste(orgId, { criados, telefone: telefone ?? "", desde: inicio }).catch(() => 0);
+    throw new ErroDaAutomacao(`Não deu para testar: ${x.motivo}.`, 409);
+  }
   for (let i = 0; i < 5; i++) {
     const r = await executarExecucao(x.execucaoId);
     if (!r || r.status !== "pendente") break;
@@ -159,8 +221,15 @@ export async function continuarTeste(orgId: string, automacaoId: string, execuca
 }
 
 export async function apagarTeste(orgId: string, automacaoId: string, execucaoId: string) {
-  const e = await prisma.automacaoExecucao.findFirst({ where: { id: execucaoId, automacaoId, orgId, teste: true }, select: { id: true, status: true } });
+  let e = await prisma.automacaoExecucao.findFirst({ where: { id: execucaoId, automacaoId, orgId, teste: true }, select: { id: true, status: true } });
   if (!e) throw new ErroDaAutomacao("Teste não encontrado.", 404);
+  // Um passo rodando agora pode criar algo depois da limpeza: espera ele soltar.
+  for (let i = 0; e?.status === "rodando" && i < ESPERA_DO_PASSO_RODANDO; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    e = await prisma.automacaoExecucao.findFirst({ where: { id: execucaoId }, select: { id: true, status: true } });
+  }
+  if (!e) throw new ErroDaAutomacao("Teste não encontrado.", 404);
+  if (e.status === "rodando") throw new ErroDaAutomacao("O teste ainda está rodando um passo. Tente de novo em alguns segundos.", 409);
   // Para o teste antes de apagar o registro (senão a próxima batida cancela sozinha).
   if (e.status === "pendente" || e.status === "esperando") {
     await prisma.automacaoExecucao.update({ where: { id: e.id }, data: { status: "cancelada", erro: "Dados do teste apagados.", proximaEm: null, terminadaEm: new Date() } });

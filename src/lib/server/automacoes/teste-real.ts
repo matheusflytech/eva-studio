@@ -110,9 +110,10 @@ export async function criarRegistroDeTeste(
   orgId: string,
   automacaoId: string,
   def: Definicao,
-  { telefone, email }: { telefone: string; email: string }
+  { telefone, email }: { telefone: string; email: string },
+  /** Recebe cada registro assim que é criado: se algo falhar no meio, quem chamou apaga. */
+  criados: CriadoNoTeste[] = []
 ): Promise<{ objetoId: string; gatilho: Record<string, unknown>; criados: CriadoNoTeste[] }> {
-  const criados: CriadoNoTeste[] = [];
   const objeto = def.objeto as Objeto;
   const cfg = (def.gatilho?.config ?? {}) as Record<string, unknown>;
   const { registro, contato, custom, customContato, tags } = camposDasCondicoes(condicoesParaCumprir(def));
@@ -142,7 +143,11 @@ export async function criarRegistroDeTeste(
       const achada = await prisma.tag.findFirst({ where: { orgId, OR: [{ id: String(t) }, { name: String(t) }] }, select: { id: true } });
       if (achada) etiquetas.push(achada.id);
     }
-    if (objeto === "contact" && cfg.tag && typeof cfg.tag === "string") etiquetas.push(cfg.tag);
+    if (objeto === "contact" && cfg.tag && typeof cfg.tag === "string") {
+      // A etiqueta do gatilho vem da definição: só entra se for deste contrato.
+      const doGatilho = await prisma.tag.findFirst({ where: { id: cfg.tag, orgId }, select: { id: true } });
+      if (doGatilho) etiquetas.push(doGatilho.id);
+    }
     await prisma.contactTag.createMany({ data: [...new Set(etiquetas)].map((tagId) => ({ contactId: pessoa.id, tagId })), skipDuplicates: true });
 
     if (objeto === "contact") return { objetoId: pessoa.id, gatilho: { tipo: def.gatilho?.tipo ?? "teste", teste: true }, criados };
@@ -239,28 +244,67 @@ function criadosPelosPassos(passos: { saida: unknown }[]): CriadoNoTeste[] {
   return out;
 }
 
-/** "Apagar dados do teste": remove só o que esta execução de teste criou. */
-export async function apagarDadosDoTeste(orgId: string, execucaoId: string) {
-  const exec = await prisma.automacaoExecucao.findFirst({
-    where: { id: execucaoId, orgId, teste: true },
-    select: { variaveis: true, passos: { select: { saida: true } } },
-  });
-  const real = (exec?.variaveis as { __testeReal?: TesteReal } | null)?.__testeReal;
-  if (!exec || !real) return { apagados: 0 };
-  const todos = [...real.criados, ...criadosPelosPassos(exec.passos)];
-  const ids = (o: CriadoNoTeste["objeto"]) => todos.filter((c) => c.objeto === o).map((c) => c.id);
+/**
+ * Apaga o que um teste criou: os registros de `criados`, o que os passos
+ * criaram ligados a eles (negócios, tarefas, notas, avisos, e-mails) e a
+ * conversa de WhatsApp com o telefone do teste, se ela nasceu durante o teste
+ * (uma conversa que já existia com esse número é da pessoa e fica).
+ */
+export async function apagarCriadosNoTeste(
+  orgId: string,
+  t: { criados: CriadoNoTeste[]; telefone?: string; desde: Date }
+): Promise<number> {
+  const ids = (o: CriadoNoTeste["objeto"]) => t.criados.filter((c) => c.objeto === o).map((c) => c.id);
   const contatos = ids("contact");
   let apagados = 0;
   await comAtor({ tipo: "automacao", teste: true }, async () => {
     // Negócios e tarefas do contato de teste (inclusive os que os passos criaram).
     const negocios = [...new Set([...ids("deal"), ...(await prisma.dealContact.findMany({ where: { contactId: { in: contatos } }, select: { dealId: true } })).map((d) => d.dealId)])];
-    apagados += (await prisma.task.deleteMany({ where: { orgId, OR: [{ id: { in: ids("task") } }, { contactId: { in: contatos } }, { dealId: { in: negocios } }] } })).count;
+    const tarefas = (await prisma.task.findMany({ where: { orgId, OR: [{ id: { in: ids("task") } }, { contactId: { in: contatos } }, { dealId: { in: negocios } }] }, select: { id: true } })).map((x) => x.id);
+    const registros = [...contatos, ...negocios, ...tarefas, ...ids("company"), ...ids("conversation")];
+    apagados += (await prisma.aviso.deleteMany({ where: { orgId, objetoId: { in: registros } } })).count;
+    apagados += (await prisma.emailEnvio.deleteMany({ where: { orgId, contactId: { in: contatos } } })).count;
+    apagados += (await prisma.task.deleteMany({ where: { orgId, id: { in: tarefas } } })).count;
     apagados += (await prisma.note.deleteMany({ where: { orgId, OR: [{ contactId: { in: contatos } }, { dealId: { in: negocios } }] } })).count;
     apagados += (await prisma.deal.deleteMany({ where: { orgId, id: { in: negocios } } })).count;
     apagados += (await prisma.conversation.deleteMany({ where: { id: { in: ids("conversation") }, agent: { orgId } } })).count;
+    if (t.telefone) {
+      apagados += (
+        await prisma.conversation.deleteMany({
+          where: { contactId: t.telefone, channel: { in: ["whatsapp_qr", "whatsapp_meta"] }, agent: { orgId }, createdAt: { gte: t.desde } },
+        })
+      ).count;
+    }
     apagados += (await prisma.contact.deleteMany({ where: { orgId, id: { in: contatos } } })).count;
     apagados += (await prisma.company.deleteMany({ where: { orgId, id: { in: ids("company") } } })).count;
+    // A etiqueta de teste sai quando mais ninguém a usa.
+    for (const tagId of ids("tag")) {
+      if (!(await prisma.contactTag.findFirst({ where: { tagId }, select: { tagId: true } }))) {
+        apagados += (await prisma.tag.deleteMany({ where: { orgId, id: tagId } })).count;
+      }
+    }
   });
-  await prisma.automacaoExecucao.update({ where: { id: execucaoId }, data: { variaveis: { ...(exec.variaveis as object), __testeReal: { ...real, apagado: true } } } });
+  return apagados;
+}
+
+/** "Apagar dados do teste": remove só o que esta execução de teste criou. */
+export async function apagarDadosDoTeste(orgId: string, execucaoId: string) {
+  const exec = await prisma.automacaoExecucao.findFirst({
+    where: { id: execucaoId, orgId, teste: true },
+    select: { variaveis: true, createdAt: true, passos: { select: { saida: true } } },
+  });
+  const real = (exec?.variaveis as { __testeReal?: TesteReal } | null)?.__testeReal;
+  if (!exec || !real) return { apagados: 0 };
+  const apagados = await apagarCriadosNoTeste(orgId, {
+    criados: [...real.criados, ...criadosPelosPassos(exec.passos)],
+    telefone: real.telefone,
+    desde: exec.createdAt,
+  });
+  // O histórico do teste também leva o telefone e o e-mail: some junto.
+  await prisma.automacaoPasso.deleteMany({ where: { execucaoId } });
+  await prisma.automacaoExecucao.update({
+    where: { id: execucaoId },
+    data: { variaveis: { passos: {}, __testeReal: { criados: [], cumpridas: real.cumpridas, naoCumpridas: real.naoCumpridas, telefone: "", email: "", apagado: true } } },
+  });
   return { apagados };
 }

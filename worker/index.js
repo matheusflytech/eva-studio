@@ -26,6 +26,7 @@ import {
   sessoesPendentes,
 } from "./fonte.js";
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
+import { decidirReconexao } from "./desconexao.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -186,19 +187,30 @@ async function sendReply(sock, jid, message) {
   }
 }
 
+// Quedas seguidas de cada sessão sem chegar a abrir (para esperar mais a cada vez).
+const quedas = new Map();
+
 async function startSession(chave) {
   if (sessions.has(chave)) return;
   sessions.set(chave, { starting: true });
 
-  const { state, saveCreds } = await loadAuthState(pool, chave, MODO);
-  const { version } = await fetchLatestBaileysVersion();
-
-  const sock = makeWASocket({
-    version,
-    auth: state,
-    logger,
-    printQRInTerminal: false,
-  });
+  let state, saveCreds, sock;
+  try {
+    ({ state, saveCreds } = await loadAuthState(pool, chave, MODO));
+    const { version } = await fetchLatestBaileysVersion();
+    sock = makeWASocket({
+      version,
+      auth: state,
+      logger,
+      printQRInTerminal: false,
+    });
+  } catch (err) {
+    // Sem isto o "starting" ficava para sempre: o polling e a reconexão pulavam
+    // o canal, e a tela culpava o worker, que estava vivo.
+    sessions.delete(chave);
+    await setConnectionState(chave, { status: "requesting", qrDataUrl: null, lastError: "Não deu para abrir a sessão, tentando de novo..." }).catch(() => {});
+    throw err;
+  }
 
   sessions.set(chave, { sock });
 
@@ -213,6 +225,7 @@ async function startSession(chave) {
     }
 
     if (connection === "open") {
+      quedas.delete(chave);
       const phoneNumber = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
       await setConnectionState(chave, { status: "connected", qrDataUrl: null, phoneNumber, lastError: null });
       logger.info({ chave, phoneNumber }, "WhatsApp conectado");
@@ -223,20 +236,24 @@ async function startSession(chave) {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-      if (loggedOut) {
+      // Regras em desconexao.js: logout limpa; sessão aberta em outro lugar ou
+      // número recusado param; o resto reconecta, esperando mais a cada queda.
+      const tentativas = quedas.get(chave) ?? 0;
+      const decisao = loggedOut ? { acao: "logout" } : decidirReconexao(statusCode, { pareado: !!state.creds?.registered, tentativas });
+      if (decisao.acao === "logout") {
+        quedas.delete(chave);
         await limparSessao(pool, MODO, chave);
         logger.info({ chave }, "WhatsApp desconectado (logout)");
+      } else if (decisao.acao === "parar") {
+        quedas.delete(chave);
+        logger.warn({ chave, statusCode }, "Sessão parada");
+        await setConnectionState(chave, { status: "disconnected", qrDataUrl: null, lastError: decisao.erro });
       } else {
-        // 408: o QR expirou sem leitura; 515: o WhatsApp pede reinício logo depois
-        // de parear. Os dois são normais e não são erro para a pessoa. Os outros
-        // ficam com o código, para dar para saber o que houve sem os logs.
-        const normal = statusCode === DisconnectReason.timedOut || statusCode === DisconnectReason.restartRequired;
-        logger.warn({ chave, statusCode }, normal ? "Sessão reiniciando (normal)" : "Conexão caiu");
-        await setConnectionState(chave, {
-          status: "requesting",
-          lastError: normal ? null : `Conexão caiu (código ${statusCode ?? "desconhecido"}), tentando de novo...`,
-        });
-        setTimeout(() => startSession(chave), 3000);
+        if (decisao.erro) quedas.set(chave, tentativas + 1);
+        logger.warn({ chave, statusCode, atrasoMs: decisao.atrasoMs }, decisao.erro ? "Conexão caiu" : "Sessão reiniciando (normal)");
+        // O QR da sessão que caiu já não vale: sai da tela até vir o novo.
+        await setConnectionState(chave, { status: "requesting", qrDataUrl: null, lastError: decisao.erro });
+        setTimeout(() => startSession(chave).catch((err) => logger.error({ err, chave }, "Falha ao reconectar")), decisao.atrasoMs);
       }
     }
   });

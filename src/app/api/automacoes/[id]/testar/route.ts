@@ -12,9 +12,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const ctx = await requirePermission("automacoes:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
-  const b = (await request.json().catch(() => ({}))) as { objetoId?: unknown; modo?: unknown; telefone?: unknown; email?: unknown };
+  const b = (await request.json().catch(() => ({}))) as { objetoId?: unknown; modo?: unknown; telefone?: unknown; email?: unknown; confirmarContatoExistente?: unknown };
   try {
-    if (b.modo === "real") return NextResponse.json(await testarDeVerdade(ctx.orgId, id, { telefone: b.telefone, email: b.email }, ctx.userId));
+    if (b.modo === "real") {
+      return NextResponse.json(
+        await testarDeVerdade(ctx.orgId, id, { telefone: b.telefone, email: b.email, confirmarContatoExistente: b.confirmarContatoExistente }, ctx.userId)
+      );
+    }
     if (typeof b.objetoId !== "string" || !b.objetoId) return NextResponse.json({ error: "Escolha o registro do teste." }, { status: 400 });
     return NextResponse.json(await testarAutomacao(ctx.orgId, id, b.objetoId, ctx.userId));
   } catch (e) {

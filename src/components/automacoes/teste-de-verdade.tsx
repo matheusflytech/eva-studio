@@ -74,6 +74,8 @@ export function TesteDeVerdade({
   const pronto = (!plano.precisaWhatsApp || telefone.replace(/\D/g, "").length >= 10) && (!plano.precisaEmail || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()));
   const [fase, setFase] = React.useState<"confirmar" | "rodando">("confirmar");
   const [erro, setErro] = React.useState<string | null>(null);
+  // O número/e-mail é de um contato do CRM: só roda depois de confirmar.
+  const [deContato, setDeContato] = React.useState(false);
   const [inicio, setInicio] = React.useState<Inicio | null>(null);
   const [exec, setExec] = React.useState<Execucao | null>(null);
   const [mostrados, setMostrados] = React.useState(0);
@@ -84,8 +86,9 @@ export function TesteDeVerdade({
   const acabou = React.useRef(false);
   const nome = NOMES_DOS_OBJETOS[def.objeto];
 
-  async function rodar() {
+  async function rodar(confirmarContatoExistente = false) {
     setErro(null);
+    setDeContato(false);
     if (plano.precisaWhatsApp) guardar(CHAVE_DO_TELEFONE, telefone);
     if (plano.precisaEmail) guardar(CHAVE_DO_EMAIL, email);
     setFase("rodando");
@@ -94,9 +97,12 @@ export function TesteDeVerdade({
     setApagado(false);
     aoMudarEstados(undefined);
     try {
-      const r = await fetch(`/api/automacoes/${automacaoId}/testar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modo: "real", telefone: plano.precisaWhatsApp ? telefone : undefined, email: plano.precisaEmail ? email : undefined }) });
+      const r = await fetch(`/api/automacoes/${automacaoId}/testar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modo: "real", telefone: plano.precisaWhatsApp ? telefone : undefined, email: plano.precisaEmail ? email : undefined, confirmarContatoExistente }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error ?? "Não deu para testar.");
+      if (!r.ok) {
+        if (d.codigo === "contato_existente") setDeContato(true);
+        throw new Error(d.error ?? "Não deu para testar.");
+      }
       setInicio(d as Inicio);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não deu para testar.");
@@ -172,7 +178,10 @@ export function TesteDeVerdade({
     if (r?.ok) {
       setApagado(true);
       avisarNaIlha({ titulo: "Dados do teste apagados" });
-    } else setErro("Não deu para apagar os dados do teste.");
+    } else {
+      const d = await r?.json().catch(() => null);
+      setErro(d?.error ?? "Não deu para apagar os dados do teste.");
+    }
   }
 
   const esperandoAte = exec?.status === "esperando" && exec.proximaEm ? Math.max(0, Math.ceil((Date.parse(exec.proximaEm) - agora) / 1000)) : null;
@@ -227,6 +236,11 @@ export function TesteDeVerdade({
             )}
             {erro && <p className="text-caption text-danger">{erro}</p>}
             <div className="flex items-center gap-2">
+              {deContato && (
+                <Button type="button" variant="secondary" onClick={() => void rodar(true)}>
+                  Usar mesmo assim
+                </Button>
+              )}
               <Button type="button" variant="primary" onClick={() => void rodar()} disabled={!pronto}>
                 <Play size={13} aria-hidden="true" /> Rodar teste
               </Button>
