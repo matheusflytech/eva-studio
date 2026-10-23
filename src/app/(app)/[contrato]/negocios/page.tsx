@@ -811,7 +811,7 @@ function NegociosConteudo() {
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [max-height:calc(100dvh-210px)]">
+              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}

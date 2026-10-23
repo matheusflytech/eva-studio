@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { FundoVivo } from "@/components/layout/fundo-vivo";
 import { OrbeEva } from "@/components/layout/orbe-eva";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
+import { useTheme } from "@/components/ui/theme";
 import { iniciais } from "@/components/inbox/tipos";
 import { buttonVariants } from "@/components/ui/button";
 import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
@@ -77,6 +79,7 @@ function resumoDoDia(p: Pendencia[], conversas7d: number): string {
 
 export default function InicioPage() {
   const { session } = useAuth();
+  const escuro = useTheme().resolved === "dark";
   const { abrir } = useBuscaGlobal();
   const [dados, setDados] = React.useState<Payload | null>(null);
   const [carregando, setCarregando] = React.useState(true);
@@ -134,8 +137,15 @@ export default function InicioPage() {
   return (
     <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6">
       {/* Topo iridescente com as curvas vivas por cima, como uma tela de boas-vindas. */}
-      <section className="heroi-iridescente relative flex min-h-[300px] shrink-0 flex-col overflow-hidden rounded-b-[34px] px-7 pb-5 pt-16 text-[#121214]">
-        <FundoVivo escuro={false} forca={3.2} niveis={14} className="pointer-events-none absolute inset-0 h-full w-full mix-blend-multiply" />
+      {/* No escuro o topo vira um iridescente fundo (mesmas luzes, apagadas) com
+          texto claro; os cartões pretos de dentro viram vidro. */}
+      <section
+        className={cn(
+          "heroi-iridescente relative flex min-h-[300px] shrink-0 flex-col overflow-hidden rounded-b-[34px] px-7 pb-5 pt-16",
+          escuro ? "heroi-escuro text-[#f2f2f4]" : "text-[#121214]"
+        )}
+      >
+        <FundoVivo escuro={escuro} forca={3.2} niveis={14} className={cn("pointer-events-none absolute inset-0 h-full w-full", escuro ? "mix-blend-screen opacity-70" : "mix-blend-multiply")} />
         <div className="relative flex items-start gap-3">
           <h1 className="min-w-0 text-[30px] font-light leading-[1.08] tracking-[-0.035em] sm:text-[38px]">
             {saudacao(hora)}
@@ -147,25 +157,25 @@ export default function InicioPage() {
                 type="button"
                 onClick={() => setEditando((v) => !v)}
                 aria-label={editando ? "Pronto" : "Personalizar"}
-                className="inline-flex h-[38px] items-center gap-2 rounded-full bg-[#121214] px-3 text-small font-semibold text-[#f2f2f4] sm:px-4"
+                className={cn("inline-flex h-[38px] items-center gap-2 rounded-full px-3 text-small font-semibold transition-transform duration-150 active:scale-[0.96] sm:px-4", escuro ? "bg-[#f2f2f4] text-[#121214]" : "bg-[#121214] text-[#f2f2f4]")}
               >
                 {editando ? <Check size={15} /> : <Pencil size={15} />}
                 <span className="hidden sm:inline">{editando ? "Pronto" : "Personalizar"}</span>
               </button>
             )}
-            <button type="button" onClick={abrir} aria-label="Buscar" className="hidden h-[38px] w-[38px] place-items-center rounded-full bg-[#121214] text-[#f2f2f4] sm:grid">
+            <button type="button" onClick={abrir} aria-label="Buscar" className={cn("hidden h-[38px] w-[38px] place-items-center rounded-full transition-transform duration-150 active:scale-[0.94] sm:grid", escuro ? "bg-[#f2f2f4] text-[#121214]" : "bg-[#121214] text-[#f2f2f4]")}>
               <Search size={16} />
             </button>
-            <span className="hidden h-[38px] w-[38px] place-items-center rounded-full bg-white/60 text-small font-semibold sm:grid">{iniciais(session?.name ?? "") || "?"}</span>
+            <span className={cn("hidden h-[38px] w-[38px] place-items-center rounded-full text-small font-semibold sm:grid", escuro ? "bg-white/10" : "bg-white/60")}>{iniciais(session?.name ?? "") || "?"}</span>
           </div>
         </div>
 
         <div className="relative mt-auto grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-1.5 rounded-[22px] bg-[#121214] px-5 py-4 text-[#f2f2f4]">
+          <div className={cn("flex flex-col gap-1.5 rounded-[22px] px-5 py-4 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06] backdrop-blur-xl" : "bg-[#121214]")}>
             <span className="text-small text-[#a8a8ad]">Conversas nos últimos 7 dias</span>
             <b className="self-end text-[34px] font-medium leading-none tracking-[-0.035em] tabular-nums">{dados ? dados.resumo.conversas7d : "—"}</b>
           </div>
-          <div className="flex items-center gap-1.5 rounded-[22px] bg-[#121214]/90 py-2.5 pl-1 pr-5 text-[#f2f2f4]">
+          <div className={cn("flex items-center gap-1.5 rounded-[22px] py-2.5 pl-1 pr-5 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06] backdrop-blur-xl" : "bg-[#121214]/90")}>
             <OrbeEva falando={falando} className="-my-4 -mr-2 h-[116px] w-[116px] shrink-0 cursor-pointer" />
             <span className="flex min-w-0 flex-col gap-1">
               <span className="font-mono text-caption text-[#8a8a90]">Eva · resumo do dia</span>
@@ -228,7 +238,7 @@ export default function InicioPage() {
               <Bloco editando={editando} onTirar={() => tirar("agentes")} titulo="Seus agentes" extra={`${dados.agentes.length}`}>
                 {dados.agentes.slice(0, 3).map((a) => (
                   <Link key={a.id} href={`/agent-studio/${a.id}`} className="flex h-11 items-center gap-3 border-t border-border-subtle text-small first:border-t-0">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-inverse text-caption font-semibold text-inverse-fg">{a.nome.charAt(0).toUpperCase()}</span>
+                    <OrbeDoAgente agenteId={a.id} tamanho={28} leve />
                     <span className="min-w-0 flex-1 truncate font-medium text-text-primary">{a.nome}</span>
                     <span className="font-mono text-caption text-text-tertiary">{a.temFluxo ? `editado ${formatRelativeDate(a.atualizadoEm)}` : "sem fluxo"}</span>
                   </Link>

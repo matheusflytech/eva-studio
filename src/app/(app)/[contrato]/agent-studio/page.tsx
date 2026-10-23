@@ -6,6 +6,7 @@ import { Ellipsis, ListFilter, MessageSquare, PlayCircle, Plus } from "lucide-re
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { AgentEmptyState } from "@/components/agent-studio/agent-empty-state";
 import {
+  CartaoDoAgente,
   LinhaDoAgente,
   precisaDeVoce,
   situacaoDoAgente,
@@ -266,11 +267,17 @@ export default function AgentStudioPage() {
         </div>
       </div>
 
-      <div className="w-full max-w-[860px]">
+      {/* Ocupa a largura do cabeçalho. No desktop (≥1280px) vira grade de
+          cartões, que não deixa a tela vazia com poucos agentes; abaixo disso,
+          a lista de linhas. */}
+      <div className="w-full">
         {overview === null ? (
-          <div className="flex flex-col gap-2" aria-label="Carregando agentes">
+          <div className="flex flex-col gap-2 xl:grid xl:grid-cols-3 xl:gap-3" aria-label="Carregando agentes">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[68px] animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+              <div
+                key={i}
+                className="h-[68px] animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none xl:h-[188px] xl:rounded-[18px]"
+              />
             ))}
           </div>
         ) : filtrados.length === 0 ? (
@@ -282,11 +289,18 @@ export default function AgentStudioPage() {
                 : "Nenhum agente com esses filtros."}
           </p>
         ) : (
-          <div className="flex flex-col divide-y divide-border-subtle">
-            {filtrados.map((a) => (
-              <LinhaDoAgente key={a.id} agent={a} />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col divide-y divide-border-subtle xl:hidden">
+              {filtrados.map((a) => (
+                <LinhaDoAgente key={a.id} agent={a} />
+              ))}
+            </div>
+            <div className="hidden grid-cols-3 gap-3 xl:grid">
+              {filtrados.map((a) => (
+                <CartaoDoAgente key={a.id} agent={a} />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

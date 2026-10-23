@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink,
-  MoreHorizontal, PauseCircle, Plus, RefreshCw, XCircle, type LucideIcon,
+  MoreHorizontal, PauseCircle, PlugZap, Plus, RefreshCw, XCircle, type LucideIcon,
 } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -269,12 +269,12 @@ export default function AprovacoesPage() {
           </div>
         ) : !dados?.conectado ? (
           <EmptyState
-            compact
+            icon={<PlugZap />}
             title="Este agente não tem o WhatsApp oficial conectado"
             description="Template aprovado é coisa da Cloud API da Meta: sem a conexão oficial não há o que aprovar."
             action={
               agentId ? (
-                <Link href={`/agent-studio/${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
+                <Link href={`/agent-studio/${agentId}`} className={buttonVariants({ variant: "primary", size: "md" })}>
                   Conectar na aba do agente <ArrowRight size={14} aria-hidden />
                 </Link>
               ) : undefined

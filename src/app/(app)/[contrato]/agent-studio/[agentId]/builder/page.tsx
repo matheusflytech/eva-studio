@@ -4,21 +4,23 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import {
-  ArrowLeft, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate,
+  ArrowLeft, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, Maximize, Minus, Plus,
 } from "lucide-react";
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
+  ConnectionLineType,
   MiniMap,
   Panel,
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
 } from "@xyflow/react";
-import type { Connection, Edge, Node, NodeProps } from "@xyflow/react";
+import type { Connection, Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -33,7 +35,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { cn } from "@/lib/utils";
-import { FlowNode, type FlowNodeData, type NodeRunState } from "@/components/agent-studio/builder/flow-node";
+import {
+  CSS_DO_FLUXO_DO_AGENTE,
+  CanvasDoAgenteContext,
+  NoDoFluxo,
+  type CanvasDoAgente,
+  type FlowNodeData,
+  type NodeRunState,
+} from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { IssuesPanel } from "@/components/agent-studio/builder/issues-panel";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
@@ -41,13 +50,12 @@ import { NodeInspector } from "@/components/agent-studio/builder/node-inspector"
 import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
-import { BLOCK_MINIMAP_COLOR } from "@/components/agent-studio/builder/block-styles";
 import { organizarFluxo } from "@/components/agent-studio/builder/auto-layout";
 import { ehFerramenta, saidaDaLigacao, saidaParaNovoBloco, saidasDoBloco, temSaidasNomeadas } from "@/components/agent-studio/builder/saidas";
 import { useCanvasTheme } from "@/components/ui/theme";
 import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-template-gallery";
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
-import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
+import { FlowEdge, ToolEdge } from "@/components/agent-studio/builder/flow-edge";
 import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
@@ -64,7 +72,59 @@ interface UltimaExecucao {
   porNo: Record<string, NodeRunState>;
 }
 
-const edgeTypes = { plusEdge: FlowEdge };
+// Fora do componente: nodeTypes/edgeTypes estáveis. A execução chega aos nós
+// pelo CanvasDoAgenteContext; recriar o nodeTypes desmontava todos os nós.
+const nodeTypes = { flowNode: NoDoFluxo };
+const edgeTypes = { plusEdge: FlowEdge, ferramenta: ToolEdge };
+
+// Cores do React Flow pelas variáveis dele (sem mexer no CSS global): quadro
+// transparente sobre o fundo do contêiner, minimapa nos tokens.
+const ESTILO_DO_QUADRO = {
+  "--xy-background-color": "transparent",
+  "--xy-minimap-background-color": "var(--surface-panel)",
+  "--xy-minimap-mask-background-color": "color-mix(in srgb, var(--surface-page) 70%, transparent)",
+  "--xy-edge-label-background-color": "var(--surface-page)",
+} as React.CSSProperties;
+
+// O CSS global pinta o minimapa com !important (fundo elevado, máscara
+// escura com contorno forte). Aqui, com prefixo próprio, ele fica discreto.
+const CSS_DO_MINIMAPA = `
+.fluxo-agente .react-flow__minimap { background: var(--surface-panel) !important; }
+.fluxo-agente .react-flow__minimap-mask { fill: color-mix(in srgb, var(--surface-page) 70%, transparent) !important; stroke: var(--border-default) !important; stroke-width: 1px; }
+`;
+
+// Barra flutuante embaixo, no centro (mesmo padrão do canvas de automações):
+// zoom, enquadrar e organizar numa cápsula só.
+function BarraFlutuante({ onOrganizar }: { onOrganizar: () => void }) {
+  const rf = useReactFlow();
+  const calmo = useReducedMotion();
+  return (
+    <Panel position="bottom-center" className="!mb-4">
+      <motion.div
+        initial={calmo ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8, delay: 0.15 }}
+        role="toolbar"
+        aria-label="Ferramentas do fluxo"
+        className="flex items-center gap-0.5 rounded-full border border-border-default bg-overlay p-1 shadow-[var(--elevation-overlay)]"
+      >
+        <IconButton aria-label="Diminuir o zoom" tooltip onClick={() => void rf.zoomOut({ duration: 200 })}>
+          <Minus />
+        </IconButton>
+        <IconButton aria-label="Aumentar o zoom" tooltip onClick={() => void rf.zoomIn({ duration: 200 })}>
+          <Plus />
+        </IconButton>
+        <IconButton aria-label="Enquadrar o fluxo" tooltip onClick={() => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}>
+          <Maximize />
+        </IconButton>
+        <span aria-hidden="true" className="mx-1 h-4 w-px bg-border-default" />
+        <IconButton aria-label="Organizar os blocos" tooltip onClick={onOrganizar}>
+          <LayoutGrid />
+        </IconButton>
+      </motion.div>
+    </Panel>
+  );
+}
 
 export default function AgentBuilderPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -85,6 +145,13 @@ export default function AgentBuilderPage() {
   const [ultimaExecucao, setUltimaExecucao] = React.useState<UltimaExecucao | null>(null);
   const [mostrarExecucao, setMostrarExecucao] = React.useState(true);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cascata de entrada dos blocos só nos primeiros instantes do canvas.
+  const [abrindo, setAbrindo] = React.useState(true);
+  React.useEffect(() => {
+    if (!flowLoaded) return;
+    const t = setTimeout(() => setAbrindo(false), 900);
+    return () => clearTimeout(t);
+  }, [flowLoaded]);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -354,10 +421,14 @@ export default function AgentBuilderPage() {
 
   // Cada ligação ganha o nome da saída de onde parte (Sim, Não, a opção do
   // menu...), mostrado numa pílula no meio dela.
+  // O fio acende quando a última execução passou pelos dois blocos dele
+  // (a origem rodou sem erro e o destino rodou depois).
+  const execucaoNoCanvas = mostrarExecucao ? ultimaExecucao?.porNo : undefined;
   const edgesForCanvas = React.useMemo(
     () =>
       edges.map((e) => {
-        if (e.targetHandle === "tools") return e;
+        // Só o tipo de render muda aqui; o que é salvo continua sendo `edges`.
+        if (e.targetHandle === "tools") return { ...e, type: "ferramenta" };
         const origem = nodes.find((n) => n.id === e.source);
         const saida = origem && temSaidasNomeadas(origem.data) ? saidaDaLigacao(origem.data, e.sourceHandle) : null;
         return {
@@ -367,11 +438,12 @@ export default function AgentBuilderPage() {
             onInsert: (iconKey: IconKey) => handleInsertOnEdge(e, iconKey),
             rotulo: saida?.rotulo ?? null,
             tipo: saida?.tipo,
+            ativa: !!execucaoNoCanvas?.[e.source]?.ok && !!execucaoNoCanvas?.[e.target],
           },
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [edges, nodes]
+    [edges, nodes, execucaoNoCanvas]
   );
 
   // Ferramenta só liga na porta de ferramentas de um bloco de IA, e nada
@@ -385,20 +457,15 @@ export default function AgentBuilderPage() {
     [nodes]
   );
 
-  const nodeTypes = React.useMemo(
-    () => ({
-      flowNode: (props: NodeProps<Node<FlowNodeData>>) => (
-        <FlowNode
-          id={props.id}
-          data={props.data}
-          selected={props.selected}
-          run={mostrarExecucao ? ultimaExecucao?.porNo[props.id] : undefined}
-          onDetailChange={(text) => handleNodeDataChangeById(props.id, { detail: text })}
-        />
-      ),
-    }),
+  // Ponto de partida da cascata de entrada (coluna mais à esquerda na carga).
+  const xInicial = React.useMemo(
+    () => (nodes.length ? Math.min(...nodes.map((n) => n.position.x)) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mostrarExecucao, ultimaExecucao]
+    [flowLoaded]
+  );
+  const contextoDoCanvas = React.useMemo<CanvasDoAgente>(
+    () => ({ execucao: execucaoNoCanvas, abrindo, xInicial }),
+    [execucaoNoCanvas, abrindo, xInicial]
   );
 
   const issues = validateFlow(nodes, edges, { temUrlDoFluxo: agent ? !!agent.webhook.outboundUrl.trim() : undefined });
@@ -549,7 +616,14 @@ export default function AgentBuilderPage() {
             recolhida={paletaRecolhida}
             onToggle={() => setPaletaRecolhida((v) => !v)}
           />
-          <div data-theme={temaDoCanvas} className="relative flex-1 overflow-hidden rounded-[18px] border border-border-subtle bg-page">
+          {/* data-theme no contêiner: "canvas sempre escuro" vale também para
+              os blocos (tokens), não só para o fundo do React Flow. */}
+          <div
+            data-theme={temaDoCanvas}
+            className="fluxo-agente relative flex-1 overflow-hidden rounded-[18px] border border-border-subtle bg-page text-text-primary"
+          >
+            <style>{CSS_DO_FLUXO_DO_AGENTE + CSS_DO_MINIMAPA}</style>
+            <CanvasDoAgenteContext.Provider value={contextoDoCanvas}>
             <ReactFlow
               colorMode={temaDoCanvas}
               isValidConnection={ligacaoValida}
@@ -559,28 +633,32 @@ export default function AgentBuilderPage() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedId(node.id)}
-              // onNodeClick sozinho nao bastava: bloco de mensagem tem campo de
-              // texto editavel dentro, e clicar no texto selecionava o no no
-              // canvas sem abrir o painel — parecia que o clique nao funcionava.
-              // A selecao e a fonte da verdade, venha o clique de onde vier.
+              // onNodeClick sozinho nao bastava: a selecao e a fonte da
+              // verdade, venha de onde vier (clique, teclado, caixa de selecao).
               onSelectionChange={aoMudarSelecao}
               onPaneClick={() => setSelectedId(null)}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
-              defaultEdgeOptions={{ type: "smoothstep" }}
+              connectionLineType={ConnectionLineType.Bezier}
               defaultViewport={viewportInicial}
               minZoom={0.3}
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
+              style={ESTILO_DO_QUADRO}
             >
-              <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-default)" />
-              <Controls showInteractive={false} position="bottom-left" />
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1.1} color="var(--border-default)" />
+              <BarraFlutuante onOrganizar={handleAutoLayout} />
               <MiniMap
                 position="bottom-right"
                 pannable
                 zoomable
-                nodeColor={(node) => BLOCK_MINIMAP_COLOR[(node.data as FlowNodeData).iconKey] ?? "var(--border-strong)"}
+                className="!overflow-hidden !rounded-[14px] !border !border-border-subtle"
+                style={{ width: 132, height: 84 }}
+                nodeBorderRadius={14}
                 nodeStrokeWidth={0}
+                nodeColor={(node) =>
+                  execucaoNoCanvas?.[node.id] && !execucaoNoCanvas[node.id].ok ? "var(--danger-solid)" : "var(--border-strong)"
+                }
               />
               <Panel position="top-right">
                 <div className="flex flex-col items-end gap-3">
@@ -597,6 +675,7 @@ export default function AgentBuilderPage() {
                 </div>
               </Panel>
             </ReactFlow>
+            </CanvasDoAgenteContext.Provider>
           </div>
 
           {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}

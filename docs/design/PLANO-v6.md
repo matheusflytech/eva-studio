@@ -1,6 +1,35 @@
 # Plano v6 do front do EvaApp (para a próxima sessão)
 
-## >>> COMECE AQUI: status em 22/10/2026, fim do dia <<<
+## >>> COMECE AQUI: status em 22/10/2026, noite (2ª sessão) <<<
+
+Feito e conferido no navegador (1440×900, claro e escuro), commit local no PR #8:
+- Bugs 1 e 2 conferidos: nós aparecem nas automações; abrir/sair do editor
+  não faz PATCH (aba Network).
+- Revisão tela a tela (claro e escuro) feita. Corrigido: topo do Início ficava
+  claro no tema escuro (`.heroi-escuro` em globals.css); orbes dos agentes no
+  Início, na lista de agentes (grade de cartões ≥1280px) e na Caixa de entrada;
+  Biblioteca em 2 colunas; Aprovações vazio em cartão; colunas de Negócios até
+  embaixo; minimapa da automação sem a moldura cinza.
+- Builder de agentes no visual do fluxograma novo (nós quadrados, fios com
+  brilho, barra flutuante, minimapa discreto). Fluxos antigos guardam as
+  posições dos cartões grandes: ficam espaçados até alguém clicar "Organizar
+  os blocos" (grava no banco; não foi clicado).
+- Troca de tema com círculo que nasce do botão (`trocarTema` em
+  `components/ui/theme.tsx`, View Transitions), medida contra o vídeo
+  `lumen-toggle.mp4` e gravada no app: ~0,45 s, tema novo entra pronto.
+- Ferramentas de movimento instaladas (só local, `.claude/` não vai pro git):
+  skills `animation-reverse-engineering` e `web-motion` em `.claude/skills/`,
+  ffmpeg (winget). Gravar o app logado:
+  `.claude/skills/web-motion/scripts/record-app.mjs` (login uma vez numa
+  janela do Edge, `EVA_PW_CANAL=msedge`; o Chromium baixado é bloqueado
+  neste Windows).
+- Dashboard: o "Ver mais N cartões" foi mantido (decisão da v5).
+
+Próximo: propostas do fundo "gelo" e do Google Agenda (mostrar antes),
+depois aplicar o mesmo método (medir vídeo, gravar, comparar) nas
+transições de painel/gaveta/modal (ref. Cadra: fundo desfocado atrás).
+
+## Status anterior (22/10, fim do dia)
 
 Feito na sessão de 22/10 (noite), tudo no PR #8, branch `feat/redesign-visual`:
 - Tema separado do canvas: editor de automação respeita "canvas sempre

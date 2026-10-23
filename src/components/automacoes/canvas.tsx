@@ -302,7 +302,10 @@ const TIPOS_DE_LIGACAO = { ligacao: Ligacao };
 const ESTILO_DO_QUADRO = {
   "--xy-background-color": "transparent",
   "--xy-minimap-background-color": "var(--surface-panel)",
-  "--xy-minimap-mask-background-color": "color-mix(in srgb, var(--surface-page) 70%, transparent)",
+  // Máscara leve: o que está fora da vista só esmaece (antes virava uma moldura cinza grossa).
+  "--xy-minimap-mask-background-color": "color-mix(in srgb, var(--text-primary) 5%, transparent)",
+  "--xy-minimap-mask-stroke-color": "var(--border-strong)",
+  "--xy-minimap-mask-stroke-width": "1",
   "--xy-edge-label-background-color": "var(--surface-page)",
 } as React.CSSProperties;
 

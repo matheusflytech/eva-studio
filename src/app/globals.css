@@ -731,6 +731,16 @@ body {
   background-size: 140% 140%;
   animation: eva-iridescencia 18s ease-in-out infinite alternate;
 }
+/* Escuro: as mesmas três luzes, apagadas sobre grafite (Início no tema escuro). */
+.heroi-iridescente.heroi-escuro {
+  background:
+    radial-gradient(60% 80% at 85% 10%, rgba(196, 204, 92, 0.22) 0%, transparent 60%),
+    radial-gradient(55% 70% at 20% 30%, rgba(112, 122, 214, 0.30) 0%, transparent 65%),
+    radial-gradient(50% 60% at 60% 90%, rgba(82, 168, 132, 0.22) 0%, transparent 70%),
+    linear-gradient(135deg, #15161c, #1b1d27);
+  background-size: 140% 140%;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
 @keyframes eva-iridescencia {
   from { background-position: 0% 0%; }
   to { background-position: 100% 60%; }
@@ -825,6 +835,11 @@ body {
    (menu, ilha, fundo) não faz o crossfade padrão do navegador. */
 ::view-transition-old(root),
 ::view-transition-new(root) { animation: none; }
+/* Troca de tema (trocarTema em ui/theme.tsx): o tema novo entra pronto, sem as
+   transições de cor de cada componente, senão o círculo revela tons no meio do caminho. */
+.trocando-tema *,
+.trocando-tema *::before,
+.trocando-tema *::after { transition: none !important; }
 ::view-transition-old(.eva-tela-sai) {
   animation: eva-tela-sai 0.16s cubic-bezier(0.4, 0, 1, 1) both;
 }

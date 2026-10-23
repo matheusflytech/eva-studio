@@ -11,29 +11,31 @@ export interface BlockStyle {
 }
 
 // Cor por categoria de bloco — pra ler o canvas de longe sem precisar abrir
-// cada card (mensagem é sempre azul, decisão é sempre âmbar, em qualquer
+// cada card (mensagem é sempre verde, decisão é sempre violeta, em qualquer
 // fluxo). Vem da paleta de "cores de categoria" do design system, que tem
-// variante clara e escura com contraste AA testado; nada de text-violet-400
-// solto, que sumia no tema claro (o Início era branco sobre branco).
-// Violeta fica com a IA, como no resto do produto.
+// variante clara e escura com contraste AA testado.
+// v6: as mesmas famílias do fluxograma de automações (visualDoPasso em
+// components/automacoes/comum.tsx): mensagem verde, condição violeta, espera e
+// fim em cinza, e-mail ciano, integração rosa, equipe laranja. A IA fica no
+// azul (o acento da Eva) e as ferramentas dela no índigo, da mesma família.
 export const BLOCK_CATEGORY: Record<IconKey, CategoryColor> = {
-  start: "green",
-  message: "blue",
-  capture: "indigo",
-  condition: "amber",
+  start: "amber",
+  message: "green",
+  capture: "green",
+  condition: "violet",
   variable: "slate",
   wait: "slate",
   human: "orange",
-  end: "red",
-  email: "rose",
-  http: "cyan",
-  webhook: "cyan",
-  agent: "purple",
-  "ai-agent": "violet",
-  "tool-http": "purple",
-  "tool-knowledge": "purple",
-  "tool-mcp": "purple",
-  "tool-crm": "purple",
+  end: "slate",
+  email: "cyan",
+  http: "rose",
+  webhook: "rose",
+  agent: "rose",
+  "ai-agent": "blue",
+  "tool-http": "indigo",
+  "tool-knowledge": "indigo",
+  "tool-mcp": "indigo",
+  "tool-crm": "indigo",
   "crm-deal": "teal",
   "crm-stage": "teal",
   "crm-task": "teal",

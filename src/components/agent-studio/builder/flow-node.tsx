@@ -1,10 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
+import { Handle, Position, useNodeConnections, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { motion, useReducedMotion, type Transition } from "framer-motion";
+import { AlertCircle, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
-import { BLOCK_STYLES } from "./block-styles";
+import { BLOCK_CATEGORY } from "./block-styles";
+import { validateNode } from "./block-validation";
+import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
+import { fonteDaIa } from "./fonte-da-ia";
+import { ESTILO_DA_SAIDA } from "./saida-estilo";
 
 export interface MenuOption {
   id: string;
@@ -126,106 +133,13 @@ export interface FlowNodeData {
   [key: string]: unknown;
 }
 
-function ConfigPreview({ data }: { data: FlowNodeData }) {
-  if ((data.iconKey === "webhook" || data.iconKey === "http" || data.iconKey === "tool-http") && (data.webhookUrl || data.httpUrl)) {
-    const url = data.httpUrl || data.webhookUrl;
-    const method = data.httpMethod ?? "POST";
-    return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
-        {data.iconKey !== "webhook" && <span className="font-semibold text-cat-cyan">{method}</span>} {url}
-      </p>
-    );
-  }
-  if (data.iconKey === "wait" && data.waitDuration) {
-    return <p className="mt-2 text-caption text-text-tertiary">Espera {data.waitDuration} {data.waitUnit ?? "minutos"}</p>;
-  }
-  if ((data.iconKey === "variable" || data.iconKey === "capture") && data.variableName) {
-    return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
-        <span>→ salva em</span> {"{" + data.variableName + "}"}
-      </p>
-    );
-  }
-  if (data.iconKey === "condition" && data.conditionExpression) {
-    return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
-        {data.conditionExpression}
-      </p>
-    );
-  }
-  if (data.iconKey === "email" && data.emailTo) {
-    return <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">para: {data.emailTo}</p>;
-  }
-  if (data.iconKey === "ai-agent") {
-    const varCount = (data.collectVars ?? []).filter((v) => v.key.trim()).length;
-    return (
-      <p className="mt-2 truncate rounded-lg bg-raised px-2 py-1 font-mono text-caption text-text-tertiary">
-        {fonteDaIa(data) === "conexao" ? "Central de IA" : data.aiModel || "modelo não escolhido"}
-        {varCount > 0 && ` · coleta ${varCount} dado${varCount === 1 ? "" : "s"}`}
-      </p>
-    );
-  }
-  if (data.iconKey === "tool-mcp") {
-    const count = (data.mcpTools ?? []).length;
-    return (
-      <p className="truncate text-caption text-text-tertiary">
-        {count > 0 ? `${count} ferramenta(s) selecionada(s)` : "todas as ferramentas do servidor"}
-      </p>
-    );
-  }
-
-  if (data.iconKey === "tool-knowledge") {
-    return <p className="mt-2 text-caption text-text-tertiary">Busca na base de conhecimento do agente</p>;
-  }
-  return null;
-}
-
-function AutoTextarea({ value, onCommit }: { value: string; onCommit: (text: string) => void }) {
-  const [draft, setDraft] = React.useState(value);
-  const ref = React.useRef<HTMLTextAreaElement>(null);
-
-  React.useEffect(() => setDraft(value), [value]);
-
-  React.useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [draft]);
-
-  return (
-    <textarea
-      ref={ref}
-      value={draft}
-      rows={1}
-      placeholder="Digite o texto…"
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => onCommit(draft)}
-      // Sem stopPropagation no clique: o bloco precisa ficar selecionado
-      // quando alguem clica no proprio texto dele. Antes o clique morria aqui,
-      // o painel nao abria e parecia que o bloco nao respondia — o jeito mais
-      // rapido de alguem concluir que a ferramenta esta quebrada.
-      // No teclado ele continua: digitar espaco ou delete dentro do campo nao
-      // pode acionar atalho do canvas.
-      onKeyDown={(e) => e.stopPropagation()}
-      className="nodrag mt-2.5 w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-caption leading-relaxed text-text-secondary outline-none transition-colors hover:border-border-subtle focus:border-focus focus:bg-hover"
-    />
-  );
-}
-
-import { validateNode } from "./block-validation";
-import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
-import { fonteDaIa } from "./fonte-da-ia";
-import { ESTILO_DA_SAIDA } from "./saida-estilo";
-
-const HANDLE_DOT = "!h-2.5 !w-2.5 !border-2 !border-panel";
 
 /**
  * O que a última execução fez neste bloco.
  *
  * Fluxo que não mostra o que rodou obriga a pessoa a ler log noutra aba e
- * casar id de nó na mão. Com o anel no próprio bloco, "onde quebrou" é uma
- * olhada, não uma investigação.
+ * casar id de nó na mão. Com a borda e o marcador no próprio bloco, "onde
+ * quebrou" é uma olhada, não uma investigação.
  */
 export interface NodeRunState {
   ok: boolean;
@@ -233,35 +147,135 @@ export interface NodeRunState {
   error?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Visual v6 (o mesmo do fluxograma de automações, components/automacoes/
+// canvas.tsx): quadrado escuro de 88px com o ícone grande na cor da categoria,
+// nome e uma linha de resumo embaixo, fora da caixa. Nada de texto longo no
+// nó: o prompt da IA, a mensagem inteira e a configuração ficam no painel.
+//
+// Diferente do canvas de automações, aqui o nome fica DENTRO da caixa que o
+// React Flow mede (só fora do quadrado): o auto-layout (auto-layout.ts) usa a
+// altura medida, e assim um bloco nunca cai em cima do nome do outro.
+// ---------------------------------------------------------------------------
+
+/** Lado do quadrado. Cresce na altura só quando há muitas saídas (menu). */
+export const LADO_DO_NO = 88;
+const PASSO_DA_SAIDA = 24;
+
+export function alturaDoQuadrado(saidas: number): number {
+  return Math.max(LADO_DO_NO, saidas * PASSO_DA_SAIDA + 16);
+}
+
+// Mola curta e firme (mesma do canvas de automações). Só transform/opacity.
+const MOLA: Transition = { type: "spring", stiffness: 420, damping: 30, mass: 0.8 };
+
+// Luz fraca vinda de cima: o quadrado parece elevado sem sombra em repouso.
+const LUZ_DE_CIMA = "linear-gradient(180deg, color-mix(in srgb, var(--text-primary) 6%, transparent), transparent 62%)";
+
+const BRILHO_SELECIONADO =
+  "border-accent-solid shadow-[0_0_0_1px_var(--accent-solid),0_0_24px_-6px_color-mix(in_srgb,var(--accent-solid)_50%,transparent)]";
+const BRILHO_FALHOU =
+  "border-danger shadow-[0_0_0_1px_var(--danger-solid),0_0_20px_-6px_color-mix(in_srgb,var(--danger-solid)_55%,transparent)]";
+
+// Ponto de ligação: pequeno, com um anel na cor do fundo para descolar do
+// quadrado. Arrastável (é por ele que se liga o fio à mão).
+const ALCA = "!h-2.5 !w-2.5 !min-h-0 !min-w-0 !rounded-full !border-2 !border-page";
+const ALCA_PADRAO = "!bg-border-strong";
+const ALCA_ACESA = "!bg-accent-solid";
+const ALCA_DA_IA = "!bg-cat-indigo-solid";
+
+/** Uma linha de resumo do bloco, para baixo do nome. Nunca o texto inteiro. */
+export function resumoDoBloco(data: FlowNodeData): { texto: string; mono: boolean } {
+  const primeiraLinha = (t?: string) => (t ?? "").split("\n").map((l) => l.trim()).find(Boolean) ?? "";
+  const k = data.iconKey;
+  if ((k === "http" || k === "tool-http" || k === "webhook") && (data.httpUrl || data.webhookUrl)) {
+    const url = data.httpUrl || data.webhookUrl;
+    return { texto: k === "webhook" ? `${url}` : `${data.httpMethod ?? "POST"} ${url}`, mono: true };
+  }
+  if (k === "wait" && data.waitDuration) return { texto: `Espera ${data.waitDuration} ${data.waitUnit ?? "minutos"}`, mono: false };
+  if (k === "condition" && data.conditionExpression) return { texto: primeiraLinha(data.conditionExpression), mono: true };
+  if (k === "variable" && data.variableName) return { texto: `→ {${data.variableName}}`, mono: true };
+  if (k === "email" && data.emailTo) return { texto: `para: ${data.emailTo}`, mono: true };
+  if (k === "ai-agent") {
+    const coleta = (data.collectVars ?? []).filter((v) => v.key.trim()).length;
+    const fonte = fonteDaIa(data) === "conexao" ? "Central de IA" : data.aiModel || "modelo não escolhido";
+    return { texto: coleta > 0 ? `${fonte} · coleta ${coleta} dado${coleta === 1 ? "" : "s"}` : fonte, mono: false };
+  }
+  if (k === "tool-mcp") {
+    const n = (data.mcpTools ?? []).length;
+    return { texto: n > 0 ? `${n} ferramenta${n === 1 ? "" : "s"}` : "Todas as ferramentas", mono: false };
+  }
+  if (k === "tool-knowledge") return { texto: "Busca nos documentos", mono: false };
+  // Mensagem e pergunta: o começo do que o agente diz é o melhor resumo.
+  if (k === "message" || k === "capture") {
+    const fala = primeiraLinha(data.detail);
+    if (fala) return { texto: fala, mono: false };
+  }
+  if (k === "capture" && data.variableName) return { texto: `→ {${data.variableName}}`, mono: true };
+  return { texto: data.kind ?? "", mono: false };
+}
+
+// Pulso do fio, brilho do caminho ativo e foco do nó. <style> local porque o
+// CSS global é de outro dono; tudo com prefixo "fluxo-agente".
+// pathLength=100 no traço: o pulso leva o mesmo tempo em fio curto ou longo.
+export const CSS_DO_FLUXO_DO_AGENTE = `
+@keyframes fluxo-agente-pulso { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+.fluxo-agente .fluxo-agente-brilho { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent-solid) 75%, transparent)); }
+.fluxo-agente .fluxo-agente-pulso { stroke-dasharray: 9 91; animation: fluxo-agente-pulso 1.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .fluxo-agente .fluxo-agente-pulso { animation-duration: 5.4s; } }
+.fluxo-agente .react-flow__node:focus-visible { outline: none; }
+.fluxo-agente .react-flow__node:focus-visible .fluxo-agente-quadrado { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.fluxo-agente .react-flow__connection-path { stroke: var(--accent-solid); stroke-width: 1.75px; }
+`;
+
 /**
- * Uma linha por saída nomeada (Sim / Não, cada opção do menu, Respondeu /
- * Não respondeu certo), com o ponto de ligação NA linha: o ponto fica
- * alinhado ao texto que ele representa, em vez de espalhado pela altura do
- * cartão. A linha estica até a borda direita do cartão (-mr/pr do padding)
- * para o ponto cair em cima da borda.
+ * Dados que o canvas inteiro compartilha com os nós: a última execução e a
+ * cascata de entrada. Ficam num contexto (e não num nodeTypes recriado) para
+ * os nós não serem desmontados quando a execução chega.
  */
-function LinhaDeSaida({ saida, indice, menu }: { saida: Saida; indice: number; menu: boolean }) {
+export interface CanvasDoAgente {
+  execucao?: Record<string, NodeRunState>;
+  /** Primeiros instantes do canvas: os nós entram em cascata da esquerda. */
+  abrindo: boolean;
+  xInicial: number;
+}
+
+export const CanvasDoAgenteContext = React.createContext<CanvasDoAgente>({ abrindo: false, xInicial: 0 });
+
+/**
+ * Saída do bloco, na lateral direita do quadrado. Quando há mais de uma e a
+ * saída ainda não tem fio, o nome dela aparece ao lado do ponto (com fio, o
+ * nome já está no meio da ligação).
+ */
+function PontoDeSaida({ saida, topo, aceso, mostrarNome }: { saida: Saida; topo: number; aceso: boolean; mostrarNome: boolean }) {
   const estilo = ESTILO_DA_SAIDA[saida.tipo];
+  const ligacoes = useNodeConnections({ handleType: "source", handleId: saida.id ?? undefined });
+  // Saída padrão de um bloco que também tem nomeadas: o hook sem handleId
+  // traria todas; filtra pela saída sem id.
+  const livre = !ligacoes.some((l) => (l.sourceHandle ?? null) === saida.id);
   return (
-    <div className="relative -mr-3.5 pr-3.5">
-      {menu ? (
-        <div className="flex items-center gap-2 rounded-md border border-border-subtle bg-raised px-2 py-1.5 text-caption text-text-secondary">
-          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-caption font-semibold text-accent-fg">
-            {indice + 1}
-          </span>
-          <span className="truncate">{saida.rotulo}</span>
-        </div>
-      ) : (
-        <p className={cn("py-1 text-right text-caption font-medium", estilo.texto)}>{saida.rotulo}</p>
-      )}
+    <>
       <Handle
         id={saida.id ?? undefined}
         type="source"
         position={Position.Right}
-        aria-label={`Saída: ${saida.rotulo}`}
-        className={cn(HANDLE_DOT, estilo.ponto)}
+        aria-label={saida.rotulo ? `Saída: ${saida.rotulo}` : "Saída"}
+        style={{ top: topo }}
+        className={cn(ALCA, aceso ? ALCA_ACESA : saida.tipo === "padrao" ? ALCA_PADRAO : estilo.ponto)}
       />
-    </div>
+      {mostrarNome && saida.rotulo && livre && (
+        <span
+          aria-hidden="true"
+          style={{ top: topo }}
+          className={cn(
+            "pointer-events-none absolute left-[calc(100%+10px)] max-w-[104px] -translate-y-1/2 truncate font-mono text-caption leading-4",
+            estilo.texto
+          )}
+        >
+          {saida.rotulo}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -270,26 +284,32 @@ export function FlowNode({
   data,
   selected,
   run,
-  onDetailChange,
+  atraso = 0,
 }: {
   /** id do nó no canvas: com ele, o React Flow remede os pontos quando as saídas mudam. */
   id?: string;
   data: FlowNodeData;
   selected?: boolean;
   run?: NodeRunState;
-  onDetailChange?: (text: string) => void;
+  /** Atraso da entrada em cascata (s); só na abertura do canvas. */
+  atraso?: number;
 }) {
+  const calmo = useReducedMotion();
   const Icon = ICON_REGISTRY[data.iconKey] ?? ICON_REGISTRY.message;
-  const style = BLOCK_STYLES[data.iconKey] ?? BLOCK_STYLES.message;
+  const cor = CATEGORY_CLASSES[BLOCK_CATEGORY[data.iconKey as IconKey] ?? "blue"];
   const isAiAgent = data.iconKey === "ai-agent";
   const isTool = ehFerramenta(data.iconKey);
-  // Motivo pelo qual o bloco não vai funcionar, se houver. Aparece como um
-  // ponto de aviso no card e o texto ao passar o mouse.
+  const inicio = data.iconKey === "start";
+  const fim = data.iconKey === "end";
+  // Motivo pelo qual o bloco não vai funcionar, se houver: marcador no canto
+  // e o texto ao passar o mouse.
   const problema = validateNode(data);
   const saidas = saidasDoBloco(data);
-  const comRotulo = saidas.length > 1 || saidas.some((s) => s.rotulo);
-  const isMenu = saidas.some((s) => s.tipo === "opcao");
-  const editableDetail = onDetailChange && data.iconKey !== "condition" && data.iconKey !== "start";
+  const altura = alturaDoQuadrado(saidas.length);
+  const varias = saidas.length > 1 || saidas.some((s) => s.rotulo);
+  const resumo = resumoDoBloco(data);
+  const aceso = !!run?.ok;
+  const falhou = !!run && !run.ok;
 
   // Opção de menu criada/apagada ou condição trocada: os pontos mudam de
   // lugar e o React Flow precisa medir de novo, senão a ligação sai do lugar
@@ -300,88 +320,145 @@ export function FlowNode({
     if (id) updateNodeInternals(id);
   }, [id, assinaturaDasSaidas, updateNodeInternals]);
 
+  const entrada = { ...MOLA, delay: atraso };
+  const dica = [data.label, problema].filter(Boolean).join(" · ");
+
   return (
-    <div
-      className={cn(
-        "relative w-[230px] cursor-pointer rounded-[14px] border border-l-[3px] bg-panel p-3.5 transition-colors",
-        style.border,
-        selected ? "border-border-strong ring-2 ring-focus/40" : "border-border-subtle",
-        problema && !selected && "ring-1 ring-warning/40",
-        // A execução fala mais alto que o aviso de configuração: um bloco que
-        // acabou de quebrar em produção importa mais que um campo em branco.
-        run && !selected && (run.ok ? "ring-1 ring-success/50" : "ring-2 ring-danger/70")
-      )}
-    >
-      {run && (
-        <span
-          title={run.error ?? `Rodou em ${run.ms} ms na última execução`}
+    // A caixa medida pelo React Flow: o quadrado em cima e o nome embaixo.
+    // A escala da entrada/hover vive numa camada de dentro do quadrado, para
+    // não mexer nos pontos de ligação nem nos fios.
+    <div className={cn("relative flex flex-col items-center", isAiAgent && "pb-5")} style={{ width: LADO_DO_NO }}>
+      <div className="relative" style={{ width: LADO_DO_NO, height: altura }}>
+        {!isTool && data.hasTarget !== false && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            aria-label="Entrada"
+            style={{ top: LADO_DO_NO / 2 }}
+            className={cn(ALCA, aceso ? ALCA_ACESA : ALCA_PADRAO)}
+          />
+        )}
+
+        <motion.div
+          initial={calmo ? { opacity: 0 } : { opacity: 0, scale: 0.82 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={calmo ? undefined : { scale: 1.04 }}
+          whileTap={calmo ? undefined : { scale: 0.97 }}
+          transition={entrada}
+          title={dica}
+          style={{ backgroundImage: LUZ_DE_CIMA }}
           className={cn(
-            "absolute -top-2 left-3 inline-flex items-center gap-1 rounded-full border px-1.5 font-mono text-caption tabular-nums",
-            run.ok ? "border-success/30 bg-success-subtle text-success" : "border-danger/30 bg-danger-subtle text-danger"
+            "fluxo-agente-quadrado absolute inset-0 flex items-center justify-center border bg-panel transition-[border-color,box-shadow] duration-200",
+            // Início com a frente redonda (é por onde a conversa começa),
+            // Encerrar com o fim redondo; ferramenta é redonda: fica pendurada
+            // no bloco de IA, não no caminho da conversa.
+            isTool ? "rounded-full" : inicio ? "rounded-[20px] rounded-l-[44px]" : fim ? "rounded-[20px] rounded-r-[44px]" : "rounded-[20px]",
+            selected
+              ? BRILHO_SELECIONADO
+              : falhou
+                ? BRILHO_FALHOU
+                : aceso
+                  ? "border-[color-mix(in_srgb,var(--accent-solid)_60%,transparent)]"
+                  : "border-border-default hover:border-border-strong"
           )}
         >
-          {run.ok ? `${run.ms} ms` : "erro"}
-        </span>
-      )}
-      {problema && (
-        <span
-          title={problema}
-          aria-label={problema}
-          className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full border border-warning/40 bg-warning-subtle text-caption font-semibold text-warning"
-        >
-          !
-        </span>
-      )}
-      {/* Fluxo principal: horizontal (esquerda→direita), igual n8n. Ferramentas
-          de um Agente de IA são a exceção — continuam verticais (porta embaixo),
-          mesma convenção do n8n pros sub-inputs de IA (modelo/ferramenta/memória). */}
-      {!isTool && data.hasTarget !== false && (
-        <Handle type="target" position={Position.Left} aria-label="Entrada" className={cn(HANDLE_DOT, "!left-0")} />
-      )}
-      <div className="flex items-center gap-2.5">
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-[9px]", style.badgeBg, style.badgeText)}>
-          <Icon size={15} />
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-small font-medium text-text-primary">{data.label}</p>
-          {data.kind && <p className="truncate text-caption text-text-tertiary">{data.kind}</p>}
-        </div>
+          <Icon size={30} strokeWidth={1.6} aria-hidden="true" className={cor.fg} />
+
+          {/* Canto: X se falhou na última execução, marcador se falta algo,
+              check discreto se está pronto. */}
+          {falhou ? (
+            <span
+              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-danger-solid text-text-on-danger"
+              title={run?.error ?? "Falhou na última execução"}
+            >
+              <X size={11} aria-hidden="true" />
+            </span>
+          ) : problema ? (
+            <span
+              className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-warning/50 bg-warning-subtle text-warning"
+              title={problema}
+              aria-label={problema}
+            >
+              <AlertCircle size={11} aria-hidden="true" />
+            </span>
+          ) : !fim && !isTool ? (
+            <Check
+              size={12}
+              strokeWidth={2.4}
+              aria-label="Configurado"
+              className={cn("absolute right-2.5 top-2.5", aceso ? "text-accent-fg" : "text-text-tertiary opacity-70")}
+            />
+          ) : null}
+
+          {run && (
+            <span
+              title={run.error ?? `Rodou em ${run.ms} ms na última execução`}
+              className={cn(
+                "absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-raised px-1.5 font-mono text-caption leading-4 tabular-nums",
+                run.ok ? "border-border-subtle text-text-secondary" : "border-danger/40 text-danger"
+              )}
+            >
+              {run.ok ? `${run.ms} ms` : "erro"}
+            </span>
+          )}
+        </motion.div>
+
+        {saidas.map((s, i) => (
+          <PontoDeSaida
+            key={s.id ?? "padrao"}
+            saida={s}
+            topo={saidas.length === 1 ? LADO_DO_NO / 2 : ((i + 1) / (saidas.length + 1)) * altura}
+            aceso={aceso && saidas.length === 1}
+            mostrarNome={varias}
+          />
+        ))}
+
+        {isTool && (
+          <Handle
+            type="source"
+            position={Position.Top}
+            aria-label="Ligar a um bloco de IA"
+            className={cn(ALCA, ALCA_DA_IA)}
+          />
+        )}
       </div>
 
-      {editableDetail ? (
-        <AutoTextarea value={data.detail ?? ""} onCommit={(text) => onDetailChange!(text)} />
-      ) : (
-        data.detail && <p className="mt-2.5 line-clamp-2 text-caption leading-relaxed text-text-secondary">{data.detail}</p>
-      )}
+      {/* Nome e resumo embaixo do quadrado: uma linha cada, cortadas. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, delay: atraso + 0.08 }}
+        className="mt-3 flex w-[176px] flex-col items-center gap-0.5 text-center"
+      >
+        <p className={cn("max-w-full truncate text-small font-medium leading-tight", selected ? "text-accent-fg" : "text-text-primary")}>
+          {data.label}
+        </p>
+        {resumo.texto && (
+          <p className={cn("max-w-full truncate text-caption leading-tight text-text-tertiary", resumo.mono && "font-mono")}>{resumo.texto}</p>
+        )}
+      </motion.div>
 
-      <ConfigPreview data={data} />
-
-      {comRotulo ? (
-        <div className={cn("mt-2.5 flex flex-col", isMenu ? "gap-1.5" : "gap-0.5")}>
-          {saidas.map((s, i) => (
-            <LinhaDeSaida key={s.id ?? "padrao"} saida={s} indice={i} menu={isMenu} />
-          ))}
-        </div>
-      ) : (
-        saidas.length === 1 && (
-          <Handle type="source" position={Position.Right} aria-label="Saída" className={cn(HANDLE_DOT, "!right-0")} />
-        )
-      )}
-
-      {/* Porta de ferramentas do Agente de IA — embaixo, igual n8n. Só
-          ferramenta liga aqui (ver isValidConnection no builder). */}
+      {/* Porta de ferramentas do bloco de IA: embaixo, depois do nome (o fio
+          da ferramenta sobe sem passar por cima do texto). Só ferramenta liga
+          aqui (ver isValidConnection no builder). */}
       {isAiAgent && (
-        <Handle
-          id="tools"
-          type="target"
-          position={Position.Bottom}
-          aria-label="Ferramentas"
-          className={cn(HANDLE_DOT, "!bottom-0 !bg-cat-purple-solid")}
-        />
-      )}
-      {isTool && (
-        <Handle type="source" position={Position.Top} aria-label="Ligar a um bloco de IA" className={cn(HANDLE_DOT, "!top-0 !bg-cat-purple-solid")} />
+        <>
+          <Handle id="tools" type="target" position={Position.Bottom} aria-label="Ferramentas" className={cn(ALCA, ALCA_DA_IA)} />
+          <span aria-hidden="true" className="pointer-events-none absolute bottom-0 left-[calc(50%+10px)] translate-y-1/2 font-mono text-caption leading-4 text-text-tertiary">
+            ferramentas
+          </span>
+        </>
       )}
     </div>
   );
 }
+
+/** O nó do React Flow: lê a execução e a cascata do contexto do canvas. */
+export const NoDoFluxo = React.memo(function NoDoFluxo({ id, data, selected, positionAbsoluteX }: NodeProps<Node<FlowNodeData>>) {
+  const canvas = React.useContext(CanvasDoAgenteContext);
+  // A cascata é decidida na montagem: bloco novo depois entra na hora.
+  const [atraso] = React.useState(() =>
+    canvas.abrindo ? Math.min(Math.max(0, Math.round((positionAbsoluteX - canvas.xInicial) / 320)), 8) * 0.07 : 0
+  );
+  return <FlowNode id={id} data={data} selected={selected} run={canvas.execucao?.[id]} atraso={atraso} />;
+});

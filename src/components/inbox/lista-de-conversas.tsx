@@ -13,6 +13,7 @@ import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { AvatarDoContato, QuadradoDoAgente } from "./avatar";
 import {
   NOME_DO_CANAL, horaCurta,
@@ -69,7 +70,7 @@ function EstadoDaConversa({ c }: { c: Conversa }) {
   }
   return (
     <span className="inline-flex items-center gap-1 text-caption text-text-tertiary">
-      <Bot size={12} aria-hidden="true" /> Agente
+      {c.agentId ? <OrbeDoAgente agenteId={c.agentId} tamanho={16} leve /> : <Bot size={12} aria-hidden="true" />} Agente
     </span>
   );
 }

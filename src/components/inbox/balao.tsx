@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { horaDaMensagem, tamanhoLegivel, type Mensagem } from "./tipos";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 
 /** Os tiques que todo mundo já conhece do WhatsApp. Ficam dentro do balão azul. */
 function Entrega({ m, onReenviar }: { m: Mensagem; onReenviar: () => void }) {
@@ -103,12 +104,14 @@ function Anexo({ m, doContato }: { m: Mensagem; doContato: boolean }) {
 }
 
 export function Balao({
-  m, onReenviar, mostrarAutor = true,
+  m, onReenviar, mostrarAutor = true, agenteId,
 }: {
   m: Mensagem;
   onReenviar: (m: Mensagem) => void;
   /** Só o primeiro balão de uma sequência do mesmo autor leva o rótulo. */
   mostrarAutor?: boolean;
+  /** Agente da conversa: o rótulo das falas dele leva a orbe do agente. */
+  agenteId?: string;
 }) {
   // Nota interna: aparece na linha do tempo, mas é visualmente outra coisa. Se
   // parecesse uma mensagem, alguém acabaria achando que o cliente leu.
@@ -148,9 +151,9 @@ export function Balao({
     <div className={cn("flex flex-col", doContato ? "items-start" : "items-end", mostrarAutor && !doContato && "mt-2")}>
       {!doContato && mostrarAutor && (
         doAgente ? (
-          // A IA é marcada pelo símbolo da Eva, não por cor.
+          // A IA é marcada pela orbe do agente (ou, sem o id, pelo símbolo da Eva), não por cor.
           <span className="mb-1 inline-flex h-5 items-center gap-1 rounded-full bg-raised px-2 text-caption font-medium text-text-secondary">
-            <MarcaEva size={12} />
+            {agenteId ? <OrbeDoAgente agenteId={agenteId} tamanho={16} leve className="-ml-1" /> : <MarcaEva size={12} />}
             Agente de IA
           </span>
         ) : (

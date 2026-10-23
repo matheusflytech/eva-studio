@@ -145,21 +145,7 @@ export function LinhaDoAgente({ agent }: { agent: AgentOverview }) {
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-body font-medium text-text-primary">{agent.name}</span>
-        {passo.tom === "ok" ? (
-          <span className={cn("truncate text-small", TOM.ok)}>{passo.texto}</span>
-        ) : (
-          <Link
-            href={passo.href}
-            className={cn(
-              "relative z-10 inline-flex max-w-full items-center gap-1.5 self-start truncate text-small hover:underline",
-              TOM[passo.tom]
-            )}
-          >
-            {passo.icone}
-            <span className="truncate">{passo.texto}</span>
-            {passo.tom === "urgente" && <ArrowRight size={13} aria-hidden="true" className="shrink-0" />}
-          </Link>
-        )}
+        <TextoDoPasso passo={passo} />
       </div>
 
       <span
@@ -180,6 +166,69 @@ export function LinhaDoAgente({ agent }: { agent: AgentOverview }) {
         )}
       </span>
       <ChevronRight size={15} aria-hidden="true" className="shrink-0 text-text-tertiary" />
+    </div>
+  );
+}
+
+/** Próximo passo: link próprio (por cima do link do cartão/linha) ou, se está tudo certo, só o texto. */
+function TextoDoPasso({ passo }: { passo: ProximoPasso }) {
+  if (passo.tom === "ok") return <span className={cn("truncate text-small", TOM.ok)}>{passo.texto}</span>;
+  return (
+    <Link
+      href={passo.href}
+      className={cn(
+        "relative z-10 inline-flex max-w-full items-center gap-1.5 self-start truncate text-small hover:underline",
+        TOM[passo.tom]
+      )}
+    >
+      {passo.icone}
+      <span className="truncate">{passo.texto}</span>
+      {passo.tom === "urgente" && <ArrowRight size={13} aria-hidden="true" className="shrink-0" />}
+    </Link>
+  );
+}
+
+/**
+ * Cartão de um agente na grade do desktop (≥1280px). Os mesmos dados e links
+ * da linha: orbe maior, status, nome com o próximo passo e as conversas da
+ * semana. O cartão inteiro abre o agente; o próximo passo leva aonde se resolve.
+ */
+export function CartaoDoAgente({ agent }: { agent: AgentOverview }) {
+  const passo = proximoPasso(agent);
+  const situacao = situacaoDoAgente(agent);
+  const n = agent.conversas7d;
+
+  return (
+    <div className="group relative flex min-h-[188px] flex-col gap-4 rounded-[18px] border border-border-subtle bg-panel p-4 transition-colors hover:bg-raised">
+      <Link
+        href={`/agent-studio/${agent.id}`}
+        aria-label={`Abrir ${agent.name}`}
+        className="absolute inset-0 rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      />
+      <div className="flex items-start justify-between gap-3">
+        <OrbeDoAgente agenteId={agent.id} tamanho={56} leve />
+        {situacao === "atendendo" ? (
+          <Badge variant="success" dot>Atendendo</Badge>
+        ) : (
+          <Badge>{situacao === "rascunho" ? "Rascunho" : "Pausado"}</Badge>
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="truncate text-body font-semibold text-text-primary">{agent.name}</span>
+        <TextoDoPasso passo={passo} />
+      </div>
+
+      <div className="mt-auto flex items-center gap-2 border-t border-border-subtle pt-3">
+        <span
+          className={cn("text-small tabular-nums", n === 0 ? "text-text-tertiary" : "text-text-secondary")}
+          title="Conversas nos últimos 7 dias"
+        >
+          {n === 0 ? "Sem conversas" : `${n} ${n === 1 ? "conversa" : "conversas"}`}
+          <span className="text-text-tertiary"> nos últimos 7 dias</span>
+        </span>
+        <ChevronRight size={15} aria-hidden="true" className="ml-auto shrink-0 text-text-tertiary" />
+      </div>
     </div>
   );
 }

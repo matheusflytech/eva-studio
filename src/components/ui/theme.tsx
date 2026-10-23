@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { flushSync } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
 import {
   CANVAS_STORAGE_KEY,
@@ -76,6 +78,43 @@ export function setThemePreference(pref: ThemePreference) {
   window.dispatchEvent(new Event(EVENTO));
 }
 
+/**
+ * Troca o tema com a revelação em círculo a partir de onde se clicou (View
+ * Transitions: o tema novo cresce por cima do antigo, só clip-path). Com
+ * "reduzir movimento", um esmaecer curto. Sem suporte, troca direto.
+ */
+export function trocarTema(pref: ThemePreference, origem?: { x: number; y: number }) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => { ready: Promise<void> } };
+  const antes = document.documentElement.getAttribute("data-theme");
+  const depois = resolveTheme(pref, sistemaEscuro());
+  if (!doc.startViewTransition || antes === depois) return setThemePreference(pref);
+  const calmo = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.documentElement.classList.add("trocando-tema");
+  const t = doc.startViewTransition(() => flushSync(() => setThemePreference(pref)));
+  void t.ready
+    .then(() => {
+      const x = origem?.x ?? window.innerWidth / 2;
+      const y = origem?.y ?? window.innerHeight / 2;
+      const raio = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+      const anim = calmo
+        ? document.documentElement.animate({ opacity: [0, 1] }, { duration: 320, easing: "ease-out", pseudoElement: "::view-transition-new(root)" })
+        : document.documentElement.animate(
+            { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${raio}px at ${x}px ${y}px)`] },
+            // Medido no vídeo do Lumen: ~0,25 s acelerando até cobrir. Aqui um pouco mais
+            // longo porque a tela do desktop é maior; acelera e termina fora da tela.
+            { duration: 420, easing: "cubic-bezier(0.5, 0, 0.75, 0)", pseudoElement: "::view-transition-new(root)" }
+          );
+      return anim.finished;
+    })
+    .catch(() => undefined)
+    .finally(() => document.documentElement.classList.remove("trocando-tema"));
+}
+
+const centroDe = (el: Element) => {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+};
+
 export function useTheme(): {
   preference: ThemePreference;
   resolved: ResolvedTheme;
@@ -100,7 +139,8 @@ const ROTULO: Record<ThemePreference, string> = {
 
 /** Botão que alterna sistema → claro → escuro. */
 export function ThemeToggle({ className }: { className?: string }) {
-  const { preference, setPreference } = useTheme();
+  const { preference } = useTheme();
+  const calmo = useReducedMotion();
   const Icone = preference === "light" ? Sun : preference === "dark" ? Moon : Monitor;
   return (
     <IconButton
@@ -108,9 +148,21 @@ export function ThemeToggle({ className }: { className?: string }) {
       tooltip={ROTULO[preference]}
       variant="secondary"
       className={className}
-      onClick={() => setPreference(nextThemePreference(preference))}
+      onClick={(e) => trocarTema(nextThemePreference(preference), centroDe(e.currentTarget))}
     >
-      <Icone />
+      {/* O ícone gira para dentro com mola, como uma tecla que vira. */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={preference}
+          className="inline-flex"
+          initial={calmo ? { opacity: 0 } : { opacity: 0, rotate: -90, scale: 0.4 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={calmo ? { opacity: 0 } : { opacity: 0, rotate: 90, scale: 0.4 }}
+          transition={{ type: "spring", stiffness: 520, damping: 30, mass: 0.7 }}
+        >
+          <Icone />
+        </motion.span>
+      </AnimatePresence>
     </IconButton>
   );
 }
@@ -123,13 +175,14 @@ const OPCOES_DE_TEMA: { value: ThemePreference; label: string; icon: React.React
 
 /** Escolha explícita do tema (Configurações → Sua conta). */
 export function ThemeChooser({ className }: { className?: string }) {
-  const { preference, setPreference } = useTheme();
+  const { preference } = useTheme();
   return (
     <SegmentedControl
       label="Tema"
       options={OPCOES_DE_TEMA}
       value={preference}
-      onChange={setPreference}
+      // A revelação nasce do segmento clicado (é ele que está com o foco).
+      onChange={(p) => trocarTema(p, document.activeElement instanceof HTMLElement ? centroDe(document.activeElement) : undefined)}
       className={className}
     />
   );

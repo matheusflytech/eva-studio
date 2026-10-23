@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useCanvasTheme, useTheme } from "@/components/ui/theme";
+import { trocarTema, useCanvasTheme, useTheme } from "@/components/ui/theme";
 import { focusRing } from "@/components/ui/styles";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn } from "@/lib/utils";
@@ -173,8 +173,14 @@ const OPCOES_DE_CANVAS: Opcao<CanvasPreference>[] = [
 
 /** Claro, Escuro ou Seguir o sistema (Configurações → Sua conta). */
 export function EscolhaDeTema() {
-  const { preference, setPreference } = useTheme();
-  return <EscolhaComMiniatura rotulo="Tema da interface" opcoes={OPCOES_DE_TEMA} valor={preference} mudar={setPreference} />;
+  const { preference } = useTheme();
+  // A revelação do tema novo nasce da miniatura clicada (é ela que está com o foco).
+  const mudar = (p: ThemePreference) => {
+    const el = document.activeElement;
+    const r = el instanceof HTMLElement ? el.getBoundingClientRect() : null;
+    trocarTema(p, r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined);
+  };
+  return <EscolhaComMiniatura rotulo="Tema da interface" opcoes={OPCOES_DE_TEMA} valor={preference} mudar={mudar} />;
 }
 
 /** Canvas do builder: acompanha o tema do app ou fica sempre escuro. */

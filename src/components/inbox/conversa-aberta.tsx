@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { AvatarDoContato } from "./avatar";
 import { Balao } from "./balao";
 import { Compositor, type AnexoPreparado } from "./compositor";
@@ -299,7 +300,14 @@ export function ConversaAberta({
               <Badge variant="danger" dot>{tempoDeEspera(conversa.lastMessageAt)}</Badge>
             )}
             {conversa.status === "active" && (
-              <span className="inline-flex shrink-0 items-center gap-1"><Bot size={12} aria-hidden="true" /> Agente respondendo</span>
+              <span className="inline-flex shrink-0 items-center gap-1">
+                {conversa.agentId ? (
+                  <OrbeDoAgente agenteId={conversa.agentId} tamanho={16} leve />
+                ) : (
+                  <Bot size={12} aria-hidden="true" />
+                )}
+                Agente respondendo
+              </span>
             )}
             {conversa.status === "human" && (
               <span className="inline-flex shrink-0 items-center gap-1 text-text-secondary">
@@ -420,7 +428,7 @@ export function ConversaAberta({
                 b.tipo === "dia" ? (
                   <p key={b.chave} className="mb-1 mt-2 text-center text-caption text-text-tertiary">{b.rotulo}</p>
                 ) : (
-                  <Balao key={b.m.id} m={b.m} mostrarAutor={b.mostrarAutor} onReenviar={reenviar} />
+                  <Balao key={b.m.id} m={b.m} mostrarAutor={b.mostrarAutor} onReenviar={reenviar} agenteId={conversa.agentId || undefined} />
                 )
               )}
             </div>

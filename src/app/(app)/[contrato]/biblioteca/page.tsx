@@ -27,7 +27,8 @@ import { SeletorDeAgente } from "@/components/biblioteca/seletor-de-agente";
 // v5: uma linha por modelo (ícone, nome, frase curta com a contagem de
 // blocos, Aplicar). A ordem dos blocos e o aviso de que aplicar substitui o
 // fluxo atual (destrutivo, sem desfazer) ficam na confirmação, com o nome do
-// agente que vai perder o fluxo. O agente mora ao lado do título.
+// agente que vai perder o fluxo. O agente mora ao lado do título. No desktop
+// (≥1280px) as linhas viram cartões numa grade de 2 colunas.
 // ---------------------------------------------------------------------------
 
 type Template = (typeof FLOW_TEMPLATES)[number];
@@ -81,14 +82,15 @@ function ModelosDeFluxo({ agentId, agenteNome, semAgentes }: { agentId: string; 
   const blocosDoAberto = aberto ? aberto.build().nodes.filter((n) => n.data.iconKey !== "start") : [];
 
   return (
-    <div className="flex max-w-3xl flex-col">
+    <div className="flex w-full flex-col">
       {erro && (
         <Notice tone="danger" onDismiss={() => setErro(null)} className="mb-3">
           {erro}
         </Notice>
       )}
 
-      <ul className="flex flex-col">
+      {/* Ocupa a largura: linhas abaixo de 1280px, grade de cartões em 2 colunas acima. */}
+      <ul className="flex flex-col xl:grid xl:grid-cols-2 xl:gap-3">
         {FLOW_TEMPLATES.map((tpl) => {
           const { nodes } = tpl.build();
           const chaves = nodes.map((n) => n.data.iconKey as IconKey);
@@ -100,7 +102,11 @@ function ModelosDeFluxo({ agentId, agenteNome, semAgentes }: { agentId: string; 
               ref={(el) => {
                 linhaRef.current[tpl.id] = el;
               }}
-              className="flex min-h-[72px] items-center gap-3.5 border-b border-border-subtle px-1 py-3 last:border-b-0"
+              className={cn(
+                "flex min-h-[72px] items-center gap-3.5 px-1 py-3",
+                "max-xl:border-b max-xl:border-border-subtle max-xl:last:border-b-0",
+                "xl:min-h-[96px] xl:rounded-[18px] xl:border xl:border-border-subtle xl:bg-panel xl:px-4 xl:py-4"
+              )}
             >
               <span
                 className={cn(
@@ -113,7 +119,7 @@ function ModelosDeFluxo({ agentId, agenteNome, semAgentes }: { agentId: string; 
               {/* Clicar no nome abre a ordem completa dos blocos antes de aplicar. */}
               <button type="button" onClick={() => setAberto(tpl)} className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-[10px] text-left">
                 <span className="truncate text-body font-medium text-text-primary hover:underline">{tpl.name}</span>
-                <span className="truncate text-small text-text-tertiary">
+                <span className="truncate text-small text-text-tertiary xl:line-clamp-2 xl:whitespace-normal">
                   {foiAplicado && <span className="font-medium text-success">Aplicado · </span>}
                   {tpl.description} · <span className="font-mono tabular-nums">{nodes.length}</span> blocos
                 </span>
