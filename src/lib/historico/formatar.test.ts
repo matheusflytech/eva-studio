@@ -77,6 +77,16 @@ describe("formatarMudancas", () => {
     expect(formatarMudancas("deal", m, d, { semEtapa: true }).map((x) => x.campo)).toEqual(["name"]);
   });
 
+  it("probabilidade que mudou junto com a etapa some na ficha; mudada à mão, fica", () => {
+    const comEtapa = { stage_id: { de: "s1", para: "s2" }, probability: { de: 10, para: 30 } };
+    expect(formatarMudancas("deal", comEtapa, d, { semEtapa: true })).toEqual([]);
+    expect(formatarMudancas("deal", { probability: { de: 10, para: 50 } }, d, { semEtapa: true })).toEqual([{ campo: "probability", rotulo: "Probabilidade", de: "10%", para: "50%" }]);
+  });
+
+  it("previsão de fechamento gravada ao meio-dia UTC: só o dia", () => {
+    expect(formatarMudancas("deal", { expected_closing_at: { de: null, para: "2026-11-30T12:00:00.000Z" } }, d)[0].para).toBe("30/11/2026");
+  });
+
   it("id que não existe mais vira 'removido'; nulo vira 'vazio'", () => {
     expect(formatarMudancas("deal", { owner_id: { de: "u-saiu", para: null } }, d)).toEqual([{ campo: "owner_id", rotulo: "Responsável", de: "removido", para: "vazio" }]);
   });

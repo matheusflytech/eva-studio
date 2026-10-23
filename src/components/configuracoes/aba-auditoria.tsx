@@ -289,7 +289,8 @@ function LinhaDaAuditoria({ item, aberta, onAlternar }: { item: ItemDoHistorico;
       >
         <IconeDoAtor tipo={item.atorTipo} nome={item.atorNome} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-small text-text-primary">
+          {/* No celular o resumo quebra em até duas linhas em vez de virar "Apagou o …". */}
+          <span className="line-clamp-2 text-small text-text-primary sm:line-clamp-1">
             <span className="font-semibold">{item.atorNome}</span>
             <span className="text-text-secondary"> · {item.resumo}</span>
           </span>

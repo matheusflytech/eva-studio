@@ -79,6 +79,10 @@ const ROTULOS: Record<string, string> = {
 const IGNORADOS = new Set(["status", "closed_at", "stage_since", "position", "currency", "archived_at", "external_id", "created_at", "updated_at", "last_seen_at"]);
 /** Na ficha do negócio a etapa já tem o próprio item ("Movido de A para B"). */
 const DA_ETAPA = new Set(["stage_id", "pipeline_id"]);
+/** Muda sozinha quando a etapa muda (cada etapa tem a sua): junto com a etapa, some também. */
+const SEGUE_A_ETAPA = new Set(["probability"]);
+/** Datas de calendário (a API grava ao meio-dia UTC): só o dia, sem hora. */
+const DATAS_SEM_HORA = new Set(["expected_closing_at"]);
 
 const FUSO = "America/Sao_Paulo";
 const VAZIO = "vazio";
@@ -86,9 +90,10 @@ const ISO_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d
 
 const brl = (reais: number) => reais.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-function data(v: string): string {
+function data(v: string, semHora = false): string {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
+  if (semHora && !/^\d{4}-\d{2}-\d{2}$/.test(v) && !/T00:00:00(\.000)?Z$/.test(v)) return d.toLocaleDateString("pt-BR", { timeZone: FUSO });
   // Data sem hora (ou meia-noite UTC, como a API grava datas): o dia como está.
   if (/^\d{4}-\d{2}-\d{2}$/.test(v) || /T00:00:00(\.000)?Z$/.test(v)) return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
   return `${d.toLocaleDateString("pt-BR", { timeZone: FUSO })} ${d.toLocaleTimeString("pt-BR", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hour12: false })}`;
@@ -127,7 +132,7 @@ function valor(campo: string, v: unknown, d: Dicionario, def?: CampoDoDicionario
   if (def) {
     if (def.tipo === "currency" && typeof v === "number") return brl(v);
     if (def.tipo === "checkbox") return v === true || v === "true" ? "Sim" : "Não";
-    if (def.tipo === "date" && typeof v === "string") return data(v);
+    if (def.tipo === "date" && typeof v === "string") return data(v, true);
     if (def.tipo === "select") return def.opcoes?.find((o) => o.value === String(v))?.label ?? String(v);
     if (def.tipo === "multiselect" && Array.isArray(v)) return v.map((x) => def.opcoes?.find((o) => o.value === String(x))?.label ?? String(x)).join(", ");
   }
@@ -144,7 +149,7 @@ function valor(campo: string, v: unknown, d: Dicionario, def?: CampoDoDicionario
   }
   if (typeof v === "boolean") return v ? "Sim" : "Não";
   if (typeof v === "number") return v.toLocaleString("pt-BR");
-  if (typeof v === "string") return ISO_RE.test(v) && /^\d{4}-\d{2}-\d{2}/.test(v) ? data(v) : v;
+  if (typeof v === "string") return ISO_RE.test(v) && /^\d{4}-\d{2}-\d{2}/.test(v) ? data(v, DATAS_SEM_HORA.has(campo)) : v;
   if (Array.isArray(v)) return itensDaLista(campo, v, d).join(", ");
   return JSON.stringify(v);
 }
@@ -175,9 +180,11 @@ export function formatarMudancas(objeto: string, m: Mudancas | null, d: Dicionar
   if (!m) return [];
   const campos = d.campos[objeto] ?? {};
   const out: MudancaLegivel[] = [];
+  const mudouEtapa = "stage_id" in m;
   for (const [campo, mud] of Object.entries(m)) {
     if (IGNORADOS.has(campo)) continue;
     if (opcoes.semEtapa && DA_ETAPA.has(campo)) continue;
+    if (opcoes.semEtapa && mudouEtapa && SEGUE_A_ETAPA.has(campo)) continue;
     const def = campo.startsWith("custom_fields.") ? campos[campo.slice("custom_fields.".length)] : undefined;
     const rotulo = rotuloDoCampo(campo, def);
     const lista = def ? null : diferencaDeLista(campo, mud?.de, mud?.para, d);
