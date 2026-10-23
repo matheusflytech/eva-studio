@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, QrCode, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
 import { LogoDaMarca } from "@/components/ui/marca";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { CANAIS, type InfoDoCanal, type TipoDeCanal } from "@/lib/canais";
-import { ConectarCanal } from "./conectar-canal";
+import { ConectarCanal, ConectarWhatsAppQr } from "./conectar-canal";
 import { CabecalhoDaSecao, EsqueletoDeLista } from "./secao";
 
 interface CanalNaTela {
@@ -168,6 +168,8 @@ function CartaoDoCanal({
   aoConectar: (aviso?: string | null) => void;
   desconectar?: (c: CanalNaTela) => void;
 }) {
+  // QR pendente: a pessoa volta para ler o QR do canal que já existe.
+  const [qrDe, setQrDe] = React.useState<string | null>(null);
   return (
     <li className="flex flex-col gap-3 px-1 py-4">
       <div className="flex items-start gap-3.5">
@@ -202,10 +204,26 @@ function CartaoDoCanal({
               <Badge variant={SITUACAO[c.status].variant} dot>
                 {SITUACAO[c.status].rotulo}
               </Badge>
+              {c.tipo === "whatsapp_qr" && c.status !== "conectado" && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setQrDe(qrDe === c.id ? null : c.id)} aria-expanded={qrDe === c.id}>
+                  <QrCode size={14} aria-hidden="true" /> {qrDe === c.id ? "Esconder QR" : "Mostrar QR"}
+                </Button>
+              )}
               {desconectar && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => desconectar(c)} aria-label={`Desconectar ${c.rotulo}`}>
                   <Trash2 size={14} aria-hidden="true" /> Desconectar
                 </Button>
+              )}
+              {qrDe === c.id && (
+                <div className="basis-full rounded-[14px] bg-raised p-4">
+                  <ConectarWhatsAppQr
+                    canalInicial={c.id}
+                    aoConectar={(aviso) => {
+                      setQrDe(null);
+                      aoConectar(aviso);
+                    }}
+                  />
+                </div>
               )}
             </li>
           ))}

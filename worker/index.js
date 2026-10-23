@@ -227,7 +227,15 @@ async function startSession(chave) {
         await limparSessao(pool, MODO, chave);
         logger.info({ chave }, "WhatsApp desconectado (logout)");
       } else {
-        await setConnectionState(chave, { status: "requesting", lastError: "Conexão caiu, tentando de novo..." });
+        // 408: o QR expirou sem leitura; 515: o WhatsApp pede reinício logo depois
+        // de parear. Os dois são normais e não são erro para a pessoa. Os outros
+        // ficam com o código, para dar para saber o que houve sem os logs.
+        const normal = statusCode === DisconnectReason.timedOut || statusCode === DisconnectReason.restartRequired;
+        logger.warn({ chave, statusCode }, normal ? "Sessão reiniciando (normal)" : "Conexão caiu");
+        await setConnectionState(chave, {
+          status: "requesting",
+          lastError: normal ? null : `Conexão caiu (código ${statusCode ?? "desconhecido"}), tentando de novo...`,
+        });
         setTimeout(() => startSession(chave), 3000);
       }
     }
