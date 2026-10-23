@@ -56,6 +56,8 @@ async function chamar(url: string, init: RequestInit): Promise<ResultadoDaAcao> 
 function corpoParaN8n(ctx: CtxDaAcao, extra: unknown) {
   return {
     evento: "automacao.passo",
+    // true quando veio do botão Testar do editor: o fluxo do n8n pode ignorar
+    teste: ctx.teste,
     automacao_id: ctx.automacaoId,
     execucao_id: ctx.execucaoId,
     passo_id: ctx.noId,

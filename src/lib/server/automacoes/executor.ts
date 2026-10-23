@@ -10,6 +10,9 @@ import type { Definicao, No, Objeto, Regra } from "@/lib/automacoes/tipos";
 import { montarContexto } from "./contexto";
 import { MANIPULADORES, type ManipuladorDeAcao } from "./acoes";
 
+/** Ações que, no Testar, rodam de verdade: só falam com um sistema de fora (o n8n da pessoa) e não mudam nada no CRM. */
+const ENVIA_DE_VERDADE_NO_TESTE = new Set(["n8n.webhook"]);
+
 // ---------------------------------------------------------------------------
 // Executor das automações: pega uma execução (FOR UPDATE SKIP LOCKED com
 // lease de 60 s), anda até 20 passos e grava cada passo com o tempo em ms.
@@ -251,7 +254,9 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
     let r: Awaited<ReturnType<ManipuladorDeAcao>>;
     if (!manipulador) r = { ok: false, erro: `A ação “${item?.nome ?? noAcao.acao}” ainda não está disponível.` };
     // Teste (modo seguro): nenhuma ação muda nada; o passo mostra o que faria.
-    else if (exec.teste) r = { ok: true, saida: { simulado: true, faria: config } };
+    // Exceção: "Enviar para o n8n" envia de verdade (com "teste": true no corpo),
+    // senão não há como ver o fluxo do n8n receber antes de publicar.
+    else if (exec.teste && !ENVIA_DE_VERDADE_NO_TESTE.has(noAcao.acao)) r = { ok: true, saida: { simulado: true, faria: config } };
     else {
       try {
         r = await comAtor({ tipo: "automacao", automacaoId: exec.automacaoId, execucaoId: id, profundidade: exec.profundidade + 1 }, () =>

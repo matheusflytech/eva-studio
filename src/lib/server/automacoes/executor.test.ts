@@ -180,6 +180,25 @@ describe("executor", () => {
     expect(estado.automacao.falhasSeguidas).toBe(0);
   });
 
+  it("teste: “Enviar para o n8n” envia de verdade (marcado como teste); o resto segue simulado", async () => {
+    const d = semEspera();
+    // depois da tarefa, manda para o n8n
+    const tarefa = d.nos.tarefa;
+    if (tarefa.tipo !== "acao") throw new Error("o exemplo mudou: tarefa deveria ser uma ação");
+    tarefa.proximo = "n8n";
+    d.nos.n8n = { id: "n8n", tipo: "acao", acao: "n8n.webhook", config: { url: "https://n8n.exemplo.com/webhook/x" }, proximo: null };
+    novaExecucao(d, { teste: true });
+    const n8n = vi.fn<ManipuladorDeAcao>(async () => ({ ok: true, saida: { status: 200, ms: 12, resposta: { recebido: true } } }));
+    const criouTarefa = vi.fn(ok);
+    const r = await executarExecucao("x1", { manipuladores: manip({ "n8n.webhook": n8n, "task.create": criouTarefa }), agora: () => QUARTA_10H });
+    expect(r).toEqual({ status: "concluida" });
+    expect(criouTarefa).not.toHaveBeenCalled();
+    expect(n8n).toHaveBeenCalledTimes(1);
+    expect(n8n.mock.calls[0][1]).toMatchObject({ teste: true });
+    expect(estado.passos.find((p) => p.noId === "n8n")!.saida).toMatchObject({ status: 200, resposta: { recebido: true } });
+    expect(estado.passos.find((p) => p.noId === "tarefa")!.saida).toMatchObject({ simulado: true });
+  });
+
   it("registro apagado: cancela; ação que ainda não existe: falha clara", async () => {
     estado.contexto = null;
     novaExecucao(semEspera());
