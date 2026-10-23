@@ -281,6 +281,8 @@ interface EstadoDoQr {
   lastError: string | null;
   /** Quando o worker mexeu na sessão pela última vez. */
   atualizadoEm?: string | null;
+  /** Há quanto tempo o worker não mexe na sessão, medido pelo servidor. */
+  idadeMs?: number | null;
   /** Calculado na leitura: esperando QR sem mudança há tempo demais. */
   parado?: boolean;
 }
@@ -307,7 +309,7 @@ export function ConectarWhatsAppQr({ aoConectar, canalInicial = null }: { aoCone
           if (!vivo || !d?.connection) return;
           const c = d.connection as EstadoDoQr;
           const esperando = c.status === "requesting" || c.status === "qr_pending";
-          setEstado({ ...c, parado: esperando && !!c.atualizadoEm && Date.now() - Date.parse(c.atualizadoEm) > WORKER_PARADO_MS });
+          setEstado({ ...c, parado: esperando && typeof c.idadeMs === "number" && c.idadeMs > WORKER_PARADO_MS });
         })
         .catch(() => {});
     void ler();

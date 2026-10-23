@@ -27,6 +27,7 @@ import { PainelDeConfiguracoes, PainelDoPasso, type ConfigDaAutomacao } from "@/
 import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/components/automacoes/comum";
 import { FaixaDeExecucoes } from "@/components/automacoes/faixa-de-execucoes";
 import { TesteDeVerdade } from "@/components/automacoes/teste-de-verdade";
+import { motivoDoPasso, passosComProblema } from "@/lib/automacoes/teste";
 
 // ---------------------------------------------------------------------------
 // Editor da automação. Sempre se edita o rascunho (salvo sozinho); a versão
@@ -109,7 +110,7 @@ function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTermi
       // O resultado também passa pela ilha: o quadro atrás já mostra o caminho aceso.
       avisarNaIlha({
         titulo: ex.status === "falhou" ? "O teste parou num erro" : `Teste concluído em ${duracao(ex.duracaoMs)}`,
-        detalhe: `${ex.passos.length} ${ex.passos.length === 1 ? "passo" : "passos"} · ${
+        detalhe: ex.status === "falhou" ? ex.erro || passosComProblema(ex.passos as PassoDoTeste[]).at(-1)?.motivo || "Veja o passo marcado em vermelho." : `${ex.passos.length} ${ex.passos.length === 1 ? "passo" : "passos"} · ${
           (ex.passos as PassoDoTeste[]).some((p) => typeof (p.saida as { status?: unknown } | null)?.status === "number") ? "só o n8n recebeu de verdade" : "nada foi enviado de verdade"
         }`,
       });
@@ -146,7 +147,7 @@ function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTermi
                             ? `enviado de verdade · respondeu ${(p.saida as { status: number }).status}`
                             : p.status}
                         {p.caminho && p.caminho !== "proximo" ? ` · ${p.caminho}` : ""}
-                        {p.erro ? ` · ${p.erro}` : ""}
+                        {motivoDoPasso(p) ? ` · ${motivoDoPasso(p)}` : ""}
                       </span>
                     </span>
                     <span className="font-mono text-caption tabular-nums text-text-tertiary">{p.ms ?? "—"} ms</span>

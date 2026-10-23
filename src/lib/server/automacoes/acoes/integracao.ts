@@ -40,6 +40,24 @@ export async function interpretarResposta(r: Response, inicio: number): Promise<
   };
 }
 
+/** Erro de rede em português, com o endereço (o código técnico fica no fim, para quem precisar). */
+export function explicarErroDeRede(msg: string, url: string): string {
+  let host = url;
+  try {
+    host = new URL(url).host;
+  } catch {
+    // URL estranha: mostra como veio
+  }
+  const codigo = msg.match(/\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|CERT_[A-Z_]+|UNABLE_TO_VERIFY_LEAF_SIGNATURE|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN)\b/)?.[1];
+  const tecnico = codigo ? ` (${codigo})` : "";
+  if (codigo === "ENOTFOUND" || codigo === "EAI_AGAIN") return `Não achei o endereço ${host}. Confira a URL do webhook${tecnico}.`;
+  if (codigo === "ECONNREFUSED") return `${host} recusou a conexão: o serviço parece fora do ar${tecnico}.`;
+  if (codigo === "ECONNRESET") return `${host} derrubou a conexão no meio do envio${tecnico}.`;
+  if (codigo === "ETIMEDOUT" || codigo === "EHOSTUNREACH") return `${host} não respondeu a tempo${tecnico}.`;
+  if (codigo && /CERT|SIGN/.test(codigo)) return `O certificado de segurança de ${host} não é válido${tecnico}.`;
+  return `Falha de rede ao chamar ${host}: ${msg}`;
+}
+
 async function chamar(url: string, init: RequestInit): Promise<ResultadoDaAcao> {
   const inicio = Date.now();
   try {
@@ -48,7 +66,7 @@ async function chamar(url: string, init: RequestInit): Promise<ResultadoDaAcao> 
     const msg = e instanceof Error ? e.message : String(e);
     // URL bloqueada (rede interna, não resolve): repetir não adianta.
     if (/interno|não resolve|inválid|protocol/i.test(msg)) return { ok: false, erro: msg };
-    return { ok: false, erro: e instanceof Error && e.name === "AbortError" ? "Sem resposta a tempo." : `Falha de rede: ${msg}`, retentavel: true };
+    return { ok: false, erro: e instanceof Error && e.name === "AbortError" ? "Sem resposta a tempo." : explicarErroDeRede(msg, url), retentavel: true };
   }
 }
 

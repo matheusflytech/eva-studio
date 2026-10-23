@@ -88,6 +88,16 @@ describe("varreduras", () => {
     expect(executor.executarExecucao).toHaveBeenCalledTimes(2);
   });
 
+  it("teste esquecido (janela fechada) para sozinho depois de 30 min", async () => {
+    db.automacao.findMany.mockResolvedValue([]);
+    await rodarAutomacoes({ agora: AGORA });
+    const parada = db.automacaoExecucao.updateMany.mock.calls.find((c) => c[0].where.teste === true)?.[0];
+    expect(parada).toBeDefined();
+    expect(parada.where.status).toEqual({ in: ["pendente", "esperando"] });
+    expect(AGORA.getTime() - (parada.where.createdAt.lt as Date).getTime()).toBe(30 * 60_000);
+    expect(parada.data).toMatchObject({ status: "cancelada", proximaEm: null });
+  });
+
   it("sem as tabelas: devolve zeros", async () => {
     db.automacaoExecucao.updateMany.mockRejectedValue(new Error('relation "eva_studio_automacao_execucoes" does not exist'));
     expect(await rodarAutomacoes({ agora: AGORA })).toEqual({ leases: 0, inscritas: 0, executadas: 0, limpos: 0 });

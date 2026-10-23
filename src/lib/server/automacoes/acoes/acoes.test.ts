@@ -36,7 +36,7 @@ import { MANIPULADORES } from "./index";
 import { corpoDosCampos } from "./registro";
 import { escolherNoRodizio, prazoDaTarefa } from "./pessoas";
 import { destinoDoWhatsApp } from "./cliente";
-import { interpretarResposta } from "./integracao";
+import { explicarErroDeRede, interpretarResposta } from "./integracao";
 import { ACOES } from "@/lib/automacoes/catalogo";
 import { assinaturaConfere } from "@/lib/server/webhooks/assinatura";
 import type { CtxDaAcao } from "./tipos";
@@ -212,5 +212,16 @@ describe("integração", () => {
     const bloqueada = await rodar("http.request", { url: "http://10.0.0.1/x" });
     expect(bloqueada.ok).toBe(false);
     expect(!bloqueada.ok && bloqueada.retentavel).toBeFalsy();
+  });
+});
+
+describe("erro de rede em português", () => {
+  it("endereço que não existe, recusado, sem resposta e certificado", () => {
+    const url = "https://hook.exemplo.com/webhook/abc";
+    expect(explicarErroDeRede("getaddrinfo ENOTFOUND hook.exemplo.com", url)).toBe("Não achei o endereço hook.exemplo.com. Confira a URL do webhook (ENOTFOUND).");
+    expect(explicarErroDeRede("connect ECONNREFUSED 1.2.3.4:443", url)).toMatch(/^hook\.exemplo\.com recusou a conexão/);
+    expect(explicarErroDeRede("connect ETIMEDOUT", url)).toMatch(/não respondeu a tempo/);
+    expect(explicarErroDeRede("unable to verify CERT_HAS_EXPIRED", url)).toMatch(/certificado de segurança/);
+    expect(explicarErroDeRede("algo estranho", url)).toBe("Falha de rede ao chamar hook.exemplo.com: algo estranho");
   });
 });
