@@ -25,3 +25,38 @@ export function planoDoTeste(def: Definicao): PlanoDoTeste {
     oQueFaz: [`criar ${nome.artigo === "a" ? "uma" : "um"} ${nome.singular} de teste`, ...nomes],
   };
 }
+
+export interface PassoComMotivo {
+  noId: string;
+  status: string;
+  erro?: string | null;
+  saida?: unknown;
+}
+
+/**
+ * Por que o passo não seguiu como esperado, numa frase para a tela: o erro de
+ * quem falhou, ou o motivo de quem foi pulado ou ficou esperando (contato que
+ * não aceita mensagens, fora do horário comercial...). null quando deu certo.
+ */
+export function motivoDoPasso(p: PassoComMotivo): string | null {
+  if (p.status === "falhou") return p.erro?.trim() || "Falhou sem dizer o motivo.";
+  if (p.status !== "pulado" && p.status !== "esperando") return null;
+  const s = (p.saida ?? {}) as { motivo?: unknown; ate?: unknown };
+  const motivo = typeof s.motivo === "string" && s.motivo.trim() ? s.motivo.trim() : null;
+  if (!motivo) return p.status === "pulado" ? "Pulado." : null;
+  const ate = typeof s.ate === "string" ? new Date(s.ate) : null;
+  const quando =
+    ate && !Number.isNaN(ate.getTime())
+      ? ` (continua ${ate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})`
+      : "";
+  const frase = motivo.charAt(0).toUpperCase() + motivo.slice(1);
+  return p.status === "pulado" ? `Pulado: ${motivo}.` : `${frase}${quando}.`;
+}
+
+/** Os passos que precisam de explicação, na ordem, com o motivo. */
+export function passosComProblema<T extends PassoComMotivo>(passos: T[]): { passo: T; motivo: string }[] {
+  return passos.flatMap((passo) => {
+    const motivo = motivoDoPasso(passo);
+    return motivo ? [{ passo, motivo }] : [];
+  });
+}

@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, ExternalLink, FlaskConical, Loader2, Play, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, ExternalLink, FlaskConical, Loader2, Play, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogoOficial } from "@/components/ui/logo-oficial";
 import { avisarNaIlha } from "@/lib/fundo/eventos";
 import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
-import { planoDoTeste } from "@/lib/automacoes/teste";
+import { passosComProblema, planoDoTeste } from "@/lib/automacoes/teste";
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { cn } from "@/lib/utils";
 import type { EstadoDoNo } from "./canvas";
@@ -23,7 +23,7 @@ import type { EstadoDoNo } from "./canvas";
 // ---------------------------------------------------------------------------
 
 type Estados = Record<string, { estado: EstadoDoNo; ms?: number }>;
-interface Passo { noId: string; status: string; ms: number | null; erro: string | null }
+interface Passo { noId: string; status: string; ms: number | null; erro: string | null; saida?: unknown }
 interface Execucao { status: string; erro: string | null; noAtual: string | null; proximaEm: string | null; passos: Passo[] }
 interface Inicio { execucaoId: string; objeto: Definicao["objeto"]; objetoId: string; cumpridas: string[]; naoCumpridas: string[] }
 
@@ -158,6 +158,11 @@ export function TesteDeVerdade({
     aoMudarEstados(estados);
   }, [exec, mostrados, aoMudarEstados]);
 
+  // Por que cada passo não seguiu (erro, pulado, adiado), na ordem em que aparecem.
+  const problemas = passosComProblema((exec?.passos ?? []).slice(0, mostrados));
+  // O erro da execução costuma ser o do último passo: só aparece à parte se for outro.
+  const erroDaExecucao = exec?.erro && !problemas.some((p) => p.motivo === exec.erro) ? exec.erro : null;
+
   // "fim" é derivado: rodando + execução terminada e todos os passos já mostrados.
   const etapa = fase === "confirmar" ? "confirmar" : terminou ? "fim" : "rodando";
   const avisou = React.useRef<string | null>(null);
@@ -166,7 +171,10 @@ export function TesteDeVerdade({
     avisou.current = inicio.execucaoId;
     avisarNaIlha({
       titulo: exec!.status === "falhou" ? "O teste parou num erro" : "Teste de verdade concluído",
-      detalhe: `${total} ${total === 1 ? "passo" : "passos"} · ${nome.singular} de teste criado`,
+      detalhe:
+        exec!.status === "falhou"
+          ? exec!.erro || passosComProblema(exec!.passos).at(-1)?.motivo || "Veja o passo marcado em vermelho."
+          : `${total} ${total === 1 ? "passo" : "passos"} · ${nome.singular} de teste criado`,
     });
   }, [etapa, inicio, exec, total, nome.singular]);
 
@@ -277,7 +285,25 @@ export function TesteDeVerdade({
               </span>
             </div>
 
-            {exec?.erro && etapa === "fim" && <p className="rounded-[12px] bg-danger/10 px-3 py-2 text-caption text-danger">{exec.erro}</p>}
+            {problemas.length > 0 && (
+              <ul className="flex flex-col gap-1.5" aria-label="O que aconteceu nos passos">
+                {problemas.map(({ passo, motivo }, i) => (
+                  <li
+                    key={`${passo.noId}-${i}`}
+                    className={cn(
+                      "flex items-start gap-2 rounded-[12px] px-3 py-2 text-caption leading-snug",
+                      passo.status === "falhou" ? "bg-danger/10 text-danger" : "bg-warning/10 text-text-secondary"
+                    )}
+                  >
+                    <AlertTriangle size={13} className="mt-px shrink-0" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="font-medium text-text-primary">{nomeDoPasso(passo.noId)}</span> · {motivo}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {erroDaExecucao && etapa === "fim" && <p className="rounded-[12px] bg-danger/10 px-3 py-2 text-caption text-danger">{erroDaExecucao}</p>}
 
             {inicio && (inicio.cumpridas.length > 0 || inicio.naoCumpridas.length > 0) && (
               <p className="text-caption leading-snug text-text-tertiary">
