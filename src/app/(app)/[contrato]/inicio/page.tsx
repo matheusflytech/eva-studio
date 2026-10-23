@@ -149,7 +149,7 @@ export default function InicioPage() {
   const fora = BLOCOS.filter((b) => !blocos.includes(b.id));
 
   return (
-    <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6">
+    <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6 lg:-mt-5">
       {/* Topo iridescente com as curvas vivas por cima, como uma tela de boas-vindas. */}
       {/* No escuro o topo vira um iridescente fundo (mesmas luzes, apagadas) com
           texto claro; os cartões pretos de dentro viram vidro. */}
