@@ -1,21 +1,25 @@
 "use client";
 
 import * as React from "react";
-import { CalendarRange, FilterX, Sparkles } from "lucide-react";
+import { FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { SeletorMultiplo } from "@/components/dashboard/seletor-multiplo";
 import type { OpcoesDoDashboard } from "@/components/dashboard/opcoes";
-import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
-import type { ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { FILTROS_GLOBAIS_PADRAO, SEM_VALOR, diaLocal, janelaDoPainel, somarDias, type FiltrosGlobais } from "@/lib/consulta";
 import { cn } from "@/lib/utils";
+import { focusRing } from "@/components/ui/styles";
 
 // ---------------------------------------------------------------------------
-// Barra de filtros do painel: período, funis e responsável valem pra todos os
-// cartões de uma vez. O estado mora na URL (?de=&ate=&funis=&donos=), então
-// "olha o painel do funil B2B do mês passado" vira um link que se manda no
-// chat. Não é salvo no layout: o painel é compartilhado, o recorte é de quem
-// está olhando.
+// Filtros do painel: período, funis e responsável valem pra todos os cartões
+// de uma vez. O estado mora na URL (?de=&ate=&funis=&donos=), então "olha o
+// painel do funil B2B do mês passado" vira um link que se manda no chat. Não
+// é salvo no layout: o painel é compartilhado, o recorte é de quem está olhando.
+//
+// v5: os períodos mais usados ficam em cápsula na barra da tela
+// (SeletorDePeriodo); o resto (6 meses, intervalo, funis, responsáveis) mora
+// no painel que o botão "Filtros" abre (PainelDeFiltros).
 // ---------------------------------------------------------------------------
 
 export const PERIODOS = [
@@ -26,6 +30,9 @@ export const PERIODOS = [
   { label: "6 meses", dias: 180 },
   { label: "12 meses", dias: 365 },
 ];
+
+/** Os que aparecem na barra; os outros ficam em Filtros. */
+const NA_BARRA = [1, 7, 30, 90, 365];
 
 function dataCurta(dia: string): string {
   const [a, m, d] = dia.split("-");
@@ -49,25 +56,99 @@ export function filtrosGlobaisAtivos(g: FiltrosGlobais): boolean {
   return !!(g.de && g.ate) || g.dias !== FILTROS_GLOBAIS_PADRAO.dias || g.funis.length > 0 || g.donos.length > 0;
 }
 
-export function BarraDeFiltros({
+/** Contador do botão "Filtros": o que está ligado e não aparece na barra. */
+export function contarFiltros(g: FiltrosGlobais): number {
+  const foraDaBarra = !!(g.de && g.ate) || !NA_BARRA.includes(g.dias);
+  return (foraDaBarra ? 1 : 0) + (g.funis.length ? 1 : 0) + (g.donos.length ? 1 : 0);
+}
+
+/** "23/09 a 22/10" (o ano só aparece quando não é o atual). */
+export function periodoCurto(globais: FiltrosGlobais, periodo?: { de: string; ate: string }): string {
+  const j = periodo ?? janelaDoPainel(globais.dias, globais.de, globais.ate);
+  const ano = diaLocal(new Date()).slice(0, 4);
+  const curta = (dia: string) => {
+    const [a, m, d] = dia.split("-");
+    return a === ano ? `${d}/${m}` : `${d}/${m}/${a.slice(2)}`;
+  };
+  return j.de === j.ate ? curta(j.de) : `${curta(j.de)} a ${curta(j.ate)}`;
+}
+
+/**
+ * Cápsulas de período na barra. Período que não está na cápsula (6 meses ou
+ * intervalo) aparece como mais uma cápsula ativa, para não sumir da vista.
+ */
+export function SeletorDePeriodo({
+  globais,
+  aoMudar,
+  aoPersonalizar,
+  className,
+}: {
+  globais: FiltrosGlobais;
+  aoMudar: (g: FiltrosGlobais) => void;
+  /** Clique na cápsula do período fora da barra: abre os filtros. */
+  aoPersonalizar: () => void;
+  className?: string;
+}) {
+  const personalizado = !!(globais.de && globais.ate);
+  const atual = personalizado ? "intervalo" : String(globais.dias);
+  const opcoes = PERIODOS.filter((p) => NA_BARRA.includes(p.dias)).map((p) => ({ value: String(p.dias), label: p.label }));
+  if (personalizado) {
+    const j = janelaDoPainel(globais.dias, globais.de, globais.ate);
+    opcoes.push({ value: "intervalo", label: `${dataCurta(j.de)} – ${dataCurta(j.ate)}` });
+  } else if (!NA_BARRA.includes(globais.dias)) {
+    opcoes.push({ value: atual, label: PERIODOS.find((p) => p.dias === globais.dias)?.label ?? `${globais.dias} dias` });
+  }
+  return (
+    // O trilho rola dentro de si no celular, sem empurrar a página.
+    <div className={cn("max-w-full overflow-x-auto [scrollbar-width:none]", className)}>
+      <SegmentedControl
+        label="Período do painel"
+        value={atual}
+        onChange={(v) => {
+          if (v === "intervalo" || !NA_BARRA.includes(Number(v))) {
+            aoPersonalizar();
+            return;
+          }
+          aoMudar({ ...globais, dias: Number(v), de: undefined, ate: undefined });
+        }}
+        options={opcoes}
+        className="shrink-0"
+      />
+    </div>
+  );
+}
+
+/** Pílula de escolha única dentro do painel de filtros. */
+function Pilula({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={ativo}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-7 items-center rounded-full px-3 text-small transition-colors",
+        ativo ? "bg-inverse font-medium text-inverse-fg" : "border border-border-subtle bg-raised text-text-secondary hover:text-text-primary",
+        focusRing
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** O que o botão "Filtros" abre: período completo, intervalo, funis e responsáveis. */
+export function PainelDeFiltros({
   globais,
   aoMudar,
   opcoes,
-  aoSalvarCartao,
 }: {
   globais: FiltrosGlobais;
   aoMudar: (g: FiltrosGlobais) => void;
   opcoes: OpcoesDoDashboard;
-  /**
-   * Opcional: recebe o cartão que a pessoa montou a partir do "Filtrar com IA"
-   * (quando o pedido tinha condições que só cabem num cartão). Sem ele, a
-   * barra só explica o que ficou de fora.
-   */
-  aoSalvarCartao?: (r: ResultadoDoConstrutor) => void;
 }) {
   const personalizado = !!(globais.de && globais.ate);
   const [mostrarIntervalo, setMostrarIntervalo] = React.useState(personalizado);
-  const [mostrarIa, setMostrarIa] = React.useState(false);
   const janela = janelaDoPainel(globais.dias, globais.de, globais.ate);
   const [rascunho, setRascunho] = React.useState(janela);
 
@@ -81,145 +162,104 @@ export function BarraDeFiltros({
     if (de && ate) aoMudar({ ...globais, de: de <= ate ? de : ate, ate: de <= ate ? ate : de });
   }
 
-
   return (
-    <div className="glass-card mb-4 flex flex-col gap-3 rounded-2xl px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-[12.5px] text-text-tertiary">Período:</span>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <span className="font-mono text-caption text-text-tertiary">Período</span>
         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Período do painel">
-          {PERIODOS.map((p) => {
-            const ativo = !personalizado && globais.dias === p.dias;
-            return (
-              <button
-                key={p.dias}
-                type="button"
-                role="radio"
-                aria-checked={ativo}
-                onClick={() => {
-                  setMostrarIntervalo(false);
-                  aoMudar({ ...globais, dias: p.dias, de: undefined, ate: undefined });
-                }}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-                  ativo ? "bg-ice text-bg-base" : "bg-surface-2 text-text-secondary hover:text-text-primary"
-                )}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={personalizado}
-            onClick={abrirIntervalo}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-              personalizado ? "bg-ice text-bg-base" : "bg-surface-2 text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <CalendarRange size={13} />
+          {PERIODOS.map((p) => (
+            <Pilula
+              key={p.dias}
+              ativo={!personalizado && globais.dias === p.dias}
+              onClick={() => {
+                setMostrarIntervalo(false);
+                aoMudar({ ...globais, dias: p.dias, de: undefined, ate: undefined });
+              }}
+            >
+              {p.label}
+            </Pilula>
+          ))}
+          <Pilula ativo={personalizado || mostrarIntervalo} onClick={abrirIntervalo}>
             {personalizado ? `${dataCurta(janela.de)} – ${dataCurta(janela.ate)}` : "Personalizado"}
-          </button>
+          </Pilula>
         </div>
+        {mostrarIntervalo && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="date"
+              aria-label="Período de"
+              className="w-[160px]"
+              value={rascunho.de}
+              max={rascunho.ate || undefined}
+              onChange={(e) => aplicarIntervalo(e.target.value, rascunho.ate)}
+            />
+            <span className="text-small text-text-tertiary">até</span>
+            <Input
+              type="date"
+              aria-label="Período até"
+              className="w-[160px]"
+              value={rascunho.ate}
+              min={rascunho.de || undefined}
+              onChange={(e) => aplicarIntervalo(rascunho.de, e.target.value)}
+            />
+            <div className="flex flex-wrap gap-1">
+              {ATALHOS.map((a) => (
+                <Button
+                  key={a.label}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const { de, ate } = a.faixa(diaLocal(new Date()));
+                    aplicarIntervalo(de, ate);
+                  }}
+                >
+                  {a.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMostrarIa((v) => !v)}
-            aria-expanded={mostrarIa}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-              mostrarIa ? "bg-accent-soft text-accent-400 ring-1 ring-accent-500/40" : "bg-surface-2 text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <Sparkles size={13} /> Filtrar com IA
-          </button>
-          {opcoes.funis.length > 1 && (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {opcoes.funis.length > 1 && (
+          <div className="flex min-w-0 flex-col gap-2">
+            <span className="font-mono text-caption text-text-tertiary">Funis</span>
             <SeletorMultiplo
               compacto
-              className="w-[220px]"
               rotulo="Filtrar o painel por funil"
               opcoes={opcoes.funis.map((f) => ({ id: f.id, label: f.name }))}
               valores={globais.funis}
               aoMudar={(funis) => aoMudar({ ...globais, funis })}
               placeholder="Todos os funis"
             />
-          )}
+          </div>
+        )}
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className="font-mono text-caption text-text-tertiary">Responsáveis</span>
           <SeletorMultiplo
             compacto
-            className="w-[220px]"
             rotulo="Filtrar o painel por responsável"
             opcoes={[{ id: SEM_VALOR, label: "Sem responsável" }, ...opcoes.membros.map((m) => ({ id: m.id, label: m.name }))]}
             valores={globais.donos}
             aoMudar={(donos) => aoMudar({ ...globais, donos })}
             placeholder="Todos os responsáveis"
           />
-          {filtrosGlobaisAtivos(globais) && (
-            <button
-              type="button"
-              onClick={() => {
-                setMostrarIntervalo(false);
-                aoMudar(FILTROS_GLOBAIS_PADRAO);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
-            >
-              <FilterX size={13} /> Limpar
-            </button>
-          )}
         </div>
       </div>
 
-      {mostrarIntervalo && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
-          <Input
-            type="date"
-            aria-label="Período de"
-            className="h-9 w-[160px] text-[13px]"
-            value={rascunho.de}
-            max={rascunho.ate || undefined}
-            onChange={(e) => aplicarIntervalo(e.target.value, rascunho.ate)}
-          />
-          <span className="text-[12px] text-text-tertiary">até</span>
-          <Input
-            type="date"
-            aria-label="Período até"
-            className="h-9 w-[160px] text-[13px]"
-            value={rascunho.ate}
-            min={rascunho.de || undefined}
-            onChange={(e) => aplicarIntervalo(rascunho.de, e.target.value)}
-          />
-          <div className="flex flex-wrap gap-1">
-            {ATALHOS.map((a) => (
-              <button
-                key={a.label}
-                type="button"
-                onClick={() => {
-                  const { de, ate } = a.faixa(diaLocal(new Date()));
-                  aplicarIntervalo(de, ate);
-                }}
-                className="rounded-lg px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {mostrarIa && (
-        <PainelFiltrarComIa
-          globais={globais}
-          opcoes={opcoes}
-          aoMudar={(g) => {
-            // Período que a IA mandou como intervalo abre a linha de datas, como no clique manual.
-            setMostrarIntervalo(!!(g.de && g.ate));
-            if (g.de && g.ate) setRascunho({ de: g.de, ate: g.ate });
-            aoMudar(g);
+      {filtrosGlobaisAtivos(globais) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => {
+            setMostrarIntervalo(false);
+            aoMudar(FILTROS_GLOBAIS_PADRAO);
           }}
-          aoFechar={() => setMostrarIa(false)}
-          aoSalvarCartao={aoSalvarCartao}
-        />
+        >
+          <FilterX size={14} aria-hidden="true" /> Limpar filtros
+        </Button>
       )}
     </div>
   );

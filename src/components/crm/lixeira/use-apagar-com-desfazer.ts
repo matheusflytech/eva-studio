@@ -3,9 +3,10 @@
 import * as React from "react";
 import { useToast } from "@/components/ui/toast";
 import { MS_PARA_DESFAZER } from "@/lib/lixeira";
+import { avisarNaIlha } from "@/lib/fundo/eventos";
 
 // ---------------------------------------------------------------------------
-// "Apagar" das telas sem confirmação: apaga, e o toast oferece "Desfazer" por
+// "Apagar" das telas sem confirmação: apaga, e a ilha oferece "Desfazer" por
 // alguns segundos (restaura da lixeira). Undo em vez de confirmação.
 //
 // Única exceção: a lixeira ainda não está ativada no banco (o servidor
@@ -69,13 +70,14 @@ export function useApagarComDesfazer() {
           toast({ title: p.titulo, description: d?.aviso ?? undefined, tone: "info" });
           return { ok: true };
         }
-        toast({
-          title: p.titulo,
-          description: "Fica 30 dias na Lixeira (Configurações).",
-          durationMs: MS_PARA_DESFAZER,
-          action: {
-            label: "Desfazer",
-            onClick: async () => {
+        // v5: ação com Desfazer vai para a ilha (no lugar do toast).
+        avisarNaIlha({
+          titulo: p.titulo,
+          detalhe: "Fica 30 dias na Lixeira (Configurações).",
+          duracao: MS_PARA_DESFAZER,
+          acao: {
+            rotulo: "Desfazer",
+            aoClicar: async () => {
               const r = await restaurarItem(trashId);
               if (!r.ok) {
                 toast({ title: "Não deu para desfazer", description: r.erro, tone: "danger" });

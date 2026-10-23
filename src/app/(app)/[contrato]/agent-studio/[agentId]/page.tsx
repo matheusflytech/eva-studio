@@ -1,9 +1,9 @@
 "use client";
 
+import { PainelDoAgente } from "@/components/playground/painel-do-agente";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams, useSearchParams } from "@/lib/contrato/navegacao";
-import { ArrowLeft } from "lucide-react";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { AgentForm, type AbaDoAgente } from "@/components/agent-studio/agent-form";
 import { AgentOverview } from "@/components/agent-studio/agent-overview";
@@ -40,50 +40,50 @@ function AgentePagina() {
 
   const agent = agents.find((a) => a.id === agentId);
 
-  if (!isLoaded) return <div className="flex-1 p-8" />;
+  if (!isLoaded) return <div className="flex-1" />;
 
   if (!agent) {
     return (
-      <div className="flex-1 p-8 text-center">
-        <p className="text-[15px] text-text-secondary">Agente não encontrado.</p>
-        <Link href="/agent-studio" className="mt-3 inline-block text-[13px] font-medium text-accent-400">
-          Voltar para o Eva Studio
+      <div className="flex flex-1 flex-col items-center gap-3 px-4 py-14 text-center">
+        <p className="text-body text-text-secondary">Agente não encontrado.</p>
+        <Link href="/agent-studio" className="text-small font-medium text-accent-fg hover:underline">
+          Voltar para Agentes de IA
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 p-4 sm:p-8">
-      <div className="mx-auto max-w-3xl">
-        <Link
-          href="/agent-studio"
-          className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary"
-        >
-          <ArrowLeft size={15} /> Agentes
-        </Link>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      <AgentOverview agent={agent} />
+      {/* Desktop largo: conteúdo à esquerda e a orbe com os dados do agente
+          numa coluna à direita (a mesma do Playground), sem faixa vazia. */}
+      <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex min-w-0 max-w-4xl flex-col gap-4">
 
-        <AgentOverview agent={agent} />
-
-        <nav className="mt-6 flex gap-1 overflow-x-auto rounded-2xl bg-surface-2 p-1" aria-label="Seções do agente">
-          {ABAS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => trocar(a.id)}
-              aria-current={aba === a.id ? "page" : undefined}
-              className={cn(
-                "shrink-0 rounded-xl px-4 py-2 text-left transition-colors",
-                aba === a.id ? "bg-surface-3 text-text-primary" : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <span className="block text-[13px] font-medium">{a.rotulo}</span>
-              <span className="hidden text-[11px] text-text-tertiary sm:block">{a.ajuda}</span>
-            </button>
-          ))}
+        {/* Abas em cápsula; a pergunta de cada uma fica no título (passar o mouse). */}
+        <nav aria-label="Seções do agente" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="inline-flex h-8 items-center rounded-full border border-border-subtle bg-raised p-0.5">
+            {ABAS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => trocar(a.id)}
+                aria-current={aba === a.id ? "page" : undefined}
+                title={a.ajuda}
+                className={cn(
+                  "inline-flex h-full shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-small transition-colors",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
+                  aba === a.id ? "bg-inverse font-medium text-inverse-fg" : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                {a.rotulo}
+              </button>
+            ))}
+          </div>
         </nav>
 
-        <div className="mt-5">
+        <div>
           {aba === "resumo" && <AgentResumo agent={agent} irParaAba={trocar} />}
           {/* O formulário fica sempre montado: o que se digita numa aba não some ao trocar. */}
           <div className={aba === "resumo" ? "hidden" : undefined}>
@@ -91,13 +91,15 @@ function AgentePagina() {
           </div>
         </div>
       </div>
+      <PainelDoAgente agent={agent} falando={false} className="hidden self-start xl:sticky xl:top-2 xl:flex" />
+      </div>
     </div>
   );
 }
 
 export default function EditAgentPage() {
   return (
-    <React.Suspense fallback={<div className="flex-1 p-8" />}>
+    <React.Suspense fallback={<div className="flex-1" />}>
       <AgentePagina />
     </React.Suspense>
   );

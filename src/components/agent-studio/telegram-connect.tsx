@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Send, Check, Loader2, Unplug, ExternalLink } from "lucide-react";
+import { Check, Loader2, Unplug, ExternalLink } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Send size={16} className="text-text-tertiary" /> Telegram
+              <LogoOficial marca="telegram" tamanho={16} /> Telegram
             </CardTitle>
             <CardDescription>
               Canal sem aprovação: crie um bot no @BotFather, cole o token e o agente já responde.
@@ -84,19 +85,19 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
 
       {status?.connected ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3">
+          <div className="flex items-center justify-between rounded-[14px] bg-raised px-4 py-3">
             <div>
-              <div className="flex items-center gap-2 text-[14px] font-medium text-text-primary">
-                <Check size={15} className="text-emerald-400" />
+              <div className="flex items-center gap-2 text-body font-medium text-text-primary">
+                <Check size={15} className="text-success" />
                 @{status.botUsername || "bot"}
               </div>
-              <div className="mt-0.5 text-[12px] text-text-tertiary">
+              <div className="mt-0.5 text-caption text-text-tertiary">
                 {status.webhookSet
                   ? "O Telegram está entregando as mensagens no app."
                   : status.lastError ?? "O webhook não foi registrado."}
               </div>
             </div>
-            <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger/10">
+            <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger-subtle">
               <Unplug size={15} /> Desconectar
             </Button>
           </div>
@@ -106,7 +107,7 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
               href={`https://t.me/${status.botUsername}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex w-fit items-center gap-1.5 text-[13px] text-accent-400 hover:underline"
+              className="inline-flex w-fit items-center gap-1.5 text-small text-accent-fg hover:underline"
             >
               Abrir conversa com o bot <ExternalLink size={13} />
             </a>
@@ -114,7 +115,7 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <ol className="flex flex-col gap-1 rounded-2xl bg-surface-2 px-4 py-3 text-[13px] text-text-secondary">
+          <ol className="flex flex-col gap-1 rounded-[14px] bg-raised px-4 py-3 text-small text-text-secondary">
             <li>1. No Telegram, fale com <span className="text-text-primary">@BotFather</span> e mande /newbot.</li>
             <li>2. Escolha um nome e um usuário para o bot.</li>
             <li>3. Copie o token que ele devolve e cole aqui.</li>
@@ -125,11 +126,11 @@ export function TelegramConnect({ agentId }: { agentId: string }) {
               id="tg-token"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="123456789:AAE..."
+              placeholder="123456789:AAE…"
               autoComplete="off"
             />
           </div>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
+          {error && <p className="text-small text-danger">{error}</p>}
           <Button onClick={connect} disabled={busy || !token.trim()} className="self-start">
             {busy && <Loader2 size={15} className="animate-spin" />} Conectar
           </Button>

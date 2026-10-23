@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ViewTransition } from "react";
 import NextLink from "next/link";
 import { useRouter, usePathname, useParams } from "next/navigation";
 import { Menu, X, ShieldOff, Search } from "lucide-react";
@@ -9,6 +10,10 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { ehIdDeContrato, idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 import { buttonVariants } from "@/components/ui/button";
 import { BuscaGlobal, useBuscaGlobal } from "@/components/busca/paleta-de-busca";
+import { FundoVivo } from "@/components/layout/fundo-vivo";
+import { Ilha } from "@/components/layout/ilha";
+import { pulsar } from "@/lib/fundo/eventos";
+import { MarcaEva } from "@/components/layout/marca-eva";
 
 // Tudo dentro de /<idDoContrato>/... A URL é a fonte da verdade do contrato:
 // o /api/me recebe o id pelo cabeçalho e confere o vínculo no servidor. Aqui só
@@ -24,6 +29,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // pra outra tela com o menu ainda aberto por cima dela.
   React.useEffect(() => {
     setMenuAberto(false);
+    // Trocou de tela: uma onda curta no fundo vivo, do centro.
+    pulsar(null, 0.9);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -46,16 +53,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     // Busca global (Ctrl+K / ⌘K) e atalhos G/?: um por contrato, por cima de todas as telas.
     <BuscaGlobal>
-      <div className="app-backdrop flex h-[100dvh] flex-col gap-3 overflow-hidden p-3 lg:flex-row">
-        {/* O menu de 248px não cabe num celular de 390px: ocupava a tela inteira e
+      {/* Uma superfície só: menu colado na borda, conteúdo ao lado, e o fundo
+          vivo (curvas de nível) por trás dos dois. */}
+      <div className="app-backdrop relative isolate flex h-[100dvh] flex-col overflow-hidden lg:flex-row">
+        <FundoVivo />
+        {/* O menu de 240px não cabe num celular de 390px: ocupava a tela inteira e
             o conteúdo desaparecia. Abaixo de 1024px vira uma gaveta, aberta por
-            uma barra no topo. */}
-        {/* Menu lateral sempre escuro, também no tema claro (como os CRMs de referência). */}
-        <div className="hidden lg:flex" data-theme="dark">
+            uma barra no topo. O menu acompanha o tema do app. */}
+        <div className="relative z-10 hidden lg:flex" data-print-ocultar>
           <Sidebar />
         </div>
 
-        <header className="glass-card flex shrink-0 items-center justify-between rounded-2xl px-3 py-2 lg:hidden">
+        <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-border-subtle bg-panel/80 px-3 py-2 backdrop-blur lg:hidden" data-print-ocultar>
           <button
             type="button"
             onClick={() => setMenuAberto(true)}
@@ -65,8 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <span className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/eva-mark.png" alt="" width={20} height={20} />
+            <MarcaEva size={18} className="text-text-primary" />
             <span className="font-display text-[14px] font-bold text-text-primary">Eva</span>
           </span>
           <BotaoBuscarNoTopo />
@@ -74,8 +82,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {menuAberto && (
           <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Menu">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuAberto(false)} />
-            <div className="absolute inset-y-0 left-0 w-[290px] max-w-[88vw] p-3" data-theme="dark">
+            <div className="absolute inset-0 bg-backdrop backdrop-blur-md" onClick={() => setMenuAberto(false)} />
+            <div className="absolute inset-y-0 left-0 w-[290px] max-w-[88vw]">
               <button
                 type="button"
                 onClick={() => setMenuAberto(false)}
@@ -89,7 +97,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-3xl">{children}</main>
+        <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Ilha dinâmica: o que pede atenção agora e os avisos com ação. */}
+          <div className="hidden h-11 shrink-0 items-center justify-center lg:flex" data-print-ocultar>
+            <Ilha />
+          </div>
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
+            <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
+              <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>
+            </ViewTransition>
+          </main>
+        </div>
       </div>
     </BuscaGlobal>
   );

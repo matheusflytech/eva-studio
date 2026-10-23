@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LayoutTemplate } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FunisEditor } from "@/components/crm/config/funis-editor";
 import { CamposEditor } from "@/components/crm/config/campos-editor";
@@ -23,29 +24,40 @@ export default function PersonalizarCrmPage({
   const funil = typeof params.funil === "string" ? params.funil : undefined;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <Link href="/negocios" className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-text-tertiary hover:text-text-primary">
-          <ArrowLeft size={14} /> Voltar aos negócios
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      {/* Barra da tela: voltar, título e, à direita, o atalho para os modelos prontos. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <Link
+          href="/negocios"
+          aria-label="Voltar aos negócios"
+          title="Voltar aos negócios"
+          className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-2" })}
+        >
+          <ArrowLeft aria-hidden="true" />
         </Link>
-        <h1 className="font-display text-2xl font-semibold text-text-primary">Personalizar o CRM</h1>
-        <p className="mt-1 max-w-[640px] text-[15px] text-text-secondary">
-          Cada negócio funciona de um jeito. Monte os funis, as etapas, o cartão, os campos e os produtos do seu.
-        </p>
-        <Link href="/comecar" className="mt-2 inline-flex items-center gap-1.5 text-[13px] text-accent-400 hover:underline">
-          Prefere partir de um modelo pronto para o seu tipo de negócio?
-        </Link>
-      </header>
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Personalizar o CRM</h1>
+        <div className="ml-auto">
+          <Link href="/comecar" className={buttonVariants({ variant: "secondary" })}>
+            <LayoutTemplate size={14} aria-hidden="true" /> Partir de um modelo pronto
+          </Link>
+        </div>
+      </div>
+      <p className="-mt-2 max-w-[640px] text-small text-text-secondary">
+        Cada negócio funciona de um jeito. Monte os funis, as etapas, o cartão, os campos e os produtos do seu.
+      </p>
 
-      <Tabs defaultValue={aba}>
-        <TabsList className="max-w-full overflow-x-auto">
-          <TabsTrigger value="funis">Funis e etapas</TabsTrigger>
-          <TabsTrigger value="cartao">Cartão do negócio</TabsTrigger>
-          <TabsTrigger value="deal">Campos do negócio</TabsTrigger>
-          <TabsTrigger value="contact">Campos do contato</TabsTrigger>
-          <TabsTrigger value="produtos">Produtos</TabsTrigger>
-        </TabsList>
-        <div className="mt-6">
+      <Tabs defaultValue={aba} className="flex min-h-0 flex-col gap-5">
+        {/* O trilho rola sozinho no celular; a página não ganha rolagem lateral. */}
+        <div className="-mx-4 overflow-x-auto px-4 lg:-mx-6 lg:px-6">
+          <TabsList>
+            <TabsTrigger value="funis">Funis e etapas</TabsTrigger>
+            <TabsTrigger value="cartao">Cartão do negócio</TabsTrigger>
+            <TabsTrigger value="deal">Campos do negócio</TabsTrigger>
+            <TabsTrigger value="contact">Campos do contato</TabsTrigger>
+            <TabsTrigger value="produtos">Produtos</TabsTrigger>
+          </TabsList>
+        </div>
+        <div className="entrada-de-tela">
           <TabsContent value="funis"><FunisEditor /></TabsContent>
           <TabsContent value="cartao"><CartaoEditor funilInicial={funil} /></TabsContent>
           <TabsContent value="deal"><CamposEditor entity="deal" /></TabsContent>

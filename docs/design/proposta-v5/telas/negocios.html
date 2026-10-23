@@ -1,0 +1,99 @@
+<!-- id: negocios | titulo: Negócios (funil) | grupo: Vender | menu: negocios | print: negocios -->
+<style>
+.t-negocios { position: relative; }
+.t-negocios .funil { height: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 6px; font-weight: 500; }
+.t-negocios .funil:hover { background: var(--hv); }
+.t-negocios .funil svg:last-child { color: var(--t3); width: 14px; height: 14px; }
+.t-negocios .eva { height: 40px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--bs); background: color-mix(in srgb, var(--aisub) 55%, var(--pg)); font-size: 13px; white-space: nowrap; overflow: hidden; }
+.t-negocios .eva > svg { color: var(--ai); }
+.t-negocios .eva b { font-weight: 600; }
+.t-negocios .eva .resto { color: var(--t2); overflow: hidden; text-overflow: ellipsis; }
+.t-negocios .eva .d-link { color: var(--ai); }
+.t-negocios .eva .dir { margin-left: auto; display: flex; gap: 6px; align-items: center; color: var(--t3); }
+.t-negocios .eva .pill { display: inline-flex; gap: 6px; align-items: center; height: 24px; padding: 0 8px; border-radius: 5px; background: var(--pg); border: 1px solid var(--bs); color: var(--t2); font-size: 12px; font-weight: 500; }
+.t-negocios .eva .pill em { font-style: normal; color: var(--acfg); font-weight: 600; }
+.t-negocios .tot { font-size: 12px; color: var(--t3); }
+.t-negocios .tot b { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.t-negocios .d-board { padding-top: 10px; }
+.t-negocios .d-col { width: 214px; }
+.t-negocios .d-col > .h { flex-wrap: wrap; row-gap: 0; padding-top: 4px; }
+.t-negocios .d-col > .h .linha2 { width: 100%; display: flex; justify-content: space-between; font-size: 12px; font-weight: 400; color: var(--t3); padding-left: 16px; padding-bottom: 4px; }
+.t-negocios .d-col > .h .linha2 b { color: var(--t2); font-weight: 500; font-variant-numeric: tabular-nums; }
+.t-negocios .val { display: flex; align-items: baseline; gap: 6px; }
+.t-negocios .val b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.t-negocios .val span { font-size: 12px; color: var(--t3); }
+.t-negocios .sinal { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; font-weight: 500; }
+.t-negocios .sinal svg { width: 13px; height: 13px; }
+.t-negocios .sinal.ok { color: var(--ok); } .t-negocios .sinal.dg { color: var(--dg); } .t-negocios .sinal.wn { color: var(--wn); }
+.t-negocios .d-lc .f .d-av { margin-left: auto; }
+.t-negocios .vazio-col { border: 1px dashed var(--bd); border-radius: 8px; padding: 14px 10px; text-align: center; font-size: 12px; color: var(--t3); }
+</style>
+<!--ILHA-->
+<span class="pto azul"></span><span>R$ 9 mil no funil</span><span class="cinza mono">6 abertos</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-negocios">
+  <div class="d-bar">
+    <h4>Negócios</h4><span class="cnt">6 abertos</span><span class="vbar"></span>
+    <button class="funil"><svg><use href="#i-kanban"/></svg>Vendas<svg><use href="#i-chevs"/></svg></button>
+    <span class="d-seg"><span class="on"><svg><use href="#i-kanban"/></svg>Quadro</span><span><svg><use href="#i-list"/></svg>Lista</span></span>
+    <div class="dir"><span class="d-bt ic" title="Buscar"><svg><use href="#i-search"/></svg></span><span class="d-bt"><svg><use href="#i-filter"/></svg>Filtros</span><span class="d-bt ic" title="Importar, exportar, configurar funil"><svg><use href="#i-more"/></svg></span><span class="d-bt p"><svg><use href="#i-plus"/></svg>Novo negócio</span></div>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas"><span class="on">Todos <em>6</em></span><span>Meus <em>2</em></span><span>Precisam de atenção <em>1</em></span></div>
+    <div class="dir tot"><b>R$ 9.000</b> no funil · <b>R$ 1.650</b> ponderado</div>
+  </div>
+  <div class="d-board">
+    <div class="d-col" data-col="novo">
+      <div class="h"><i style="background:var(--d-slate)"></i>Novo<em data-cnt>3</em><svg><use href="#i-plus"/></svg><span class="linha2"><span>10%</span><b data-soma>R$ 4.800</b></span></div>
+      <div class="d-lc" data-mover><div class="t"><span class="n">Clínica Aurora · Piloto</span></div><div class="val"><b>R$ 4.800</b><span>10%</span></div><div class="f"><span class="sinal dg"><svg><use href="#i-clock"/></svg>Atrasada 2d</span><span class="d-av xs h-teal">MP</span></div></div>
+      <div class="d-lc"><div class="t"><span class="n">Lead do site: Matheus</span></div><div class="val"><b class="t3" style="font-weight:500">Sem valor</b><span>10%</span></div><div class="f"><span class="sinal wn"><svg><use href="#i-alert"/></svg>Sem atividade</span></div></div>
+      <div class="d-lc"><div class="t"><span class="n">Teste Guard</span></div><div class="val"><b class="t3" style="font-weight:500">Sem valor</b><span>10%</span></div><div class="f"><span class="t3 sm12">há 23 h</span></div></div>
+      <div class="d-addcard"><svg><use href="#i-plus"/></svg>Adicionar</div>
+    </div>
+    <div class="d-col" data-col="qualif">
+      <div class="h"><i style="background:var(--d-blue)"></i>Qualificado<em data-cnt>1</em><svg><use href="#i-plus"/></svg><span class="linha2"><span>30%</span><b data-soma>R$ 2.400</b></span></div>
+      <div class="d-lc parado"><div class="t"><span class="n">Colégio Ipê · Renovação</span></div><div class="val"><b>R$ 2.400</b><span>30%</span></div><div class="f"><span class="sinal wn"><svg><use href="#i-clock"/></svg>Parado há 12d</span><span class="d-av xs h-rose">LA</span></div></div>
+      <div class="d-addcard"><svg><use href="#i-plus"/></svg>Adicionar</div>
+    </div>
+    <div class="d-col">
+      <div class="h"><i style="background:var(--d-violet)"></i>Proposta<em>1</em><svg><use href="#i-plus"/></svg><span class="linha2"><span>60%</span><b>R$ 1.500</b></span></div>
+      <div class="d-lc"><div class="t"><span class="n">[TESTE] Funil A</span></div><div class="val"><b>R$ 1.500</b><span>60%</span></div><div class="f"><span class="sinal ok"><svg><use href="#i-cal"/></svg>Hoje 16:00</span><span class="d-av xs h-teal">MP</span></div></div>
+      <div class="d-addcard"><svg><use href="#i-plus"/></svg>Adicionar</div>
+    </div>
+    <div class="d-col">
+      <div class="h"><i style="background:var(--d-orange)"></i>Negociação<em>1</em><svg><use href="#i-plus"/></svg><span class="linha2"><span>80%</span><b>R$ 300</b></span></div>
+      <div class="d-lc"><div class="t"><span class="n">Loja Atlântico · Expansão</span></div><div class="val"><b>R$ 300</b><span>80%</span></div><div class="f"><span class="sinal ok"><svg><use href="#i-phone"/></svg>Amanhã 10:00</span><span class="d-av xs h-teal">MP</span></div></div>
+      <div class="d-addcard"><svg><use href="#i-plus"/></svg>Adicionar</div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+
+<!--SCRIPT-->
+
+window.ANIMA.negocios = function (c) {
+  c.entra(".d-col > .h", { passo: 60 }); c.entra(".d-lc", { d: 120, passo: 40 });
+  var card = c.q("[data-mover]"), novo = c.q('[data-col="novo"]'), qual = c.q('[data-col="qualif"]');
+  var orig = c.q("[data-ilha]").innerHTML;
+  return c.espera(1400).then(function () {
+    card.animate([{ transform: "none" }, { transform: "scale(1.04) rotate(-1.5deg)", boxShadow: "0 20px 44px rgba(0,0,0,.4)" }], { duration: 260, fill: "forwards", easing: "ease-out" });
+    return c.espera(320);
+  }).then(function () {
+    card.getAnimations().forEach(function (a) { a.cancel(); });
+    var p = c.move(card, qual, qual.querySelector(".d-addcard"));
+    novo.querySelector("[data-cnt]").textContent = "2"; qual.querySelector("[data-cnt]").textContent = "2";
+    novo.querySelector("[data-soma]").textContent = "R$ 0"; qual.querySelector("[data-soma]").textContent = "R$ 7.200";
+    return p;
+  }).then(function () {
+    c.ilha('<span class="av" style="background:#3a3a3e">CA</span><span class="txt"><b>Clínica Aurora foi para Qualificado</b><span>por Matheus Paes · agora</span></span><span class="acao">Desfazer</span>', true);
+    return c.espera(3200);
+  }).then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>O quadro é a tela.</b> Sai a faixa do recado, os contadores "Desde ontem" e "Pede atenção" e a fileira de onze filtros. O recado da Eva aparece na ilha; os filtros ficam em "Filtros".</li>
+<li><b>Cartão com três coisas.</b> Nome do negócio, valor com a chance e o próximo passo (verde, vermelho ou âmbar, sempre com texto). Empresa, etiquetas e dono aparecem ao abrir.</li>
+<li><b>Coluna com quanto tem.</b> Contagem, chance e soma em cada etapa. Importar, exportar e configurar o funil ficam no "…".</li>
+<li><b>Mover com Desfazer.</b> Arrastar o cartão muda a etapa, o fundo reage e a ilha oferece Desfazer. Clique em "Ver animação".</li>
+<!--/NOTAS-->

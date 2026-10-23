@@ -1,11 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Plug, Plus, Trash2, RefreshCw, Loader2, CheckCircle2, AlertTriangle, ChevronDown } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
+import { Plug, Plus, Trash2, RefreshCw, CheckCircle2, AlertTriangle, ChevronDown, Ellipsis } from "lucide-react";
+import { Field, Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { IconButton } from "@/components/ui/icon-button";
+import { Notice } from "@/components/ui/notice";
+import { Modal, ModalContent } from "@/components/ui/modal";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CabecalhoDaSecao, ItemDeConfig, ListaDeConfig, VazioDeConfig } from "@/components/configuracoes/secao";
 
 interface McpTool {
   name: string;
@@ -30,6 +34,9 @@ interface McpServerRow {
  * minhas ferramentas". Em vez de configurar uma chamada HTTP por integração,
  * o servidor se apresenta e o agente de IA descobre sozinho o que dá pra
  * fazer — e passa a poder usar isso dentro de qualquer fluxo.
+ *
+ * v5: lista com linhas finas; "Novo servidor" abre numa janela e Verificar e
+ * Remover moram no "…" da linha.
  */
 export function McpServersPanel() {
   const [servers, setServers] = React.useState<McpServerRow[]>([]);
@@ -85,140 +92,144 @@ export function McpServersPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Plug size={16} className="text-text-tertiary" /> Servidores MCP
-            </CardTitle>
-            <CardDescription>
-              O agente de IA descobre e usa as ferramentas que o servidor anunciar, sem configurar cada chamada.
-            </CardDescription>
-          </div>
-          <Button variant="secondary" onClick={() => setShowForm(!showForm)}>
-            <Plus size={15} /> Novo servidor
+    <div>
+      <CabecalhoDaSecao
+        nivel={2}
+        titulo="Servidores MCP"
+        descricao="O agente de IA descobre e usa as ferramentas que o servidor anunciar, sem configurar cada chamada."
+        acoes={
+          <Button variant="primary" onClick={() => setShowForm(true)}>
+            <Plus size={14} aria-hidden="true" /> Novo servidor
           </Button>
-        </div>
-      </CardHeader>
+        }
+      />
 
-      {showForm && (
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl bg-surface-2 px-4 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="mcp-name">Nome</Label>
-              <Input
-                id="mcp-name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Ex: CRM interno"
-              />
-            </div>
-            <div>
-              <Label htmlFor="mcp-url">URL</Label>
-              <Input
-                id="mcp-url"
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                placeholder="https://servidor.exemplo.com/mcp"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="mcp-auth">Cabeçalho de autenticação (opcional)</Label>
-            <Input
-              id="mcp-auth"
-              value={form.authHeader}
-              onChange={(e) => setForm({ ...form, authHeader: e.target.value })}
-              placeholder="Bearer sk-..."
-              autoComplete="off"
-            />
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-              Vai inteiro no header Authorization. Guardado cifrado, nunca volta pra tela depois de salvo.
-            </p>
-          </div>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
-          <div className="flex gap-2">
-            <Button onClick={create} disabled={busy || !form.name.trim() || !form.url.trim()}>
-              {busy && <Loader2 size={15} className="animate-spin" />} Conectar e salvar
-            </Button>
-            <Button variant="ghost" onClick={() => { setShowForm(false); setError(null); }}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
+      {error && !showForm && (
+        <Notice tone="danger" className="mb-3">
+          {error}
+        </Notice>
       )}
 
       {servers.length === 0 ? (
-        <p className="text-[13px] text-text-tertiary">
-          Nenhum servidor MCP cadastrado. Depois de cadastrar um, arraste o bloco &quot;Ferramenta: MCP&quot; no
-          Builder e conecte na porta roxa de um Agente de IA.
-        </p>
+        <VazioDeConfig>
+          Nenhum servidor MCP cadastrado. Depois de cadastrar um, arraste o bloco &quot;Ferramenta: MCP&quot; no Builder e conecte
+          na porta roxa de um Agente de IA.
+        </VazioDeConfig>
       ) : (
-        <div className="flex flex-col gap-2">
+        <ListaDeConfig>
           {servers.map((s) => (
-            <div key={s.id} className="rounded-2xl bg-surface-2 px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[14px] font-medium text-text-primary">{s.name}</span>
-                    <Badge variant={s.active ? "success" : "danger"}>
-                      {s.active ? `${s.tools.length} ferramenta(s)` : "sem resposta"}
-                    </Badge>
-                    {s.hasAuth && <Badge>autenticado</Badge>}
-                  </div>
-                  <div className="truncate text-[12px] text-text-tertiary">{s.url}</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
+            <ItemDeConfig
+              key={s.id}
+              icone={<Plug />}
+              titulo={s.name}
+              detalhe={s.url}
+              direita={
+                <>
+                  <Badge variant={s.active ? "success" : "danger"} dot>
+                    {s.active ? `${s.tools.length} ferramenta(s)` : "sem resposta"}
+                  </Badge>
+                  {s.hasAuth && <Badge>autenticado</Badge>}
                   {s.tools.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-                    >
-                      <ChevronDown
-                        size={15}
-                        className={expanded === s.id ? "rotate-180 transition-transform" : "transition-transform"}
-                      />
+                    <Button variant="ghost" size="sm" aria-expanded={expanded === s.id} onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
+                      <ChevronDown size={14} aria-hidden="true" className={expanded === s.id ? "rotate-180 transition-transform" : "transition-transform"} />
                       Ferramentas
                     </Button>
                   )}
-                  <Button variant="ghost" onClick={() => recheck(s.id)} disabled={busy}>
-                    <RefreshCw size={15} /> Verificar
-                  </Button>
-                  <button
-                    onClick={() => remove(s.id)}
-                    className="rounded-lg p-1.5 text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
-                    aria-label={`Remover ${s.name}`}
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton aria-label={`Mais ações de ${s.name}`}>
+                        <Ellipsis />
+                      </IconButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem disabled={busy} onSelect={() => void recheck(s.id)}>
+                        <RefreshCw /> Verificar de novo
+                      </DropdownMenuItem>
+                      <DropdownMenuItem tone="danger" onSelect={() => void remove(s.id)}>
+                        <Trash2 /> Remover {s.name}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              }
+            >
+              {(s.lastError || expanded === s.id) && (
+                <div className="flex flex-col gap-2 pb-3 pl-1 sm:pl-12">
+                  {s.lastError && (
+                    <p className="inline-flex items-start gap-1.5 text-caption text-danger">
+                      <AlertTriangle size={13} aria-hidden="true" className="mt-0.5 shrink-0" /> {s.lastError}
+                    </p>
+                  )}
+                  {expanded === s.id && (
+                    <ul className="flex flex-col gap-1.5 rounded-[14px] bg-raised p-3">
+                      {s.tools.map((t) => (
+                        <li key={t.name} className="text-small">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-text-primary">
+                            <CheckCircle2 size={12} aria-hidden="true" className="text-success" /> {t.name}
+                          </span>
+                          {t.description && <span className="ml-5 block text-caption text-text-tertiary">{t.description}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              </div>
-
-              {s.lastError && (
-                <p className="mt-2 inline-flex items-start gap-1.5 text-[12px] text-danger">
-                  <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {s.lastError}
-                </p>
               )}
-
-              {expanded === s.id && (
-                <ul className="mt-3 flex flex-col gap-1.5 border-t border-border-subtle pt-3">
-                  {s.tools.map((t) => (
-                    <li key={t.name} className="text-[12.5px]">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-text-primary">
-                        <CheckCircle2 size={12} className="text-emerald-400" /> {t.name}
-                      </span>
-                      {t.description && (
-                        <span className="ml-5 block text-[11.5px] text-text-tertiary">{t.description}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            </ItemDeConfig>
           ))}
-        </div>
+        </ListaDeConfig>
       )}
-    </Card>
+
+      <Modal
+        open={showForm}
+        onOpenChange={(v) => {
+          if (!v) {
+            setShowForm(false);
+            setError(null);
+          }
+        }}
+      >
+        <ModalContent
+          title="Novo servidor MCP"
+          description="O Eva conecta no endereço e lê as ferramentas que ele anuncia."
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowForm(false);
+                  setError(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={create} disabled={busy || !form.name.trim() || !form.url.trim()} loading={busy}>
+                Conectar e salvar
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Nome">
+                <Input id="mcp-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: CRM interno" />
+              </Field>
+              <Field label="URL">
+                <Input id="mcp-url" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://servidor.exemplo.com/mcp" />
+              </Field>
+            </div>
+            <Field label="Cabeçalho de autenticação (opcional)" hint="Vai inteiro no header Authorization. Guardado cifrado, nunca volta pra tela depois de salvo.">
+              <Input
+                id="mcp-auth"
+                value={form.authHeader}
+                onChange={(e) => setForm({ ...form, authHeader: e.target.value })}
+                placeholder="Bearer sk-..."
+                autoComplete="off"
+              />
+            </Field>
+            {error && <Notice tone="danger">{error}</Notice>}
+          </div>
+        </ModalContent>
+      </Modal>
+    </div>
   );
 }

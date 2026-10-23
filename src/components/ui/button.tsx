@@ -6,13 +6,14 @@ import { focusRing } from "./styles";
 
 /*
  * Botão. Um primário por área da tela; o resto é secondary ou ghost.
- * "solid" é o nome antigo de "primary" (continua valendo). Tamanhos "lg",
- * "pill" e "icon" ficam por compatibilidade: pill não é mais redondo.
+ * "solid" é o nome antigo de "primary" (continua valendo). Visual v5: todo
+ * botão é cápsula; o secundário é preenchido, com borda de meio tom; ícone é
+ * círculo. Tamanhos "lg" e "pill" ficam por compatibilidade.
  */
 export const buttonVariants = cva(
   cn(
-    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium select-none",
-    "transition-colors duration-120 ease-standard",
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium select-none",
+    "transition-[background-color,color,transform] duration-150 ease-standard active:scale-[0.97] motion-reduce:active:scale-100",
     "disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress",
     focusRing
   ),
@@ -21,13 +22,13 @@ export const buttonVariants = cva(
       variant: {
         primary: "bg-accent-solid text-text-on-accent hover:bg-accent-solid-hover",
         solid: "bg-accent-solid text-text-on-accent hover:bg-accent-solid-hover",
-        secondary: "border border-border-default bg-panel text-text-primary hover:border-border-strong hover:bg-raised",
+        secondary: "border border-border-subtle bg-raised text-text-primary hover:bg-hover",
         ghost: "text-text-secondary hover:bg-hover hover:text-text-primary",
         danger: "bg-danger-solid text-text-on-danger hover:opacity-90",
       },
       size: {
-        sm: "h-7 px-2.5 text-small",
-        md: "h-8 px-3 text-body",
+        sm: "h-7 px-3 text-small",
+        md: "h-8 px-3.5 text-small",
         lg: "h-9 px-4 text-body",
         pill: "h-9 px-4 text-body",
         icon: "h-8 w-8 [&_svg]:size-4",

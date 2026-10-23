@@ -4,26 +4,45 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import {
-  ArrowLeft, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, History,
+  ArrowLeft, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, Maximize, Minus, Plus,
 } from "lucide-react";
 import {
   ReactFlow,
   Background,
   BackgroundVariant,
-  Controls,
+  ConnectionLineType,
   MiniMap,
   Panel,
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
 } from "@xyflow/react";
-import type { Connection, Edge, Node, NodeProps } from "@xyflow/react";
+import type { Connection, Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAgentsStore } from "@/lib/stores/agents-store";
-import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { cn } from "@/lib/utils";
-import { FlowNode, type FlowNodeData, type NodeRunState } from "@/components/agent-studio/builder/flow-node";
+import {
+  CSS_DO_FLUXO_DO_AGENTE,
+  CanvasDoAgenteContext,
+  NoDoFluxo,
+  type CanvasDoAgente,
+  type FlowNodeData,
+  type NodeRunState,
+} from "@/components/agent-studio/builder/flow-node";
 import { BlockPalette } from "@/components/agent-studio/builder/block-palette";
 import { IssuesPanel } from "@/components/agent-studio/builder/issues-panel";
 import { validateFlow } from "@/components/agent-studio/builder/block-validation";
@@ -31,13 +50,12 @@ import { NodeInspector } from "@/components/agent-studio/builder/node-inspector"
 import { LivePreview } from "@/components/agent-studio/builder/live-preview";
 import { SAMPLE_NODES, SAMPLE_EDGES } from "@/components/agent-studio/builder/flow-data";
 import { getBlockDefault } from "@/components/agent-studio/builder/block-defaults";
-import { BLOCK_MINIMAP_COLOR } from "@/components/agent-studio/builder/block-styles";
 import { organizarFluxo } from "@/components/agent-studio/builder/auto-layout";
 import { ehFerramenta, saidaDaLigacao, saidaParaNovoBloco, saidasDoBloco, temSaidasNomeadas } from "@/components/agent-studio/builder/saidas";
 import { useCanvasTheme } from "@/components/ui/theme";
 import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-template-gallery";
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
-import { FlowEdge } from "@/components/agent-studio/builder/flow-edge";
+import { FlowEdge, ToolEdge } from "@/components/agent-studio/builder/flow-edge";
 import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
@@ -54,7 +72,59 @@ interface UltimaExecucao {
   porNo: Record<string, NodeRunState>;
 }
 
-const edgeTypes = { plusEdge: FlowEdge };
+// Fora do componente: nodeTypes/edgeTypes estáveis. A execução chega aos nós
+// pelo CanvasDoAgenteContext; recriar o nodeTypes desmontava todos os nós.
+const nodeTypes = { flowNode: NoDoFluxo };
+const edgeTypes = { plusEdge: FlowEdge, ferramenta: ToolEdge };
+
+// Cores do React Flow pelas variáveis dele (sem mexer no CSS global): quadro
+// transparente sobre o fundo do contêiner, minimapa nos tokens.
+const ESTILO_DO_QUADRO = {
+  "--xy-background-color": "transparent",
+  "--xy-minimap-background-color": "var(--surface-panel)",
+  "--xy-minimap-mask-background-color": "color-mix(in srgb, var(--surface-page) 70%, transparent)",
+  "--xy-edge-label-background-color": "var(--surface-page)",
+} as React.CSSProperties;
+
+// O CSS global pinta o minimapa com !important (fundo elevado, máscara
+// escura com contorno forte). Aqui, com prefixo próprio, ele fica discreto.
+const CSS_DO_MINIMAPA = `
+.fluxo-agente .react-flow__minimap { background: var(--surface-panel) !important; }
+.fluxo-agente .react-flow__minimap-mask { fill: color-mix(in srgb, var(--surface-page) 70%, transparent) !important; stroke: var(--border-default) !important; stroke-width: 1px; }
+`;
+
+// Barra flutuante embaixo, no centro (mesmo padrão do canvas de automações):
+// zoom, enquadrar e organizar numa cápsula só.
+function BarraFlutuante({ onOrganizar }: { onOrganizar: () => void }) {
+  const rf = useReactFlow();
+  const calmo = useReducedMotion();
+  return (
+    <Panel position="bottom-center" className="!mb-4">
+      <motion.div
+        initial={calmo ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8, delay: 0.15 }}
+        role="toolbar"
+        aria-label="Ferramentas do fluxo"
+        className="flex items-center gap-0.5 rounded-full border border-border-default bg-overlay p-1 shadow-[var(--elevation-overlay)]"
+      >
+        <IconButton aria-label="Diminuir o zoom" tooltip onClick={() => void rf.zoomOut({ duration: 200 })}>
+          <Minus />
+        </IconButton>
+        <IconButton aria-label="Aumentar o zoom" tooltip onClick={() => void rf.zoomIn({ duration: 200 })}>
+          <Plus />
+        </IconButton>
+        <IconButton aria-label="Enquadrar o fluxo" tooltip onClick={() => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}>
+          <Maximize />
+        </IconButton>
+        <span aria-hidden="true" className="mx-1 h-4 w-px bg-border-default" />
+        <IconButton aria-label="Organizar os blocos" tooltip onClick={onOrganizar}>
+          <LayoutGrid />
+        </IconButton>
+      </motion.div>
+    </Panel>
+  );
+}
 
 export default function AgentBuilderPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -75,6 +145,13 @@ export default function AgentBuilderPage() {
   const [ultimaExecucao, setUltimaExecucao] = React.useState<UltimaExecucao | null>(null);
   const [mostrarExecucao, setMostrarExecucao] = React.useState(true);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cascata de entrada dos blocos só nos primeiros instantes do canvas.
+  const [abrindo, setAbrindo] = React.useState(true);
+  React.useEffect(() => {
+    if (!flowLoaded) return;
+    const t = setTimeout(() => setAbrindo(false), 900);
+    return () => clearTimeout(t);
+  }, [flowLoaded]);
 
   React.useEffect(() => {
     if (!isLoaded) load();
@@ -344,10 +421,14 @@ export default function AgentBuilderPage() {
 
   // Cada ligação ganha o nome da saída de onde parte (Sim, Não, a opção do
   // menu...), mostrado numa pílula no meio dela.
+  // O fio acende quando a última execução passou pelos dois blocos dele
+  // (a origem rodou sem erro e o destino rodou depois).
+  const execucaoNoCanvas = mostrarExecucao ? ultimaExecucao?.porNo : undefined;
   const edgesForCanvas = React.useMemo(
     () =>
       edges.map((e) => {
-        if (e.targetHandle === "tools") return e;
+        // Só o tipo de render muda aqui; o que é salvo continua sendo `edges`.
+        if (e.targetHandle === "tools") return { ...e, type: "ferramenta" };
         const origem = nodes.find((n) => n.id === e.source);
         const saida = origem && temSaidasNomeadas(origem.data) ? saidaDaLigacao(origem.data, e.sourceHandle) : null;
         return {
@@ -357,11 +438,12 @@ export default function AgentBuilderPage() {
             onInsert: (iconKey: IconKey) => handleInsertOnEdge(e, iconKey),
             rotulo: saida?.rotulo ?? null,
             tipo: saida?.tipo,
+            ativa: !!execucaoNoCanvas?.[e.source]?.ok && !!execucaoNoCanvas?.[e.target],
           },
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [edges, nodes]
+    [edges, nodes, execucaoNoCanvas]
   );
 
   // Ferramenta só liga na porta de ferramentas de um bloco de IA, e nada
@@ -375,20 +457,15 @@ export default function AgentBuilderPage() {
     [nodes]
   );
 
-  const nodeTypes = React.useMemo(
-    () => ({
-      flowNode: (props: NodeProps<Node<FlowNodeData>>) => (
-        <FlowNode
-          id={props.id}
-          data={props.data}
-          selected={props.selected}
-          run={mostrarExecucao ? ultimaExecucao?.porNo[props.id] : undefined}
-          onDetailChange={(text) => handleNodeDataChangeById(props.id, { detail: text })}
-        />
-      ),
-    }),
+  // Ponto de partida da cascata de entrada (coluna mais à esquerda na carga).
+  const xInicial = React.useMemo(
+    () => (nodes.length ? Math.min(...nodes.map((n) => n.position.x)) : 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mostrarExecucao, ultimaExecucao]
+    [flowLoaded]
+  );
+  const contextoDoCanvas = React.useMemo<CanvasDoAgente>(
+    () => ({ execucao: execucaoNoCanvas, abrindo, xInicial }),
+    [execucaoNoCanvas, abrindo, xInicial]
   );
 
   const issues = validateFlow(nodes, edges, { temUrlDoFluxo: agent ? !!agent.webhook.outboundUrl.trim() : undefined });
@@ -410,141 +487,143 @@ export default function AgentBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowLoaded]);
 
-  if (!isLoaded || !flowLoaded) return <div className="flex-1 p-8" />;
+  if (!isLoaded || !flowLoaded) return <div className="flex-1" />;
 
   if (!agent) {
     return (
-      <div className="flex-1 p-8 text-center">
-        <p className="text-[15px] text-text-secondary">Agente não encontrado.</p>
-        <Link href="/agent-studio" className="mt-3 inline-block text-[13px] font-medium text-text-secondary hover:text-text-primary">
-          Voltar para o Eva Studio
+      <div className="flex flex-1 flex-col items-center gap-3 px-4 py-14 text-center">
+        <p className="text-body text-text-secondary">Agente não encontrado.</p>
+        <Link href="/agent-studio" className="text-small font-medium text-accent-fg hover:underline">
+          Voltar para Agentes de IA
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-1 lg:px-6">
+      {/* Barra do Builder (v5): voltar, agente, modo e, à direita, o estado do
+          fluxo, a IA, Testar e o "…" com o resto (modelos, organizar, última
+          execução, Playground). */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             href={`/agent-studio/${agentId}`}
-            title="Voltar para o agente"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-text-secondary transition-colors hover:text-text-primary"
+            aria-label="Voltar para o agente"
+            className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-1.5 shrink-0" })}
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft aria-hidden="true" />
           </Link>
-          <h1 className="truncate font-display text-lg font-semibold text-text-primary">{agent.name}</h1>
-
-          {/* As abas moram no cabeçalho: uma barra só em vez de duas. */}
-          <div className="flex items-center gap-0.5 rounded-xl bg-surface-2 p-1">
-            {([
-              { key: "editor", label: "Editor" },
-              { key: "conversa", label: "Conversa" },
-              { key: "executions", label: "Execuções" },
-            ] as const).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-                  tab === t.key
-                    ? "bg-surface-3 text-text-primary"
-                    : "text-text-tertiary hover:text-text-primary"
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <OrbeDoAgente agenteId={agent.id} tamanho={28} leve />
+          <h1 className="min-w-0 truncate text-heading font-semibold tracking-tight text-text-primary">{agent.name}</h1>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
+
+        <SegmentedControl
+          label="Modo do Builder"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "editor", label: "Editor" },
+            { value: "conversa", label: "Conversa" },
+            { value: "executions", label: "Execuções" },
+          ]}
+        />
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {tab === "editor" && (
-            <span className="text-[12.5px] text-text-tertiary">
-              {saveState === "pending" && "Salvando..."}
-              {saveState === "saved" && "Salvo."}
+            <span className="font-mono text-caption text-text-tertiary" aria-live="polite">
+              {saveState === "pending" && "salvando…"}
+              {saveState === "saved" && "salvo"}
               {saveState === "error" && (
                 <span className="text-danger" title={erroAoSalvar ?? undefined}>
-                  {erroAoSalvar ? `Não salvou: ${erroAoSalvar}` : "Erro ao salvar."}
+                  {erroAoSalvar ? `não salvou: ${erroAoSalvar}` : "erro ao salvar"}
                 </span>
               )}
             </span>
           )}
+          {tab === "editor" && <IssuesPanel issues={issues} onSelect={setSelectedId} />}
           {tab === "editor" && (
-            <>
-              <MontarComIa
-                agentId={agentId}
-                nodes={nodes}
-                edges={edges}
-                onAplicar={(novosNos, novasLigacoes) => {
-                  setNodes(novosNos);
-                  setEdges(novasLigacoes);
-                  setSelectedId(null);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowTemplateGallery(true)}
-                title="Começar de um modelo pronto"
-                className={buttonVariants({ variant: "secondary", size: "icon" })}
-              >
-                <LayoutTemplate size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={handleAutoLayout}
-                title="Organizar: arruma os blocos da esquerda para a direita"
-                className={buttonVariants({ variant: "secondary", size: "md" })}
-              >
-                <LayoutGrid size={15} /> Organizar
-              </button>
-              {ultimaExecucao && (
-                <button
-                  type="button"
-                  onClick={() => setMostrarExecucao((v) => !v)}
-                  title={`Última execução em ${new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}`}
-                  className={cn(
-                    buttonVariants({ variant: "secondary", size: "icon" }),
-                    "relative",
-                    mostrarExecucao && "border-accent-500/40 text-text-primary"
-                  )}
-                >
-                  <History size={15} />
-                  {ultimaExecucao.status === "error" && (
-                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger" />
-                  )}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowPreview((v) => !v)}
-                title={showPreview ? "Esconder a prévia" : "Testar a conversa ao vivo"}
-                className={cn(
-                  buttonVariants({ variant: "secondary", size: "icon" }),
-                  showPreview && "border-accent-500/40 text-text-primary"
-                )}
-              >
-                {showPreview ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-              </button>
-            </>
+            <MontarComIa
+              agentId={agentId}
+              nodes={nodes}
+              edges={edges}
+              onAplicar={(novosNos, novasLigacoes) => {
+                setNodes(novosNos);
+                setEdges(novasLigacoes);
+                setSelectedId(null);
+              }}
+            />
           )}
-          <Link href={`/playground?agent=${agentId}`} className={buttonVariants({ variant: "secondary", size: "md" })}>
-            <PlayCircle size={15} /> Playground
-          </Link>
+          {tab === "editor" && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowPreview((v) => !v)}
+              aria-pressed={showPreview}
+              title={showPreview ? "Esconder a prévia" : "Testar a conversa ao vivo"}
+            >
+              {showPreview ? <PanelRightClose size={14} aria-hidden="true" /> : <PanelRightOpen size={14} aria-hidden="true" />}
+              <span className="hidden sm:inline">{showPreview ? "Fechar teste" : "Testar"}</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label="Mais: modelos, organizar, última execução, Playground" variant="secondary" className="relative">
+                <Ellipsis />
+                {/* A última execução falhou: o ponto avisa sem ocupar a barra. */}
+                {tab === "editor" && ultimaExecucao?.status === "error" && (
+                  <span aria-hidden="true" className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-danger-solid" />
+                )}
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              {tab === "editor" && (
+                <>
+                  <DropdownMenuItem onSelect={() => setShowTemplateGallery(true)}>
+                    <LayoutTemplate aria-hidden="true" /> Começar de um modelo pronto
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleAutoLayout}>
+                    <LayoutGrid aria-hidden="true" /> Organizar os blocos
+                  </DropdownMenuItem>
+                  {ultimaExecucao && (
+                    <DropdownMenuCheckboxItem checked={mostrarExecucao} onCheckedChange={(v) => setMostrarExecucao(v === true)}>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span>Mostrar a última execução</span>
+                        <span className={cn("font-mono text-caption", ultimaExecucao.status === "error" ? "text-danger" : "text-text-tertiary")}>
+                          {new Date(ultimaExecucao.createdAt).toLocaleString("pt-BR")}
+                          {ultimaExecucao.status === "error" ? " · com erro" : ""}
+                        </span>
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem asChild>
+                <Link href={`/playground?agent=${agentId}`}>
+                  <PlayCircle aria-hidden="true" /> Abrir no Playground
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {tab === "editor" ? (
-        <div className="flex flex-1 gap-3 overflow-hidden">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
           <BlockPalette
             onAdd={handleAddBlock}
             ancora={ancora ? nodes.find((n) => n.id === ancora)?.data.label ?? null : null}
             recolhida={paletaRecolhida}
             onToggle={() => setPaletaRecolhida((v) => !v)}
           />
-          <div data-theme={temaDoCanvas} className="relative flex-1 overflow-hidden rounded-lg border border-border-subtle bg-page">
+          {/* data-theme no contêiner: "canvas sempre escuro" vale também para
+              os blocos (tokens), não só para o fundo do React Flow. */}
+          <div
+            data-theme={temaDoCanvas}
+            className="fluxo-agente relative flex-1 overflow-hidden rounded-[18px] border border-border-subtle bg-page text-text-primary"
+          >
+            <style>{CSS_DO_FLUXO_DO_AGENTE + CSS_DO_MINIMAPA}</style>
+            <CanvasDoAgenteContext.Provider value={contextoDoCanvas}>
             <ReactFlow
               colorMode={temaDoCanvas}
               isValidConnection={ligacaoValida}
@@ -554,28 +633,32 @@ export default function AgentBuilderPage() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={(_, node) => setSelectedId(node.id)}
-              // onNodeClick sozinho nao bastava: bloco de mensagem tem campo de
-              // texto editavel dentro, e clicar no texto selecionava o no no
-              // canvas sem abrir o painel — parecia que o clique nao funcionava.
-              // A selecao e a fonte da verdade, venha o clique de onde vier.
+              // onNodeClick sozinho nao bastava: a selecao e a fonte da
+              // verdade, venha de onde vier (clique, teclado, caixa de selecao).
               onSelectionChange={aoMudarSelecao}
               onPaneClick={() => setSelectedId(null)}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
-              defaultEdgeOptions={{ type: "smoothstep" }}
+              connectionLineType={ConnectionLineType.Bezier}
               defaultViewport={viewportInicial}
               minZoom={0.3}
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
+              style={ESTILO_DO_QUADRO}
             >
-              <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-default)" />
-              <Controls showInteractive={false} position="bottom-left" />
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1.1} color="var(--border-default)" />
+              <BarraFlutuante onOrganizar={handleAutoLayout} />
               <MiniMap
                 position="bottom-right"
                 pannable
                 zoomable
-                nodeColor={(node) => BLOCK_MINIMAP_COLOR[(node.data as FlowNodeData).iconKey] ?? "var(--border-strong)"}
+                className="!overflow-hidden !rounded-[14px] !border !border-border-subtle"
+                style={{ width: 132, height: 84 }}
+                nodeBorderRadius={14}
                 nodeStrokeWidth={0}
+                nodeColor={(node) =>
+                  execucaoNoCanvas?.[node.id] && !execucaoNoCanvas[node.id].ok ? "var(--danger-solid)" : "var(--border-strong)"
+                }
               />
               <Panel position="top-right">
                 <div className="flex flex-col items-end gap-3">
@@ -592,12 +675,13 @@ export default function AgentBuilderPage() {
                 </div>
               </Panel>
             </ReactFlow>
+            </CanvasDoAgenteContext.Provider>
           </div>
 
           {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
         </div>
       ) : tab === "conversa" ? (
-        <div className="flex flex-1 gap-4 overflow-hidden">
+        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
           <ConversationMode
             nodes={nodes}
             edges={edges}

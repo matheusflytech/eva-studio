@@ -2,13 +2,17 @@
 
 import * as React from "react";
 import { UserPlus, Trash2, ShieldCheck } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { IconButton } from "@/components/ui/icon-button";
+import { Notice } from "@/components/ui/notice";
+import { focusRing } from "@/components/ui/styles";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { CabecalhoDaSecao, EsqueletoDeLista, ItemDeConfig, LinhaDeConfig, ListaDeConfig, RotuloDeGrupo } from "./secao";
 
 interface Membro {
   id: string;
@@ -31,6 +35,12 @@ interface PapelSistema {
   description: string;
 }
 
+/** "Maria Silva" → "MS" (círculo da linha). */
+function iniciaisDe(nome: string) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase() || "?";
+}
+
 // O <select> de papel mistura sistema ("sis:admin") e personalizado ("pp:<id>").
 function valorDoPapel(m: Membro) {
   return m.roleId ? `pp:${m.roleId}` : `sis:${m.role}`;
@@ -51,22 +61,26 @@ function Multiplo({
 }) {
   const nomes = opcoes.filter((o) => marcados.includes(o.id)).map((o) => o.name);
   if (desabilitado) {
-    return <span className="text-[12px] text-text-tertiary">{nomes.join(", ") || "—"}</span>;
+    return <span className="max-w-[160px] truncate text-caption text-text-tertiary">{nomes.join(", ") || "—"}</span>;
   }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="max-w-[180px] truncate rounded-lg border border-border-default bg-surface-2 px-2.5 py-1.5 text-left text-[12px] text-text-secondary hover:text-text-primary"
+          aria-label={`${rotulo}: ${nomes.length ? nomes.join(", ") : "nenhum"}`}
+          className={cn(
+            "h-8 max-w-[160px] truncate rounded-full border border-border-subtle bg-raised px-3 text-left text-caption text-text-secondary hover:bg-hover hover:text-text-primary",
+            focusRing
+          )}
         >
           {nomes.length ? nomes.join(", ") : `Sem ${rotulo.toLowerCase()}`}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[220px] p-2">
-        {opcoes.length === 0 && <p className="px-2 py-1 text-[12px] text-text-tertiary">Nenhum(a) criado(a) ainda.</p>}
+        {opcoes.length === 0 && <p className="px-2 py-1 text-caption text-text-tertiary">Nenhum(a) criado(a) ainda.</p>}
         {opcoes.map((o) => (
-          <label key={o.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary hover:bg-surface-3">
+          <label key={o.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-small text-text-secondary hover:bg-hover">
             <Checkbox
               checked={marcados.includes(o.id)}
               onCheckedChange={(v) => aoMudar(v ? [...marcados, o.id] : marcados.filter((x) => x !== o.id))}
@@ -97,6 +111,7 @@ export function AbaMembros() {
   const [email, setEmail] = React.useState("");
   const [papelConvite, setPapelConvite] = React.useState("sis:agent");
   const [convidando, setConvidando] = React.useState(false);
+  const [carregado, setCarregado] = React.useState(false);
 
   const carregar = React.useCallback(async () => {
     const [m, g, t] = await Promise.all([fetch("/api/members"), fetch("/api/permission-groups"), fetch("/api/teams")]);
@@ -110,6 +125,7 @@ export function AbaMembros() {
     }
     if (g.ok) setGrupos((await g.json()).grupos ?? []);
     if (t.ok) setEquipes(((await t.json()).equipes ?? []).map((e: Opcao) => ({ id: e.id, name: e.name })));
+    setCarregado(true);
   }, []);
 
   React.useEffect(() => {
@@ -156,123 +172,147 @@ export function AbaMembros() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Membros</CardTitle>
-        <CardDescription>
-          Quem participa deste contrato. A mesma pessoa pode estar em vários contratos, com um papel diferente em cada.
-        </CardDescription>
-      </CardHeader>
+    <div>
+      <CabecalhoDaSecao
+        titulo="Membros"
+        descricao="Quem participa deste contrato. A mesma pessoa pode estar em vários contratos, com um papel diferente em cada."
+      />
 
       {pode && (
-        <form onSubmit={convidar} className="mb-5 flex flex-col gap-3 rounded-2xl border border-border-subtle bg-surface-2/50 p-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Label htmlFor="convite-email">Convidar por e-mail</Label>
-            <Input id="convite-email" type="email" value={email} placeholder="pessoa@empresa.com" onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="sm:w-[200px]">
-            <Label htmlFor="convite-papel">Papel</Label>
-            <Select id="convite-papel" value={papelConvite} onChange={(e) => setPapelConvite(e.target.value)}>
-              {sistema
-                .filter((s) => s.value !== "owner" || souDono)
-                .map((s) => (
-                  <option key={s.value} value={`sis:${s.value}`}>
-                    {s.label}
-                  </option>
-                ))}
-              {personalizados.map((p) => (
-                <option key={p.id} value={`pp:${p.id}`}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button type="submit" disabled={!email.trim() || convidando} className="shrink-0">
-            <UserPlus size={15} /> {convidando ? "Convidando..." : "Convidar"}
-          </Button>
+        <form onSubmit={convidar}>
+          <LinhaDeConfig rotulo="Convidar por e-mail" descricao="A pessoa recebe o link por e-mail. Quem já tem conta passa a ver o contrato no seletor.">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="convite-email"
+                type="email"
+                aria-label="E-mail de quem vai entrar"
+                value={email}
+                placeholder="pessoa@empresa.com"
+                onChange={(e) => setEmail(e.target.value)}
+                className="sm:flex-1"
+              />
+              <div className="sm:w-[180px]">
+                <Select id="convite-papel" aria-label="Papel no convite" value={papelConvite} onChange={(e) => setPapelConvite(e.target.value)}>
+                  {sistema
+                    .filter((s) => s.value !== "owner" || souDono)
+                    .map((s) => (
+                      <option key={s.value} value={`sis:${s.value}`}>
+                        {s.label}
+                      </option>
+                    ))}
+                  {personalizados.map((p) => (
+                    <option key={p.id} value={`pp:${p.id}`}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="submit" disabled={!email.trim() || convidando} className="shrink-0">
+                <UserPlus size={14} aria-hidden="true" /> {convidando ? "Convidando..." : "Convidar"}
+              </Button>
+            </div>
+          </LinhaDeConfig>
         </form>
       )}
 
-      {erro && <p className="mb-3 text-[13px] text-danger">{erro}</p>}
-      {aviso && <p className="mb-3 text-[13px] text-emerald-400">{aviso}</p>}
+      {erro && (
+        <Notice tone="danger" className="mb-3">
+          {erro}
+        </Notice>
+      )}
+      {aviso && (
+        <Notice tone="info" className="mb-3">
+          {aviso}
+        </Notice>
+      )}
 
-      <div className="flex flex-col gap-2">
-        {membros.map((m) => {
-          const travado = !pode || m.isMe || (m.role === "owner" && !souDono);
-          return (
-            <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-[14px] font-medium text-text-primary">{m.name}</span>
-                  {m.isMe && <Badge>você</Badge>}
-                  {m.status === "convidado" && <Badge variant="accent">convidado</Badge>}
-                </div>
-                <div className="truncate text-[12px] text-text-tertiary">{m.email}</div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Multiplo
-                  rotulo="Equipes"
-                  opcoes={equipes}
-                  marcados={m.teamIds}
-                  desabilitado={!pode}
-                  aoMudar={(ids) => enviar("PATCH", { userId: m.id, teamIds: ids })}
+      <div className={pode ? "border-t border-border-subtle pt-5" : undefined}>
+        <RotuloDeGrupo contagem={carregado ? membros.length : undefined}>Pessoas no contrato</RotuloDeGrupo>
+        {!carregado ? (
+          <EsqueletoDeLista />
+        ) : (
+          <ListaDeConfig>
+            {membros.map((m) => {
+              const travado = !pode || m.isMe || (m.role === "owner" && !souDono);
+              return (
+                <ItemDeConfig
+                  key={m.id}
+                  icone={<span className="text-caption font-semibold">{iniciaisDe(m.name || m.email)}</span>}
+                  titulo={
+                    <span className="flex items-center gap-2">
+                      <span className="truncate">{m.name}</span>
+                      {m.isMe && <Badge>você</Badge>}
+                      {m.status === "convidado" && <Badge variant="info">convidado</Badge>}
+                    </span>
+                  }
+                  detalhe={m.email}
+                  direita={
+                    <>
+                      <Multiplo
+                        rotulo="Equipes"
+                        opcoes={equipes}
+                        marcados={m.teamIds}
+                        desabilitado={!pode}
+                        aoMudar={(ids) => enviar("PATCH", { userId: m.id, teamIds: ids })}
+                      />
+                      <Multiplo
+                        rotulo="Grupos"
+                        opcoes={grupos}
+                        marcados={m.groupIds}
+                        desabilitado={travado}
+                        aoMudar={(ids) => enviar("PATCH", { userId: m.id, groupIds: ids })}
+                      />
+                      {travado ? (
+                        <span className="inline-flex items-center gap-1.5 text-small text-text-secondary">
+                          <ShieldCheck size={14} aria-hidden="true" className="text-text-tertiary" />
+                          {m.roleId
+                            ? personalizados.find((p) => p.id === m.roleId)?.name ?? "Papel personalizado"
+                            : sistema.find((s) => s.value === m.role)?.label ?? m.role}
+                        </span>
+                      ) : (
+                        <div className="w-[170px]">
+                          <Select
+                            value={valorDoPapel(m)}
+                            onChange={(e) => enviar("PATCH", { userId: m.id, ...papelDoSelect(e.target.value) })}
+                            aria-label={`Papel de ${m.name}`}
+                          >
+                            {sistema
+                              .filter((s) => s.value !== "owner" || souDono)
+                              .map((s) => (
+                                <option key={s.value} value={`sis:${s.value}`}>
+                                  {s.label}
+                                </option>
+                              ))}
+                            {personalizados.map((p) => (
+                              <option key={p.id} value={`pp:${p.id}`}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      )}
+                      {!travado && (
+                        <IconButton
+                          aria-label={`Remover ${m.name}`}
+                          tooltip="Remover do contrato"
+                          className="hover:text-danger"
+                          onClick={() => {
+                            if (window.confirm(`Tirar ${m.name} deste contrato? O que ela criou continua aqui.`)) {
+                              enviar("DELETE", undefined, `?userId=${encodeURIComponent(m.id)}`);
+                            }
+                          }}
+                        >
+                          <Trash2 />
+                        </IconButton>
+                      )}
+                    </>
+                  }
                 />
-                <Multiplo
-                  rotulo="Grupos"
-                  opcoes={grupos}
-                  marcados={m.groupIds}
-                  desabilitado={travado}
-                  aoMudar={(ids) => enviar("PATCH", { userId: m.id, groupIds: ids })}
-                />
-                {travado ? (
-                  <span className="inline-flex items-center gap-1.5 text-[13px] text-text-secondary">
-                    <ShieldCheck size={14} className="text-text-tertiary" />
-                    {m.roleId
-                      ? personalizados.find((p) => p.id === m.roleId)?.name ?? "Papel personalizado"
-                      : sistema.find((s) => s.value === m.role)?.label ?? m.role}
-                  </span>
-                ) : (
-                  <Select
-                    className="h-9 w-[180px] text-[13px]"
-                    value={valorDoPapel(m)}
-                    onChange={(e) => enviar("PATCH", { userId: m.id, ...papelDoSelect(e.target.value) })}
-                    aria-label={`Papel de ${m.name}`}
-                  >
-                    {sistema
-                      .filter((s) => s.value !== "owner" || souDono)
-                      .map((s) => (
-                        <option key={s.value} value={`sis:${s.value}`}>
-                          {s.label}
-                        </option>
-                      ))}
-                    {personalizados.map((p) => (
-                      <option key={p.id} value={`pp:${p.id}`}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-                {!travado && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`Tirar ${m.name} deste contrato? O que ela criou continua aqui.`)) {
-                        enviar("DELETE", undefined, `?userId=${encodeURIComponent(m.id)}`);
-                      }
-                    }}
-                    aria-label={`Remover ${m.name}`}
-                    title="Remover do contrato"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-text-tertiary hover:bg-surface-3 hover:text-danger"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </ListaDeConfig>
+        )}
       </div>
-    </Card>
+    </div>
   );
 }

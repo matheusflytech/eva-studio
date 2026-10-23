@@ -82,7 +82,7 @@ export function ProdutosEditor() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-[560px] text-[13.5px] text-text-secondary">
+        <p className="max-w-[560px] text-small text-text-secondary">
           O que você vende. Na ficha do negócio, a equipe escolhe daqui e o valor do negócio passa a ser a soma dos produtos.
         </p>
         <Button onClick={() => setEditando("novo")}>
@@ -101,16 +101,16 @@ export function ProdutosEditor() {
             className="h-10 pl-9"
           />
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text-secondary">
+        <label className="flex cursor-pointer items-center gap-2 text-small text-text-secondary">
           <Switch checked={comArquivados} onCheckedChange={setComArquivados} aria-label="Mostrar arquivados" />
           Mostrar arquivados
         </label>
       </div>
 
-      {erro && <div role="alert" className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{erro}</div>}
+      {erro && <div role="alert" className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">{erro}</div>}
 
       {carregando ? (
-        <p className="text-[14px] text-text-tertiary">Carregando...</p>
+        <p className="text-body text-text-tertiary">Carregando...</p>
       ) : produtos.length === 0 ? (
         <EmptyState
           icon={<Package size={36} className="text-text-tertiary" aria-hidden />}
@@ -126,26 +126,26 @@ export function ProdutosEditor() {
           {produtos.map((p) => (
             <li
               key={p.id}
-              className={cn("flex items-center gap-3 rounded-2xl bg-surface-2 p-3 ring-1 ring-border-subtle", p.archivedAt && "opacity-60")}
+              className={cn("flex items-center gap-3 rounded-[14px] bg-raised p-3 ring-1 ring-border-subtle", p.archivedAt && "opacity-60")}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-[13.5px] font-medium text-text-primary">{p.name}</span>
-                  {p.sku && <span className="text-[12px] tabular-nums text-text-tertiary">{p.sku}</span>}
+                  <span className="truncate text-small font-medium text-text-primary">{p.name}</span>
+                  {p.sku && <span className="text-caption tabular-nums text-text-tertiary">{p.sku}</span>}
                   {p.recurrence !== "unico" && <Badge variant="accent">{rotuloDaRecorrencia(p.recurrence)}</Badge>}
                   {p.category && <Badge>{p.category}</Badge>}
                   {p.archivedAt && <Badge>Arquivado</Badge>}
                 </div>
-                {p.description && <p className="mt-0.5 truncate text-[12px] text-text-tertiary">{p.description}</p>}
+                {p.description && <p className="mt-0.5 truncate text-caption text-text-tertiary">{p.description}</p>}
               </div>
               <div className="shrink-0 text-right">
-                <div className="font-display text-[14px] font-semibold tabular-nums text-text-primary">
+                <div className="text-body font-semibold tabular-nums text-text-primary">
                   {moeda(p.priceCents)}
-                  <span className="text-[12px] font-normal text-text-tertiary">{SUFIXO[p.recurrence]}</span>
+                  <span className="text-caption font-normal text-text-tertiary">{SUFIXO[p.recurrence]}</span>
                 </div>
-                <div className="text-[11.5px] text-text-tertiary">por {p.unit}</div>
+                <div className="text-caption text-text-tertiary">por {p.unit}</div>
               </div>
-              <button type="button" onClick={() => setEditando(p)} aria-label={`Editar ${p.name}`} title="Editar" className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60">
+              <button type="button" onClick={() => setEditando(p)} aria-label={`Editar ${p.name}`} title="Editar" className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus">
                 <Pencil size={15} />
               </button>
               <button
@@ -153,12 +153,12 @@ export function ProdutosEditor() {
                 onClick={() => arquivar(p, !p.archivedAt)}
                 aria-label={p.archivedAt ? `Reativar ${p.name}` : `Arquivar ${p.name}`}
                 title={p.archivedAt ? "Reativar" : "Arquivar (some da busca, os negócios antigos ficam)"}
-                className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {p.archivedAt ? <ArchiveRestore size={15} /> : <Archive size={15} />}
               </button>
               {p.archivedAt && (
-                <button type="button" onClick={() => setExcluindo(p)} aria-label={`Excluir ${p.name}`} title="Excluir" className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-danger/10 hover:text-danger focus-visible:ring-2 focus-visible:ring-danger/60">
+                <button type="button" onClick={() => setExcluindo(p)} aria-label={`Excluir ${p.name}`} title="Excluir" className="rounded-lg p-2 text-text-tertiary outline-none hover:bg-danger-subtle hover:text-danger focus-visible:ring-2 focus-visible:ring-danger/60">
                   <Trash2 size={15} />
                 </button>
               )}
@@ -276,7 +276,7 @@ function ProdutoModal({
             <Label htmlFor="prod-descricao">Descrição (opcional)</Label>
             <Textarea id="prod-descricao" rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} maxLength={2000} />
           </div>
-          {erro && <p role="alert" className="text-[13px] text-danger">{erro}</p>}
+          {erro && <p role="alert" className="text-small text-danger">{erro}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={aoFechar}>
               Cancelar

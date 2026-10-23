@@ -27,7 +27,7 @@ export function Notice({
 }) {
   const { classe, Icone } = tons[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex items-start gap-2 rounded-md px-3 py-2 text-small", classe, className)}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex items-start gap-2 rounded-[12px] px-3 py-2 text-small", classe, className)}>
       <Icone size={16} aria-hidden="true" className="mt-px shrink-0" />
       <div className="min-w-0 flex-1">{children}</div>
       {onDismiss && (

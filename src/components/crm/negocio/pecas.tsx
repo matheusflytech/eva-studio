@@ -1,12 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Globe, Loader2, MessageCircle, MessagesSquare, Search, Send, X, type LucideIcon } from "lucide-react";
+import { ChevronRight, Globe, Loader2, MessagesSquare, Search, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 
 // Peças pequenas que a ficha usa em mais de uma coluna.
 
-/** Bloco com título, contador e ação à direita. */
+/**
+ * Bloco com título, contador e ação à direita. `recolhivel`: o título vira o
+ * botão que abre e fecha o corpo (v5: o que não cabe no cartão lateral fica
+ * em seções recolhíveis, sem sair da ficha).
+ */
 export function Secao({
   titulo,
   contagem,
@@ -14,6 +19,8 @@ export function Secao({
   children,
   className,
   id,
+  recolhivel = false,
+  abertoInicial = true,
 }: {
   titulo: string;
   contagem?: number;
@@ -21,26 +28,39 @@ export function Secao({
   children: React.ReactNode;
   className?: string;
   id?: string;
+  recolhivel?: boolean;
+  abertoInicial?: boolean;
 }) {
   const idDoTitulo = React.useId();
+  const idDoCorpo = React.useId();
+  const [aberto, setAberto] = React.useState(abertoInicial);
+  const mostra = !recolhivel || aberto;
+  const numero = contagem !== undefined && contagem > 0 && (
+    <span className="font-mono text-caption tabular-nums text-text-secondary">{contagem}</span>
+  );
   return (
-    <section
-      id={id}
-      aria-labelledby={idDoTitulo}
-      className={cn("rounded-2xl border border-border-subtle bg-surface-1 p-4", className)}
-    >
-      <header className="mb-3 flex min-h-7 items-center justify-between gap-2">
-        <h2 id={idDoTitulo} className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-text-tertiary">
-          {titulo}
-          {contagem !== undefined && contagem > 0 && (
-            <span className="rounded-md bg-surface-3 px-1.5 py-px text-[11px] font-medium tabular-nums tracking-normal text-text-secondary">
-              {contagem}
-            </span>
+    <section id={id} aria-labelledby={idDoTitulo} className={cn("rounded-[18px] border border-border-subtle bg-panel p-4", !mostra && "py-2.5", className)}>
+      <header className={cn("flex min-h-7 items-center justify-between gap-2", mostra && "mb-3")}>
+        <h2 id={idDoTitulo} className="flex min-w-0 items-center gap-2 font-mono text-caption text-text-tertiary">
+          {recolhivel ? (
+            <button
+              type="button"
+              aria-expanded={aberto}
+              aria-controls={idDoCorpo}
+              onClick={() => setAberto((v) => !v)}
+              className="-ml-1 inline-flex items-center gap-1.5 rounded-full px-1 py-0.5 outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <ChevronRight size={13} aria-hidden className={cn("shrink-0 transition-transform duration-120", aberto && "rotate-90")} />
+              {titulo}
+            </button>
+          ) : (
+            titulo
           )}
+          {numero}
         </h2>
-        {acao}
+        {mostra && acao}
       </header>
-      {children}
+      {mostra && <div id={idDoCorpo}>{children}</div>}
     </section>
   );
 }
@@ -51,8 +71,8 @@ export function BotaoDeSecao({ className, ...props }: React.ButtonHTMLAttributes
     <button
       type="button"
       className={cn(
-        "inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-accent-400 outline-none transition-colors",
-        "hover:bg-accent-soft focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-40",
+        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-caption font-medium text-accent-fg outline-none transition-colors",
+        "hover:bg-accent-subtle focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40",
         className
       )}
       {...props}
@@ -72,8 +92,8 @@ export function BotaoDeIcone({
       aria-label={rotulo}
       title={rotulo}
       className={cn(
-        "grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-tertiary outline-none transition-colors",
-        "hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-40",
+        "grid h-7 w-7 shrink-0 place-items-center rounded-full text-text-tertiary outline-none transition-colors",
+        "hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40",
         className
       )}
       {...props}
@@ -82,15 +102,14 @@ export function BotaoDeIcone({
 }
 
 const ICONE_DO_CANAL: Record<string, { icone: LucideIcon; cor: string }> = {
-  whatsapp_meta: { icone: MessageCircle, cor: "text-[#25d366]" },
-  whatsapp_qr: { icone: MessageCircle, cor: "text-[#25d366]" },
-  telegram: { icone: Send, cor: "text-sky-400" },
   website: { icone: Globe, cor: "text-text-secondary" },
   webchat: { icone: Globe, cor: "text-text-secondary" },
 };
 
-/** Ícone do canal. Sem marca de terceiros: só a cor lembra o WhatsApp. */
+/** Ícone do canal: o logo oficial (WhatsApp, Telegram, Instagram...); o site, que não tem marca, fica com o globo. */
 export function IconeDoCanal({ canal, tamanho = 15 }: { canal: string; tamanho?: number }) {
+  const marca = marcaDoCanal(canal);
+  if (marca) return <LogoOficial marca={marca} tamanho={tamanho} />;
   const { icone: Icone, cor } = ICONE_DO_CANAL[canal] ?? { icone: MessagesSquare, cor: "text-text-secondary" };
   return <Icone size={tamanho} aria-hidden className={cn("shrink-0", cor)} />;
 }
@@ -160,9 +179,9 @@ export function CampoInline({
   }
 
   const classe = cn(
-    "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-[13px] text-text-primary outline-none transition-colors",
-    "placeholder:text-text-tertiary hover:border-border-subtle hover:bg-surface-2",
-    "focus:border-accent-500/60 focus:bg-surface-2 focus:ring-2 focus:ring-accent-500/20",
+    "w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-small text-text-primary outline-none transition-colors",
+    "placeholder:text-text-tertiary hover:border-border-subtle hover:bg-hover",
+    "focus:border-accent-solid focus:bg-raised focus:ring-2 focus:ring-accent-solid/20",
     erro && "border-danger/50",
     prefixo && "pl-8",
     className
@@ -181,12 +200,12 @@ export function CampoInline({
 
   return (
     <div>
-      <label htmlFor={id} className={cn("mb-0.5 block px-2 text-[11.5px] text-text-tertiary", rotuloOculto && "sr-only")}>
+      <label htmlFor={id} className={cn("mb-0.5 block px-2 text-caption text-text-tertiary", rotuloOculto && "sr-only")}>
         {rotulo}
       </label>
       <div className="relative">
         {prefixo && (
-          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-text-tertiary">{prefixo}</span>
+          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-caption text-text-tertiary">{prefixo}</span>
         )}
         {tipo === "area" ? (
           <textarea
@@ -216,17 +235,17 @@ export function CampoInline({
             onBlur={() => tipo !== "data" && salvar()}
             onKeyDown={teclas}
             aria-invalid={!!erro}
-            className={cn(classe, "h-8", tipo === "data" && "[color-scheme:dark]")}
+            className={cn(classe, "h-8")}
           />
         )}
         {(salvando || sufixo) && (
-          <span className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[12px] text-text-tertiary">
+          <span className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 text-caption text-text-tertiary">
             {salvando ? <Loader2 size={13} className="animate-spin" aria-label="Salvando" /> : sufixo}
           </span>
         )}
       </div>
       {erro && (
-        <p role="alert" className="mt-1 px-2 text-[11.5px] text-danger">
+        <p role="alert" className="mt-1 px-2 text-caption text-danger">
           {erro}
         </p>
       )}
@@ -297,7 +316,7 @@ export function BuscaDeVinculo({
 
   return (
     <div
-      className="mb-3 rounded-xl border border-border-default bg-surface-2 p-2"
+      className="mb-3 rounded-xl border border-border-default bg-raised p-2"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();
@@ -320,7 +339,7 @@ export function BuscaDeVinculo({
           placeholder={placeholder}
           aria-label={rotulo}
           aria-controls={idDaLista}
-          className="h-8 min-w-0 flex-1 bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-tertiary"
+          className="h-8 min-w-0 flex-1 bg-transparent text-small text-text-primary outline-none placeholder:text-text-tertiary"
         />
         {buscando && <Loader2 size={13} className="animate-spin text-text-tertiary" aria-label="Buscando" />}
         <BotaoDeIcone rotulo="Fechar busca" onClick={onFechar}>
@@ -329,19 +348,19 @@ export function BuscaDeVinculo({
       </div>
       <ul id={idDaLista} className="mt-1 flex flex-col gap-0.5">
         {falhou ? (
-          <li className="px-2 py-1.5 text-[12px] text-danger">Não foi possível buscar.</li>
+          <li className="px-2 py-1.5 text-caption text-danger">Não foi possível buscar.</li>
         ) : visiveis.length === 0 && !buscando ? (
-          <li className="px-2 py-1.5 text-[12px] text-text-tertiary">{q.trim() ? "Nada encontrado." : "Digite para buscar."}</li>
+          <li className="px-2 py-1.5 text-caption text-text-tertiary">{q.trim() ? "Nada encontrado." : "Digite para buscar."}</li>
         ) : (
           visiveis.map((o) => (
             <li key={o.id}>
               <button
                 type="button"
                 onClick={() => onEscolher(o.id)}
-                className="flex w-full flex-col rounded-lg px-2 py-1.5 text-left outline-none hover:bg-surface-3 focus-visible:bg-surface-3 focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                className="flex w-full flex-col rounded-lg px-2 py-1.5 text-left outline-none hover:bg-hover focus-visible:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
               >
-                <span className="truncate text-[13px] text-text-primary">{o.titulo}</span>
-                {o.sub && <span className="truncate text-[11.5px] text-text-tertiary">{o.sub}</span>}
+                <span className="truncate text-small text-text-primary">{o.titulo}</span>
+                {o.sub && <span className="truncate text-caption text-text-tertiary">{o.sub}</span>}
               </button>
             </li>
           ))

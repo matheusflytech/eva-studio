@@ -60,7 +60,7 @@ export function CampoEditor({
     case "currency":
       return (
         <div className="relative">
-          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-text-tertiary">R$</span>
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-small text-text-tertiary">R$</span>
           <Input id={id} inputMode="decimal" className="pl-10" value={String(valor ?? "")} onChange={(e) => onChange(e.target.value)} placeholder="0,00" />
         </div>
       );
@@ -91,8 +91,8 @@ export function CampoEditor({
                 aria-pressed={ligado}
                 onClick={() => onChange(ligado ? marcados.filter((m) => m !== o.value) : [...marcados, o.value])}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-[12.5px] ring-1 transition-colors",
-                  ligado ? "bg-accent-500/15 text-text-primary ring-accent-500/50" : "bg-surface-2 text-text-secondary ring-border-subtle hover:text-text-primary"
+                  "rounded-full px-3 py-1.5 text-small ring-1 transition-colors",
+                  ligado ? "bg-accent-subtle text-text-primary ring-accent-solid" : "bg-raised text-text-secondary ring-border-subtle hover:text-text-primary"
                 )}
               >
                 {o.label}
@@ -105,8 +105,8 @@ export function CampoEditor({
 
     case "checkbox":
       return (
-        <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-border-default bg-surface-2 px-3.5 text-sm text-text-primary">
-          <input id={id} type="checkbox" checked={valor === true} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[var(--accent-500,#6366f1)]" />
+        <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-border-default bg-raised px-3.5 text-small text-text-primary">
+          <input id={id} type="checkbox" checked={valor === true} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[var(--accent-solid)]" />
           {valor === true ? "Sim" : "Não"}
         </label>
       );
@@ -146,7 +146,7 @@ export function CamposDoFormulario({
             {d.required && <span className="ml-1 text-danger">*</span>}
           </Label>
           <CampoEditor id={`${prefixo}-${d.key}`} def={d} valor={rascunho[d.key]} onChange={(v) => onChange(d.key, v)} />
-          {d.helpText && <p className="mt-1.5 text-[12px] text-text-tertiary">{d.helpText}</p>}
+          {d.helpText && <p className="mt-1.5 text-caption text-text-tertiary">{d.helpText}</p>}
         </div>
       ))}
     </div>
@@ -166,7 +166,7 @@ export function ChipsDeCampos({ defs, valores }: { defs: DefinicaoDeCampo[]; val
         <span
           key={d.id}
           title={d.label}
-          className="max-w-full truncate rounded-md bg-surface-3/70 px-1.5 py-0.5 text-[11px] text-text-secondary"
+          className="max-w-full truncate rounded-md bg-hover/70 px-1.5 py-0.5 text-caption text-text-secondary"
         >
           {d.type === "checkbox" ? d.label : ["select", "multiselect", "text"].includes(d.type) ? texto : `${d.label}: ${texto}`}
         </span>
@@ -184,7 +184,7 @@ export function ValoresDeCampos({ defs, valores }: { defs: DefinicaoDeCampo[]; v
   return (
     <dl className="flex flex-col gap-1.5">
       {itens.map(({ d, texto }) => (
-        <div key={d.id} className="flex items-baseline justify-between gap-3 text-[13px]">
+        <div key={d.id} className="flex items-baseline justify-between gap-3 text-small">
           <dt className="shrink-0 text-text-tertiary">{d.label}</dt>
           <dd className="min-w-0 break-words text-right text-text-primary">{texto}</dd>
         </div>

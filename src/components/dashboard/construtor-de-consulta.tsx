@@ -121,12 +121,12 @@ export function ConstrutorDeConsulta({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-label="Montar cartão">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={aoFechar} />
-      <div className="glass-card glass-card-solid relative z-10 flex max-h-[94dvh] w-full max-w-[1040px] flex-col overflow-hidden rounded-3xl">
+      <div className="absolute inset-0 bg-backdrop" onClick={aoFechar} />
+      <div className="border border-border-default bg-overlay shadow-overlay relative z-10 flex max-h-[94dvh] w-full max-w-[1040px] flex-col overflow-hidden rounded-[18px]">
         <header className="flex items-start justify-between gap-3 border-b border-border-subtle p-5">
           <div>
-            <h2 className="font-display text-[17px] font-semibold text-text-primary">Montar um cartão</h2>
-            <p className="mt-1 text-[12.5px] text-text-secondary">Escolha o que medir. A prévia calcula com os seus negócios de verdade.</p>
+            <h2 className="text-title-sm font-semibold text-text-primary">Montar um cartão</h2>
+            <p className="mt-1 text-small text-text-secondary">Escolha o que medir. A prévia calcula com os seus negócios de verdade.</p>
           </div>
           <button type="button" onClick={aoFechar} aria-label="Fechar" className="text-text-tertiary hover:text-text-primary">
             <X size={17} />
@@ -153,12 +153,12 @@ export function ConstrutorDeConsulta({
                     onClick={() => mudarMedida(m.id)}
                     aria-pressed={consulta.medida === m.id}
                     className={cn(
-                      "rounded-xl px-3 py-2.5 text-left ring-1 transition-colors",
-                      consulta.medida === m.id ? "bg-accent-500/12 ring-accent-500/50" : "bg-surface-2 ring-border-subtle hover:ring-border-strong"
+                      "rounded-[14px] px-3 py-2.5 text-left ring-1 transition-colors",
+                      consulta.medida === m.id ? "bg-accent-subtle ring-accent-solid/50" : "bg-raised ring-border-subtle hover:ring-border-strong"
                     )}
                   >
-                    <div className="text-[13px] font-medium text-text-primary">{m.rotulo}</div>
-                    <div className="mt-0.5 text-[11px] leading-snug text-text-tertiary">{m.descricao}</div>
+                    <div className="text-small font-medium text-text-primary">{m.rotulo}</div>
+                    <div className="mt-0.5 text-caption leading-snug text-text-tertiary">{m.descricao}</div>
                   </button>
                 ))}
               </div>
@@ -178,7 +178,7 @@ export function ConstrutorDeConsulta({
                     )}
                   </Select>
                   {camposNumericos.length === 0 && (
-                    <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+                    <p className="mt-1.5 text-caption text-text-tertiary">
                       Campos de número ou de valor que você criar em Negócios {">"} Personalizar aparecem aqui.
                     </p>
                   )}
@@ -223,8 +223,8 @@ export function ConstrutorDeConsulta({
                     aria-checked={consulta.status === s.id}
                     onClick={() => mudar({ status: s.id, ...(consulta.periodo === "tudo" && (s.id === "ganhos" || s.id === "perdidos") ? { periodo: "painel" } : {}) })}
                     className={cn(
-                      "rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-colors",
-                      consulta.status === s.id ? "bg-accent-soft text-accent-300 ring-1 ring-accent-500/40" : "bg-surface-2 text-text-secondary hover:text-text-primary"
+                      "rounded-xl px-3.5 py-2 text-small font-medium transition-colors",
+                      consulta.status === s.id ? "bg-accent-subtle text-accent-fg ring-1 ring-accent-solid/40" : "bg-raised text-text-secondary hover:text-text-primary"
                     )}
                   >
                     {s.rotulo}
@@ -279,17 +279,17 @@ export function ConstrutorDeConsulta({
               </div>
               {intervaloFixo && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <Input type="date" aria-label="De" className="h-9 w-[170px] text-[13px]" value={intervaloFixo.de} onChange={(e) => e.target.value && mudar({ periodo: { ...intervaloFixo, de: e.target.value } })} />
-                  <span className="text-[12px] text-text-tertiary">até</span>
-                  <Input type="date" aria-label="Até" className="h-9 w-[170px] text-[13px]" value={intervaloFixo.ate} onChange={(e) => e.target.value && mudar({ periodo: { ...intervaloFixo, ate: e.target.value } })} />
+                  <Input type="date" aria-label="De" className="h-9 w-[170px] text-small" value={intervaloFixo.de} onChange={(e) => e.target.value && mudar({ periodo: { ...intervaloFixo, de: e.target.value } })} />
+                  <span className="text-caption text-text-tertiary">até</span>
+                  <Input type="date" aria-label="Até" className="h-9 w-[170px] text-small" value={intervaloFixo.ate} onChange={(e) => e.target.value && mudar({ periodo: { ...intervaloFixo, ate: e.target.value } })} />
                 </div>
               )}
 
               {podeComparar && (
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
                   <span>
-                    <span className="block text-[13px] text-text-primary">Comparar com o período anterior</span>
-                    <span className="block text-[11.5px] text-text-tertiary">Mostra a variação contra o mesmo número de dias logo antes.</span>
+                    <span className="block text-small text-text-primary">Comparar com o período anterior</span>
+                    <span className="block text-caption text-text-tertiary">Mostra a variação contra o mesmo número de dias logo antes.</span>
                   </span>
                   <Switch checked={!!consulta.comparar} onCheckedChange={(v) => mudar({ comparar: v || undefined })} aria-label="Comparar com o período anterior" />
                 </label>
@@ -311,8 +311,8 @@ export function ConstrutorDeConsulta({
                     onClick={() => setTipoEscolhido(t)}
                     aria-pressed={tipo === t}
                     className={cn(
-                      "rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-colors",
-                      tipo === t ? "bg-accent-soft text-accent-300 ring-1 ring-accent-500/40" : "bg-surface-2 text-text-secondary hover:text-text-primary"
+                      "h-8 rounded-full px-3.5 text-small font-medium transition-colors",
+                      tipo === t ? "bg-inverse text-inverse-fg" : "border border-border-subtle bg-raised text-text-secondary hover:text-text-primary"
                     )}
                   >
                     {NOME_DO_TIPO[t]}
@@ -326,18 +326,18 @@ export function ConstrutorDeConsulta({
             </section>
           </div>
 
-          <aside className="border-t border-border-subtle bg-surface-1/40 p-5 md:overflow-y-auto md:border-l md:border-t-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Prévia</p>
-            <div className="glass-card mt-2 rounded-2xl p-4">
-              <h3 className="text-[12.5px] text-text-tertiary">{tituloFinal}</h3>
+          <aside className="border-t border-border-subtle bg-raised/40 p-5 md:overflow-y-auto md:border-l md:border-t-0">
+            <p className="font-mono text-caption text-text-tertiary">Prévia</p>
+            <div className="mt-2 rounded-[18px] border border-border-subtle bg-panel p-4">
+              <h3 className="text-small text-text-tertiary">{tituloFinal}</h3>
               <div className="mt-2">
                 <VisaoDoResultado resultado={resultado} erro={erro} carregando={carregando} tipo={tipo} />
               </div>
             </div>
-            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">O que entra</p>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-secondary">{selecao}.</p>
+            <p className="mt-4 font-mono text-caption text-text-tertiary">O que entra</p>
+            <p className="mt-1.5 text-small leading-relaxed text-text-secondary">{selecao}.</p>
             {(globais.funis.length > 0 || globais.donos.length > 0) && (
-              <p className="mt-2 text-[11.5px] leading-relaxed text-text-tertiary">
+              <p className="mt-2 text-caption leading-relaxed text-text-tertiary">
                 Os filtros do painel (funis e responsável) também valem para este cartão.
               </p>
             )}
@@ -346,7 +346,7 @@ export function ConstrutorDeConsulta({
 
         <footer className="flex justify-end gap-2 border-t border-border-subtle p-4">
           <Button variant="ghost" onClick={aoFechar}>Cancelar</Button>
-          <Button onClick={() => aoSalvar({ consulta, tipo, titulo: tituloFinal })}>
+          <Button variant="primary" onClick={() => aoSalvar({ consulta, tipo, titulo: tituloFinal })}>
             {inicial ? "Salvar cartão" : "Adicionar ao painel"}
           </Button>
         </footer>

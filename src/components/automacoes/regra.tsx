@@ -40,7 +40,7 @@ function ValorDaCondicao({ c, campo, opcoes, mudar }: { c: Condicao; campo?: Cam
     return (
       <div className="flex items-center gap-1">
         <Input type={tipo} value={String(a ?? "")} onChange={(e) => mudar([e.target.value, b])} />
-        <span className="text-[12px] text-text-tertiary">e</span>
+        <span className="text-caption text-text-tertiary">e</span>
         <Input type={tipo} value={String(b ?? "")} onChange={(e) => mudar([a, e.target.value])} />
       </div>
     );
@@ -83,18 +83,18 @@ export function EditorDeRegra({ regra, mudar, objeto, opcoes, vazio = "Sem condi
 
   return (
     <div className="flex flex-col gap-2">
-      {grupos.length === 0 && <p className="text-[12px] text-text-tertiary">{vazio}</p>}
+      {grupos.length === 0 && <p className="text-caption text-text-tertiary">{vazio}</p>}
       {grupos.map((g, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-tertiary">ou</p>}
-          <div className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-panel p-2.5">
+          {i > 0 && <p className="text-center font-mono text-caption text-text-tertiary">ou</p>}
+          <div className="flex flex-col gap-2 rounded-[14px] border border-border-subtle bg-panel p-2.5">
             {g.condicoes.map((c, k) => {
               const campo = campos.find((x) => x.caminho === c.campo);
               const ops = OPERADORES_POR_TIPO[campo?.tipo ?? "texto"] ?? OPERADORES_POR_TIPO.texto;
               const setC = (patch: Partial<Condicao>) => setGrupo(i, g.condicoes.map((x, j) => (j === k ? { ...x, ...patch } : x)));
               return (
                 <div key={k} className="flex flex-col gap-1.5">
-                  {k > 0 && <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-tertiary">e</p>}
+                  {k > 0 && <p className="font-mono text-caption text-text-tertiary">e</p>}
                   <div className="flex items-center gap-1.5">
                     <Select
                       value={c.campo}

@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Loader2, Plus, Trash2, Upload, Braces, Reply, ExternalLink, Phone } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { focusRing } from "@/components/ui/styles";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -71,7 +73,7 @@ function snake(texto: string): string {
 
 function Contador({ atual, max }: { atual: number; max: number }) {
   return (
-    <span className={cn("text-[11px] tabular-nums", atual > max ? "text-danger" : "text-text-tertiary")}>
+    <span className={cn("font-mono text-caption tabular-nums", atual > max ? "text-danger" : "text-text-tertiary")}>
       {atual}/{max}
     </span>
   );
@@ -83,7 +85,7 @@ function Erros({ erros, campo }: { erros: { campo: CampoDoTemplate; mensagem: st
   return (
     <ul className="mt-1.5 flex flex-col gap-0.5">
       {meus.map((e, i) => (
-        <li key={i} className="text-[11.5px] text-danger">{e.mensagem}</li>
+        <li key={i} className="text-caption text-danger">{e.mensagem}</li>
       ))}
     </ul>
   );
@@ -216,7 +218,7 @@ export function CriarTemplate({
                 <Label htmlFor="tpl-nome">Nome na Meta</Label>
                 <Input
                   id="tpl-nome"
-                  className="font-mono text-[13px]"
+                  className="font-mono text-small"
                   value={f.nome}
                   placeholder="lembrete_consulta"
                   onChange={(e) => {
@@ -238,7 +240,7 @@ export function CriarTemplate({
                 >
                   {CATEGORIAS.map((c) => <option key={c.valor} value={c.valor}>{c.rotulo}</option>)}
                 </Select>
-                <p className="mt-1 text-[11.5px] text-text-tertiary">
+                <p className="mt-1 text-caption text-text-tertiary">
                   {CATEGORIAS.find((c) => c.valor === f.categoria)?.dica} A Meta pode reclassificar.
                 </p>
               </div>
@@ -252,8 +254,8 @@ export function CriarTemplate({
             </div>
 
             {auth ? (
-              <div className="rounded-2xl bg-surface-2 p-4">
-                <p className="text-[13px] text-text-secondary">
+              <div className="rounded-[14px] bg-raised p-4">
+                <p className="text-small text-text-secondary">
                   Template de autenticação tem texto fixo da Meta (código + aviso de segurança + botão de copiar).
                   Você só escolhe a validade do código.
                 </p>
@@ -275,15 +277,20 @@ export function CriarTemplate({
                 {/* Cabeçalho */}
                 <div>
                   <Label>Cabeçalho</Label>
-                  <div className="flex flex-wrap gap-1.5">
+                  {/* Escolha única em cápsulas: a ativa fica invertida, como no resto do app. */}
+                  <div role="group" aria-label="Formato do cabeçalho" className="flex flex-wrap gap-1.5">
                     {FORMATOS.map((o) => (
                       <button
                         key={o.valor}
                         type="button"
+                        aria-pressed={f.header.formato === o.valor}
                         onClick={() => mudar({ header: { formato: o.valor } })}
                         className={cn(
-                          "rounded-lg px-3 py-1.5 text-[12.5px] transition-colors",
-                          f.header.formato === o.valor ? "bg-accent-soft font-medium text-accent-400" : "bg-surface-2 text-text-secondary hover:bg-surface-3"
+                          "h-7 rounded-full px-3 text-small transition-colors duration-120",
+                          f.header.formato === o.valor
+                            ? "bg-inverse font-medium text-inverse-fg"
+                            : "bg-raised text-text-secondary ring-1 ring-border-subtle hover:bg-hover hover:text-text-primary",
+                          focusRing
                         )}
                       >
                         {o.rotulo}
@@ -310,7 +317,7 @@ export function CriarTemplate({
                     </div>
                   )}
                   {f.header.formato !== "NONE" && f.header.formato !== "TEXT" && (
-                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-2.5 text-[13px] text-text-secondary hover:bg-surface-3">
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-[14px] bg-raised px-3.5 py-2.5 text-small text-text-secondary ring-1 ring-border-subtle transition-colors hover:bg-hover focus-within:ring-border-strong">
                       {subindo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                       {f.header.handle ? `Exemplo enviado: ${f.header.nomeArquivo ?? "arquivo"}` : "Enviar arquivo de exemplo (até 4 MB)"}
                       <input
@@ -334,13 +341,9 @@ export function CriarTemplate({
                   <div className="mb-2 flex items-center justify-between">
                     <Label htmlFor="tpl-corpo" className="mb-0">Mensagem</Label>
                     <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={inserirVariavel}
-                        className="inline-flex items-center gap-1 rounded-lg bg-surface-2 px-2.5 py-1 text-[12px] text-text-secondary hover:bg-surface-3"
-                      >
-                        <Braces size={12} /> Variável
-                      </button>
+                      <Button type="button" variant="secondary" size="sm" onClick={inserirVariavel}>
+                        <Braces size={12} aria-hidden /> Variável
+                      </Button>
                       <Contador atual={tamanhoCorpo} max={LIMITES.corpo} />
                     </div>
                   </div>
@@ -352,15 +355,15 @@ export function CriarTemplate({
                     placeholder={"Oi {nome}, sua consulta está marcada para {{2}}.\nResponda 1 para confirmar."}
                     onChange={(e) => mudar({ corpo: e.target.value })}
                   />
-                  <p className="mt-1 text-[11.5px] text-text-tertiary">
+                  <p className="mt-1 text-caption text-text-tertiary">
                     Variáveis: {"{{1}}"}, {"{{2}}"}... ou pelo nome, como {"{nome}"}. *negrito*, _itálico_, ~riscado~.
                   </p>
                   <Erros erros={errosVisiveis} campo="corpo" />
                 </div>
 
                 {variaveis.length > 0 && (
-                  <div className="rounded-2xl bg-surface-2 p-4">
-                    <p className="mb-2 text-[12.5px] font-medium text-text-secondary">
+                  <div className="rounded-[14px] bg-raised p-4">
+                    <p className="mb-2 text-small font-medium text-text-secondary">
                       Exemplos das variáveis <span className="font-normal text-text-tertiary">(a Meta exige para revisar)</span>
                     </p>
                     <div className="flex flex-col gap-2">
@@ -368,7 +371,7 @@ export function CriarTemplate({
                         const numerica = /^\d+$/.test(chave);
                         return (
                           <div key={chave} className="grid items-center gap-2 sm:grid-cols-[90px_1fr_170px]">
-                            <span className="font-mono text-[12px] text-text-tertiary">
+                            <span className="font-mono text-caption text-text-tertiary">
                               {`{{${i + 1}}}`}{numerica ? "" : ` ${chave}`}
                             </span>
                             <Input
@@ -385,7 +388,7 @@ export function CriarTemplate({
                                 {CAMPOS_DO_CONTATO.map((c) => <option key={c.valor} value={c.valor}>{c.rotulo}</option>)}
                               </Select>
                             ) : (
-                              <span className="text-[11.5px] text-text-tertiary">preenche com {`{${chave}}`}</span>
+                              <span className="text-caption text-text-tertiary">preenche com {`{${chave}}`}</span>
                             )}
                           </div>
                         );
@@ -415,21 +418,21 @@ export function CriarTemplate({
                   <Label>Botões <span className="font-normal text-text-tertiary">(até 10: respostas rápidas, 2 links, 1 telefone)</span></Label>
                   <div className="flex flex-col gap-2">
                     {f.botoes.map((b, i) => (
-                      <div key={i} className="flex flex-col gap-2 rounded-xl bg-surface-2 p-3">
+                      <div key={i} className="flex flex-col gap-2 rounded-[14px] bg-raised p-3">
                         <div className="flex items-center gap-2">
-                          <span className="w-[110px] shrink-0 text-[12px] text-text-tertiary">
+                          <span className="w-[110px] shrink-0 text-caption text-text-tertiary">
                             {b.tipo === "QUICK_REPLY" ? "Resposta rápida" : b.tipo === "URL" ? "Link" : "Ligar"}
                           </span>
                           <Input value={b.texto} placeholder="Texto do botão" onChange={(e) => mudarBotao(i, { texto: e.target.value })} />
                           <Contador atual={b.texto.length} max={LIMITES.textoBotao} />
-                          <button
-                            type="button"
+                          <IconButton
                             aria-label="Remover botão"
+                            size="sm"
                             onClick={() => mudar({ botoes: f.botoes.filter((_, j) => j !== i) })}
-                            className="rounded-lg p-1.5 text-text-tertiary hover:bg-danger/10 hover:text-danger"
+                            className="shrink-0 hover:bg-danger-subtle hover:text-danger"
                           >
-                            <Trash2 size={14} />
-                          </button>
+                            <Trash2 aria-hidden />
+                          </IconButton>
                         </div>
                         {b.tipo === "URL" && (
                           <div className="grid gap-2 sm:grid-cols-2">
@@ -451,15 +454,16 @@ export function CriarTemplate({
                       { tipo: "URL", rotulo: "Link", icone: ExternalLink },
                       { tipo: "PHONE_NUMBER", rotulo: "Ligar", icone: Phone },
                     ] as const).map((o) => (
-                      <button
+                      <Button
                         key={o.tipo}
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         disabled={!podeAdicionar(o.tipo)}
                         onClick={() => mudar({ botoes: [...f.botoes, { tipo: o.tipo, texto: "" }] })}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:bg-surface-3 disabled:opacity-40"
                       >
-                        <Plus size={12} /> <o.icone size={12} /> {o.rotulo}
-                      </button>
+                        <Plus size={12} aria-hidden /> <o.icone size={12} aria-hidden /> {o.rotulo}
+                      </Button>
                     ))}
                   </div>
                   <Erros erros={errosVisiveis} campo="botoes" />
@@ -469,18 +473,18 @@ export function CriarTemplate({
           </div>
 
           <div className="flex flex-col gap-3 md:sticky md:top-0 md:self-start">
-            <p className="text-[12.5px] font-medium text-text-secondary">Prévia</p>
+            <p className="font-mono text-caption uppercase tracking-wider text-text-tertiary">Prévia</p>
             <PreviaWhatsApp previa={previa} />
-            {erroGeral && <p className="text-[12.5px] text-danger">{erroGeral}</p>}
+            {erroGeral && <p className="text-small text-danger">{erroGeral}</p>}
             {mostrarErros && erros.length > 0 && (
-              <p className="text-[12px] text-danger">
+              <p className="text-caption text-danger">
                 {erros.length === 1 ? "Falta corrigir 1 ponto." : `Faltam corrigir ${erros.length} pontos.`}
               </p>
             )}
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={onFechar}>Cancelar</Button>
-              <Button type="button" className="flex-1" disabled={enviando || subindo} onClick={enviar}>
-                {enviando && <Loader2 size={14} className="animate-spin" />} Enviar para aprovação
+              <Button type="button" variant="primary" className="flex-1" loading={enviando} disabled={subindo} onClick={enviar}>
+                Enviar para aprovação
               </Button>
             </div>
           </div>

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * "accent" é nome antigo; prefira "info" ou "neutral".
  */
 const badgeVariants = cva(
-  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-1.5 text-caption font-medium",
+  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-caption font-medium",
   {
     variants: {
       variant: {

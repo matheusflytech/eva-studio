@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { usePathname } from "@/lib/contrato/navegacao";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export function SidebarNavItem({
@@ -27,18 +28,24 @@ export function SidebarNavItem({
     <Link
       href={href}
       className={cn(
-        "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-body font-medium transition-colors",
-        // Item ativo no acento da marca (o menu é navy em qualquer tema).
-        isActive
-          ? "bg-accent-subtle text-accent-fg"
-          : "text-text-secondary hover:bg-hover hover:text-text-primary"
+        "group relative flex h-[34px] items-center gap-2.5 rounded-[10px] px-2.5 text-small font-medium transition-colors",
+        // Item ativo em cinza preenchido (a pílula desliza entre os itens); a
+        // cor fica para o dado (contador).
+        isActive ? "text-text-primary" : "text-text-secondary hover:bg-raised hover:text-text-primary"
       )}
     >
+      {isActive && (
+        <motion.span
+          layoutId="menu-item-ativo"
+          className="absolute inset-0 -z-10 rounded-[10px] bg-hover"
+          transition={{ type: "spring", stiffness: 520, damping: 40, mass: 0.8 }}
+        />
+      )}
       <Icon
         size={17}
         className={cn(
           "shrink-0",
-          isActive ? "text-accent-fg" : "text-text-tertiary group-hover:text-text-secondary",
+          isActive ? "text-text-primary" : "text-text-tertiary group-hover:text-text-secondary",
           animated && isActive && "animate-aperture-breathe"
         )}
       />
@@ -46,7 +53,7 @@ export function SidebarNavItem({
         <>
           <span className="flex-1 truncate">{label}</span>
           {badge && (
-            <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[10.5px] font-semibold text-text-tertiary">
+            <span className="rounded-full bg-accent-solid px-1.5 font-mono text-caption font-medium leading-[18px] text-text-on-accent">
               {badge}
             </span>
           )}

@@ -1,0 +1,29 @@
+/* Base comum das propostas de login (tipografia e formulário da Eva). */
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+.etiqueta { position: fixed; left: 20px; top: 16px; z-index: 10; font: 600 11px/1 ui-monospace, "JetBrains Mono", monospace; letter-spacing: .04em; padding: 7px 10px; border-radius: 999px; text-decoration: none; }
+.nota { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10; font-size: 12px; max-width: 760px; text-align: center; line-height: 1.5; }
+
+.cartao { position: fixed; inset: 0; margin: auto; width: min(1120px, calc(100vw - 64px)); height: min(660px, calc(100vh - 96px)); border-radius: 30px; overflow: hidden; display: grid; grid-template-columns: 420px 1fr; }
+.form { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: center; padding: 0 56px; }
+.marca { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 26px; font-weight: 700; }
+.form h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
+.form .sub { font-size: 13px; margin: 6px 0 28px; }
+.form label { display: block; font-size: 12px; font-weight: 500; margin: 0 0 6px; }
+.form .campo { height: 42px; width: 100%; border-radius: 12px; padding: 0 14px; font: inherit; font-size: 13px; margin-bottom: 14px; outline: none; transition: border-color .2s, box-shadow .2s; }
+.form .botao { height: 44px; width: 100%; border: 0; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; margin-top: 8px; cursor: pointer; transition: transform .15s cubic-bezier(.3,.7,.4,1); }
+.form .botao:active { transform: scale(.97); }
+.form .rodape { font-size: 12px; margin-top: 18px; text-align: center; }
+.palco { position: relative; overflow: hidden; }
+.palco canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Entrada da tela: o cartão sobe com mola curta; o formulário vem em cascata. */
+@keyframes sobe { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
+.cartao { animation: sobe .7s cubic-bezier(.32,.72,0,1) both; }
+.form > * { animation: sobe .6s cubic-bezier(.32,.72,0,1) both; }
+.form > *:nth-child(2) { animation-delay: .06s; } .form > *:nth-child(3) { animation-delay: .1s; }
+.form > *:nth-child(4) { animation-delay: .14s; } .form > *:nth-child(5) { animation-delay: .18s; }
+.form > *:nth-child(6) { animation-delay: .22s; } .form > *:nth-child(7) { animation-delay: .26s; }
+@media (prefers-reduced-motion: reduce) { .cartao, .form > * { animation-duration: 1.2s; } }

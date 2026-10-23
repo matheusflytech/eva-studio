@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/input";
 import { CamposDoFormulario, rascunhoInicial, rascunhoParaEnvio, type Rascunho } from "@/components/crm/campos-personalizados";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 
-// Campos do contato, no painel lateral: os que o cliente definiu (editáveis,
+// Campos do contato, na aba Dados da ficha e da página completa: os que o cliente definiu (editáveis,
 // com tipo) e, abaixo, o que o fluxo capturou sem ter um campo definido.
 
 export function CamposDoContato({
@@ -71,12 +71,12 @@ export function CamposDoContato({
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <Label className="mb-0">Dados do contato</Label>
-          <Link href="/negocios/configurar" className="inline-flex items-center gap-1 text-[12px] text-text-tertiary hover:text-text-primary">
+          <Link href="/negocios/configurar" className="inline-flex items-center gap-1 text-caption text-text-tertiary hover:text-text-primary">
             <SlidersHorizontal size={12} /> Personalizar
           </Link>
         </div>
         {defs.length === 0 ? (
-          <p className="text-[12.5px] text-text-tertiary">
+          <p className="text-small text-text-tertiary">
             Nenhum campo extra criado. Em Personalizar você cria os campos que fazem sentido para o seu negócio.
           </p>
         ) : (
@@ -87,7 +87,7 @@ export function CamposDoContato({
             onChange={(k, v) => { setRascunho((r) => ({ ...r, [k]: v })); setSujo(true); }}
           />
         )}
-        {erro && <p className="text-[12.5px] text-danger">{erro}</p>}
+        {erro && <p className="text-small text-danger">{erro}</p>}
         {sujo && (
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setRascunho(rascunhoInicial(defs, valores)); setSujo(false); setErro(null); }}>
@@ -103,9 +103,9 @@ export function CamposDoContato({
       {livres.length > 0 && (
         <section>
           <Label>Capturado no fluxo</Label>
-          <dl className="mt-1.5 flex flex-col gap-1.5 rounded-2xl bg-surface-2 px-4 py-3">
+          <dl className="mt-1.5 flex flex-col gap-1.5 rounded-[14px] bg-raised px-3.5 py-3 ring-1 ring-border-subtle">
             {livres.map(([key, value]) => (
-              <div key={key} className="flex items-start justify-between gap-4 text-[13px]">
+              <div key={key} className="flex items-start justify-between gap-4 text-small">
                 <dt className="text-text-tertiary">{key}</dt>
                 <dd className="max-w-[60%] break-words text-right text-text-primary">{String(value)}</dd>
               </div>

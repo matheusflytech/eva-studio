@@ -1,11 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
+import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
+import { Field, Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Notice } from "@/components/ui/notice";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MatrizDePermissoes } from "./matriz-de-permissoes";
+import { CabecalhoDaSecao, EsqueletoDeLista, ItemDeConfig, ListaDeConfig, VazioDeConfig } from "./secao";
 
 interface Grupo {
   id: string;
@@ -17,15 +21,17 @@ type Rascunho = Omit<Grupo, "id"> & { id: string | null };
 
 // Grupo = pacote extra de permissões, SOMADO ao papel. Serve para dar um
 // acesso a mais a algumas pessoas sem criar um papel novo (ex.: "Exportar
-// dados" só para dois atendentes).
+// dados" só para dois atendentes). v5: lista com linhas finas; criar e
+// editar abrem numa gaveta, com Salvar/Cancelar no rodapé.
 export function AbaGrupos({ podeGerenciar }: { podeGerenciar: boolean }) {
-  const [grupos, setGrupos] = React.useState<Grupo[]>([]);
+  const [grupos, setGrupos] = React.useState<Grupo[] | null>(null);
   const [rascunho, setRascunho] = React.useState<Rascunho | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
 
   const carregar = React.useCallback(async () => {
     const r = await fetch("/api/permission-groups");
     if (r.ok) setGrupos((await r.json()).grupos ?? []);
+    else setGrupos((g) => g ?? []);
   }, []);
   React.useEffect(() => {
     // Fora do corpo do efeito: a primeira carga não dispara setState síncrono.
@@ -54,81 +60,102 @@ export function AbaGrupos({ podeGerenciar }: { podeGerenciar: boolean }) {
     carregar();
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <CardHeader>
-          <CardTitle>Grupos de permissões</CardTitle>
-          <CardDescription>
-            Um <strong className="text-text-primary">grupo</strong> é um pacote extra que se soma ao papel — por exemplo
-            “Financeiro” ou “Exportar dados”. Dá para colocar o grupo num papel (todos daquele papel ganham) ou direto
-            numa pessoa, na aba Membros.
-          </CardDescription>
-        </CardHeader>
-        <div className="flex flex-col gap-2">
-          {grupos.length === 0 && <p className="text-[13px] text-text-tertiary">Nenhum grupo ainda.</p>}
-          {grupos.map((g) => (
-            <div key={g.id} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-[14px] font-medium text-text-primary">{g.name}</p>
-                <p className="truncate text-[12px] text-text-tertiary">
-                  {g.description || `${g.permissions.length} permiss${g.permissions.length === 1 ? "ão" : "ões"}`}
-                </p>
-              </div>
-              {podeGerenciar && (
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setRascunho({ ...g })}>
-                    Editar
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => apagar(g)} aria-label={`Apagar o grupo ${g.name}`}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-          {podeGerenciar && !rascunho && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="self-start"
-              onClick={() => setRascunho({ id: null, name: "", description: "", permissions: [] })}
-            >
-              <Plus size={14} /> Criar grupo
-            </Button>
-          )}
-        </div>
-      </Card>
+  const novo = () => {
+    setErro(null);
+    setRascunho({ id: null, name: "", description: "", permissions: [] });
+  };
 
-      {rascunho && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{rascunho.id ? "Editar grupo" : "Novo grupo"}</CardTitle>
-          </CardHeader>
-          <div className="flex flex-col gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Nome</Label>
-                <Input value={rascunho.name} placeholder="Ex.: Exportar dados" onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })} />
-              </div>
-              <div>
-                <Label>Descrição</Label>
-                <Input value={rascunho.description} onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })} />
-              </div>
-            </div>
-            <MatrizDePermissoes valor={rascunho.permissions} onChange={(p) => setRascunho({ ...rascunho, permissions: p })} />
-            {erro && <p className="text-[13px] text-danger">{erro}</p>}
-            <div className="flex gap-2">
-              <Button size="sm" onClick={salvar}>
-                Salvar grupo
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setRascunho(null)}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        </Card>
+  return (
+    <div>
+      <CabecalhoDaSecao
+        titulo="Grupos de permissões"
+        descricao={
+          <>
+            Um grupo é um pacote extra que se soma ao papel, por exemplo “Financeiro” ou “Exportar dados”. Dá para colocar o
+            grupo num papel (todos daquele papel ganham) ou direto numa pessoa, em Membros.
+          </>
+        }
+        acoes={
+          podeGerenciar && (
+            <Button onClick={novo}>
+              <Plus size={14} aria-hidden="true" /> Criar grupo
+            </Button>
+          )
+        }
+      />
+
+      {grupos === null ? (
+        <EsqueletoDeLista />
+      ) : grupos.length === 0 ? (
+        <VazioDeConfig>Nenhum grupo ainda.</VazioDeConfig>
+      ) : (
+        <ListaDeConfig>
+          {grupos.map((g) => (
+            <ItemDeConfig
+              key={g.id}
+              titulo={g.name}
+              detalhe={g.description || undefined}
+              onClick={podeGerenciar ? () => setRascunho({ ...g }) : undefined}
+              rotuloDoClique={`Editar o grupo ${g.name}`}
+              direita={
+                <>
+                  <span className="font-mono text-caption tabular-nums text-text-tertiary">
+                    {g.permissions.length} permiss{g.permissions.length === 1 ? "ão" : "ões"}
+                  </span>
+                  {podeGerenciar && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <IconButton aria-label={`Mais ações do grupo ${g.name}`}>
+                          <Ellipsis />
+                        </IconButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setRascunho({ ...g })}>
+                          <Pencil /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem tone="danger" onSelect={() => void apagar(g)}>
+                          <Trash2 /> Apagar grupo
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </>
+              }
+            />
+          ))}
+        </ListaDeConfig>
       )}
+
+      <Drawer open={!!rascunho} onOpenChange={(v) => !v && setRascunho(null)}>
+        {rascunho && (
+          <DrawerContent
+            size="lg"
+            title={rascunho.id ? "Editar grupo" : "Novo grupo"}
+            description="Marque o que o grupo acrescenta. Clique no nome do módulo para marcar a linha inteira."
+            footer={
+              <>
+                <Button variant="ghost" onClick={() => setRascunho(null)}>
+                  Cancelar
+                </Button>
+                <Button onClick={salvar}>Salvar grupo</Button>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Nome">
+                  <Input value={rascunho.name} placeholder="Ex.: Exportar dados" onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })} />
+                </Field>
+                <Field label="Descrição">
+                  <Input value={rascunho.description} onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })} />
+                </Field>
+              </div>
+              <MatrizDePermissoes valor={rascunho.permissions} onChange={(p) => setRascunho({ ...rascunho, permissions: p })} />
+              {erro && <Notice tone="danger">{erro}</Notice>}
+            </div>
+          </DrawerContent>
+        )}
+      </Drawer>
     </div>
   );
 }

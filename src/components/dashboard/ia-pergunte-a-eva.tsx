@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, ArrowUp, Loader2, Sparkles, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowUp, Loader2, Undo2 } from "lucide-react";
+import { MarcaEva } from "@/components/layout/marca-eva";
 import type { Consulta, FiltrosGlobais, TipoDeCartao } from "@/lib/consulta";
 import { cn } from "@/lib/utils";
 
@@ -68,17 +69,17 @@ export async function pedirParaEva<M extends "cartao" | "globais">(
 export function EntendiAssim({ explicacao, avisos, className }: { explicacao?: string; avisos?: string[]; className?: string }) {
   if (!explicacao && !avisos?.length) return null;
   return (
-    <div className={cn("rounded-xl bg-accent-soft px-3 py-2.5 text-[12.5px] leading-relaxed", className)} role="status">
+    <div className={cn("rounded-[14px] bg-raised px-3 py-2.5 text-small leading-relaxed", className)} role="status">
       {explicacao && (
         <p className="text-text-primary">
-          <span className="font-medium text-accent-400">Entendi assim:</span> {explicacao}
+          <span className="font-medium text-text-primary">Entendi assim:</span> {explicacao}
         </p>
       )}
       {!!avisos?.length && (
         <ul className={cn("flex flex-col gap-1 text-text-secondary", explicacao && "mt-1.5")}>
           {avisos.map((a) => (
             <li key={a} className="flex items-start gap-1.5">
-              <AlertTriangle size={12} className="mt-[3px] shrink-0 text-amber-300" aria-hidden />
+              <AlertTriangle size={12} className="mt-[3px] shrink-0 text-warning" aria-hidden />
               <span>{a}</span>
             </li>
           ))}
@@ -124,7 +125,7 @@ export function CampoDePedido({
         }}
       >
         <div className="relative flex-1">
-          <Sparkles size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-accent-400" aria-hidden />
+          <MarcaEva size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
           <input
             id={id}
             value={texto}
@@ -133,14 +134,14 @@ export function CampoDePedido({
             maxLength={LIMITE_DO_PEDIDO}
             autoFocus={autoFocus}
             disabled={carregando}
-            className="h-10 w-full rounded-xl border border-border-default bg-surface-2 pl-9 pr-3 text-[13px] text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/20 disabled:opacity-60"
+            className="h-10 w-full rounded-[10px] border border-border-subtle bg-raised pl-9 pr-3 text-small text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent-solid/60 focus:ring-2 focus:ring-accent-solid/20 disabled:opacity-60"
           />
         </div>
         <button
           type="submit"
           disabled={!pedido || carregando}
           aria-label="Enviar para a Eva"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-500 text-text-on-accent transition-colors hover:bg-accent-400 disabled:pointer-events-none disabled:opacity-40"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-solid text-text-on-accent transition-colors hover:bg-accent-solid-hover disabled:pointer-events-none disabled:opacity-40"
         >
           {carregando ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={16} />}
         </button>
@@ -152,7 +153,7 @@ export function CampoDePedido({
             type="button"
             disabled={carregando}
             onClick={() => enviar(ex)}
-            className="rounded-lg bg-surface-2 px-2.5 py-1 text-left text-[11.5px] text-text-secondary ring-1 ring-border-subtle transition-colors hover:text-text-primary hover:ring-border-strong disabled:opacity-50"
+            className="rounded-full bg-raised px-2.5 py-1 text-left text-caption text-text-secondary ring-1 ring-border-subtle transition-colors hover:text-text-primary hover:ring-border-strong disabled:opacity-50"
           >
             {ex}
           </button>
@@ -198,10 +199,10 @@ export function PergunteAEva({
   }
 
   return (
-    <section className="rounded-2xl bg-surface-2/60 p-4 ring-1 ring-border-subtle">
+    <section className="rounded-[14px] bg-raised p-4">
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <label htmlFor="q-ia" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-primary">
-          <Sparkles size={14} className="text-accent-400" aria-hidden /> Pergunte à Eva
+        <label htmlFor="q-ia" className="inline-flex items-center gap-1.5 text-small font-medium text-text-primary">
+          <MarcaEva size={13} className="text-text-secondary" /> Pergunte à Eva
         </label>
         {podeDesfazer && (
           <button
@@ -210,13 +211,13 @@ export function PergunteAEva({
               aoDesfazer();
               setUltima(null);
             }}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-caption text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary"
           >
             <Undo2 size={13} /> Desfazer
           </button>
         )}
       </div>
-      <p className="mb-2.5 text-[12px] text-text-tertiary">
+      <p className="mb-2.5 text-caption text-text-tertiary">
         Me diz o que você quer ver, do seu jeito. Eu monto o cartão e você confere na prévia antes de salvar.
       </p>
       <CampoDePedido
@@ -227,7 +228,7 @@ export function PergunteAEva({
         aoEnviar={enviar}
       />
       {erro && (
-        <p className="mt-2.5 text-[12.5px] text-danger" role="alert">
+        <p className="mt-2.5 text-small text-danger" role="alert">
           {erro}
         </p>
       )}

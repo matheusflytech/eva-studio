@@ -8,12 +8,17 @@ import { saidasDe, type Definicao, type Ponta } from "./tipos";
 // próximo passo. Puro: a tela só converte em nós/arestas do React Flow.
 // ---------------------------------------------------------------------------
 
-export const NO_LARGURA = 264;
-export const NO_ALTURA = 78;
-const VAZIO_LARGURA = 160;
-const VAZIO_ALTURA = 44;
-const GAP_X = 92;
-const GAP_Y = 30;
+// v6: o nó é um quadrado com ícone; nome e resumo ficam embaixo, fora da
+// caixa. Por isso o vão entre colunas e linhas é largo: cabe o rótulo (até
+// ~176px de largura, centrado) e o "+"/nome do ramo sobre o fio.
+export const NO_LARGURA = 88;
+export const NO_ALTURA = 88;
+export const VAZIO_LARGURA = 56;
+export const VAZIO_ALTURA = 56;
+const GAP_X = 150;
+const GAP_Y = 68;
+/** Distância entre o começo de uma coluna e o da seguinte. */
+export const PASSO_X = NO_LARGURA + GAP_X;
 
 export interface Caixa {
   id: string;
@@ -72,10 +77,11 @@ export function layoutDaAutomacao(def: Definicao): Layout {
   const colocados = new Set<string>();
 
   const colocarSaida = (deCaixa: string, ponta: Ponta, nome: string, alvo: string | null, coluna: number, topo: number) => {
-    const x = coluna * (NO_LARGURA + GAP_X);
     if (!alvo || !def.nos[alvo] || colocados.has(alvo)) {
       const id = `vazio:${ponta.de}:${ponta.saida}`;
-      const y = topo + (VAZIO_ALTURA - VAZIO_ALTURA) / 2;
+      // Centrado na coluna: o meio do "+" fica na mesma linha do meio dos nós.
+      const x = coluna * (NO_LARGURA + GAP_X) + (NO_LARGURA - VAZIO_LARGURA) / 2;
+      const y = topo;
       caixas.push({ id, tipo: "vazio", x, y, largura: VAZIO_LARGURA, altura: VAZIO_ALTURA, ponta });
       ligacoes.push({ id: `l:${id}`, de: deCaixa, para: id, saida: ponta.saida, nome, ponta, paraVazio: true });
       maxX = Math.max(maxX, x + VAZIO_LARGURA);
@@ -106,7 +112,8 @@ export function layoutDaAutomacao(def: Definicao): Layout {
 
   const alturaTotal = Math.max(NO_ALTURA, medir(def.inicio));
   caixas.push({ id: "gatilho", tipo: "gatilho", x: 0, y: (alturaTotal - NO_ALTURA) / 2, largura: NO_LARGURA, altura: NO_ALTURA });
-  colocarSaida("gatilho", { de: "gatilho", saida: "proximo" }, "", def.inicio, 1, 0);
+  // O primeiro ramo ocupa a altura toda quando é um nó; se é só o "+", centra.
+  colocarSaida("gatilho", { de: "gatilho", saida: "proximo" }, "", def.inicio, 1, (alturaTotal - medir(def.inicio)) / 2);
   maxX = Math.max(maxX, NO_LARGURA);
   maxY = Math.max(maxY, alturaTotal);
   return { caixas, ligacoes, largura: maxX, altura: maxY };

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { LogoDaMarca } from "@/components/ui/marca";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { CANAIS, type InfoDoCanal, type TipoDeCanal } from "@/lib/canais";
 import { ConectarCanal } from "./conectar-canal";
+import { CabecalhoDaSecao, EsqueletoDeLista } from "./secao";
 
 interface CanalNaTela {
   id: string;
@@ -80,57 +80,71 @@ export function AbaCanais() {
     recarregar();
   }
 
-  if (!dados) return <p className="text-[12.5px] text-text-tertiary">Carregando...</p>;
+  const cabecalho = (
+    <CabecalhoDaSecao
+      titulo="Canais"
+      descricao="Os números e contas que o contrato usa para conversar. Conecte quantos precisar; depois, na aba Canais de cada agente, escolha por qual ele atende."
+    />
+  );
+
+  if (!dados)
+    return (
+      <div>
+        {cabecalho}
+        <EsqueletoDeLista linhas={4} />
+      </div>
+    );
 
   const voltaDoInstagram = volta.get("instagram") === "connected";
   const erroDoInstagram = volta.get("instagram_error");
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="max-w-2xl text-[13px] text-text-secondary">
-        Os números e contas que o contrato usa para conversar. Conecte quantos precisar; depois, na aba Canais de
-        cada agente, escolha por qual ele atende.
-      </p>
-      {!dados.disponivel && (
-        <Notice tone="warning">
-          Os canais do contrato ainda não foram ativados no banco deste ambiente. Por enquanto, a lista abaixo mostra
-          as conexões feitas dentro de cada agente, e é por lá que se conecta.
-        </Notice>
-      )}
-      {voltaDoInstagram && <Notice tone="info">Instagram conectado. Escolha, na aba Canais de um agente, quem atende por ele.</Notice>}
-      {erroDoInstagram && (
-        <Notice tone="danger">
-          {erroDoInstagram === "outro_contrato" ? "Essa conta do Instagram já está conectada em outro contrato." : "Não deu para conectar o Instagram. Tente de novo."}
-        </Notice>
-      )}
-      {mensagem && <Notice tone={mensagem.tom}>{mensagem.texto}</Notice>}
+    <div>
+      {cabecalho}
+      <div className="flex flex-col gap-2 empty:hidden [&:not(:empty)]:pb-4">
+        {!dados.disponivel && (
+          <Notice tone="warning">
+            Os canais do contrato ainda não foram ativados no banco deste ambiente. Por enquanto, a lista abaixo mostra
+            as conexões feitas dentro de cada agente, e é por lá que se conecta.
+          </Notice>
+        )}
+        {voltaDoInstagram && <Notice tone="info">Instagram conectado. Escolha, na aba Canais de um agente, quem atende por ele.</Notice>}
+        {erroDoInstagram && (
+          <Notice tone="danger">
+            {erroDoInstagram === "outro_contrato" ? "Essa conta do Instagram já está conectada em outro contrato." : "Não deu para conectar o Instagram. Tente de novo."}
+          </Notice>
+        )}
+        {mensagem && <Notice tone={mensagem.tom}>{mensagem.texto}</Notice>}
+      </div>
 
-      {CANAIS.map((info) => (
-        <CartaoDoCanal
-          key={info.tipo}
-          info={info}
-          canais={dados.canais.filter((c) => c.tipo === info.tipo)}
-          podeConectar={dados.disponivel}
-          aberto={aberto === info.tipo}
-          abrir={() => setAberto(info.tipo)}
-          fechar={() => setAberto(null)}
-          aoConectar={aoConectar}
-          desconectar={dados.disponivel ? desconectar : undefined}
-        />
-      ))}
+      <ul className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle">
+        {CANAIS.map((info) => (
+          <CartaoDoCanal
+            key={info.tipo}
+            info={info}
+            canais={dados.canais.filter((c) => c.tipo === info.tipo)}
+            podeConectar={dados.disponivel}
+            aberto={aberto === info.tipo}
+            abrir={() => setAberto(info.tipo)}
+            fechar={() => setAberto(null)}
+            aoConectar={aoConectar}
+            desconectar={dados.disponivel ? desconectar : undefined}
+          />
+        ))}
 
-      <Card className="flex items-start gap-3.5">
-        <LogoDaMarca marca="site" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-text-primary">Chat no seu site</p>
-          <p className="text-[12.5px] text-text-secondary">
-            Cada agente tem o próprio código para colar no site (aba Canais do agente).
-            {dados.agentes.some((a) => a.widget)
-              ? ` Ligado em: ${dados.agentes.filter((a) => a.widget).map((a) => a.nome).join(", ")}.`
-              : " Nenhum agente com o chat ligado."}
-          </p>
-        </div>
-      </Card>
+        <li className="flex items-start gap-3.5 px-1 py-4">
+          <LogoDaMarca marca="site" />
+          <div className="min-w-0 flex-1">
+            <p className="text-body font-semibold text-text-primary">Chat no seu site</p>
+            <p className="text-small text-text-tertiary">
+              Cada agente tem o próprio código para colar no site (aba Canais do agente).
+              {dados.agentes.some((a) => a.widget)
+                ? ` Ligado em: ${dados.agentes.filter((a) => a.widget).map((a) => a.nome).join(", ")}.`
+                : " Nenhum agente com o chat ligado."}
+            </p>
+          </div>
+        </li>
+      </ul>
     </div>
   );
 }
@@ -155,54 +169,56 @@ function CartaoDoCanal({
   desconectar?: (c: CanalNaTela) => void;
 }) {
   return (
-    <Card className="flex flex-col gap-4">
+    <li className="flex flex-col gap-3 px-1 py-4">
       <div className="flex items-start gap-3.5">
         <LogoDaMarca marca={info.marca} />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold text-text-primary">{info.nome}</p>
-          <p className="text-[12.5px] text-text-secondary">{info.descricao}</p>
+          <p className="text-body font-semibold text-text-primary">{info.nome}</p>
+          <p className="text-small text-text-tertiary">{info.descricao}</p>
         </div>
         {podeConectar &&
           (aberto ? (
-            <Button type="button" variant="ghost" size="sm" onClick={fechar}>
-              <X size={14} /> Fechar
+            <Button type="button" variant="ghost" onClick={fechar}>
+              <X size={14} aria-hidden="true" /> Fechar
             </Button>
           ) : (
-            <Button type="button" variant="secondary" size="sm" onClick={abrir}>
-              <Plus size={14} /> Conectar
+            <Button type="button" variant="secondary" onClick={abrir}>
+              <Plus size={14} aria-hidden="true" /> Conectar
             </Button>
           ))}
       </div>
 
       {canais.length > 0 ? (
-        <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+        <ul className="ml-0 flex flex-col divide-y divide-border-subtle sm:ml-[50px]">
           {canais.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center gap-3 px-3.5 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-medium text-text-primary">{c.rotulo}</p>
-                <p className="text-[11.5px] text-text-tertiary">
+            <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+              <div className="min-w-[140px] flex-1">
+                <p className="truncate text-small font-medium text-text-primary">{c.rotulo}</p>
+                <p className="truncate text-caption text-text-tertiary">
                   {c.agentNome ? `Usado por ${c.agentNome}` : "Nenhum agente atende por ele ainda"}
                   {c.detalhe ? ` · ${c.detalhe}` : ""}
                 </p>
               </div>
-              <Badge variant={SITUACAO[c.status].variant}>{SITUACAO[c.status].rotulo}</Badge>
+              <Badge variant={SITUACAO[c.status].variant} dot>
+                {SITUACAO[c.status].rotulo}
+              </Badge>
               {desconectar && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => desconectar(c)} aria-label={`Desconectar ${c.rotulo}`}>
-                  <Trash2 size={14} /> Desconectar
+                  <Trash2 size={14} aria-hidden="true" /> Desconectar
                 </Button>
               )}
             </li>
           ))}
         </ul>
       ) : (
-        !aberto && <p className="text-[12.5px] text-text-tertiary">Nenhum conectado.</p>
+        !aberto && <p className="font-mono text-caption text-text-tertiary sm:ml-[50px]">Nenhum conectado</p>
       )}
 
       {aberto && (
-        <div className="rounded-xl bg-surface-2 p-3.5">
+        <div className="rounded-[14px] bg-raised p-4 sm:ml-[50px]">
           <ConectarCanal tipo={info.tipo} aoConectar={aoConectar} />
         </div>
       )}
-    </Card>
+    </li>
   );
 }

@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import {
-  Send, Paperclip, X, Loader2, Lock, Bot, UserRound, FileText, Clock, MessageSquareText, AlertTriangle,
+  Send, Paperclip, X, Lock, Bot, UserRound, FileText, Clock, MessageSquareText, AlertTriangle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Modal, ModalContent } from "@/components/ui/modal";
+import { pulsar } from "@/lib/fundo/eventos";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { cn } from "@/lib/utils";
 import { tamanhoLegivel, type Conversa } from "./tipos";
@@ -103,11 +105,11 @@ function EscolherModelo({
         className="max-w-xl"
       >
         {modelos === null ? (
-          <p className="py-6 text-center text-[13px] text-text-tertiary">Carregando...</p>
+          <p className="py-6 text-center text-small text-text-tertiary">Carregando...</p>
         ) : modelos.length === 0 ? (
-          <div className="rounded-2xl bg-surface-2 px-4 py-6 text-center">
-            <p className="text-[13.5px] font-medium text-text-primary">Nenhum modelo ligado a um template da Meta</p>
-            <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-text-secondary">
+          <div className="rounded-[14px] border border-border-subtle bg-raised px-4 py-6 text-center">
+            <p className="text-body font-medium text-text-primary">Nenhum modelo ligado a um template da Meta</p>
+            <p className="mx-auto mt-1.5 max-w-sm text-small text-text-secondary">
               Cadastre um em Eva Studio, na aba do agente, em Modelos de mensagem, e ligue ao nome do template aprovado
               na Meta. A tela Aprovações mostra o que já foi aprovado.
             </p>
@@ -115,21 +117,23 @@ function EscolherModelo({
         ) : (
           <div className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
             {modelos.map((m) => (
-              <div key={m.id} className="rounded-2xl bg-surface-2 p-4">
-                <p className="text-[13px] font-medium text-text-primary">{m.name}</p>
-                <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-text-secondary">{m.bodyText}</p>
-                <button
-                  type="button"
+              <div key={m.id} className="rounded-[14px] border border-border-subtle bg-raised p-4">
+                <p className="text-small font-medium text-text-primary">{m.name}</p>
+                <p className="mt-1 whitespace-pre-wrap text-small leading-relaxed text-text-secondary">{m.bodyText}</p>
+                <Button
+                  variant="primary"
+                  size="sm"
                   disabled={enviando !== null}
+                  loading={enviando === m.id}
                   onClick={async () => {
                     setEnviando(m.id);
                     await onEscolher(m);
                     setEnviando(null);
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 py-1.5 text-[12.5px] font-medium text-text-on-accent transition-colors hover:bg-accent-400 disabled:opacity-50"
+                  className="mt-3"
                 >
-                  {enviando === m.id && <Loader2 size={12} className="animate-spin" />} Enviar este modelo
-                </button>
+                  Enviar este modelo
+                </Button>
               </div>
             ))}
           </div>
@@ -157,6 +161,7 @@ export function Compositor({
   const [modelosAbertos, setModelosAbertos] = React.useState(false);
   const campo = React.useRef<HTMLTextAreaElement>(null);
   const arquivo = React.useRef<HTMLInputElement>(null);
+  const botaoEnviar = React.useRef<HTMLButtonElement>(null);
 
   // Cada conversa tem o seu rascunho: trocar de conversa não pode levar o que
   // estava sendo escrito para outro cliente.
@@ -222,41 +227,40 @@ export function Compositor({
       setErro(falha);
       return;
     }
+    // Mensagem saiu: a onda no fundo parte do botão. Nota interna não sai
+    // para ninguém, então fica quieta.
+    if (modo === "responder") pulsar(botaoEnviar.current, 1.2);
     setTexto("");
     setAnexo(null);
     campo.current?.focus();
   }
 
   return (
-    <div className="border-t border-border-subtle p-3">
+    <div className="shrink-0 border-t border-border-subtle px-3.5 pb-3 pt-2.5">
       {/* Por que está bloqueado, dito com todas as letras, e o que fazer. */}
       {modo === "responder" && deOutro && (
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-400/10 px-3.5 py-2.5">
-          <p className="flex items-center gap-2 text-[12.5px] text-amber-200">
-            <UserRound size={14} /> {conversa.assignedTo?.name} está atendendo esta conversa.
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-warning-subtle px-3.5 py-2.5">
+          <p className="flex items-center gap-2 text-small text-warning">
+            <UserRound size={14} aria-hidden="true" /> {conversa.assignedTo?.name} está atendendo esta conversa.
           </p>
-          <button
-            type="button"
-            onClick={onAssumir}
-            className="rounded-lg bg-amber-400/20 px-2.5 py-1 text-[12px] font-medium text-amber-200 transition-colors hover:bg-amber-400/30"
-          >
+          <Button variant="secondary" size="sm" onClick={onAssumir}>
             Assumir mesmo assim
-          </button>
+          </Button>
         </div>
       )}
 
       {modo === "responder" && !deOutro && semCanal && (
-        <div className="mb-2.5 flex items-start gap-2 rounded-xl bg-surface-2 px-3.5 py-2.5 text-[12.5px] text-text-secondary">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-300" />
+        <div className="mb-2.5 flex items-start gap-2 rounded-[10px] bg-raised px-3.5 py-2.5 text-small text-text-secondary">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
           Este canal não permite responder por aqui: a mensagem não chegaria ao cliente. Você pode deixar uma nota
           interna.
         </div>
       )}
 
       {modo === "responder" && !deOutro && !semCanal && janelaFechada && (
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-400/10 px-3.5 py-2.5">
-          <p className="flex items-start gap-2 text-[12.5px] text-amber-200">
-            <Clock size={14} className="mt-0.5 shrink-0" />
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-warning-subtle px-3.5 py-2.5">
+          <p className="flex items-start gap-2 text-small text-warning">
+            <Clock size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
             <span>
               A janela de 24h desta conversa acabou.{" "}
               {podeModelo
@@ -265,41 +269,52 @@ export function Compositor({
             </span>
           </p>
           {podeModelo && (
-            <button
-              type="button"
-              onClick={() => setModelosAbertos(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400/20 px-2.5 py-1 text-[12px] font-medium text-amber-200 transition-colors hover:bg-amber-400/30"
-            >
-              <MessageSquareText size={12} /> Enviar modelo
-            </button>
+            <Button variant="secondary" size="sm" onClick={() => setModelosAbertos(true)}>
+              <MessageSquareText size={14} aria-hidden="true" /> Enviar modelo
+            </Button>
           )}
         </div>
       )}
 
+      {/* Regra do PR #7: só responde quem assumiu. O Assumir principal fica no
+          cabeçalho; aqui ele repete, perto de onde a pessoa ia escrever. */}
       {modo === "responder" && precisaAssumir && (
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2 px-3.5 py-2.5">
-          <p className="flex items-center gap-2 text-[12.5px] text-text-secondary">
-            <Bot size={14} />
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-[10px] bg-raised px-3.5 py-2.5">
+          <p className="flex items-center gap-2 text-small text-text-secondary">
+            <Bot size={14} className="shrink-0" aria-hidden="true" />
             {conversa.status === "active"
               ? "O agente está respondendo. Assuma para escrever; ele fica em silêncio até você devolver."
               : "Assuma a conversa para responder. O agente fica em silêncio até você devolver."}
           </p>
-          <button
-            type="button"
-            onClick={onAssumir}
-            className="rounded-lg bg-accent-500 px-2.5 py-1 text-[12px] font-medium text-text-on-accent transition-colors hover:bg-accent-600"
-          >
+          <Button variant="secondary" size="sm" onClick={onAssumir}>
             Assumir para responder
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="mb-2 flex items-center gap-1">
+      <div className="mb-2 flex items-center gap-4">
+        {(["responder", "nota"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => { setModo(m); setErro(null); }}
+            aria-pressed={modo === m}
+            className={cn(
+              "inline-flex items-center gap-1.5 text-caption font-medium transition-colors duration-120",
+              modo === m
+                ? m === "nota" ? "text-warning" : "text-text-primary"
+                : "text-text-tertiary hover:text-text-secondary"
+            )}
+          >
+            {m === "nota" && <Lock size={12} aria-hidden="true" />}
+            {m === "responder" ? "Responder" : "Nota interna"}
+          </button>
+        ))}
         {podeAgendar && (
           <AgendarMensagem
             rotulo="Agendar"
             variante="ghost"
-            className="order-last ml-auto h-7 px-2.5 text-[12.5px]"
+            className="ml-auto h-7 px-2.5 text-small"
             destino={{
               agentId: conversa.agentId,
               agentName: conversa.agentName,
@@ -314,83 +329,43 @@ export function Compositor({
             }}
           />
         )}
-        {(["responder", "nota"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => { setModo(m); setErro(null); }}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
-              modo === m
-                ? m === "nota"
-                  ? "bg-amber-400/15 text-amber-300"
-                  : "bg-surface-3 text-text-primary"
-                : "text-text-tertiary hover:text-text-secondary"
-            )}
-          >
-            {m === "nota" && <Lock size={11} />}
-            {m === "responder" ? "Responder" : "Nota interna"}
-          </button>
-        ))}
       </div>
 
       {(anexo || subindo) && modo === "responder" && (
-        <div className="mb-2 flex items-center gap-3 rounded-xl bg-surface-2 p-2.5">
+        <div className="mb-2 flex items-center gap-3 rounded-[10px] border border-border-subtle bg-raised p-2.5">
           {anexo?.previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={anexo.previewUrl} alt="" className="h-11 w-11 rounded-lg object-cover" />
           ) : (
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-text-tertiary">
-              <FileText size={18} />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-hover text-text-tertiary">
+              <FileText size={18} aria-hidden="true" />
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12.5px] text-text-primary">{anexo?.name ?? subindo?.nome}</p>
+            <p className="truncate text-small text-text-primary">{anexo?.name ?? subindo?.nome}</p>
             {subindo ? (
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-3">
-                <div className="h-1 rounded-full bg-accent-500 transition-all" style={{ width: `${subindo.pct}%` }} />
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-hover">
+                <div className="h-1 rounded-full bg-accent-solid transition-all" style={{ width: `${subindo.pct}%` }} />
               </div>
             ) : (
-              <p className="text-[11px] text-text-tertiary">{tamanhoLegivel(anexo?.size ?? 0)}</p>
+              <p className="text-caption text-text-tertiary">{tamanhoLegivel(anexo?.size ?? 0)}</p>
             )}
           </div>
           {anexo && !subindo && (
-            <button
-              type="button"
-              onClick={() => setAnexo(null)}
-              aria-label="Remover anexo"
-              className="rounded-md p-1 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
-            >
-              <X size={14} />
-            </button>
+            <Button variant="ghost" size="icon" onClick={() => setAnexo(null)} aria-label="Remover anexo" className="h-7 w-7">
+              <X aria-hidden="true" />
+            </Button>
           )}
         </div>
       )}
 
       <div
         className={cn(
-          "flex items-end gap-2 rounded-2xl px-3 py-2 transition-colors",
-          modo === "nota" ? "bg-amber-400/8 ring-1 ring-amber-400/25" : "bg-surface-2",
+          "flex items-end gap-1.5 rounded-[14px] border py-1.5 pl-3 pr-1.5 transition-colors duration-120",
+          modo === "nota" ? "border-warning/40 bg-warning-subtle" : "border-border-default bg-raised focus-within:border-focus",
           respostaBloqueada && "opacity-60"
         )}
       >
-        {/* No chat do site só vai texto: ele não mostra arquivo do atendente. */}
-        {modo === "responder" && conversa.channel !== "website" && (
-          <>
-            <input ref={arquivo} type="file" accept={TIPOS_ACEITOS} onChange={aoEscolherArquivo} className="hidden" />
-            <button
-              type="button"
-              onClick={() => arquivo.current?.click()}
-              disabled={respostaBloqueada || !!subindo}
-              aria-label="Anexar arquivo"
-              title="Anexar foto, áudio, vídeo ou documento"
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary disabled:pointer-events-none"
-            >
-              <Paperclip size={16} />
-            </button>
-          </>
-        )}
-
         <textarea
           ref={campo}
           value={texto}
@@ -407,6 +382,7 @@ export function Compositor({
           }}
           rows={1}
           disabled={respostaBloqueada}
+          aria-label={modo === "nota" ? "Nota interna" : "Mensagem para o cliente"}
           placeholder={
             modo === "nota"
               ? "Recado para a equipe. O cliente não vê."
@@ -414,28 +390,48 @@ export function Compositor({
                 ? "Assuma a conversa para responder"
                 : respostaBloqueada
                   ? "Resposta indisponível"
-                : "Escreva uma mensagem"
+                  : `Escreva para ${conversa.nome.split(" ")[0]}`
           }
-          className="max-h-40 min-h-[34px] flex-1 resize-none bg-transparent py-1.5 text-[13.5px] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+          // 16px no celular: abaixo disso o iPhone dá zoom ao tocar no campo.
+          className="max-h-40 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-body-lg leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary lg:text-body"
         />
 
-        <button
-          type="button"
+        {/* No chat do site só vai texto: ele não mostra arquivo do atendente. */}
+        {modo === "responder" && conversa.channel !== "website" && (
+          <>
+            <input ref={arquivo} type="file" accept={TIPOS_ACEITOS} onChange={aoEscolherArquivo} className="hidden" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => arquivo.current?.click()}
+              disabled={respostaBloqueada || !!subindo}
+              aria-label="Anexar arquivo"
+              title="Anexar foto, áudio, vídeo ou documento"
+              className="shrink-0"
+            >
+              <Paperclip aria-hidden="true" />
+            </Button>
+          </>
+        )}
+
+        <Button
+          ref={botaoEnviar}
+          variant="primary"
+          size="md"
           onClick={() => void enviar()}
           disabled={!podeEnviar}
+          loading={enviando}
           aria-label={modo === "nota" ? "Salvar nota" : "Enviar mensagem"}
-          className={cn(
-            "mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors disabled:opacity-35",
-            modo === "nota" ? "bg-amber-500 hover:bg-amber-400" : "bg-accent-500 hover:bg-accent-400"
-          )}
+          className="shrink-0"
         >
-          {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-        </button>
+          {!enviando && <Send size={14} aria-hidden="true" />}
+          <span className="hidden sm:inline">{modo === "nota" ? "Salvar" : "Enviar"}</span>
+        </Button>
       </div>
 
-      {erro && <p className="mt-2 px-1 text-[12px] text-danger">{erro}</p>}
+      {erro && <p className="mt-2 px-1 text-caption text-danger">{erro}</p>}
 
-      <p className="mt-1.5 hidden px-1 text-[10.5px] text-text-tertiary [@media(pointer:fine)]:block">
+      <p className="mt-1.5 hidden px-1 text-caption text-text-tertiary [@media(pointer:fine)]:block">
         Enter envia. Shift+Enter quebra a linha.
       </p>
 
@@ -446,7 +442,10 @@ export function Compositor({
         onEscolher={async (m) => {
           const falha = await onEnviar({ templateId: m.id });
           if (falha) setErro(falha);
-          else setModelosAbertos(false);
+          else {
+            pulsar(botaoEnviar.current, 1.2);
+            setModelosAbertos(false);
+          }
         }}
       />
     </div>

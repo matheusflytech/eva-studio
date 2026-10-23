@@ -3,17 +3,32 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  Download, X, Mail, Phone, Plus, Trash2, Code2, MessageCircle, Smartphone,
-  MoreHorizontal, Zap, ChevronDown, ChevronRight, Inbox,
+  Download, X, Plus, Trash2, Code2, MessageCircle, MoreHorizontal, Zap, ChevronDown, ChevronRight,
+  ListFilter, SquareKanban,
 } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "framer-motion";
-import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { IconButton } from "@/components/ui/icon-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SearchInput } from "@/components/ui/search-input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { PhoneNumber } from "@/components/ui/phone-number";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
+import type { CategoryColor } from "@/lib/design-system/tokens";
+import { AvatarDoContato } from "@/components/inbox/avatar";
+import { iniciais, horaDaMensagem } from "@/components/inbox/tipos";
+import { formatarTelefone } from "@/lib/telefone";
+import { pulsar, avisarNaIlha } from "@/lib/fundo/eventos";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { ConversasDoPipe } from "@/components/leads/conversas-do-pipe";
 import { cn, formatRelativeDate, generateId } from "@/lib/utils";
@@ -71,39 +86,22 @@ const STAGE_LABEL: Record<string, string> = {
   perdido: "Perdido",
 };
 
-// Só um ponto discreto por estágio no cabeçalho da coluna — sem barra de cor
-// decorativa (esse padrão de "faixa colorida no topo do card" é exatamente o
-// que faz uma tela parecer "gerada", não desenhada). Neutro por padrão,
-// destaque reservado só pra Ganho/Perdido, que são os dois estados que
-// realmente importa bater o olho e reconhecer.
-const STAGE_ACCENT: Record<string, { dot: string; ring: string }> = {
-  novo: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
-  contatado: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
-  qualificado: { dot: "bg-text-tertiary", ring: "ring-border-strong" },
-  ganho: { dot: "bg-emerald-400", ring: "ring-emerald-400/40" },
-  perdido: { dot: "bg-danger", ring: "ring-danger/40" },
+// Cor da etapa: é dado (onde o lead está no funil), então ganha cor. Só no
+// ponto do cabeçalho e no seletor de etapa do detalhe, nunca no cartão.
+const STAGE_COLOR: Record<string, CategoryColor> = {
+  novo: "slate",
+  contatado: "blue",
+  qualificado: "violet",
+  ganho: "green",
+  perdido: "red",
 };
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+// Quantos cartões cada coluna mostra antes do "Mais N". A API manda tudo; é
+// só para a coluna Novo (a que enche) não virar uma pilha sem fim.
+const LIMITE_DA_COLUNA = 8;
 
-// Avatar monocromático (cinza neutro) — nada de cor por hash do nome. Uma
-// tela com "toda pessoa tem uma cor diferente" é bonita numa demo e cansativa
-// no uso real; enterprise de verdade (Linear, Stripe) usa uma cor só.
-function Avatar({ name, size = 32 }: { name: string; size?: number }) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-surface-3 font-semibold text-text-secondary"
-      style={{ width: size, height: size, fontSize: size * 0.36 }}
-    >
-      {initials(name)}
-    </span>
-  );
-}
+// Tempo que o "Desfazer" fica na ilha antes de o lead sair de verdade.
+const ESPERA_PARA_REMOVER = 5000;
 
 function pick(vars: Record<string, unknown>, candidates: string[]): string | null {
   for (const key of candidates) {
@@ -113,14 +111,19 @@ function pick(vars: Record<string, unknown>, candidates: string[]): string | nul
   return null;
 }
 
-function leadName(lead: Lead): string {
-  return lead.name || pick(lead.fields, ["nome", "nome_cliente", "name", "nome_completo"]) || "Sem nome";
+function nomeInformado(lead: Lead): string | null {
+  return lead.name || pick(lead.fields, ["nome", "nome_cliente", "name", "nome_completo"]);
 }
 function leadEmail(lead: Lead): string | null {
   return lead.email || pick(lead.fields, ["email", "e-mail", "email_cliente"]);
 }
 function leadPhone(lead: Lead): string | null {
   return lead.phone || pick(lead.fields, ["telefone", "telefone_cliente", "phone", "whatsapp"]);
+}
+// Sem nome, o telefone formatado diz mais que "Sem nome" (é como a pessoa
+// aparece no WhatsApp de quem atende).
+function leadName(lead: Lead): string {
+  return nomeInformado(lead) || formatarTelefone(leadPhone(lead))?.texto || "Sem nome";
 }
 function capturedVarCount(lead: Lead): number {
   return Object.keys(lead.fields ?? {}).filter((k) => !k.startsWith("__")).length;
@@ -151,6 +154,12 @@ function leadSource(lead: Lead): LeadSource {
       return "outro";
   }
 }
+/** Origem que é um canal com marca (WhatsApp, Instagram...) leva o logo oficial; as outras, nada. */
+function LogoDaOrigem({ origem, tamanho }: { origem: LeadSource; tamanho: number }) {
+  const marca = marcaDoCanal(origem);
+  return marca ? <LogoOficial marca={marca} tamanho={tamanho} /> : null;
+}
+
 const SOURCE_LABEL: Record<LeadSource, string> = {
   chat: "Chat do site",
   form: "Formulário",
@@ -160,16 +169,6 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   messenger: "Messenger",
   telegram: "Telegram",
   outro: "Outro canal",
-};
-const SOURCE_ICON: Record<LeadSource, typeof MessageCircle> = {
-  chat: MessageCircle,
-  form: Smartphone,
-  manual: Code2,
-  whatsapp: Phone,
-  instagram: MessageCircle,
-  messenger: MessageCircle,
-  telegram: MessageCircle,
-  outro: Inbox,
 };
 
 function exportCsv(leads: Lead[]) {
@@ -192,69 +191,51 @@ function exportCsv(leads: Lead[]) {
   URL.revokeObjectURL(url);
 }
 
+// Cartão do quadro: só avatar, nome, tempo e a primeira mensagem. E-mail,
+// origem e dados capturados moram no detalhe (LeadDetail).
 function LeadCardContent({
   lead, anySelected, selected, onToggleSelect,
 }: {
-  lead: Lead; anySelected: boolean; selected: boolean; onToggleSelect?: (e: React.MouseEvent) => void;
+  lead: Lead; anySelected: boolean; selected: boolean; onToggleSelect?: () => void;
 }) {
-  const email = leadEmail(lead);
-  const phone = leadPhone(lead);
-  const source = leadSource(lead);
-  const SourceIcon = SOURCE_ICON[source];
-  const varCount = capturedVarCount(lead);
   const name = leadName(lead);
+  const selecionavel = !!onToggleSelect;
 
   return (
     <>
-      <div className="flex items-start gap-2.5">
-        <Avatar name={name} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-text-primary">{name}</p>
-          <p className="text-[10.5px] text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</p>
-        </div>
-        <span
-          onClick={onToggleSelect}
-          className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-opacity",
-            selected ? "border-accent-500 bg-accent-500 text-text-on-accent opacity-100" : "border-border-default opacity-0 group-hover:opacity-100",
-            anySelected && "opacity-100"
+      <div className="flex items-center gap-2">
+        {/* Avatar vira checkbox ao passar o mouse (ou com seleção ativa): a
+            seleção em massa não ocupa espaço no cartão quando não é usada. */}
+        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+          <span
+            className={cn(
+              "transition-opacity",
+              selecionavel && "group-hover:opacity-0 group-focus-within:opacity-0",
+              selecionavel && (anySelected || selected) && "opacity-0"
+            )}
+          >
+            <AvatarDoContato chave={lead.id} nome={name} tamanho="sm" className="h-7 w-7" />
+          </span>
+          {selecionavel && (
+            <span
+              className={cn(
+                "absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
+                (anySelected || selected) && "opacity-100"
+              )}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <Checkbox checked={selected} onCheckedChange={() => onToggleSelect?.()} aria-label={`Selecionar ${name}`} />
+            </span>
           )}
-        >
-          {selected && <span className="text-[10px] leading-none">✓</span>}
         </span>
+        <p className="min-w-0 flex-1 truncate text-small font-semibold text-text-primary">{name}</p>
+        <span className="shrink-0 font-mono text-caption text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</span>
       </div>
-
-      {(email || phone) && (
-        <div className="mt-2 flex flex-col gap-1">
-          {email && (
-            <p className="flex items-center gap-1.5 truncate text-[11px] text-text-tertiary">
-              <Mail size={10.5} /> {email}
-            </p>
-          )}
-          {phone && (
-            <p className="flex items-center gap-1.5 truncate text-[11px] text-text-tertiary">
-              <Phone size={10.5} /> {phone}
-            </p>
-          )}
-        </div>
-      )}
 
       {lead.lastMessage && (
-        <p className="mt-2 line-clamp-2 text-[11.5px] leading-snug text-text-secondary">
-          {lead.lastMessage.text}
-        </p>
+        <p className="line-clamp-2 text-caption text-text-secondary">{semMarcacao(lead.lastMessage.text)}</p>
       )}
-
-      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border-subtle pt-2">
-        <span className="flex items-center gap-1 text-[10.5px] text-text-tertiary">
-          <SourceIcon size={11} /> {SOURCE_LABEL[source]}
-        </span>
-        {varCount > 0 && (
-          <span className="shrink-0 text-[10.5px] text-text-tertiary">
-            {varCount} dado{varCount === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
     </>
   );
 }
@@ -271,32 +252,27 @@ function DraggableLeadCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      data-lead-id={lead.id}
       style={{ transform: transform ? CSS.Translate.toString(transform) : undefined, opacity: isDragging ? 0.35 : 1 }}
       onClick={onOpen}
-      className="group flex cursor-grab flex-col rounded-2xl border border-border-default bg-surface-2 p-3 shadow-sm transition-colors hover:border-border-strong hover:shadow-md active:cursor-grabbing"
+      className={cn(
+        "group flex cursor-grab flex-col gap-2 rounded-[14px] border bg-panel p-3 transition-colors active:cursor-grabbing",
+        selected ? "border-accent-solid" : "border-border-subtle hover:border-border-default"
+      )}
     >
-      <LeadCardContent
-        lead={lead}
-        selected={selected}
-        anySelected={anySelected}
-        onToggleSelect={(e) => {
-          e.stopPropagation();
-          onToggleSelect();
-        }}
-      />
+      <LeadCardContent lead={lead} selected={selected} anySelected={anySelected} onToggleSelect={onToggleSelect} />
     </div>
   );
 }
 
 function DroppableColumn({ stage, isOver, children }: { stage: string; isOver: boolean; children: React.ReactNode }) {
   const { setNodeRef } = useDroppable({ id: stage });
-  const accent = STAGE_ACCENT[stage];
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "glass-card relative flex w-[272px] shrink-0 flex-col overflow-hidden rounded-3xl p-3 transition-shadow",
-        isOver && `ring-2 ${accent.ring}`
+        "flex w-[272px] shrink-0 flex-col rounded-2xl bg-raised/50 p-2 transition-shadow",
+        isOver && "ring-1 ring-border-strong"
       )}
     >
       {children}
@@ -321,35 +297,35 @@ function LeadExecutions({ agentId, channel, externalId }: { agentId: string; cha
 
   return (
     <div className="mt-5">
-      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
-        <Zap size={11} /> O que a IA fez nessa conversa
+      <p className="mb-2 flex items-center gap-1.5 font-mono text-caption text-text-tertiary">
+        <Zap size={12} /> O que a Eva fez nessa conversa
       </p>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col border-t border-border-subtle">
         {executions.map((exec) => {
           const expanded = expandedId === exec.id;
           return (
-            <div key={exec.id} className="rounded-xl border border-border-subtle bg-surface-3/60">
+            <div key={exec.id} className="border-b border-border-subtle">
               <button
                 type="button"
                 onClick={() => setExpandedId(expanded ? null : exec.id)}
-                className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+                className="flex w-full items-center gap-2 py-2 text-left"
               >
                 {expanded ? <ChevronDown size={12} className="shrink-0 text-text-tertiary" /> : <ChevronRight size={12} className="shrink-0 text-text-tertiary" />}
-                <span className={cn("text-[11px] font-medium", exec.status === "success" ? "text-emerald-400" : "text-danger")}>
+                <span className={cn("text-caption font-medium", exec.status === "success" ? "text-success" : "text-danger")}>
                   {exec.status === "success" ? "Sucesso" : "Erro"}
                 </span>
-                <span className="text-[10.5px] text-text-tertiary">
+                <span className="font-mono text-caption text-text-tertiary">
                   {exec.steps.length} passo{exec.steps.length === 1 ? "" : "s"}
                 </span>
-                <span className="ml-auto shrink-0 text-[10.5px] text-text-tertiary">{formatRelativeDate(exec.createdAt)}</span>
+                <span className="ml-auto shrink-0 font-mono text-caption text-text-tertiary">{formatRelativeDate(exec.createdAt)}</span>
               </button>
               {expanded && (
-                <div className="flex flex-col gap-1.5 border-t border-border-subtle p-2.5">
+                <div className="flex flex-col gap-1.5 pb-2.5 pl-5">
                   {exec.steps.map((step, i) => (
-                    <div key={`${step.nodeId}-${i}`} className="text-[11px]">
+                    <div key={`${step.nodeId}-${i}`} className="text-caption">
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-text-secondary">{step.label}</span>
-                        <span className="text-text-tertiary">{step.ms}ms</span>
+                        <span className="font-mono text-text-tertiary">{step.ms}ms</span>
                       </div>
                       {step.output && <p className="truncate text-text-tertiary">{step.output}</p>}
                       {step.error && <p className="truncate text-danger">{step.error}</p>}
@@ -365,9 +341,22 @@ function LeadExecutions({ agentId, channel, externalId }: { agentId: string; cha
   );
 }
 
+// Par rótulo/valor da coluna de dados do detalhe.
+function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-mono text-caption text-text-tertiary">{rotulo}</p>
+      <div className="truncate text-small text-text-primary">{children}</div>
+    </div>
+  );
+}
+
 function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void }) {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const name = leadName(lead);
+  const email = leadEmail(lead);
+  const phone = leadPhone(lead);
+  const varCount = capturedVarCount(lead);
   const conversationId = lead.conversationId;
 
   React.useEffect(() => {
@@ -379,73 +368,69 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
   }, [conversationId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6" onClick={onClose}>
       <motion.div
         initial={{ opacity: 0, scale: 0.97, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.15 }}
-        className="glass-card glass-card-solid flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl"
+        className="flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-overlay shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-border-subtle p-4">
-          <div className="flex items-center gap-3">
-            <Avatar name={name} size={38} />
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-[14px] font-medium text-text-primary">{name}</p>
-                <Badge variant="neutral" className="text-[10px]">
-                  {SOURCE_LABEL[leadSource(lead)]}
-                </Badge>
-              </div>
-              <p className="text-[11.5px] text-text-tertiary">
-                {lead.agentName ? `${lead.agentName} · ` : ""}{formatRelativeDate(lead.createdAt)} ·{" "}
-                <Link href={`/contatos?abrir=${lead.id}`} className="text-accent-400 hover:text-accent-500">
-                  Abrir ficha
-                </Link>
-              </p>
-            </div>
+        <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-3">
+          <AvatarDoContato chave={lead.id} nome={name} tamanho="lg" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-body font-semibold text-text-primary">{name}</p>
+            <p className="truncate text-caption text-text-tertiary">
+              {lead.agentName ? `${lead.agentName} · ` : ""}lead {formatRelativeDate(lead.createdAt)} ·{" "}
+              <Link href={`/contatos?abrir=${lead.id}`} className="text-accent-fg hover:underline">
+                Abrir ficha
+              </Link>
+            </p>
           </div>
-          <div className="flex items-center gap-1.5">
-            {STAGES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onStageChange(s)}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors",
-                  lead.stage === s ? "border-border-strong bg-surface-3 text-text-primary" : "border-border-default text-text-tertiary hover:text-text-primary"
-                )}
-              >
-                {STAGE_LABEL[s]}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={onDelete}
-              title="Remover dos leads (o contato continua em Contatos)"
-              className="ml-1 rounded-lg p-1 text-text-tertiary hover:bg-surface-3 hover:text-danger"
-            >
-              <Trash2 size={15} />
-            </button>
-            <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
-              <X size={16} />
-            </button>
-          </div>
+          <IconButton aria-label="Remover dos leads (o contato continua em Contatos)" tooltip onClick={onDelete} className="hover:text-danger">
+            <Trash2 />
+          </IconButton>
+          <IconButton aria-label="Fechar" onClick={onClose}>
+            <X />
+          </IconButton>
+        </div>
+        <div className="flex items-center gap-3 border-b border-border-subtle px-4 py-2.5">
+          <span className="font-mono text-caption text-text-tertiary">Etapa</span>
+          <SegmentedControl
+            label="Etapa do lead"
+            value={(lead.stage || "novo") as (typeof STAGES)[number]}
+            onChange={(s) => { if (s !== (lead.stage || "novo")) onStageChange(s); }}
+            options={STAGES.map((s) => ({
+              value: s,
+              label: STAGE_LABEL[s],
+              icon: <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", CATEGORY_CLASSES[STAGE_COLOR[s]].solid)} />,
+            }))}
+          />
         </div>
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[240px] shrink-0 overflow-y-auto border-r border-border-subtle p-4">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Dados capturados</p>
-            {capturedVarCount(lead) === 0 ? (
-              <p className="text-[12px] text-text-tertiary">Nenhum dado capturado ainda.</p>
+          <div className="w-[260px] shrink-0 overflow-y-auto border-r border-border-subtle p-4">
+            <div className="flex flex-col gap-3">
+              <Dado rotulo="E-mail">{email || <span className="text-text-tertiary">—</span>}</Dado>
+              <Dado rotulo="Telefone"><PhoneNumber value={phone} /></Dado>
+              <Dado rotulo="Origem">
+                <span className="inline-flex items-center gap-1.5">
+                  <LogoDaOrigem origem={leadSource(lead)} tamanho={14} />
+                  {SOURCE_LABEL[leadSource(lead)]}
+                </span>
+              </Dado>
+            </div>
+
+            <p className="mb-2 mt-5 font-mono text-caption text-text-tertiary">
+              Dados capturados{varCount > 0 ? ` · ${varCount}` : ""}
+            </p>
+            {varCount === 0 ? (
+              <p className="text-caption text-text-tertiary">Nenhum dado capturado ainda.</p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {Object.entries(lead.fields ?? {})
                   .filter(([key]) => !key.startsWith("__"))
                   .map(([key, value]) => (
-                    <div key={key} className="rounded-lg border border-border-subtle bg-surface-2 px-2.5 py-1.5">
-                      <p className="text-[10px] uppercase tracking-wide text-text-tertiary">{key}</p>
-                      <p className="truncate text-[12.5px] text-text-primary">{String(value)}</p>
-                    </div>
+                    <Dado key={key} rotulo={key}>{String(value)}</Dado>
                   ))}
               </div>
             )}
@@ -455,21 +440,29 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
           </div>
           <div className="flex-1 overflow-y-auto p-5">
             {!conversationId && (
-              <p className="text-[12.5px] text-text-tertiary">Sem conversa — lead criado pela tela ou pela API.</p>
+              <p className="text-small text-text-tertiary">Sem conversa: lead criado pela tela ou pela API.</p>
             )}
-            <div className="flex flex-col gap-3">
-              {messages.map((m) => (
-                <div key={m.id} className={cn("flex", m.role === "contact" ? "justify-end" : "justify-start")}>
+            {/* Mesmas bolhas da Caixa de entrada: cliente à esquerda, agente à direita. */}
+            <div className="flex flex-col gap-1.5">
+              {messages.map((m) => {
+                const doContato = m.role === "contact";
+                return (
                   <div
+                    key={m.id}
                     className={cn(
-                      "max-w-[75%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-sm",
-                      m.role === "contact" ? "bg-accent-500 text-text-on-accent" : "border border-border-subtle bg-surface-2 text-text-primary"
+                      "max-w-[78%] rounded-[18px] px-3.5 py-2",
+                      doContato
+                        ? "self-start rounded-bl-md border border-border-subtle bg-raised text-text-primary"
+                        : "self-end rounded-br-md bg-accent-solid text-text-on-accent"
                     )}
                   >
-                    {m.text}
+                    <p className="whitespace-pre-wrap break-words text-body leading-relaxed">{m.text}</p>
+                    <p className={cn("mt-0.5 text-right font-mono text-caption tabular-nums", doContato ? "text-text-tertiary" : "text-text-on-accent/70")}>
+                      {horaDaMensagem(m.createdAt)}
+                    </p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -544,13 +537,13 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card glass-card-solid flex w-full max-w-md flex-col gap-4 rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6" onClick={onClose}>
+      <div className="flex w-full max-w-md flex-col gap-4 rounded-[18px] border border-border-subtle bg-overlay p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <p className="text-[15px] font-semibold text-text-primary">Novo lead</p>
-          <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
-            <X size={16} />
-          </button>
+          <p className="text-title-sm text-text-primary">Novo lead</p>
+          <IconButton aria-label="Fechar" size="sm" onClick={onClose}>
+            <X />
+          </IconButton>
         </div>
 
         <div>
@@ -565,13 +558,14 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <Label className="mb-0">Dados do lead</Label>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setFields((prev) => [...prev, { id: generateId(), key: "", value: "" }])}
-              className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
             >
-              <Plus size={12} /> Adicionar campo
-            </button>
+              <Plus size={13} /> Adicionar campo
+            </Button>
           </div>
           <div className="flex flex-col gap-1.5">
             {fields.map((f) => {
@@ -587,15 +581,16 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
                       aria-invalid={fieldError ? true : undefined}
                       className={cn(fieldError && "border-danger")}
                     />
-                    <button
-                      type="button"
+                    <IconButton
+                      aria-label="Tirar campo"
+                      size="sm"
                       onClick={() => setFields((prev) => prev.filter((x) => x.id !== f.id))}
-                      className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+                      className="shrink-0 hover:text-danger"
                     >
-                      <Trash2 size={13} />
-                    </button>
+                      <Trash2 />
+                    </IconButton>
                   </div>
-                  {fieldError && <p className="mt-0.5 pl-[116px] text-[11.5px] text-danger">{fieldError}</p>}
+                  {fieldError && <p className="mt-0.5 pl-[116px] text-caption text-danger">{fieldError}</p>}
                 </div>
               );
             })}
@@ -611,7 +606,7 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
           </Select>
         </div>
 
-        {error && <p className="text-[12.5px] text-danger">{error}</p>}
+        {error && <p className="text-small text-danger">{error}</p>}
 
         <Button type="button" onClick={handleSubmit} disabled={isSaving}>
           {isSaving ? "Salvando..." : "Adicionar lead"}
@@ -621,11 +616,13 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   );
 }
 
+// O exemplo de cada etapa (que antes ficava no ícone </> de cada coluna)
+// agora é escolhido aqui dentro: o quadro fica sem ícone por coluna.
 function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onClose: () => void }) {
   const [origin, setOrigin] = React.useState("");
+  const [effectiveStage, setEffectiveStage] = React.useState<(typeof STAGES)[number]>(stage ?? "novo");
   React.useEffect(() => setOrigin(window.location.origin), []);
 
-  const effectiveStage = stage ?? "novo";
   const snippet = `curl -X POST ${origin}/api/leads \\
   -H "Content-Type: application/json" \\
   -H "X-Internal-Secret: SEU_INTERNAL_API_SECRET" \\
@@ -636,38 +633,30 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
   }'`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="glass-card glass-card-solid flex w-full max-w-lg flex-col gap-3 rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-6" onClick={onClose}>
+      <div className="flex w-full max-w-lg flex-col gap-3 rounded-[18px] border border-border-subtle bg-overlay p-5 shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <p className="text-[15px] font-semibold text-text-primary">
-            Adicionar lead via API {stage && <span className="text-text-tertiary">(direto em &quot;{STAGE_LABEL[stage]}&quot;)</span>}
-          </p>
-          <button type="button" onClick={onClose} className="text-text-tertiary hover:text-text-primary">
-            <X size={16} />
-          </button>
+          <p className="text-title-sm text-text-primary">Adicionar lead via API</p>
+          <IconButton aria-label="Fechar" size="sm" onClick={onClose}>
+            <X />
+          </IconButton>
         </div>
-        <p className="text-[12.5px] text-text-secondary">
+        <p className="text-small text-text-secondary">
           Pra mandar lead de um n8n, formulário externo, etc., use o mesmo <code className="font-mono">INTERNAL_API_SECRET</code> que
           já está no seu <code className="font-mono">.env.local</code>. <code className="font-mono">fields</code> aceita
           qualquer campo, não só os do exemplo: nome, e-mail e telefone são validados e vão para a ficha do contato
           (mesmo e-mail ou telefone atualiza o contato existente em vez de duplicar); o resto vira campo livre. Cada etapa
-          do funil tem seu próprio valor de <code className="font-mono">stage</code>, clique no ícone{" "}
-          <code className="font-mono">{"</>"}</code> de outra coluna do Kanban pra pegar o exemplo já configurado pra ela.
+          do funil tem seu próprio valor de <code className="font-mono">stage</code>: escolha abaixo para ver o exemplo
+          já configurado para ela.
         </p>
-        <div className="grid grid-cols-5 gap-1.5">
-          {STAGES.map((s) => (
-            <span
-              key={s}
-              className={cn(
-                "truncate rounded-lg px-1.5 py-1 text-center font-mono text-[10.5px]",
-                s === effectiveStage ? "bg-accent-soft text-accent-400" : "bg-surface-3 text-text-tertiary"
-              )}
-            >
-              {s}
-            </span>
-          ))}
-        </div>
-        <pre className="overflow-x-auto rounded-xl border border-border-default bg-surface-3 p-3 font-mono text-[11.5px] leading-relaxed text-text-secondary">
+        <SegmentedControl
+          label="Etapa do exemplo"
+          value={effectiveStage}
+          onChange={setEffectiveStage}
+          className="self-start"
+          options={STAGES.map((s) => ({ value: s, label: STAGE_LABEL[s] }))}
+        />
+        <pre className="overflow-x-auto rounded-[10px] border border-border-subtle bg-raised p-3 font-mono text-caption leading-relaxed text-text-secondary">
           {snippet}
         </pre>
       </div>
@@ -716,6 +705,12 @@ export default function LeadsPage() {
   const [sourceFilter, setSourceFilter] = React.useState<LeadSource | "all">("all");
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [actionError, setActionError] = React.useState<string | null>(null);
+  // Colunas abertas além do limite ("Mais N").
+  const [colunasAbertas, setColunasAbertas] = React.useState<Set<string>>(new Set());
+  // Leads removidos esperando o "Desfazer" vencer: somem da tela já, mas o
+  // DELETE só sai depois. A sondagem de 8s não pode trazê-los de volta.
+  const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
+  const remocoesPendentes = React.useRef(new Map<number, string[]>());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -742,6 +737,26 @@ export default function LeadsPage() {
     return () => clearInterval(interval);
   }, [load]);
 
+  // Saiu da tela (ou fechou a aba) com remoção esperando o Desfazer: manda
+  // na hora, com keepalive para a requisição sobreviver à saída.
+  React.useEffect(() => {
+    const pendentes = remocoesPendentes.current;
+    function despachar() {
+      pendentes.forEach((ids, timer) => {
+        window.clearTimeout(timer);
+        ids.forEach((id) => {
+          fetch(`/api/leads/${id}`, { method: "DELETE", keepalive: true }).catch(() => {});
+        });
+      });
+      pendentes.clear();
+    }
+    window.addEventListener("pagehide", despachar);
+    return () => {
+      window.removeEventListener("pagehide", despachar);
+      despachar();
+    };
+  }, []);
+
   async function erroDaResposta(res: Response, padrao: string): Promise<string> {
     const data = await res.json().catch(() => null);
     return (data && typeof data.error === "string" && data.error) || padrao;
@@ -759,6 +774,8 @@ export default function LeadsPage() {
         body: JSON.stringify({ stage }),
       });
       if (!res.ok) throw new Error(await erroDaResposta(res, "Não foi possível mudar a etapa."));
+      // A onda sai do cartão já na coluna nova.
+      pulsar(document.querySelector(`[data-lead-id="${escaparSeletor(id)}"]`), 1.2);
     } catch (err) {
       if (anterior !== undefined) setLeads((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, stage: anterior } : l)));
       setActionError(err instanceof Error ? err.message : "Não foi possível mudar a etapa.");
@@ -792,9 +809,43 @@ export default function LeadsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Remover esse lead da lista? O contato, as conversas e os negócios continuam em Contatos.")) return;
-    await removerDosLeads([id]);
+  // No lugar do window.confirm: tira da tela na hora e oferece "Desfazer" na
+  // ilha. O DELETE só vai quando o Desfazer vence (a API não tem "devolver
+  // aos leads"; adiar o envio é o que deixa desfazer sem mudar a API).
+  function removerComDesfazer(ids: string[]) {
+    if (ids.length === 0) return;
+    const primeiro = (leads ?? []).find((l) => l.id === ids[0]);
+    setOcultos((prev) => new Set([...prev, ...ids]));
+    setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+    if (openId && ids.includes(openId)) setOpenId(null);
+
+    const reexibir = () => setOcultos((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+    const timer = window.setTimeout(async () => {
+      remocoesPendentes.current.delete(timer);
+      await removerDosLeads(ids);
+      reexibir();
+    }, ESPERA_PARA_REMOVER);
+    remocoesPendentes.current.set(timer, ids);
+
+    avisarNaIlha({
+      titulo: ids.length === 1 ? `${primeiro ? leadName(primeiro) : "Lead"} saiu dos leads` : `${ids.length} leads saíram da lista`,
+      detalhe: ids.length === 1 ? "O contato continua em Contatos" : "Os contatos continuam em Contatos",
+      avatar: ids.length === 1 ? (primeiro && iniciais(leadName(primeiro))) || undefined : String(ids.length),
+      duracao: ESPERA_PARA_REMOVER,
+      acao: {
+        rotulo: "Desfazer",
+        aoClicar: () => {
+          if (!remocoesPendentes.current.has(timer)) return;
+          window.clearTimeout(timer);
+          remocoesPendentes.current.delete(timer);
+          reexibir();
+        },
+      },
+    });
+  }
+
+  function handleDelete(id: string) {
+    removerComDesfazer([id]);
   }
 
   function toggleSelect(id: string) {
@@ -806,10 +857,9 @@ export default function LeadsPage() {
     });
   }
 
-  async function handleBulkDelete() {
+  function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Remover ${selectedIds.size} lead(s) da lista? Os contatos continuam em Contatos.`)) return;
-    await removerDosLeads(Array.from(selectedIds));
+    removerComDesfazer(Array.from(selectedIds));
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -831,134 +881,150 @@ export default function LeadsPage() {
     }
   }
 
+  function abrirColuna(stage: string) {
+    setColunasAbertas((prev) => new Set([...prev, stage]));
+  }
+
   if (leads === null) return <div className="flex-1 p-8" />;
 
   // Pipe guardado que não existe mais (agente apagado): volta para todos.
   const pipeAtivo = pipes.some((p) => p.agentId === pipe) ? pipe : "";
+  const filtrosAtivos = (pipeAtivo ? 1 : 0) + (sourceFilter !== "all" ? 1 : 0);
 
   const filtered = leads.filter((l) => {
+    if (ocultos.has(l.id)) return false;
     if (pipeAtivo && l.agentId !== pipeAtivo) return false;
     if (sourceFilter !== "all" && leadSource(l) !== sourceFilter) return false;
     if (search.trim() && !`${leadName(l)} ${JSON.stringify(l.fields)}`.toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
   });
 
-  const opened = leads.find((l) => l.id === openId) ?? null;
+  const opened = leads.find((l) => l.id === openId && !ocultos.has(l.id)) ?? null;
   const activeLead = leads.find((l) => l.id === activeDragId) ?? null;
   const anySelected = selectedIds.size > 0;
+  const totalDeConversas = pipeAtivo ? pipes.find((p) => p.agentId === pipeAtivo)?.conversas ?? 0 : pipes.reduce((s, p) => s + p.conversas, 0);
 
   return (
-    <div className="flex flex-1 flex-col p-8">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-xl font-semibold text-text-primary">Leads</h1>
-          <p className="mt-1 text-[13px] text-text-secondary">Contatos que viraram lead em qualquer canal (site, WhatsApp, Instagram, formulário, API). Arraste entre colunas pra mudar o estágio.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {pipes.length > 0 && (
-            <Select value={pipeAtivo} onChange={(e) => setPipe(e.target.value)} className="w-[220px]" aria-label="Pipe (site)">
-              <option value="">Todos os sites</option>
-              {pipes.map((p) => (
-                <option key={p.agentId} value={p.agentId}>{p.nome}</option>
-              ))}
-            </Select>
-          )}
-          {aba === "leads" && anySelected && (
-            <Button type="button" variant="danger" size="sm" onClick={handleBulkDelete}>
-              <Trash2 size={14} /> Remover {selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}
-            </Button>
-          )}
-          <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as LeadSource | "all")} className="w-[150px]">
-            <option value="all">Todas as origens</option>
-            {(Object.keys(SOURCE_LABEL) as LeadSource[]).map((s) => (
-              <option key={s} value={s}>{SOURCE_LABEL[s]}</option>
-            ))}
-          </Select>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="w-[200px]" />
+    <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
+      {/* Barra única: título e contagem à esquerda; busca, Filtros, "…" e a
+          ação principal à direita. */}
+      <div className="flex h-[58px] shrink-0 items-center gap-2.5">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Leads</h1>
+        <span className="mt-1 font-mono text-caption text-text-tertiary">{filtered.length}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <SearchInput value={search} onValueChange={setSearch} placeholder="Buscar lead" aria-label="Buscar lead" className="w-[200px]" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" title="Mais ações">
-                <MoreHorizontal size={16} />
+              <Button type="button" variant="secondary">
+                <ListFilter size={15} className="text-text-secondary" /> Filtros
+                {filtrosAtivos > 0 && (
+                  <span className="rounded-full bg-accent-solid px-1.5 font-mono text-caption font-semibold leading-[18px] text-text-on-accent">{filtrosAtivos}</span>
+                )}
               </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[240px]">
+              {pipes.length > 0 && (
+                <>
+                  <DropdownMenuLabel>Site</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem checked={pipeAtivo === ""} onSelect={(e) => { e.preventDefault(); setPipe(""); }}>
+                    Todos os sites
+                  </DropdownMenuCheckboxItem>
+                  {pipes.map((p) => (
+                    <DropdownMenuCheckboxItem key={p.agentId} checked={pipeAtivo === p.agentId} onSelect={(e) => { e.preventDefault(); setPipe(p.agentId); }}>
+                      <span className="truncate">{p.nome}</span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuLabel>Origem</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem checked={sourceFilter === "all"} onSelect={(e) => { e.preventDefault(); setSourceFilter("all"); }}>
+                Todas as origens
+              </DropdownMenuCheckboxItem>
+              {(Object.keys(SOURCE_LABEL) as LeadSource[]).map((s) => (
+                <DropdownMenuCheckboxItem key={s} checked={sourceFilter === s} onSelect={(e) => { e.preventDefault(); setSourceFilter(s); }}>
+                  <LogoDaOrigem origem={s} tamanho={14} />
+                  {SOURCE_LABEL[s]}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {filtrosAtivos > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => { setPipe(""); setSourceFilter("all"); }}>
+                    <X /> Limpar filtros
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton variant="secondary" aria-label="Mais ações">
+                <MoreHorizontal />
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setApiInfoStage("novo")}>
-                <Code2 size={14} /> Adicionar via API
+                <Code2 /> Adicionar via API
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => exportCsv(filtered)}>
-                <Download size={14} /> Exportar CSV
+                <Download /> Exportar CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button type="button" size="sm" onClick={() => setShowNewLead(true)}>
-            <Plus size={14} /> Novo lead
+          <Button type="button" onClick={() => setShowNewLead(true)}>
+            <Plus size={15} /> Novo lead
           </Button>
         </div>
       </div>
 
+      <div className="flex h-11 shrink-0 items-center">
+        <SegmentedControl
+          label="Visão dos leads"
+          value={aba}
+          onChange={setAba}
+          className="tabular-nums"
+          options={[
+            { value: "leads", label: `Quadro ${filtered.length}`, icon: <SquareKanban /> },
+            { value: "conversas", label: `Conversas ${totalDeConversas}`, icon: <MessageCircle /> },
+          ]}
+        />
+      </div>
+
       {actionError && (
-        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-surface-2 px-3 py-2 text-[12.5px] text-danger">
+        <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-[10px] bg-danger-subtle px-3 py-2 text-small text-danger">
           <span>{actionError}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-text-tertiary hover:text-text-primary" title="Fechar">
-            <X size={14} />
-          </button>
+          <IconButton aria-label="Fechar" size="sm" onClick={() => setActionError(null)}>
+            <X />
+          </IconButton>
         </div>
       )}
-
-      <div role="tablist" className="mb-4 flex items-center gap-1 border-b border-border-subtle">
-        {([
-          ["leads", "Leads", filtered.length],
-          ["conversas", "Conversas", pipeAtivo ? pipes.find((p) => p.agentId === pipeAtivo)?.conversas ?? 0 : pipes.reduce((s, p) => s + p.conversas, 0)],
-        ] as const).map(([id, rotulo, n]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={aba === id}
-            onClick={() => setAba(id)}
-            className={cn(
-              "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition-colors",
-              aba === id ? "border-accent-500 text-text-primary" : "border-transparent text-text-tertiary hover:text-text-primary"
-            )}
-          >
-            {rotulo}
-            <Badge variant="neutral" className="text-[10px]">{n}</Badge>
-          </button>
-        ))}
-      </div>
 
       {aba === "conversas" ? (
         <ConversasDoPipe agentId={pipeAtivo || null} />
       ) : (
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2 pt-2">
           {STAGES.map((stage) => {
             const stageLeads = filtered.filter((l) => (l.stage || "novo") === stage);
-            const accent = STAGE_ACCENT[stage];
+            const aberta = colunasAbertas.has(stage);
+            const visiveis = aberta ? stageLeads : stageLeads.slice(0, LIMITE_DA_COLUNA);
+            const escondidos = stageLeads.length - visiveis.length;
             return (
               <DroppableColumn key={stage} stage={stage} isOver={overStage === stage}>
-                <div className="mb-2 flex items-center gap-2 px-1">
-                  <span className={cn("h-2 w-2 rounded-full", accent.dot)} />
-                  <p className="text-[12.5px] font-semibold text-text-primary">{STAGE_LABEL[stage]}</p>
-                  <button
-                    type="button"
-                    onClick={() => setApiInfoStage(stage)}
-                    title={`Criar via API direto em "${STAGE_LABEL[stage]}"`}
-                    className="rounded p-0.5 text-text-tertiary hover:text-accent-400"
-                  >
-                    <Code2 size={12} />
-                  </button>
-                  <Badge variant="neutral" className="ml-auto">{stageLeads.length}</Badge>
+                <div className="flex h-8 shrink-0 items-center gap-2 px-1.5">
+                  <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", CATEGORY_CLASSES[STAGE_COLOR[stage]].solid)} />
+                  <p className="text-small font-semibold text-text-primary">{STAGE_LABEL[stage]}</p>
+                  <span className="font-mono text-caption text-text-tertiary">{stageLeads.length}</span>
                 </div>
-                <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+                <div className="flex flex-1 flex-col gap-2 overflow-y-auto pt-1">
                   <AnimatePresence initial={false}>
                     {stageLeads.length === 0 ? (
-                      <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-border-default p-6 text-center">
-                        <Inbox size={16} className="text-text-tertiary" />
-                        <p className="text-[11.5px] text-text-tertiary">Nenhum lead aqui ainda.</p>
-                      </div>
+                      <p className="rounded-[14px] border border-border-subtle px-3 py-4 text-center text-caption text-text-tertiary">
+                        Nenhum lead
+                      </p>
                     ) : (
-                      stageLeads.map((lead) => (
+                      visiveis.map((lead) => (
                         <motion.div
                           key={lead.id}
                           layout
@@ -978,6 +1044,15 @@ export default function LeadsPage() {
                       ))
                     )}
                   </AnimatePresence>
+                  {escondidos > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => abrirColuna(stage)}
+                      className="flex h-8 shrink-0 items-center rounded-[10px] px-2 text-caption text-text-tertiary transition-colors hover:bg-hover hover:text-text-primary"
+                    >
+                      Mais {escondidos}
+                    </button>
+                  )}
                 </div>
               </DroppableColumn>
             );
@@ -986,12 +1061,20 @@ export default function LeadsPage() {
 
         <DragOverlay>
           {activeLead && (
-            <div className="w-[272px] rotate-2 rounded-2xl border border-border-strong bg-surface-2 p-3 shadow-2xl">
+            <div className="flex w-[256px] rotate-2 flex-col gap-2 rounded-[14px] border border-border-default bg-panel p-3 shadow-overlay">
               <LeadCardContent lead={activeLead} selected={false} anySelected={false} />
             </div>
           )}
         </DragOverlay>
       </DndContext>
+      )}
+
+      {aba === "leads" && (
+        <BulkActionBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+          <Button type="button" variant="ghost" size="sm" onClick={handleBulkDelete} className="text-danger hover:text-danger">
+            <Trash2 size={14} /> Remover dos leads
+          </Button>
+        </BulkActionBar>
       )}
 
       {opened && (
@@ -1007,4 +1090,19 @@ export default function LeadsPage() {
       {apiInfoStage && <ApiInfoModal stage={apiInfoStage} onClose={() => setApiInfoStage(null)} />}
     </div>
   );
+}
+
+// CSS.escape existe em todo navegador atual; o fallback só evita quebrar se
+// o id tiver aspas (ids são cuid, então na prática nunca).
+function escaparSeletor(v: string): string {
+  return typeof window !== "undefined" && window.CSS?.escape ? window.CSS.escape(v) : v.replace(/"/g, '\\"');
+}
+
+/** Prévia em texto corrido: tira a marcação de markdown que o agente usa (#, **, _, `). */
+function semMarcacao(texto: string): string {
+  return texto
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, "$2")
+    .replace(/\s+/g, " ")
+    .trim();
 }

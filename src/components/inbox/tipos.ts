@@ -1,5 +1,25 @@
 // Tipos e pequenas funções compartilhadas pela caixa de entrada.
 
+import type { CategoryColor } from "@/lib/design-system/tokens";
+
+// Cores de identidade (agente, contato). Sem vermelho, que na caixa de entrada
+// quer dizer "esperando", e sem cinza, que não distingue ninguém.
+const CORES_DE_IDENTIDADE: CategoryColor[] = [
+  "blue", "teal", "rose", "amber", "violet", "green", "cyan", "orange", "indigo", "purple",
+];
+
+/** Cor fixa para um id: a mesma pessoa (ou agente) tem sempre a mesma cor. */
+export function corPorHash(chave: string): CategoryColor {
+  let h = 5381;
+  for (let i = 0; i < chave.length; i++) h = ((h << 5) + h + chave.charCodeAt(i)) | 0;
+  return CORES_DE_IDENTIDADE[Math.abs(h) % CORES_DE_IDENTIDADE.length];
+}
+
+/** Minutos inteiros desde o horário (nunca negativo, para relógio adiantado). */
+export function minutosDesde(iso: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+}
+
 export interface Janela {
   restrita: boolean;
   aberta: boolean;

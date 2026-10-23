@@ -3,14 +3,17 @@
 import * as React from "react";
 import { MessageCircle, Inbox } from "lucide-react";
 import Link from "@/components/contrato/link";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { cn, formatRelativeDate } from "@/lib/utils";
+import { SearchInput } from "@/components/ui/search-input";
+import { AvatarDoContato } from "@/components/inbox/avatar";
+import { horaCurta, horaDaMensagem } from "@/components/inbox/tipos";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Aba "Conversas" da tela de Leads: as conversas do site do pipe escolhido
 // (widget da Eva Holding, chat do Drawing Club...), lista à esquerda e a
 // conversa inteira à direita. Só leitura: responder é na Caixa de entrada.
+// Linha e bolhas seguem a Caixa de entrada, para a mesma conversa parecer a
+// mesma nos dois lugares.
 // ---------------------------------------------------------------------------
 
 interface ConversaDoSite {
@@ -33,6 +36,13 @@ interface Mensagem {
 
 const CANAL_DO_SITE = "website";
 const POR_PAGINA = 100;
+
+// Mesmo prefixo da prévia da Caixa de entrada.
+function prefixoDaPrevia(papel: string | null): string {
+  if (papel === "human") return "Você: ";
+  if (papel === "contact") return "";
+  return "Agente: ";
+}
 
 export function ConversasDoPipe({ agentId }: { agentId: string | null }) {
   const [conversas, setConversas] = React.useState<ConversaDoSite[] | null>(null);
@@ -66,46 +76,54 @@ export function ConversasDoPipe({ agentId }: { agentId: string | null }) {
 
   if (conversas.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border-default p-10 text-center">
-        <Inbox size={18} className="text-text-tertiary" />
-        <p className="text-[13px] text-text-secondary">Nenhuma conversa desse site ainda.</p>
-        <p className="max-w-md text-[12px] text-text-tertiary">As conversas aparecem aqui assim que o site começar a mandar cada troca para o agente.</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-10 text-center">
+        <Inbox size={20} className="text-text-tertiary" aria-hidden="true" />
+        <p className="text-body font-medium text-text-primary">Nenhuma conversa desse site ainda.</p>
+        <p className="max-w-md text-caption text-text-tertiary">As conversas aparecem aqui assim que o site começar a mandar cada troca para o agente.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4">
-      <div className="flex w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-surface-1">
-        <div className="border-b border-border-subtle p-2.5">
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nas conversas..." />
-          <p className="mt-1.5 px-1 text-[11px] text-text-tertiary">
+    // Uma superfície só: lista e conversa no mesmo painel, separadas por linha.
+    <div className="mt-2 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border-subtle bg-panel">
+      <div className="flex w-[300px] shrink-0 flex-col border-r border-border-subtle">
+        <div className="flex flex-col gap-1.5 border-b border-border-subtle p-2.5">
+          <SearchInput value={busca} onValueChange={setBusca} placeholder="Buscar nas conversas" aria-label="Buscar nas conversas" />
+          <p className="px-1 font-mono text-caption text-text-tertiary">
             {conversas.length}{temMais ? "+" : ""} conversa{conversas.length === 1 ? "" : "s"}, as mais recentes primeiro
           </p>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {lista.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setAberta(c.id)}
-              className={cn(
-                "flex w-full flex-col gap-0.5 border-b border-border-subtle px-3 py-2.5 text-left transition-colors hover:bg-surface-2",
-                selecionada?.id === c.id && "bg-surface-2"
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <span className="truncate text-[13px] font-medium text-text-primary">{c.contato?.name || c.nome}</span>
-                {c.contato && <Badge variant="neutral" className="text-[10px]">Contato</Badge>}
-                <span className="ml-auto shrink-0 text-[11px] text-text-tertiary">{formatRelativeDate(c.lastMessageAt)}</span>
-              </div>
-              <span className="truncate text-[12px] text-text-secondary">
-                {c.lastMessageRole === "contact" ? "" : "IA: "}
-                {c.lastMessageText || "—"}
-              </span>
-            </button>
-          ))}
-        </div>
+        <ul className="min-h-0 flex-1 overflow-y-auto">
+          {lista.map((c) => {
+            const nome = c.contato?.name || c.nome;
+            const ativa = selecionada?.id === c.id;
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => setAberta(c.id)}
+                  aria-current={ativa ? "true" : undefined}
+                  className={cn(
+                    "flex w-full items-start gap-2.5 border-b border-border-subtle px-3 py-2.5 text-left transition-colors duration-120",
+                    ativa ? "bg-accent-subtle" : "hover:bg-hover"
+                  )}
+                >
+                  <AvatarDoContato chave={c.contato?.id ?? c.id} nome={nome} className="mt-0.5" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className="flex items-baseline gap-2">
+                      <span className="truncate text-body font-medium text-text-primary">{nome}</span>
+                      <span className="ml-auto shrink-0 text-caption tabular-nums text-text-tertiary">{horaCurta(c.lastMessageAt)}</span>
+                    </span>
+                    <span className="truncate text-small text-text-tertiary">
+                      {c.lastMessageText ? `${prefixoDaPrevia(c.lastMessageRole)}${c.lastMessageText}` : "Sem mensagens"}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
       {selecionada && <Transcricao key={selecionada.id} conversa={selecionada} />}
     </div>
@@ -115,6 +133,7 @@ export function ConversasDoPipe({ agentId }: { agentId: string | null }) {
 function Transcricao({ conversa }: { conversa: ConversaDoSite }) {
   const [mensagens, setMensagens] = React.useState<Mensagem[] | null>(null);
   const fim = React.useRef<HTMLDivElement>(null);
+  const nome = conversa.contato?.name || conversa.nome;
 
   React.useEffect(() => {
     let vivo = true;
@@ -132,37 +151,48 @@ function Transcricao({ conversa }: { conversa: ConversaDoSite }) {
   }, [mensagens]);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-surface-1">
-      <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-medium text-text-primary">{conversa.contato?.name || conversa.nome}</p>
-          <p className="truncate text-[11.5px] text-text-tertiary">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border-subtle px-4">
+        <AvatarDoContato chave={conversa.contato?.id ?? conversa.id} nome={nome} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-semibold text-text-primary">{nome}</p>
+          <p className="truncate text-caption text-text-tertiary">
             {conversa.agentName}
+            {conversa.contato ? " · contato salvo" : ""}
             {conversa.contato?.email ? ` · ${conversa.contato.email}` : ""}
             {conversa.contato?.phone ? ` · ${conversa.contato.phone}` : ""}
           </p>
         </div>
-        <Link href={`/conversas?c=${conversa.id}`} className="flex shrink-0 items-center gap-1.5 text-[12px] text-accent-400 hover:underline">
-          <MessageCircle size={13} /> Abrir na Caixa de entrada
+        <Link href={`/conversas?c=${conversa.id}`} className="flex shrink-0 items-center gap-1.5 text-small text-accent-fg hover:underline">
+          <MessageCircle size={14} aria-hidden="true" /> Abrir na Caixa de entrada
         </Link>
       </div>
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
         {mensagens === null ? null : mensagens.length === 0 ? (
-          <p className="text-[12.5px] text-text-tertiary">Sem mensagens.</p>
+          <p className="text-small text-text-tertiary">Sem mensagens.</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {mensagens.map((m) => (
-              <div key={m.id} className={cn("flex", m.role === "contact" ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-sm",
-                    m.role === "contact" ? "bg-accent-500 text-text-on-accent" : "border border-border-subtle bg-surface-2 text-text-primary"
-                  )}
-                >
-                  {m.text}
+          <div className="flex flex-col gap-1.5">
+            {mensagens.map((m) => {
+              // Cliente à esquerda, agente/atendente à direita (como na Caixa de entrada).
+              const doContato = m.role === "contact";
+              return (
+                <div key={m.id} className={cn("flex flex-col", doContato ? "items-start" : "items-end")}>
+                  <div
+                    className={cn(
+                      "max-w-[78%] rounded-[18px] px-3.5 py-2 lg:max-w-[66%]",
+                      doContato
+                        ? "rounded-bl-md border border-border-subtle bg-raised text-text-primary"
+                        : "rounded-br-md bg-accent-solid text-text-on-accent"
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap break-words text-body leading-relaxed">{m.text}</p>
+                    <p className={cn("mt-0.5 text-right font-mono text-caption tabular-nums", doContato ? "text-text-tertiary" : "text-text-on-accent/70")}>
+                      {horaDaMensagem(m.createdAt)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div ref={fim} />
           </div>
         )}

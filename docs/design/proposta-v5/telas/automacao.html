@@ -1,0 +1,207 @@
+<!-- id: automacao | titulo: Editor de automação | grupo: Automação | menu: automacoes | print: - -->
+<style>
+.t-fx { flex-direction: row; }
+.t-fx .lib { width: 262px; flex: none; border-right: 1px solid var(--bs); padding: 14px 14px 14px 16px; display: flex; flex-direction: column; gap: 12px; background: color-mix(in srgb, var(--sb) 60%, transparent); }
+.t-fx .lib h4 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.t-fx .modos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.t-fx .modo { height: 74px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 9px 10px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11.5px; color: var(--t3); position: relative; overflow: hidden; }
+.t-fx .modo.on { box-shadow: 0 0 0 1.5px var(--t1); color: var(--t1); }
+.t-fx .modo b { font-size: 12.5px; font-weight: 600; color: var(--t1); }
+.t-fx .modo .arte { position: absolute; right: -6px; top: -6px; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #9ccbff, #2f6fc4 60%, transparent 61%); opacity: .55; filter: blur(.5px); }
+.t-fx .modo.vivo .arte { background: radial-gradient(circle at 35% 35%, #e8e8ec, #6a6a72 60%, transparent 61%); }
+.t-fx .abas3 { display: flex; gap: 14px; border-bottom: 1px solid var(--bs); font-size: 12.5px; font-weight: 500; color: var(--t3); }
+.t-fx .abas3 span { padding-bottom: 8px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.t-fx .abas3 span.on { color: var(--t1); border-color: var(--d-blue); }
+.t-fx .grp { font-size: 12.5px; font-weight: 500; color: var(--t2); display: flex; align-items: center; gap: 6px; }
+.t-fx .grp svg { width: 12px; height: 12px; color: var(--d-blue); }
+.t-fx .grp em { font-style: normal; color: var(--t3); }
+.t-fx .itens { display: flex; flex-direction: column; gap: 6px; padding-left: 12px; border-left: 1px dashed var(--bd); margin-left: 5px; }
+.t-fx .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); font-size: 12.5px; }
+.t-fx .item .ap { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff; flex: none; }
+.t-fx .item .ap svg { width: 14px; height: 14px; }
+.t-fx .item small { display: block; font-size: 11px; color: var(--t3); }
+.t-fx .item .gr { margin-left: auto; color: var(--t3); width: 14px; height: 14px; }
+.t-fx .testar { margin-top: auto; height: 40px; border-radius: 99px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.t-fx .testar svg { width: 15px; height: 15px; }
+.t-fx .dir2 { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.t-fx .topo2 { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+.t-fx .topo2 h4 { font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
+.t-fx .topo2 .dir { margin-left: auto; display: flex; gap: 8px; }
+.t-fx .quadro { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.t-fx .fios { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; stroke: none; }
+.t-fx .fios path { fill: none; stroke: var(--d-teal); stroke-width: 1.6; }
+.t-fx .fios path.az { stroke: var(--d-blue); }
+.t-fx .fios path.tr { stroke-dasharray: 3 5; stroke: var(--t3); }
+.t-fx .fios circle { fill: var(--pg); stroke: var(--t2); stroke-width: 1.5; }
+.t-fx .fios text { fill: var(--t3); font: 400 10.5px ui-monospace, "SF Mono", monospace; }
+.t-fx .gat { position: absolute; left: 190px; top: 26px; width: 300px; height: 150px; border-radius: 20px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd), 0 18px 40px rgba(0,0,0,.35); padding: 16px 18px; display: flex; gap: 12px; }
+.t-fx .gat .esq { flex: 1; display: flex; flex-direction: column; }
+.t-fx .gat small { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-fx .gat h3 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; line-height: 1.15; }
+.t-fx .gat .sub { font-size: 12px; color: var(--t3); margin-top: 3px; }
+.t-fx .gat .aneis { margin-top: auto; display: flex; gap: 10px; }
+.t-fx .anel2 { width: 38px; height: 38px; position: relative; }
+.t-fx .anel2 svg { width: 38px; height: 38px; transform: rotate(-90deg); }
+.t-fx .anel2 circle { fill: none; stroke-width: 3; }
+.t-fx .anel2 span { position: absolute; inset: 0; display: grid; place-items: center; font: 500 10px ui-monospace, monospace; color: var(--t2); }
+.t-fx .gat .barra2 { width: 58px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); position: relative; overflow: hidden; }
+.t-fx .gat .barra2 i { position: absolute; left: 0; right: 0; bottom: 0; height: 96%; border-radius: 14px; background: var(--destaque); }
+.t-fx .gat .barra2 b { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; color: #fff; font-size: 15px; font-weight: 600; }
+.t-fx .gat .pts { position: absolute; top: -4px; left: 0; right: 0; display: flex; justify-content: space-around; }
+.t-fx .gat .pts i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 3px var(--pg); }
+.t-fx .no2 { position: absolute; border-radius: 14px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 54px; font-size: 13px; }
+.t-fx .no2 .ap { width: 28px; height: 28px; border-radius: 8px; background: var(--rs); display: grid; place-items: center; color: var(--t2); box-shadow: inset 0 0 0 1px var(--bs); }
+.t-fx .no2 .ap svg { width: 14px; height: 14px; }
+.t-fx .no2 small { display: block; font-size: 11px; color: var(--t3); }
+.t-fx .no2 .mais2 { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; background: var(--d-blue); color: #fff; display: grid; place-items: center; }
+.t-fx .no2 .mais2 svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.t-fx .grupo { position: absolute; left: 30px; top: 392px; width: 620px; height: 150px; border-radius: 22px; border: 1.5px dashed var(--bd); }
+.t-fx .grupo > em { position: absolute; bottom: -9px; right: 22px; font: 400 10.5px ui-monospace, "SF Mono", monospace; font-style: normal; color: var(--t3); background: var(--pg); padding: 0 6px; }
+.t-fx .pc { position: absolute; top: 18px; width: 178px; height: 112px; border-radius: 16px; overflow: hidden; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd), 0 12px 28px rgba(0,0,0,.3); display: flex; flex-direction: column; }
+.t-fx .pc .cab { height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; font-weight: 600; color: #fff; }
+.t-fx .pc .cab svg { width: 13px; height: 13px; }
+.t-fx .pc .corpo2 { flex: 1; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.t-fx .pc .bolha { align-self: flex-start; background: var(--rs); border-radius: 12px 12px 12px 4px; padding: 6px 9px; font-size: 11.5px; color: var(--t2); max-width: 100%; }
+.t-fx .pc .linhas { display: flex; gap: 3px; align-items: flex-end; height: 28px; }
+.t-fx .pc .linhas i { flex: 1; border-radius: 2px; background: var(--hv); }
+.t-fx .pc.vazio { background: transparent; box-shadow: none; border: 1.5px dashed var(--bd); align-items: center; justify-content: center; color: var(--t3); font-size: 12px; gap: 4px; }
+.t-fx .pc.vazio svg { width: 16px; height: 16px; }
+.t-fx .mais3 { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); display: grid; place-items: center; font: 500 11px ui-monospace, monospace; color: var(--t2); }
+.t-fx .zoom2 { position: absolute; right: 16px; top: 150px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.t-fx .zoom2 span { width: 32px; height: 32px; border-radius: 50%; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); display: grid; place-items: center; color: var(--t2); font: 500 11px ui-monospace, monospace; }
+.t-fx .zoom2 span.pct { width: 44px; height: 44px; color: var(--t1); }
+.t-fx .zoom2 svg { width: 13px; height: 13px; }
+.t-fx .linha-tempo { height: 62px; flex: none; margin: 0 16px 14px; border-radius: 18px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); display: flex; align-items: center; gap: 14px; padding: 0 14px; }
+.t-fx .linha-tempo .cal { width: 34px; height: 34px; border-radius: 50%; background: var(--d-blue); color: #fff; display: grid; place-items: center; }
+.t-fx .linha-tempo .cal svg { width: 15px; height: 15px; }
+.t-fx .linha-tempo .rot { display: flex; flex-direction: column; font-size: 13px; font-weight: 500; }
+.t-fx .linha-tempo .rot small { font-size: 11px; color: var(--t3); font-weight: 400; }
+.t-fx .dias { flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); align-items: center; height: 40px; border-radius: 12px; position: relative; }
+.t-fx .dias span { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 400 10.5px ui-monospace, monospace; color: var(--t3); }
+.t-fx .dias span i { width: 7px; height: 7px; border-radius: 2px; background: var(--d-slate); opacity: .5; }
+.t-fx .dias span.ok i { background: var(--d-blue); opacity: 1; }
+.t-fx .dias span.er i { background: var(--d-red); opacity: 1; }
+.t-fx .dias span.hj { color: var(--t1); }
+.t-fx .dias .sel { position: absolute; left: 30%; right: 0; top: 0; bottom: 0; border-radius: 12px; background: var(--acsub); border-left: 2px solid var(--d-blue); border-right: 2px solid var(--d-blue); }
+.t-fx .arrasta { position: absolute; z-index: 9; display: none; }
+.t-fx .cursor { position: absolute; left: 0; top: 0; width: 18px; height: 18px; z-index: 20; pointer-events: none; opacity: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.t-fx .cursor svg { width: 18px; height: 18px; fill: #fff; stroke: #111; stroke-width: 1.2; }
+.t-fx .viaja { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #9ccbff; box-shadow: 0 0 10px #5aa8ff; display: none; z-index: 4; }
+</style>
+<!--ILHA-->
+<span class="pto azul"></span><span>Ligada</span><span class="cinza mono">128 execuções em 30 dias</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-fx">
+  <div class="lib">
+    <h4>Montar automação</h4>
+    <div class="modos"><div class="modo on"><span class="arte"></span><span>&nbsp;</span><b>Editar</b></div><div class="modo vivo"><span class="arte"></span><span>&nbsp;</span><b>Ver ao vivo</b></div></div>
+    <div class="abas3"><span>Gatilhos</span><span class="on">Ações</span><span>Condições</span></div>
+    <span class="d-in" style="height:34px"><svg><use href="#i-search"/></svg>Buscar passo…</span>
+    <div class="grp"><svg><use href="#i-chev"/></svg>Mensagens <em>(4)</em></div>
+    <div class="itens">
+      <div class="item"><span class="ap" style="background:#3d827b"><svg><use href="#i-wa"/></svg></span><span>Enviar WhatsApp<small>modelo aprovado</small></span><svg class="gr"><use href="#i-grip"/></svg></div>
+      <div class="item" data-pega><span class="ap" style="background:#2f6fc4"><svg><use href="#i-mail"/></svg></span><span>Enviar e-mail<small>modelo de e-mail</small></span><svg class="gr"><use href="#i-grip"/></svg></div>
+    </div>
+    <div class="grp"><svg style="transform:rotate(-90deg)"><use href="#i-chev"/></svg>Negócios <em>(6)</em></div>
+    <div class="grp"><svg style="transform:rotate(-90deg)"><use href="#i-chev"/></svg>Equipe <em>(3)</em></div>
+    <div class="testar" data-testar><svg><use href="#i-play"/></svg>Testar com um registro</div>
+  </div>
+  <div class="dir2">
+    <div class="topo2"><h4>Lead novo no WhatsApp</h4><span class="chip">Rascunho</span><div class="dir"><span class="d-bt ic"><svg><use href="#i-more"/></svg></span><span class="d-bt p">Publicar</span></div></div>
+    <div class="quadro d-pontilhado" data-quadro>
+      <svg class="fios" viewBox="0 0 678 476" preserveAspectRatio="xMinYMin meet">
+        <path class="az" d="M340 176 V214"/>
+        <path class="az" d="M340 268 V300"/>
+        <path d="M340 354 C340 380, 120 372, 120 410"/>
+        <path class="tr" d="M340 354 V410"/>
+        <path d="M340 354 C340 380, 560 372, 560 410"/>
+        <path class="tr" d="M190 100 H70"/><path class="tr" d="M490 100 H610"/>
+        <circle cx="340" cy="176" r="4"/><circle cx="340" cy="354" r="4"/><circle cx="70" cy="100" r="3.5"/><circle cx="610" cy="100" r="3.5"/>
+        <text x="182" y="382">Respondeu</text><text x="488" y="382">Não respondeu</text>
+        <text x="40" y="88">Contatos</text><text x="570" y="88">Negócios</text>
+      </svg>
+      <div class="gat" data-gat>
+        <div class="pts"><i style="background:var(--d-teal)"></i><i style="background:var(--d-blue)"></i><i style="background:var(--d-amber)"></i></div>
+        <div class="esq"><small>Gatilho</small><h3>Lead novo no WhatsApp</h3><span class="sub">qualquer número, qualquer agente</span>
+          <div class="aneis">
+            <span class="anel2"><svg><circle cx="19" cy="19" r="15" style="stroke:var(--hv)"/><circle cx="19" cy="19" r="15" style="stroke:var(--d-teal);stroke-dasharray:65 95"/></svg><span>68%</span></span>
+            <span class="anel2"><svg><circle cx="19" cy="19" r="15" style="stroke:var(--hv)"/><circle cx="19" cy="19" r="15" style="stroke:var(--d-amber);stroke-dasharray:30 95"/></svg><span>32%</span></span>
+          </div>
+        </div>
+        <div class="barra2"><i></i><b>96%</b></div>
+      </div>
+      <div class="no2" style="left:262px;top:214px;width:156px" data-n="espera"><span class="ap"><svg><use href="#i-clock"/></svg></span><span>Esperar 1 dia<small>horário comercial</small></span></div>
+      <div class="no2" style="left:250px;top:300px;width:180px" data-n="cond"><span class="ap"><svg><use href="#i-flow"/></svg></span><span>Respondeu?<small>em 24 horas</small></span><span class="mais2"><svg><use href="#i-plus"/></svg></span></div>
+      <div class="grupo" data-grupo><em>Depois da resposta</em>
+        <div class="pc" style="left:12px" data-pc="sim"><div class="cab" style="background:#3d827b">Mover etapa<svg><use href="#i-arrow"/></svg></div><div class="corpo2"><b class="b5">Para Qualificado</b><span class="linhas"><i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:90%"></i><i style="height:65%"></i><i style="height:80%"></i></span></div></div>
+        <div class="pc vazio" style="left:220px" data-slot><svg><use href="#i-plus"/></svg>Solte um passo aqui</div>
+        <div class="pc" style="left:428px" data-pc="nao"><div class="cab" style="background:#b07d2a">Criar tarefa<svg><use href="#i-arrow"/></svg></div><div class="corpo2"><b class="b5">Ligar para o lead</b><span class="bolha">para o dono do negócio</span></div></div>
+      </div>
+      <span class="mais3" style="left:112px;top:548px">+2</span>
+      <div class="zoom2"><span><svg><use href="#i-plus"/></svg></span><span class="pct">100%</span><span><svg><use href="#i-x"/></svg></span></div>
+      <span class="viaja" data-viaja></span>
+      <div class="arrasta" data-arrasta></div>
+      <span class="cursor" data-cursor><svg viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1 3.5 7-2.6 1.2-3.4-7.1L5 19z"/></svg></span>
+    </div>
+    <div class="linha-tempo">
+      <span class="cal"><svg><use href="#i-cal"/></svg></span>
+      <span class="rot">Execuções<small>13 a 22 de out.</small></span>
+      <div class="dias"><span class="sel"></span><span class="ok"><i></i>13</span><span class="ok"><i></i>14</span><span class="ok"><i></i>15</span><span class="er"><i></i>16</span><span class="ok"><i></i>17</span><span><i></i>18</span><span><i></i>19</span><span class="ok"><i></i>20</span><span class="ok"><i></i>21</span><span class="ok hj"><i></i>hoje</span></div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.automacao = function (c) {
+  var MOLA = "cubic-bezier(.32,.72,0,1)", root = c.root, quadro = c.q("[data-quadro]"), cur = c.q("[data-cursor]");
+  var k = function () { return (root.getBoundingClientRect().width / root.offsetWidth) || 1; };
+  var rel = function (el) { var r = el.getBoundingClientRect(), q = quadro.getBoundingClientRect(), s = k(); return { x: (r.left - q.left) / s, y: (r.top - q.top) / s, w: r.width / s, h: r.height / s }; };
+  var pos = { x: 300, y: 300 };
+  var vai = function (x, y, ms) { cur.animate([{ transform: "translate(" + pos.x + "px," + pos.y + "px)", opacity: 1 }, { transform: "translate(" + x + "px," + y + "px)", opacity: 1 }], { duration: ms || 650, easing: MOLA, fill: "forwards" }); pos = { x: x, y: y }; return c.espera((ms || 650) + 30); };
+  c.q("[data-gat]").animate([{ opacity: 0, transform: "translateY(16px) scale(.95)" }, { opacity: 1, transform: "none" }], { duration: 700, easing: MOLA, fill: "backwards" });
+  c.entra(".no2", { d: 300, passo: 120, y: 10 }); c.entra(".pc", { d: 650, passo: 90, y: 12 }); c.entra(".item, .modo, .grp", { passo: 40, y: 6 });
+  c.qa(".fios path").forEach(function (p, i) { var L = p.getTotalLength(); if (p.classList.contains("tr")) return; p.animate([{ strokeDasharray: L + " " + L, strokeDashoffset: L }, { strokeDasharray: L + " " + L, strokeDashoffset: 0 }], { duration: 700, delay: 250 + i * 110, easing: "ease-out", fill: "backwards" }); });
+  c.qa(".gat .barra2 i").forEach(function (i) { i.style.transformOrigin = "bottom"; i.animate([{ transform: "scaleY(0)" }, { transform: "none" }], { duration: 1100, delay: 400, easing: MOLA, fill: "backwards" }); });
+  var orig = c.q("[data-ilha]").innerHTML;
+  var pega = c.q("[data-pega]"), slot = c.q("[data-slot]"), arr = c.q("[data-arrasta]");
+  return c.espera(1600).then(function () {
+    var p = rel(pega); return vai(p.x + 120, p.y + 18);
+  }).then(function () {
+    var p = rel(pega); arr.innerHTML = pega.outerHTML; arr.style.display = "block"; arr.style.width = p.w + "px";
+    arr.animate([{ transform: "translate(" + p.x + "px," + p.y + "px)" }, { transform: "translate(" + p.x + "px," + p.y + "px) rotate(-3deg) scale(1.05)" }], { duration: 200, fill: "forwards" });
+    pega.style.opacity = ".35"; return c.espera(220);
+  }).then(function () {
+    var p = rel(pega), s = rel(slot), dx = s.x + 4, dy = s.y + 30;
+    arr.animate([{ transform: "translate(" + p.x + "px," + p.y + "px) rotate(-3deg) scale(1.05)" }, { transform: "translate(" + dx + "px," + dy + "px) rotate(2deg) scale(1.05)" }], { duration: 900, easing: MOLA, fill: "forwards" });
+    vai(dx + 120, dy + 18, 900); slot.animate([{ boxShadow: "0 0 0 0 transparent" }, { boxShadow: "0 0 0 4px rgba(90,168,255,.25)" }], { duration: 900, fill: "forwards" });
+    return c.espera(950);
+  }).then(function () {
+    arr.style.display = "none"; pega.style.opacity = "";
+    slot.className = "pc"; slot.innerHTML = '<div class="cab" style="background:#2f6fc4">Enviar e-mail<svg><use href="#i-arrow"/></svg></div><div class="corpo2"><b class="b5">Proposta em PDF</b><span class="bolha">Olá {nome}, segue a proposta…</span></div>';
+    slot.getAnimations().forEach(function (a) { a.cancel(); });
+    slot.animate([{ transform: "scale(.92)", opacity: .4 }, { transform: "none", opacity: 1 }], { duration: 500, easing: "cubic-bezier(.34,1.4,.5,1)" });
+    var t = c.qa(".fios path")[3]; t.classList.remove("tr"); t.classList.add("az");
+    c.pulso(slot, 1.8); cur.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 200, fill: "forwards" });
+    return c.espera(900);
+  }).then(function () {
+    var anel = function (p) { return '<svg class="anel" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" style="stroke:#2a2a2e"/><circle cx="11" cy="11" r="8" style="stroke:#7ab8ff;stroke-dasharray:' + (50.3 * p) + ' 60;transform:rotate(-90deg);transform-origin:center"/></svg>'; };
+    c.ilha(anel(.3) + '<span class="txt"><b>Testando com Renata Lopes</b><span>nada é enviado de verdade</span></span>', true);
+    var v = c.q("[data-viaja]"); v.style.display = "block";
+    var trilha = [[340, 176], [340, 214], [340, 268], [340, 300], [340, 354], [340, 380], [340, 410]];
+    v.animate(trilha.map(function (p) { return { transform: "translate(" + (p[0] - 4) + "px," + (p[1] - 4) + "px)" }; }), { duration: 1800, easing: "ease-in-out", fill: "forwards" });
+    c.qa(".no2").forEach(function (n, i) { n.animate([{ boxShadow: "var(--cartao-sh), 0 0 0 1px var(--cartao-bd)" }, { boxShadow: "0 0 0 2px #5aa8ff" }, { boxShadow: "var(--cartao-sh), 0 0 0 1px var(--cartao-bd)" }], { duration: 700, delay: 500 + i * 500 }); });
+    return c.espera(1900);
+  }).then(function () {
+    c.q("[data-viaja]").style.display = "none";
+    c.ilha('<svg style="color:#86c4a3"><use href="#i-done"/></svg><span class="txt"><b>Teste concluído em 1,1 s</b><span>caminho "Respondeu" · 3 passos</span></span><span class="acao">Publicar</span>', true);
+    return c.espera(2800);
+  }).then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Fluxo com cara de produto.</b> Como no seu exemplo: o gatilho vira um cartão grande com os números da automação (concluídas e por caminho), os passos descem ligados por fios e o que acontece depois da resposta fica num grupo tracejado.</li>
+<li><b>Cada tipo de passo tem cor no cabeçalho.</b> Mover etapa, enviar e-mail e criar tarefa aparecem como cartões com cabeçalho colorido e uma prévia do que fazem (texto da mensagem, movimento no funil).</li>
+<li><b>Biblioteca ao lado para arrastar.</b> Gatilhos, ações e condições numa coluna, agrupados e com busca. Arrastar um passo para o grupo cria o cartão no lugar.</li>
+<li><b>Execuções numa faixa embaixo.</b> Os últimos dez dias com o dia de cada execução (azul) e o dia em que falhou (vermelho). "Testar com um registro" faz um ponto de luz percorrer o fluxo, com o progresso na ilha.</li>
+<!--/NOTAS-->

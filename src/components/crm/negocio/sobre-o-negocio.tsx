@@ -49,13 +49,13 @@ export function SobreONegocio({
   }
 
   return (
-    <Secao titulo="Sobre o negócio">
+    <Secao titulo="Sobre o negócio" recolhivel abertoInicial={false}>
       <div className="flex flex-col gap-2">
         {valorDosProdutos ? (
           <div className="px-2 py-0.5">
-            <div className="text-[11.5px] text-text-tertiary">Valor</div>
-            <div className="py-1 font-display text-[13px] tabular-nums text-text-primary">R$ {reaisParaTexto(deal.amountCents) || "0,00"}</div>
-            <div className="text-[11.5px] text-text-tertiary">Soma dos produtos. Para digitar outro, ligue &quot;Usar valor manual&quot; em Produtos.</div>
+            <div className="text-caption text-text-tertiary">Valor</div>
+            <div className="py-1 font-display text-small tabular-nums text-text-primary">R$ {reaisParaTexto(deal.amountCents) || "0,00"}</div>
+            <div className="text-caption text-text-tertiary">Soma dos produtos. Para digitar outro, ligue &quot;Usar valor manual&quot; em Produtos.</div>
           </div>
         ) : (
           <CampoInline
@@ -87,14 +87,14 @@ export function SobreONegocio({
           onSalvar={(v) => patch({ expectedClosingAt: v || null })}
         />
         <div>
-          <label htmlFor="ficha-dono-sobre" className="mb-0.5 block px-2 text-[11.5px] text-text-tertiary">
+          <label htmlFor="ficha-dono-sobre" className="mb-0.5 block px-2 text-caption text-text-tertiary">
             Responsável
           </label>
           <Select
             id="ficha-dono-sobre"
             value={deal.ownerId ?? ""}
             onChange={async (e) => setErroDono(await patch({ ownerId: e.target.value || null }))}
-            className="h-8 rounded-lg border-transparent bg-transparent px-2 text-[13px] hover:border-border-subtle hover:bg-surface-2"
+            className="h-8 border-transparent bg-transparent px-2 text-small hover:border-border-subtle hover:bg-hover"
           >
             <option value="">Sem responsável</option>
             {deal.owner && !membros.some((m) => m.id === deal.owner!.id) && (
@@ -106,7 +106,7 @@ export function SobreONegocio({
               </option>
             ))}
           </Select>
-          {erroDono && <p role="alert" className="mt-1 px-2 text-[11.5px] text-danger">{erroDono}</p>}
+          {erroDono && <p role="alert" className="mt-1 px-2 text-caption text-danger">{erroDono}</p>}
         </div>
         <ApenasLeitura rotulo="Funil" valor={deal.pipeline.name} />
         <ApenasLeitura rotulo="Criado em" valor={dataLonga(deal.createdAt)} />
@@ -135,16 +135,16 @@ function MotivoDaPerda({ deal, patch }: { deal: NegocioDaFicha; patch: (body: Re
   return (
     <div className="px-2 py-0.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11.5px] text-text-tertiary">Motivo da perda</span>
+        <span className="text-caption text-text-tertiary">Motivo da perda</span>
         <Button variant="ghost" size="sm" onClick={() => setTrocando(true)}>
           Trocar
         </Button>
       </div>
-      <div className="py-1 text-[13px] text-text-secondary">
+      <div className="py-1 text-small text-text-secondary">
         {rotulo}
         {deal.perda?.nota && <span className="block text-text-tertiary">{deal.perda.nota}</span>}
       </div>
-      {erro && <p role="alert" className="text-[11.5px] text-danger">{erro}</p>}
+      {erro && <p role="alert" className="text-caption text-danger">{erro}</p>}
       {trocando && (
         <MarcarPerdido
           nome={deal.name}
@@ -164,8 +164,8 @@ function MotivoDaPerda({ deal, patch }: { deal: NegocioDaFicha; patch: (body: Re
 function ApenasLeitura({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="px-2 py-0.5">
-      <div className="text-[11.5px] text-text-tertiary">{rotulo}</div>
-      <div className="py-1 text-[13px] text-text-secondary">{valor}</div>
+      <div className="text-caption text-text-tertiary">{rotulo}</div>
+      <div className="py-1 text-small text-text-secondary">{valor}</div>
     </div>
   );
 }
@@ -205,7 +205,7 @@ function CamposDoNegocio({
 
   return (
     <div className="mt-4 border-t border-border-subtle pt-4">
-      <h3 className="mb-3 px-2 text-[12px] font-medium text-text-secondary">Campos personalizados</h3>
+      <h3 className="mb-3 px-2 text-caption font-medium text-text-secondary">Campos personalizados</h3>
       <div className="flex flex-col gap-3 px-2">
         <CamposDoFormulario
           defs={defs}
@@ -217,7 +217,7 @@ function CamposDoNegocio({
           }}
         />
         {erro && (
-          <p role="alert" className="text-[12px] text-danger">
+          <p role="alert" className="text-caption text-danger">
             {erro}
           </p>
         )}

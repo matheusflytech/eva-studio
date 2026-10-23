@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { MessageSquare, Music2, Check, Loader2, Unplug, Copy, AlertTriangle } from "lucide-react";
+import { Check, Loader2, Unplug, Copy, AlertTriangle } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export function MessengerConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-text-tertiary" /> Messenger
+              <LogoOficial marca="messenger" tamanho={16} /> Messenger
             </CardTitle>
             <CardDescription>
               Mensagens da sua Página do Facebook, pelo mesmo webhook já usado no WhatsApp e no Instagram.
@@ -77,20 +78,20 @@ export function MessengerConnect({ agentId }: { agentId: string }) {
       </CardHeader>
 
       {status?.connected ? (
-        <div className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3">
+        <div className="flex items-center justify-between rounded-[14px] bg-raised px-4 py-3">
           <div>
-            <div className="flex items-center gap-2 text-[14px] font-medium text-text-primary">
-              <Check size={15} className="text-emerald-400" /> {status.pageName || status.pageId}
+            <div className="flex items-center gap-2 text-body font-medium text-text-primary">
+              <Check size={15} className="text-success" /> {status.pageName || status.pageId}
             </div>
-            <div className="mt-0.5 text-[12px] text-text-tertiary">Página {status.pageId}</div>
+            <div className="mt-0.5 text-caption text-text-tertiary">Página {status.pageId}</div>
           </div>
-          <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger/10">
+          <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger-subtle">
             <Unplug size={15} /> Desconectar
           </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <ol className="flex flex-col gap-1 rounded-2xl bg-surface-2 px-4 py-3 text-[13px] text-text-secondary">
+          <ol className="flex flex-col gap-1 rounded-[14px] bg-raised px-4 py-3 text-small text-text-secondary">
             <li>1. No painel da Meta, abra o produto Messenger do seu app.</li>
             <li>2. Gere um token de acesso da Página que o agente vai atender.</li>
             <li>3. Cole o ID da Página e esse token aqui.</li>
@@ -114,9 +115,9 @@ export function MessengerConnect({ agentId }: { agentId: string }) {
               />
             </div>
           </div>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
+          {error && <p className="text-small text-danger">{error}</p>}
           {warning && (
-            <p className="inline-flex items-start gap-1.5 text-[13px] text-amber-400">
+            <p className="inline-flex items-start gap-1.5 text-small text-warning">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {warning}
             </p>
           )}
@@ -187,7 +188,7 @@ export function TikTokConnect({ agentId }: { agentId: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Music2 size={16} className="text-text-tertiary" /> TikTok
+              <LogoOficial marca="tiktok" tamanho={16} /> TikTok
             </CardTitle>
             <CardDescription>
               Mensagens diretas de uma conta TikTok Business, pela Business Messaging API.
@@ -197,34 +198,34 @@ export function TikTokConnect({ agentId }: { agentId: string }) {
         </div>
       </CardHeader>
 
-      <p className="mb-3 inline-flex items-start gap-1.5 rounded-2xl bg-surface-2 px-4 py-3 text-[12px] text-text-secondary">
-        <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" />
+      <p className="mb-3 inline-flex items-start gap-1.5 rounded-[14px] bg-raised px-4 py-3 text-caption text-text-secondary">
+        <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
         Exige app aprovado no portal do TikTok, e a API não atende contas registradas no Espaço Econômico Europeu,
         Suíça e Reino Unido.
       </p>
 
       {status?.connected ? (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3">
+          <div className="flex items-center justify-between rounded-[14px] bg-raised px-4 py-3">
             <div>
-              <div className="flex items-center gap-2 text-[14px] font-medium text-text-primary">
-                <Check size={15} className="text-emerald-400" /> {status.displayName || status.businessId}
+              <div className="flex items-center gap-2 text-body font-medium text-text-primary">
+                <Check size={15} className="text-success" /> {status.displayName || status.businessId}
               </div>
-              <div className="mt-0.5 text-[12px] text-text-tertiary">
+              <div className="mt-0.5 text-caption text-text-tertiary">
                 {status.expiresAt
                   ? `Token expira em ${new Date(status.expiresAt).toLocaleString("pt-BR")} — renovado sozinho`
                   : "Sem data de expiração registrada"}
               </div>
             </div>
-            <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger/10">
+            <Button variant="ghost" onClick={disconnect} disabled={busy} className="text-danger hover:bg-danger-subtle">
               <Unplug size={15} /> Desconectar
             </Button>
           </div>
-          {status.lastError && <p className="text-[13px] text-danger">{status.lastError}</p>}
+          {status.lastError && <p className="text-small text-danger">{status.lastError}</p>}
           <div>
             <Label>URL de callback (cole no portal do TikTok)</Label>
             <div className="flex gap-2">
-              <Input readOnly value={status.webhookUrl} className="font-mono text-[12px]" />
+              <Input readOnly value={status.webhookUrl} className="font-mono text-caption" />
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -276,11 +277,11 @@ export function TikTokConnect({ agentId }: { agentId: string }) {
               />
             </div>
           </div>
-          <p className="text-[11.5px] text-text-tertiary">
+          <p className="text-caption text-text-tertiary">
             O access token do TikTok dura cerca de 24h. Com o refresh token preenchido, o app renova sozinho antes
             de cada envio; sem ele, a conexão para de funcionar no dia seguinte.
           </p>
-          {error && <p className="text-[13px] text-danger">{error}</p>}
+          {error && <p className="text-small text-danger">{error}</p>}
           <Button
             onClick={connect}
             disabled={busy || !form.businessId.trim() || !form.accessToken.trim()}

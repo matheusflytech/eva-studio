@@ -84,7 +84,7 @@ export function Popover({
       ref={caixa}
       role="dialog"
       style={{ top: pos.top, left: pos.left, width: largura, transform: pos.acima ? "translateY(-100%)" : undefined }}
-      className="glass-card glass-card-solid fixed z-[70] flex max-h-[340px] flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-border-default"
+      className="fixed z-[70] flex max-h-[340px] flex-col overflow-hidden rounded-[14px] border border-border-default bg-overlay shadow-overlay"
     >
       {children}
     </div>,
@@ -129,15 +129,15 @@ export function ListaDeOpcoes({
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar..."
             aria-label="Buscar opção"
-            className="h-7 w-full bg-transparent text-[13px] text-text-primary outline-none placeholder:text-text-tertiary"
+            className="h-7 w-full bg-transparent text-small text-text-primary outline-none placeholder:text-text-tertiary"
           />
         </div>
       )}
       <div className="flex-1 overflow-y-auto p-1.5" role="listbox" aria-multiselectable={!unica}>
-        {visiveis.length === 0 && <p className="px-3 py-4 text-center text-[12px] text-text-tertiary">{termo ? `Nada com “${busca}”.` : vazio}</p>}
+        {visiveis.length === 0 && <p className="px-3 py-4 text-center text-caption text-text-tertiary">{termo ? `Nada com “${busca}”.` : vazio}</p>}
         {grupos.map((g) => (
           <div key={g || "_"}>
-            {g && <p className="px-2.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-wide text-text-tertiary">{g}</p>}
+            {g && <p className="px-2.5 pb-1 pt-2 font-mono text-caption text-text-tertiary">{g}</p>}
             {visiveis
               .filter((o) => (o.grupo ?? "") === g)
               .map((o) => {
@@ -150,7 +150,7 @@ export function ListaDeOpcoes({
                     aria-selected={marcado}
                     onClick={() => alternar(o.id)}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-surface-3",
+                      "flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-small transition-colors hover:bg-hover",
                       marcado ? "text-text-primary" : "text-text-secondary"
                     )}
                   >
@@ -158,17 +158,17 @@ export function ListaDeOpcoes({
                       <span
                         className={cn(
                           "flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border",
-                          marcado ? "border-accent-500 bg-accent-500" : "border-border-strong"
+                          marcado ? "border-accent-solid bg-accent-solid" : "border-border-strong"
                         )}
                       >
-                        {marcado && <Check size={11} strokeWidth={3} className="text-white" />}
+                        {marcado && <Check size={11} strokeWidth={3} className="text-text-on-accent" />}
                       </span>
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{o.label}</span>
-                      {o.detalhe && <span className="block truncate text-[11px] text-text-tertiary">{o.detalhe}</span>}
+                      {o.detalhe && <span className="block truncate text-caption text-text-tertiary">{o.detalhe}</span>}
                     </span>
-                    {unica && marcado && <Check size={13} className="shrink-0 text-accent-400" />}
+                    {unica && marcado && <Check size={13} className="shrink-0 text-accent-fg" />}
                   </button>
                 );
               })}
@@ -176,9 +176,9 @@ export function ListaDeOpcoes({
         ))}
       </div>
       {!unica && valores.length > 0 && (
-        <div className="flex items-center justify-between border-t border-border-subtle px-3 py-2 text-[12px]">
+        <div className="flex items-center justify-between border-t border-border-subtle px-3 py-2 text-caption">
           <span className="text-text-tertiary">{valores.length} escolhido(s)</span>
-          <button type="button" onClick={() => aoMudar([])} className="text-accent-400 hover:underline">
+          <button type="button" onClick={() => aoMudar([])} className="text-accent-fg hover:underline">
             Limpar
           </button>
         </div>
@@ -230,15 +230,15 @@ export function SeletorMultiplo({
           }
         }}
         className={cn(
-          "flex w-full cursor-pointer flex-wrap items-center gap-1 rounded-xl border border-border-default bg-surface-2 py-1 pl-2 pr-8 text-left text-sm outline-none transition-colors",
-          "hover:border-border-strong focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-ice/20",
-          compacto ? "min-h-9" : "min-h-11",
+          "flex w-full cursor-pointer flex-wrap items-center gap-1 rounded-[10px] border border-border-subtle bg-raised py-1 pl-2 pr-8 text-left text-small outline-none transition-colors",
+          "hover:border-border-strong focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-solid/30",
+          compacto ? "min-h-8" : "min-h-10",
           aberto && "border-border-strong"
         )}
       >
         {valores.length === 0 && <span className="px-1.5 text-text-tertiary">{placeholder}</span>}
         {valores.map((v) => (
-          <span key={v} className="inline-flex max-w-[180px] items-center gap-1 rounded-lg bg-accent-soft py-0.5 pl-2 pr-1 text-[12px] text-accent-300">
+          <span key={v} className="inline-flex max-w-[180px] items-center gap-1 rounded-full bg-accent-subtle py-0.5 pl-2 pr-1 text-caption text-accent-fg">
             <span className="truncate">{porId.get(v)?.label ?? "removido"}</span>
             <button
               type="button"
@@ -247,7 +247,7 @@ export function SeletorMultiplo({
                 e.stopPropagation();
                 aoMudar(valores.filter((x) => x !== v));
               }}
-              className="rounded p-0.5 text-accent-300/80 hover:bg-accent-500/20 hover:text-accent-200"
+              className="rounded-full p-0.5 text-accent-fg/80 hover:text-accent-fg"
             >
               <X size={11} />
             </button>

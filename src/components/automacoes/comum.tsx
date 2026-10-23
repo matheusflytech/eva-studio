@@ -13,7 +13,6 @@ import {
   Handshake,
   Hourglass,
   Mail,
-  MessageCircle,
   MessageSquare,
   Repeat,
   Split,
@@ -26,6 +25,7 @@ import {
 import type { Nomes } from "@/lib/automacoes/catalogo";
 import type { Objeto } from "@/lib/automacoes/tipos";
 import type { CategoryColor } from "@/lib/design-system/tokens";
+import { LogoOficial, ladoDoLogo, type Marca } from "@/components/ui/logo-oficial";
 
 // ---------------------------------------------------------------------------
 // O que as telas de automação compartilham: as opções dos seletores (vindas
@@ -113,8 +113,16 @@ export const ICONE_DO_OBJETO: Record<Objeto, LucideIcon> = {
   conversation: MessageSquare,
 };
 
+export interface VisualDoPasso {
+  icone: LucideIcon;
+  cor: CategoryColor;
+  categoria: string;
+  /** Passo de um serviço de fora (WhatsApp, n8n): mostra o logo oficial no lugar do ícone. */
+  marca?: Marca;
+}
+
 /** Ícone e cor de cada passo no canvas (cor de categoria do design system). */
-export function visualDoPasso(tipo: string, acao?: string): { icone: LucideIcon; cor: CategoryColor; categoria: string } {
+export function visualDoPasso(tipo: string, acao?: string): VisualDoPasso {
   if (tipo === "gatilho") return { icone: Zap, cor: "amber", categoria: "Gatilho" };
   if (tipo === "condicao") return { icone: GitBranch, cor: "violet", categoria: "Condição" };
   if (tipo === "caminhos") return { icone: Split, cor: "violet", categoria: "Caminhos" };
@@ -123,7 +131,7 @@ export function visualDoPasso(tipo: string, acao?: string): { icone: LucideIcon;
   if (tipo === "fim") return { icone: Flag, cor: "slate", categoria: "Fim" };
   switch (acao) {
     case "whatsapp.send":
-      return { icone: MessageCircle, cor: "green", categoria: "Mensagem" };
+      return { icone: MessageSquare, cor: "green", categoria: "Mensagem", marca: "whatsapp" };
     case "email.send":
       return { icone: Mail, cor: "cyan", categoria: "E-mail" };
     case "sequence.enroll":
@@ -142,11 +150,22 @@ export function visualDoPasso(tipo: string, acao?: string): { icone: LucideIcon;
     case "contact.remove_tag":
       return { icone: Tag, cor: "blue", categoria: "CRM" };
     case "n8n.webhook":
+      return { icone: Webhook, cor: "rose", categoria: "Integração", marca: "n8n" };
     case "http.request":
       return { icone: Webhook, cor: "rose", categoria: "Integração" };
     default:
       return { icone: Database, cor: "blue", categoria: "CRM" };
   }
+}
+
+/**
+ * Ícone do passo: o logo oficial quando é de uma marca (sem a cor de categoria,
+ * o logo já tem a dele), senão o ícone na cor recebida em `className`.
+ */
+export function IconeDoPasso({ visual, tamanho, strokeWidth, className }: { visual: VisualDoPasso; tamanho: number; strokeWidth?: number; className?: string }) {
+  if (visual.marca) return <LogoOficial marca={visual.marca} tamanho={ladoDoLogo(visual.marca, tamanho)} />;
+  const Icone = visual.icone;
+  return <Icone size={tamanho} strokeWidth={strokeWidth} aria-hidden="true" className={className} />;
 }
 
 export const STATUS_DA_AUTOMACAO: Record<string, { rotulo: string; variante: "success" | "warning" | "neutral" }> = {

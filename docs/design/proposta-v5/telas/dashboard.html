@@ -1,0 +1,105 @@
+<!-- id: dashboard | titulo: Dashboard | grupo: Acompanhar | menu: dashboard | print: dashboard -->
+<style>
+.t-dash .pg { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 6px 28px 22px; gap: 18px; }
+.t-dash .heroi { display: flex; align-items: flex-end; gap: 28px; }
+.t-dash .rotulo { font: 400 12px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-dash .grande { font-size: 64px; font-weight: 300; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.t-dash .grande em { font-style: normal; font-size: 22px; color: var(--t3); margin-right: 6px; vertical-align: 30px; letter-spacing: 0; font-weight: 400; }
+.t-dash .apoio { display: flex; gap: 26px; padding-bottom: 8px; }
+.t-dash .apoio div { display: flex; flex-direction: column; gap: 2px; }
+.t-dash .apoio b { font-size: 22px; font-weight: 400; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.t-dash .apoio span { font: 400 11.5px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-dash .graf-box { position: relative; flex: 1; min-height: 0; }
+.t-dash .graf { width: 100%; height: 100%; display: block; overflow: visible; stroke: none; }
+.t-dash .graf .linha { fill: none; stroke: var(--acfg); stroke-width: 2; }
+.t-dash .graf .area { fill: url(#gArea); }
+.t-dash .graf .gl { stroke: var(--bs); stroke-width: 1; }
+.t-dash .graf .guia { stroke: var(--t3); stroke-width: 1; stroke-dasharray: 3 5; opacity: .6; }
+.t-dash .graf .ponto { fill: var(--pg); stroke: var(--acfg); stroke-width: 2.2; }
+.t-dash .graf text { fill: var(--t3); font: 400 11px ui-monospace, "SF Mono", monospace; stroke: none; }
+.t-dash .dica { position: absolute; transform: translate(-50%, -150%); height: 26px; padding: 0 12px; border-radius: 99px; background: var(--thumb); color: var(--thumb-t); font: 500 11.5px ui-monospace, "SF Mono", monospace; display: inline-flex; align-items: center; box-shadow: var(--thumb-sh); white-space: nowrap; }
+.t-dash .base { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; flex: none; }
+.t-dash .base h5 { font-size: 13px; font-weight: 500; color: var(--t2); display: flex; margin-bottom: 12px; }
+.t-dash .base h5 span { margin-left: auto; font: 400 11.5px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-dash .pilha { display: flex; height: 10px; border-radius: 99px; overflow: hidden; gap: 3px; }
+.t-dash .pilha i { display: block; height: 100%; border-radius: 99px; background: var(--hv); }
+.t-dash .pilha i.top { background: var(--destaque); }
+.t-dash .leg { display: flex; gap: 22px; margin-top: 12px; font-size: 12.5px; color: var(--t2); }
+.t-dash .leg b { display: block; font-size: 15px; font-weight: 500; color: var(--t1); font-variant-numeric: tabular-nums; }
+.t-dash .canais { display: flex; gap: 28px; }
+.t-dash .canais div { display: flex; flex-direction: column; }
+.t-dash .canais b { font-size: 30px; font-weight: 300; letter-spacing: -0.04em; }
+.t-dash .canais b.top { color: var(--acfg); }
+.t-dash .canais span { font-size: 12.5px; color: var(--t3); }
+</style>
+<!--ILHA-->
+<span class="pto azul"></span><span>15 vendas em 30 dias</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-dash">
+  <div class="d-bar">
+    <h4>Dashboard</h4>
+    <span class="d-seg" style="margin-left:14px"><span>Hoje</span><span>7 dias</span><span class="on">30 dias</span><span>90 dias</span><span>12 meses</span></span>
+    <div class="dir"><span class="d-bt"><svg><use href="#i-filter"/></svg>Filtros</span><span class="d-bt ic" title="Exportar, painel do funil, filtrar com a Eva"><svg><use href="#i-more"/></svg></span><span class="d-bt claro">Editar painel</span></div>
+  </div>
+  <div class="pg">
+    <div class="heroi">
+      <div><span class="rotulo">Receita · 23/09 a 22/10</span><div class="grande"><em>R$</em><span data-rec>302.800</span></div></div>
+      <div class="apoio">
+        <div><b data-vendas>15</b><span>vendas fechadas</span></div>
+        <div><b>R$ 20.187</b><span>ticket médio</span></div>
+      </div>
+    </div>
+    <div class="graf-box">
+      <svg class="graf" viewBox="0 0 880 250" preserveAspectRatio="none">
+        <defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:#5aa8ff;stop-opacity:.28"/><stop offset="1" style="stop-color:#5aa8ff;stop-opacity:0"/></linearGradient></defs>
+        <line class="gl" x1="0" x2="820" y1="230" y2="230"/><line class="gl" x1="0" x2="820" y1="126" y2="126"/><line class="gl" x1="0" x2="820" y1="22" y2="22"/>
+        <text x="830" y="234">0</text><text x="830" y="130">20 mil</text><text x="830" y="26">40 mil</text>
+        <path class="area" d="M0.0 172.2 C4.7 172.6 18.9 174.2 28.3 174.6 C37.7 175.0 47.1 169.1 56.6 174.6 C66.0 180.1 75.4 199.9 84.8 207.8 C94.3 215.7 103.7 225.8 113.1 222.0 C122.5 218.2 132.0 191.0 141.4 184.8 C150.8 178.6 160.2 184.8 169.7 184.8 C179.1 184.8 188.5 178.6 197.9 184.8 C207.4 191.0 216.8 215.8 226.2 222.0 C235.6 228.2 245.1 222.0 254.5 222.0 C263.9 222.0 273.3 222.0 282.8 222.0 C292.2 222.0 301.6 222.0 311.0 222.0 C320.5 222.0 329.9 222.0 339.3 222.0 C348.7 222.0 358.2 222.0 367.6 222.0 C377.0 222.0 386.4 222.0 395.9 222.0 C405.3 222.0 414.7 222.0 424.1 222.0 C433.6 222.0 443.0 233.9 452.4 222.0 C461.8 210.1 471.3 170.0 480.7 150.6 C490.1 131.2 499.5 122.0 509.0 105.4 C518.4 88.8 527.8 55.2 537.2 50.9 C546.7 46.6 556.1 77.4 565.5 79.5 C574.9 81.6 584.4 57.1 593.8 63.5 C603.2 69.9 612.6 101.8 622.1 118.0 C631.5 134.2 640.9 148.0 650.3 160.8 C659.8 173.6 669.2 194.4 678.6 194.7 C688.0 195.1 697.5 168.1 706.9 162.7 C716.3 157.4 725.7 161.2 735.2 162.7 C744.6 164.3 754.0 167.3 763.4 172.2 C772.9 177.2 782.3 191.5 791.7 192.4 C801.1 193.3 815.3 180.0 820.0 177.6 L820 230 L0 230 Z"/>
+        <path class="linha" d="M0.0 172.2 C4.7 172.6 18.9 174.2 28.3 174.6 C37.7 175.0 47.1 169.1 56.6 174.6 C66.0 180.1 75.4 199.9 84.8 207.8 C94.3 215.7 103.7 225.8 113.1 222.0 C122.5 218.2 132.0 191.0 141.4 184.8 C150.8 178.6 160.2 184.8 169.7 184.8 C179.1 184.8 188.5 178.6 197.9 184.8 C207.4 191.0 216.8 215.8 226.2 222.0 C235.6 228.2 245.1 222.0 254.5 222.0 C263.9 222.0 273.3 222.0 282.8 222.0 C292.2 222.0 301.6 222.0 311.0 222.0 C320.5 222.0 329.9 222.0 339.3 222.0 C348.7 222.0 358.2 222.0 367.6 222.0 C377.0 222.0 386.4 222.0 395.9 222.0 C405.3 222.0 414.7 222.0 424.1 222.0 C433.6 222.0 443.0 233.9 452.4 222.0 C461.8 210.1 471.3 170.0 480.7 150.6 C490.1 131.2 499.5 122.0 509.0 105.4 C518.4 88.8 527.8 55.2 537.2 50.9 C546.7 46.6 556.1 77.4 565.5 79.5 C574.9 81.6 584.4 57.1 593.8 63.5 C603.2 69.9 612.6 101.8 622.1 118.0 C631.5 134.2 640.9 148.0 650.3 160.8 C659.8 173.6 669.2 194.4 678.6 194.7 C688.0 195.1 697.5 168.1 706.9 162.7 C716.3 157.4 725.7 161.2 735.2 162.7 C744.6 164.3 754.0 167.3 763.4 172.2 C772.9 177.2 782.3 191.5 791.7 192.4 C801.1 193.3 815.3 180.0 820.0 177.6"/>
+        <line class="guia" x1="537.2" x2="537.2" y1="50.9" y2="230"/>
+        <circle class="ponto" cx="537.2" cy="50.9" r="5"/>
+      </svg>
+      <span class="dica" style="left:61.0%;top:20.4%">12/10 · R$ 38,5 mil</span>
+    </div>
+    <div class="base">
+      <div><h5>Onde o dinheiro está parado<span>R$ 1,28 mi em aberto</span></h5>
+        <div class="pilha"><i style="width:9%"></i><i style="width:13%"></i><i style="width:10%"></i><i class="top" style="width:35%"></i><i style="width:15%"></i><i style="width:18%"></i></div>
+        <div class="leg"><span><b>Reunião</b>R$ 452 mil</span><span><b>Proposta</b>R$ 189 mil</span><span><b>Qualificação</b>R$ 175 mil</span></div>
+      </div>
+      <div><h5>De onde vêm as vendas</h5>
+        <div class="canais"><div><b class="top">60%</b><span>WhatsApp</span></div><div><b>27%</b><span>Site</span></div><div><b>13%</b><span>Outros</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.dashboard = function (c) {
+  var MOLA = "cubic-bezier(.32,.72,0,1)";
+  var brl = function (v) { return Math.round(v).toLocaleString("pt-BR"); };
+  c.entra(".heroi > *", { y: 16, passo: 120 });
+  c.conta(c.q("[data-rec]"), 302800, brl, 1400);
+  var ln = c.q(".graf .linha"), L = ln.getTotalLength();
+  ln.animate([{ strokeDasharray: L + " " + L, strokeDashoffset: L }, { strokeDasharray: L + " " + L, strokeDashoffset: 0 }], { duration: 1800, delay: 200, easing: "cubic-bezier(.45,0,.2,1)", fill: "backwards" });
+  c.q(".graf .area").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 1300, fill: "backwards" });
+  c.qa(".graf .guia, .graf .ponto, .dica").forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, delay: 1700, fill: "backwards", easing: MOLA }); });
+  c.qa(".pilha i").forEach(function (i, k) { i.style.transformOrigin = "left"; i.animate([{ transform: "scaleX(0)" }, { transform: "none" }], { duration: 800, delay: 600 + k * 80, easing: MOLA, fill: "backwards" }); });
+  c.entra(".leg span, .canais div", { d: 900, passo: 70 });
+  var orig = c.q("[data-ilha]").innerHTML;
+  return c.espera(3000).then(function () {
+    c.ilha('<span class="av">CA</span><span class="txt"><b>Venda fechada · R$ 9.000</b><span>Clínica Aurora · Renata Lopes</span></span><span class="acao">Ver</span>', true);
+    return c.espera(700);
+  }).then(function () {
+    c.conta(c.q("[data-rec]"), 311800, brl, 900); c.conta(c.q("[data-vendas]"), 16, null, 600);
+    c.pulso(c.q(".grande"), 2.2);
+    return c.espera(2600);
+  }).then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Um número que conta a história.</b> A receita do período em destaque, grande e leve, com vendas e ticket médio ao lado. Sem os ícones de joinha, cifrão e alvo, e sem textos explicando cada número.</li>
+<li><b>Uma curva limpa.</b> A receita por dia vira uma curva suave com área em degradê e o pico marcado. A curva usa a média de 3 dias para não virar serrote; o dia a dia aparece ao passar o mouse.</li>
+<li><b>Só o essencial embaixo.</b> Onde o dinheiro está parado vira uma barra única com as três maiores etapas, e as vendas por canal viram três porcentagens. Últimas vendas, painel do funil e exportar estão no "…"; funil e responsável em "Filtros".</li>
+<li><b>Vivo.</b> Quando entra uma venda, a ilha avisa, o número sobe e o fundo reage. Clique em "Ver animação".</li>
+<!--/NOTAS-->

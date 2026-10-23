@@ -59,8 +59,8 @@ function UrlDeEntrada({ agentId }: { agentId: string }) {
       {erro && <Notice tone="danger">{erro}</Notice>}
       {url ? (
         <>
-          <div className="flex items-center gap-1.5 rounded-xl border border-border-subtle bg-surface-2 px-3 py-2">
-            <code className="min-w-0 flex-1 break-all font-mono text-[12px] text-text-primary">{url}</code>
+          <div className="flex items-center gap-1.5 rounded-xl border border-border-subtle bg-raised px-3 py-2">
+            <code className="min-w-0 flex-1 break-all font-mono text-caption text-text-primary">{url}</code>
             <IconButton
               aria-label="Copiar URL"
               tooltip
@@ -130,8 +130,8 @@ export function WebhookConfig({
           id="agent-outbound-url"
           value={outboundUrl}
           onChange={(e) => onOutboundChange(e.target.value)}
-          placeholder="https://seu-n8n.com/webhook/..."
-          className="font-mono text-[12.5px]"
+          placeholder="https://seu-n8n.com/webhook/…"
+          className="font-mono text-small"
         />
         <p className="text-caption text-text-tertiary">
           Quando a conversa chega no bloco “Enviar para o n8n” (ou se o agente não tem fluxo no Builder), a Eva manda a

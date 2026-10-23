@@ -3,13 +3,12 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, ThumbsDown, ThumbsUp, UserPlus, type LucideIcon,
+  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, UserPlus, XCircle, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import {
   agruparPorDia,
@@ -27,136 +26,36 @@ import { mensagemDeErro, type NegocioDaFicha } from "./use-ficha";
 import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { TIPOS_DE_TAREFA } from "@/lib/tarefas/tipos";
 
+/** Mantido por compatibilidade: a ficha v5 troca as abas pelo filtro da linha do tempo. */
 export type AbaDaAtividade = "atividade" | "notas" | "tarefas";
 
 const FILTROS: { id: FiltroDaLinhaDoTempo; rotulo: string }[] = [
   { id: "tudo", rotulo: "Tudo" },
-  { id: "etapas", rotulo: "Etapas" },
-  { id: "notas", rotulo: "Notas" },
-  { id: "tarefas", rotulo: "Tarefas" },
   { id: "conversas", rotulo: "Conversas" },
+  { id: "notas", rotulo: "Notas" },
+  { id: "etapas", rotulo: "Etapas" },
+  { id: "tarefas", rotulo: "Tarefas" },
 ];
 
-export function AtividadeDoNegocio({
-  deal,
-  itens,
-  linhaFalhou,
-  agora,
-  aba,
-  onAba,
-  recarregar,
-}: {
-  deal: NegocioDaFicha;
-  itens: ItemDaLinhaDoTempo[];
-  linhaFalhou: boolean;
-  agora: Date;
-  aba: AbaDaAtividade;
-  onAba: (a: AbaDaAtividade) => void;
-  recarregar: () => Promise<void>;
-}) {
-  const notas = itens.filter((i) => i.tipo === "nota");
-  const abertas = deal.tasks.filter((t) => !t.doneAt).length;
-
-  return (
-    <section aria-label="Atividade do negócio" className="rounded-2xl border border-border-subtle bg-surface-1 p-4">
-      <Tabs value={aba} onValueChange={(v) => onAba(v as AbaDaAtividade)}>
-        <TabsList aria-label="Seções da atividade">
-          <TabsTrigger value="atividade" className="focus-visible:ring-2 focus-visible:ring-accent-500/60">
-            Atividade
-          </TabsTrigger>
-          <TabsTrigger value="notas" className="focus-visible:ring-2 focus-visible:ring-accent-500/60">
-            Notas {notas.length > 0 && <span className="ml-1 tabular-nums text-text-tertiary">{notas.length}</span>}
-          </TabsTrigger>
-          <TabsTrigger value="tarefas" className="focus-visible:ring-2 focus-visible:ring-accent-500/60">
-            Tarefas {abertas > 0 && <span className="ml-1 tabular-nums text-text-tertiary">{abertas}</span>}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="atividade" className="mt-4 outline-none">
-          <NovaNota vinculo={{ dealId: deal.id }} onCriada={recarregar} compacto />
-          <LinhaDoTempoView itens={itens} falhou={linhaFalhou} agora={agora} />
-        </TabsContent>
-
-        <TabsContent value="notas" className="mt-4 outline-none">
-          <NovaNota vinculo={{ dealId: deal.id }} onCriada={recarregar} />
-          {notas.length === 0 ? (
-            <Vazio texto="Nenhuma nota ainda. Registre o que foi conversado para o próximo a pegar o negócio." />
-          ) : (
-            <ul className="mt-4 flex flex-col gap-2.5">
-              {notas.map((n) =>
-                n.tipo === "nota" ? (
-                  <li key={n.id} className="rounded-xl border border-border-subtle bg-surface-2 px-3.5 py-3">
-                    <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-text-primary">{n.texto}</p>
-                    <p className="mt-1.5 text-[11.5px] text-text-tertiary">
-                      {n.autor ?? "Sem autor"} · {dataLonga(n.em)}, {horaEmSP(n.em)}
-                    </p>
-                  </li>
-                ) : null
-              )}
-            </ul>
-          )}
-        </TabsContent>
-
-        <TabsContent value="tarefas" className="mt-4 outline-none">
-          <TarefasDoNegocio deal={deal} agora={agora} recarregar={recarregar} />
-        </TabsContent>
-      </Tabs>
-    </section>
-  );
-}
-
-function Vazio({ texto }: { texto: string }) {
-  return <p className="rounded-xl border border-dashed border-border-subtle px-4 py-6 text-center text-[12.5px] text-text-tertiary">{texto}</p>;
-}
-
-// ---- linha do tempo ----
-
-function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string } {
-  switch (item.tipo) {
-    case "criado":
-      return { icone: CirclePlus, tom: "bg-accent-soft text-accent-400" };
-    case "contato_criado":
-      return { icone: UserPlus, tom: "bg-accent-soft text-accent-400" };
-    case "etapa":
-      if (item.paraTipo === "won") return { icone: ThumbsUp, tom: "bg-emerald-500/12 text-emerald-400" };
-      if (item.paraTipo === "lost") return { icone: ThumbsDown, tom: "bg-rose-500/12 text-rose-400" };
-      return { icone: ArrowRight, tom: "bg-accent-soft text-accent-400" };
-    case "nota":
-      return { icone: StickyNote, tom: "bg-amber-400/12 text-amber-300" };
-    case "tarefa_criada":
-      return { icone: ListTodo, tom: "bg-surface-3 text-text-secondary" };
-    case "tarefa_concluida":
-      return { icone: CheckCircle2, tom: "bg-emerald-500/12 text-emerald-400" };
-    case "conversa":
-      return { icone: MessagesSquare, tom: "bg-surface-3" };
-  }
-}
-
 /**
- * Linha do tempo agrupada por dia, com filtros. Usada também na ficha do
- * contato, onde "Etapas" vira "Negócios" (os itens trazem de qual negócio são).
+ * Filtro da linha do tempo em cápsula escura, preso na borda de cima da
+ * folha (v5). A borda em volta é a cor do fundo da página, para a cápsula
+ * parecer encaixada na folha.
  */
-export function LinhaDoTempoView({
+export function FiltroNaBorda({
   itens,
-  falhou,
-  agora,
-  rotulos,
+  filtro,
+  onFiltro,
+  className,
 }: {
   itens: ItemDaLinhaDoTempo[];
-  falhou: boolean;
-  agora: Date;
-  rotulos?: Partial<Record<FiltroDaLinhaDoTempo, string>>;
+  filtro: FiltroDaLinhaDoTempo;
+  onFiltro: (f: FiltroDaLinhaDoTempo) => void;
+  className?: string;
 }) {
-  const [filtro, setFiltro] = React.useState<FiltroDaLinhaDoTempo>("tudo");
-  const grupos = React.useMemo(() => agruparPorDia(filtrarItens(itens, filtro), agora), [itens, filtro, agora]);
-
-  if (falhou && itens.length === 0) {
-    return <p role="alert" className="mt-4 text-[12.5px] text-danger">Não foi possível carregar a linha do tempo. Recarregue a página.</p>;
-  }
-
   return (
-    <div className="mt-4">
-      <div role="radiogroup" aria-label="Filtrar atividade" className="flex flex-wrap gap-1">
+    <span className={cn("inline-flex max-w-full rounded-full bg-page p-1", className)}>
+      <span data-theme="dark" role="radiogroup" aria-label="Filtrar a linha do tempo" className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-panel p-1 [scrollbar-width:none]">
         {FILTROS.map((f) => {
           const n = f.id === "tudo" ? itens.length : filtrarItens(itens, f.id).length;
           const ativo = filtro === f.id;
@@ -166,34 +65,161 @@ export function LinhaDoTempoView({
               type="button"
               role="radio"
               aria-checked={ativo}
-              onClick={() => setFiltro(f.id)}
+              onClick={() => onFiltro(f.id)}
               className={cn(
-                "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium outline-none transition-colors",
-                "focus-visible:ring-2 focus-visible:ring-accent-500/60",
-                ativo
-                  ? "border-accent-500/40 bg-accent-soft text-accent-400"
-                  : "border-border-subtle text-text-secondary hover:border-border-default hover:text-text-primary"
+                "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-small font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                ativo ? "bg-inverse text-inverse-fg" : "text-text-secondary hover:text-text-primary"
               )}
             >
-              {rotulos?.[f.id] ?? f.rotulo}
-              <span className="tabular-nums text-[11px] opacity-70">{n}</span>
+              {f.rotulo}
+              <span className="font-mono text-caption tabular-nums opacity-70">{n}</span>
             </button>
           );
         })}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Linha do tempo do negócio (v5, dentro da folha): o filtro mora na borda da
+ * folha (FiltroNaBorda); "Tarefas" também traz a lista para criar e concluir;
+ * o composer de nota fica preso embaixo enquanto se lê.
+ */
+export function AtividadeDoNegocio({
+  deal,
+  itens,
+  linhaFalhou,
+  agora,
+  filtro,
+  recarregar,
+}: {
+  deal: NegocioDaFicha;
+  itens: ItemDaLinhaDoTempo[];
+  linhaFalhou: boolean;
+  agora: Date;
+  filtro: FiltroDaLinhaDoTempo;
+  recarregar: () => Promise<void>;
+}) {
+  const abertas = deal.tasks.filter((t) => !t.doneAt).length;
+  return (
+    <section aria-label="Atividade do negócio" className="flex min-w-0 flex-col">
+      <h2 className="mx-2 mb-1 flex justify-between font-mono text-caption text-text-tertiary">
+        <span>{filtro === "tarefas" ? "Tarefas" : "Linha do tempo"}</span>
+        {filtro === "tarefas" ? <span>{abertas} abertas</span> : <span>{itens.length} acontecimentos</span>}
+      </h2>
+      {filtro === "tarefas" && (
+        <div className="mb-4 px-2">
+          <TarefasDoNegocio deal={deal} agora={agora} recarregar={recarregar} />
+        </div>
+      )}
+      <LinhaDoTempoView itens={itens} falhou={linhaFalhou} agora={agora} filtro={filtro} semFiltros destacarConversa />
+      <div className="sticky bottom-3 z-10 mt-4">
+        <NovaNota vinculo={{ dealId: deal.id }} onCriada={recarregar} compacto />
       </div>
+    </section>
+  );
+}
+
+function Vazio({ texto }: { texto: string }) {
+  return <p className="rounded-[14px] border border-dashed border-border-subtle px-4 py-6 text-center text-small text-text-tertiary">{texto}</p>;
+}
+
+// ---- linha do tempo ----
+
+// Cor só em status (ganho, perdido, concluída); o resto é neutro.
+function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string } {
+  switch (item.tipo) {
+    case "criado":
+      return { icone: CirclePlus, tom: "bg-raised text-text-secondary" };
+    case "contato_criado":
+      return { icone: UserPlus, tom: "bg-raised text-text-secondary" };
+    case "etapa":
+      if (item.paraTipo === "won") return { icone: CheckCircle2, tom: "bg-success-subtle text-success" };
+      if (item.paraTipo === "lost") return { icone: XCircle, tom: "bg-danger-subtle text-danger" };
+      return { icone: ArrowRight, tom: "bg-raised text-text-secondary" };
+    case "nota":
+      return { icone: StickyNote, tom: "bg-raised text-text-secondary" };
+    case "tarefa_criada":
+      return { icone: ListTodo, tom: "bg-raised text-text-secondary" };
+    case "tarefa_concluida":
+      return { icone: CheckCircle2, tom: "bg-success-subtle text-success" };
+    case "conversa":
+      return { icone: MessagesSquare, tom: "bg-raised" };
+  }
+}
+
+/**
+ * Linha do tempo agrupada por dia, com filtros. Usada também na ficha do
+ * contato, onde "Etapas" vira "Negócios" (os itens trazem de qual negócio são).
+ * Com `filtro` (e `semFiltros`), quem filtra é a tela (a folha da ficha).
+ */
+export function LinhaDoTempoView({
+  itens,
+  falhou,
+  agora,
+  rotulos,
+  filtro: filtroDeFora,
+  semFiltros = false,
+  destacarConversa = false,
+}: {
+  itens: ItemDaLinhaDoTempo[];
+  falhou: boolean;
+  agora: Date;
+  rotulos?: Partial<Record<FiltroDaLinhaDoTempo, string>>;
+  filtro?: FiltroDaLinhaDoTempo;
+  /** Não mostra os botões de filtro (a tela mostra os seus). */
+  semFiltros?: boolean;
+  /** A conversa mais recente sai destacada (folha da ficha do negócio). */
+  destacarConversa?: boolean;
+}) {
+  const [filtroInterno, setFiltro] = React.useState<FiltroDaLinhaDoTempo>("tudo");
+  const filtro = filtroDeFora ?? filtroInterno;
+  const grupos = React.useMemo(() => agruparPorDia(filtrarItens(itens, filtro), agora), [itens, filtro, agora]);
+  const conversaDestacada = destacarConversa ? grupos.flatMap((g) => g.itens).find((i) => i.tipo === "conversa")?.id : undefined;
+
+  if (falhou && itens.length === 0) {
+    return <p role="alert" className="mt-4 text-small text-danger">Não foi possível carregar a linha do tempo. Recarregue a página.</p>;
+  }
+
+  return (
+    <div className={cn(!semFiltros && "mt-4")}>
+      {!semFiltros && (
+        <div role="radiogroup" aria-label="Filtrar atividade" className="mb-4 flex flex-wrap gap-1">
+          {FILTROS.map((f) => {
+            const n = f.id === "tudo" ? itens.length : filtrarItens(itens, f.id).length;
+            const ativo = filtro === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                role="radio"
+                aria-checked={ativo}
+                onClick={() => setFiltro(f.id)}
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-caption font-medium outline-none transition-colors",
+                  "focus-visible:ring-2 focus-visible:ring-focus",
+                  ativo ? "bg-inverse text-inverse-fg" : "text-text-secondary hover:bg-hover hover:text-text-primary"
+                )}
+              >
+                {rotulos?.[f.id] ?? f.rotulo}
+                <span className="font-mono tabular-nums opacity-70">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {grupos.length === 0 ? (
-        <div className="mt-4">
-          <Vazio texto="Nada deste tipo por aqui ainda." />
-        </div>
+        <Vazio texto="Nada deste tipo por aqui ainda." />
       ) : (
-        <ol className="mt-4 flex flex-col gap-5">
+        <ol className="flex flex-col gap-4">
           {grupos.map((g) => (
             <li key={g.dia}>
-              <h3 className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-text-tertiary">{g.rotulo}</h3>
-              <ol className="relative flex flex-col">
-                {g.itens.map((item, i) => (
-                  <ItemDaLinha key={item.id} item={item} ultimo={i === g.itens.length - 1} />
+              <h3 className="mx-2 mb-1 font-mono text-caption text-text-tertiary">{g.rotulo}</h3>
+              <ol className="flex flex-col gap-0.5">
+                {g.itens.map((item) => (
+                  <ItemDaLinha key={item.id} item={item} destacado={item.id === conversaDestacada} />
                 ))}
               </ol>
             </li>
@@ -204,54 +230,49 @@ export function LinhaDoTempoView({
   );
 }
 
-function ItemDaLinha({ item, ultimo }: { item: ItemDaLinhaDoTempo; ultimo: boolean }) {
+/** Uma linha por acontecimento: ícone, o que foi (e quem), detalhe e a hora. */
+function ItemDaLinha({ item, destacado }: { item: ItemDaLinhaDoTempo; destacado: boolean }) {
   const { titulo, detalhe } = descreverItem(item);
   const { icone: Icone, tom } = iconeDoItem(item);
+  const nota = item.tipo === "nota";
 
   return (
-    <li className="relative flex gap-3 pb-3.5">
-      {/* Fio vertical ligando os itens do dia. */}
-      {!ultimo && <span aria-hidden className="absolute left-[13px] top-7 bottom-0 w-px bg-border-subtle" />}
-      <span className={cn("relative grid h-7 w-7 shrink-0 place-items-center rounded-full", tom)}>
-        {item.tipo === "conversa" ? <IconeDoCanal canal={item.canal} tamanho={14} /> : <Icone size={14} aria-hidden />}
+    <li className={cn("flex gap-3 rounded-[14px] px-2.5 py-2 transition-colors", destacado ? "bg-inverse text-inverse-fg" : "hover:bg-raised")}>
+      <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", destacado ? "bg-inverse-fg/10 text-inverse-fg" : tom)}>
+        {item.tipo === "conversa" ? <IconeDoCanal canal={item.canal} tamanho={15} /> : <Icone size={15} aria-hidden />}
       </span>
-      <div className="min-w-0 flex-1 pt-1">
+      <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="min-w-0 text-[13px] font-medium text-text-primary">
+          <p className={cn("min-w-0 truncate text-small font-semibold", destacado ? "text-inverse-fg" : "text-text-primary")}>
             {item.tipo === "conversa" ? (
-              <Link
-                href={`/conversas?c=${item.conversaId}`}
-                className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
-              >
+              <Link href={`/conversas?c=${item.conversaId}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
                 {titulo}
               </Link>
             ) : (item.tipo === "criado" || item.tipo === "etapa") && item.negocio ? (
-              <Link
-                href={`/negocios/${item.negocio.id}`}
-                className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60"
-              >
+              <Link href={`/negocios/${item.negocio.id}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
                 {titulo}
               </Link>
             ) : (
               titulo
             )}
           </p>
-          <time dateTime={item.em} className="shrink-0 text-[11.5px] tabular-nums text-text-tertiary">
+          <time dateTime={item.em} className={cn("shrink-0 font-mono text-caption tabular-nums", destacado ? "text-inverse-fg/70" : "text-text-tertiary")}>
             {horaEmSP(item.em)}
           </time>
         </div>
         {detalhe && (
           <p
             className={cn(
-              "mt-0.5 text-[12.5px] text-text-secondary",
-              item.tipo === "nota" ? "whitespace-pre-wrap rounded-lg bg-surface-2 px-3 py-2 leading-relaxed" : "truncate"
+              "text-caption",
+              destacado ? "text-inverse-fg/70" : "text-text-secondary",
+              nota ? "mt-1 whitespace-pre-wrap leading-relaxed" : "truncate"
             )}
           >
             {detalhe}
           </p>
         )}
         {item.tipo === "tarefa_criada" && item.prazo && (
-          <p className="mt-0.5 inline-flex items-center gap-1 text-[11.5px] text-text-tertiary">
+          <p className="mt-0.5 inline-flex items-center gap-1 text-caption text-text-tertiary">
             <CalendarDays size={11} aria-hidden /> Prazo {dataLonga(item.prazo)}
           </p>
         )}
@@ -310,15 +331,19 @@ export function NovaNota({
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="flex h-10 w-full items-center gap-2 rounded-xl border border-border-subtle bg-surface-2 px-3.5 text-left text-[13px] text-text-tertiary outline-none transition-colors hover:border-border-default focus-visible:ring-2 focus-visible:ring-accent-500/60"
+        className="flex h-10 w-full items-center gap-2 rounded-full bg-raised pl-4 pr-1.5 text-left text-small text-text-tertiary shadow-overlay outline-none ring-1 ring-inset ring-border-subtle transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
       >
         <StickyNote size={14} aria-hidden /> Registrar uma nota...
+        <span aria-hidden className="ml-auto inline-flex h-7 items-center rounded-full bg-accent-solid px-3 text-caption font-medium text-text-on-accent">
+          Escrever
+        </span>
       </button>
     );
   }
 
   return (
-    <div>
+    // Superfície própria: aberto, o composer pode ficar preso sobre a linha do tempo.
+    <div className={cn(compacto && "rounded-[18px] border border-border-subtle bg-panel p-2.5 shadow-overlay")}>
       <label htmlFor={id} className="sr-only">
         Nova nota
       </label>
@@ -336,11 +361,11 @@ export function NovaNota({
           if (e.key === "Escape" && compacto && !texto.trim()) setAberto(false);
         }}
         placeholder="O que aconteceu? Combinados, objeções, próximos passos..."
-        className="text-[13px]"
+        className="text-small"
       />
-      {erro && <p role="alert" className="mt-1.5 text-[12px] text-danger">{erro}</p>}
+      {erro && <p role="alert" className="mt-1.5 text-caption text-danger">{erro}</p>}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="hidden text-[11.5px] text-text-tertiary sm:inline">Ctrl + Enter para salvar</span>
+        <span className="hidden text-caption text-text-tertiary sm:inline">Ctrl + Enter para salvar</span>
         <div className="ml-auto flex gap-2">
           {compacto && (
             <Button variant="ghost" size="sm" onClick={() => { setAberto(false); setErro(null); }}>
@@ -436,7 +461,7 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Nova tarefa..."
-          className="h-9 rounded-lg text-[13px]"
+          className="h-9 rounded-lg text-small"
         />
         <label htmlFor="ficha-tarefa-tipo" className="sr-only">
           Tipo da tarefa
@@ -445,7 +470,7 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
           id="ficha-tarefa-tipo"
           value={tipo}
           onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}
-          className="h-9 rounded-lg text-[13px]"
+          className="h-9 rounded-lg text-small"
         >
           {TIPOS.map((t) => (
             <option key={t} value={t}>
@@ -461,13 +486,13 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
           type="date"
           value={prazo}
           onChange={(e) => setPrazo(e.target.value)}
-          className="h-9 rounded-lg text-[13px] [color-scheme:dark]"
+          className="h-9 rounded-lg text-small"
         />
         <Button type="submit" size="sm" className="h-9" disabled={!texto.trim() || salvando}>
           {salvando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} aria-hidden />} Criar
         </Button>
       </form>
-      {erro && <p role="alert" className="mt-2 text-[12px] text-danger">{erro}</p>}
+      {erro && <p role="alert" className="mt-2 text-caption text-danger">{erro}</p>}
 
       {tarefas.length === 0 ? (
         <div className="mt-4">
@@ -479,18 +504,18 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
             const atrasada = tarefaAtrasada(t, agora);
             const idDoCheck = `tarefa-${t.id}`;
             return (
-              <li key={t.id} className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-surface-2">
+              <li key={t.id} className="flex items-start gap-3 rounded-xl px-2.5 py-2 hover:bg-hover">
                 <Checkbox
                   id={idDoCheck}
                   checked={!!t.doneAt}
                   disabled={alternando === t.id}
                   onCheckedChange={() => alternar(t, !!t.doneAt)}
                   aria-label={t.doneAt ? `Reabrir tarefa: ${t.text}` : `Concluir tarefa: ${t.text}`}
-                  className="mt-0.5 focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                  className="mt-0.5 focus-visible:ring-2 focus-visible:ring-focus"
                 />
                 <label htmlFor={idDoCheck} className="min-w-0 flex-1 cursor-pointer">
-                  <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>{t.text}</span>
-                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-text-tertiary">
+                  <span className={cn("block text-small", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>{t.text}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-caption text-text-tertiary">
                     <span>{rotuloDoTipoDeTarefa(t.type)}</span>
                     {t.doneAt ? (
                       <span>· concluída {formatRelativeDate(t.doneAt)}</span>

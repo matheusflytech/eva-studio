@@ -58,7 +58,7 @@ export function McpToolPicker({
           value={serverId ?? ""}
           onChange={(e) => onChange({ mcpServerId: e.target.value, mcpTools: [] })}
         >
-          <option value="">Selecione...</option>
+          <option value="">Selecione…</option>
           {(servers ?? []).map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}{s.active ? "" : " — fora do ar"}
@@ -66,9 +66,9 @@ export function McpToolPicker({
           ))}
         </Select>
         {servers && servers.length === 0 && (
-          <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-text-tertiary">
+          <p className="mt-1.5 inline-flex items-center gap-1.5 text-caption text-text-tertiary">
             Nenhum servidor cadastrado. Cadastre em{" "}
-            <Link href="/integracoes" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
+            <Link href="/integracoes" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
               Integrações <ExternalLink size={11} />
             </Link>
           </p>
@@ -76,7 +76,7 @@ export function McpToolPicker({
       </div>
 
       {selected && !selected.active && (
-        <p className="inline-flex items-start gap-1.5 rounded-xl bg-danger/10 px-3 py-2 text-[12px] text-danger">
+        <p className="inline-flex items-start gap-1.5 rounded-xl bg-danger-subtle px-3 py-2 text-caption text-danger">
           <AlertTriangle size={13} className="mt-0.5 shrink-0" />
           {selected.lastError ?? "O servidor não respondeu na última verificação."}
         </p>
@@ -85,14 +85,14 @@ export function McpToolPicker({
       {selected && selected.tools.length > 0 && (
         <div>
           <Label>Ferramentas disponíveis</Label>
-          <p className="mb-2 text-[11.5px] text-text-tertiary">
+          <p className="mb-2 text-caption text-text-tertiary">
             Nenhuma marcada = o agente enxerga todas ({selected.tools.length}).
           </p>
-          <div className="flex max-h-[220px] flex-col gap-1.5 overflow-y-auto rounded-xl bg-surface-2 p-3">
+          <div className="flex max-h-[220px] flex-col gap-1.5 overflow-y-auto rounded-[14px] bg-raised p-3">
             {selected.tools.map((tool) => {
               const checked = selectedTools.includes(tool.name);
               return (
-                <label key={tool.name} className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+                <label key={tool.name} className="flex cursor-pointer items-start gap-2.5 text-small">
                   <Checkbox
                     checked={checked}
                     onCheckedChange={(value) => {
@@ -105,7 +105,7 @@ export function McpToolPicker({
                   <span className="min-w-0">
                     <span className="block font-medium text-text-primary">{tool.name}</span>
                     {tool.description && (
-                      <span className="block truncate text-[11.5px] text-text-tertiary">{tool.description}</span>
+                      <span className="block truncate text-caption text-text-tertiary">{tool.description}</span>
                     )}
                   </span>
                 </label>

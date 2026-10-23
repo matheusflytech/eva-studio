@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 · Denário</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: #09080a; color: #f2efe8; }
+  .etiqueta { background: rgba(255,240,210,.08); color: #d9cfb8; }
+  .nota { color: #6f6a60; }
+  .cartao { background: #0e0d0f; box-shadow: 0 0 0 1px rgba(255,236,200,.07), 0 40px 120px -40px rgba(0,0,0,.9); }
+  .marca { background: linear-gradient(145deg, #f3dc9a, #b98a3c); color: #1a140a; }
+  .form .sub, .form .rodape { color: #8d867a; }
+  .form label { color: #cfc6b4; }
+  .form .campo { border: 1px solid rgba(255,236,200,.09); background: rgba(255,236,200,.04); color: #f2efe8; }
+  .form .campo:focus { border-color: #d6b46a; box-shadow: 0 0 0 4px rgba(214,180,106,.16); }
+  .form .botao { background: #f2efe8; color: #0e0d0f; }
+  .palco { background: radial-gradient(60% 60% at 60% 50%, #1a1611 0%, #0e0d0f 70%); perspective: 1200px; }
+  #moeda { position: absolute; left: 50%; top: 50%; width: 500px; height: 500px; margin: -250px 0 0 -230px; transform-style: preserve-3d; will-change: transform; }
+  #moeda canvas { border-radius: 50%; box-shadow: 0 40px 80px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,230,170,.12); }
+</style>
+</head>
+<body>
+  <a class="etiqueta" href="index.html">← Proposta 3 · Denário</a>
+  <div class="cartao">
+    <form class="form" onsubmit="return false">
+      <div class="marca"><svg viewBox="0 0 380 400" width="20" height="20" aria-label="Eva"><path fill="currentColor" fill-rule="evenodd" d="M118 48Q132 15 165 15Q199 15 213 46L358 381H310L247 240L190 381H88Q20 381 21 318Q22 292 34 266ZM161 92Q167 80 173 92L221 186L158 323Q154 333 143 333H92Q67 333 76 306Z"/></svg></div>
+      <h1>Entrar</h1>
+      <p class="sub">Acesse o painel da Eva Holding.</p>
+      <div><label>E-mail</label><input class="campo" placeholder="voce@empresa.com"></div>
+      <div><label>Senha</label><input class="campo" type="password" placeholder="••••••••"></div>
+      <button class="botao">Entrar</button>
+      <p class="rodape">Ainda não tem conta? <b style="color:#f2efe8">Criar conta</b></p>
+    </form>
+    <div class="palco" id="palco"><div id="moeda"><canvas id="c"></canvas></div></div>
+  </div>
+  <p class="nota">Um denário de ouro com César em alto-relevo e a legenda "CAESAR · DICT · PERPETVO · EVA HOLDING" girando na borda. A luz acompanha o mouse: o relevo do rosto brilha de onde a mão está, e a moeda inclina de leve, como na palma da mão.</p>
+
+<script src="cesar.js"></script>
+<script src="base.js"></script>
+<script>
+(async () => {
+  const canvas = document.getElementById("c"), palco = document.getElementById("palco"), moeda = document.getElementById("moeda");
+  const N = 300; // resolução do relevo
+  const busto = await carregarBusto(CESAR_34, 300);
+  const mao = new Ponteiro(palco);
+  // Altura do relevo (0..1) dentro do campo da moeda, suavizada.
+  const alt = new Float32Array(N * N);
+  const R = N / 2, campo = R * 0.78;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const dx = x - R, dy = y - R;
+    if (dx * dx + dy * dy > campo * campo) continue;
+    const bx = (x - (R - campo)) / (campo * 2) * busto.w * 1.02 - 4, by = (y - (R - campo)) / (campo * 2) * busto.h * 0.74 + 10;
+    alt[y * N + x] = Math.pow(busto.em(bx, by), 1.2);
+  }
+  const suave = new Float32Array(N * N);
+  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+    let s = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) s += alt[(y + j) * N + x + i];
+    suave[y * N + x] = s / 9;
+  }
+  const g = prepararCanvas(canvas);
+  const off = document.createElement("canvas"); off.width = off.height = N;
+  const og = off.getContext("2d"), img = og.createImageData(N, N);
+  const TEXTO = "CAESAR · DICT · PERPETVO · EVA HOLDING · ";
+  let lx = -0.5, ly = -0.6, rx = 0, ry = 0;
+  function quadro(t) {
+    mao.passo(0.1);
+    const pr = palco.getBoundingClientRect(), mr = moeda.getBoundingClientRect();
+    const cxm = mr.left - pr.left + mr.width / 2, cym = mr.top - pr.top + mr.height / 2;
+    // luz: da mão (ou passeando sozinha) em direção ao centro da moeda
+    const tl = t / 1000 * (CALMO ? 0.3 : 1);
+    const alvoX = mao.forca > 0.05 ? (mao.x - cxm) / 300 : Math.cos(tl * 0.4) * 0.7;
+    const alvoY = mao.forca > 0.05 ? (mao.y - cym) / 300 : -0.6 + Math.sin(tl * 0.4) * 0.3;
+    lx += (alvoX - lx) * 0.08; ly += (alvoY - ly) * 0.08;
+    rx += ((mao.forca > 0.05 ? -ly * 10 : 0) - rx) * 0.06; ry += ((mao.forca > 0.05 ? lx * 12 : 0) - ry) * 0.06;
+    moeda.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+    const L = Math.hypot(lx, ly, 1), Lx = lx / L, Ly = ly / L, Lz = 1 / L;
+    const d = img.data;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x, dx = x - R, dy = y - R, r2 = dx * dx + dy * dy, o = i * 4;
+      if (r2 > R * R) { d[o + 3] = 0; continue; }
+      let nx, ny, base;
+      const r = Math.sqrt(r2);
+      if (r > R * 0.9) { // aro: chanfro que pega luz
+        const k = (r - R * 0.9) / (R * 0.1); nx = (dx / r) * k * 1.2; ny = (dy / r) * k * 1.2; base = 0.9;
+      } else if (r > campo) { // faixa da legenda
+        nx = 0; ny = 0; base = 0.72;
+      } else {
+        nx = (suave[i + 1] - suave[i - 1]) * 6; ny = (suave[i + N] - suave[i - N]) * 6; base = 0.55 + suave[i] * 0.45;
+      }
+      const nz = 1, nl = Math.hypot(nx, ny, nz);
+      let luz = Math.max(0, (-nx * Lx - ny * Ly + nz * Lz) / nl);
+      const brilho = Math.pow(luz, 18) * 0.9; // reflexo especular do ouro
+      luz = 0.25 + luz * 0.75;
+      d[o] = Math.min(255, (196 * base * luz + 255 * brilho) | 0);
+      d[o + 1] = Math.min(255, (150 * base * luz + 236 * brilho) | 0);
+      d[o + 2] = Math.min(255, (78 * base * luz + 190 * brilho) | 0);
+      d[o + 3] = 255;
+    }
+    og.putImageData(img, 0, 0);
+    const S = canvas.getBoundingClientRect().width;
+    g.clearRect(0, 0, S, S);
+    g.imageSmoothingQuality = "high";
+    g.drawImage(off, 0, 0, S, S);
+    // legenda em volta, gravada (sombra + luz), girando devagar
+    const ang = tl * 0.05;
+    g.save(); g.translate(S / 2, S / 2);
+    g.font = `600 ${S * 0.052}px "Times New Roman", serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    const raio = S / 2 * 0.845, passo = (Math.PI * 2) / TEXTO.length;
+    for (let i = 0; i < TEXTO.length; i++) {
+      const a = ang + i * passo;
+      g.save(); g.rotate(a); g.translate(0, -raio);
+      g.fillStyle = "rgba(60,40,10,.55)"; g.fillText(TEXTO[i], 0.8, 1.2);
+      g.fillStyle = "rgba(255,236,190,.75)"; g.fillText(TEXTO[i], 0, 0);
+      g.restore();
+    }
+    g.restore();
+    requestAnimationFrame(quadro);
+  }
+  requestAnimationFrame(quadro);
+})();
+</script>
+</body>
+</html>

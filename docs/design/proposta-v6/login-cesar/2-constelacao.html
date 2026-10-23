@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2 · Constelação</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: #050506; color: #f2f2f4; }
+  .etiqueta { background: rgba(255,255,255,.08); color: #d6d6da; }
+  .nota { color: #6f6f76; }
+  .cartao { background: #0c0c0e; box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 40px 120px -40px rgba(0,0,0,.9); }
+  .marca { background: #f2f2f4; color: #0c0c0e; }
+  .form .sub, .form .rodape { color: #8a8a90; }
+  .form label { color: #c9c9ce; }
+  .form .campo { border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: #f2f2f4; }
+  .form .campo:focus { border-color: #5d9bf0; box-shadow: 0 0 0 4px rgba(31,111,214,.18); }
+  .form .botao { background: #f2f2f4; color: #0c0c0e; }
+  .palco { background: radial-gradient(70% 60% at 65% 45%, #14151a 0%, #0c0c0e 70%); }
+  .lema { position: absolute; left: 34px; bottom: 28px; z-index: 2; font: 500 11px/1.7 ui-monospace, monospace; letter-spacing: .2em; color: #4c4c54; }
+</style>
+</head>
+<body>
+  <a class="etiqueta" href="index.html">← Proposta 2 · Constelação</a>
+  <div class="cartao">
+    <form class="form" onsubmit="return false">
+      <div class="marca"><svg viewBox="0 0 380 400" width="20" height="20" aria-label="Eva"><path fill="currentColor" fill-rule="evenodd" d="M118 48Q132 15 165 15Q199 15 213 46L358 381H310L247 240L190 381H88Q20 381 21 318Q22 292 34 266ZM161 92Q167 80 173 92L221 186L158 323Q154 333 143 333H92Q67 333 76 306Z"/></svg></div>
+      <h1>Entrar</h1>
+      <p class="sub">Acesse o painel da Eva Holding.</p>
+      <div><label>E-mail</label><input class="campo" placeholder="voce@empresa.com"></div>
+      <div><label>Senha</label><input class="campo" type="password" placeholder="••••••••"></div>
+      <button class="botao">Entrar</button>
+      <p class="rodape">Ainda não tem conta? <b style="color:#f2f2f4">Criar conta</b></p>
+    </form>
+    <div class="palco" id="palco"><canvas id="c"></canvas><div class="lema">GAIVS · IVLIVS · CAESAR<br>EVA HOLDING · MMXXVI</div></div>
+  </div>
+  <p class="nota">Busto em nuvem de pontos com profundidade (o claro do mármore fica mais perto). O busto gira devagar seguindo o mouse, como uma escultura no museu; perto da mão os pontos acendem e uma faixa de luz varre o mármore de tempos em tempos.</p>
+
+<script src="cesar.js"></script>
+<script src="base.js"></script>
+<script>
+(async () => {
+  const canvas = document.getElementById("c"), palco = document.getElementById("palco");
+  const busto = await carregarBusto(CESAR_34, 260);
+  const mao = new Ponteiro(palco);
+  const rand = semente(9);
+  // Pontos no espaço: x,y do busto centrados; z = brilho (relevo).
+  const pts = [];
+  for (let y = 0; y < busto.h; y += 2)
+    for (let x = 0; x < busto.w; x += 2) {
+      const v = busto.em(x, y);
+      if (v < 0.12 || rand() > 0.35 + v * 0.65) continue;
+      pts.push({ x: x - busto.w / 2 + (rand() - 0.5), y: y - busto.h / 2 + (rand() - 0.5), z: (v - 0.5) * 90 + (rand() - 0.5) * 6, v, f: rand() * 6.28 });
+    }
+  let W = 0, H = 0, escala = 1;
+  const g = prepararCanvas(canvas, (w, h) => { W = w; H = h; escala = (h * 0.98) / busto.h; });
+  let giro = 0, incl = 0, t0 = performance.now();
+  function quadro(t) {
+    mao.passo(0.08);
+    const tempo = (t - t0) / 1000 * (CALMO ? 0.4 : 1);
+    // giro: segue o mouse (±0,45 rad) e balança sozinho bem devagar
+    const alvoGiro = (mao.forca > 0.05 ? ((mao.x / W) - 0.55) * 0.9 : 0) + Math.sin(tempo * 0.25) * 0.12;
+    const alvoIncl = mao.forca > 0.05 ? ((mao.y / H) - 0.5) * 0.25 : 0;
+    giro += (alvoGiro - giro) * 0.05; incl += (alvoIncl - incl) * 0.05;
+    const cg = Math.cos(giro), sg = Math.sin(giro), ci = Math.cos(incl), si = Math.sin(incl);
+    const cx = W * 0.56, cy = H * 0.52, foco = 700;
+    const faixa = ((tempo * 0.18) % 1.6) - 0.3; // luz que varre de cima para baixo
+    g.fillStyle = "rgba(12,12,14,1)"; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = "lighter";
+    for (const p of pts) {
+      let x = p.x * cg + p.z * sg, z = -p.x * sg + p.z * cg;
+      let y = p.y * ci - z * si; z = p.y * si + z * ci;
+      const k = foco / (foco - z * escala * 0.5);
+      const sx = cx + x * escala * k, sy = cy + y * escala * k;
+      let a = 0.26 + p.v * 0.8;
+      const dx = sx - mao.x, dy = sy - mao.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 120) a += (1 - d / 120) * 0.9 * mao.forca;
+      const fy = (p.y / busto.h + 0.5) - faixa; if (Math.abs(fy) < 0.06) a += (1 - Math.abs(fy) / 0.06) * 0.6;
+      a *= 0.75 + 0.25 * Math.sin(tempo * 1.6 + p.f);
+      g.fillStyle = `rgba(214,222,240,${Math.min(1, a)})`;
+      const r = 0.6 + p.v * 0.9 * k;
+      g.fillRect(sx, sy, r, r);
+    }
+    g.globalCompositeOperation = "source-over";
+    requestAnimationFrame(quadro);
+  }
+  requestAnimationFrame(quadro);
+})();
+</script>
+</body>
+</html>

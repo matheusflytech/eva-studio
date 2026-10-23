@@ -61,8 +61,8 @@ export function CampoDataSP({
                 type="button"
                 onClick={() => onChange(v)}
                 className={cn(
-                  "rounded-lg px-2.5 py-1 text-[12px] transition-colors",
-                  valor === v ? "bg-accent-soft font-medium text-accent-400" : "bg-surface-3 text-text-secondary hover:text-text-primary"
+                  "rounded-lg px-2.5 py-1 text-caption transition-colors",
+                  valor === v ? "bg-accent-subtle font-medium text-accent-fg" : "bg-hover text-text-secondary hover:text-text-primary"
                 )}
               >
                 {o.rotulo}
@@ -71,7 +71,7 @@ export function CampoDataSP({
           })}
         </div>
       )}
-      <p className="flex items-center gap-1.5 text-[11.5px] text-text-tertiary">
+      <p className="flex items-center gap-1.5 text-caption text-text-tertiary">
         <Clock size={11} />
         {instante
           ? <>Sai em <span className="font-medium text-text-secondary">{formatarSaoPaulo(instante)}</span> (horário de São Paulo)</>

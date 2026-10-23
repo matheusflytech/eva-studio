@@ -5,6 +5,7 @@ import { Bold, Braces, Link2, List, MousePointerClick, Plus, Send, Trash2 } from
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Notice } from "@/components/ui/notice";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { montarEmail } from "@/lib/email/montar";
@@ -43,7 +44,7 @@ const EXEMPLO = {
 // botão, variáveis por clique) ou HTML avançado, com prévia do e-mail como
 // ele sai (mesma montagem do envio) e "Enviar teste para mim".
 // ---------------------------------------------------------------------------
-export function ModelosDeEmail() {
+export function ModelosDeEmail({ aoContar }: { aoContar?: (n: number) => void } = {}) {
   const [modelos, setModelos] = React.useState<Modelo[] | null>(null);
   const [disponivel, setDisponivel] = React.useState(true);
   const [atual, setAtual] = React.useState<Rascunho>(NOVO);
@@ -62,10 +63,13 @@ export function ModelosDeEmail() {
         if (!vivo) return;
         setDisponivel(d.disponivel !== false);
         setModelos(d.modelos ?? []);
+        aoContar?.((d.modelos ?? []).length);
       });
     return () => {
       vivo = false;
     };
+    // aoContar só informa a aba; recarregar quando ele muda não faz sentido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versao]);
 
   const previa = React.useMemo(
@@ -142,32 +146,44 @@ export function ModelosDeEmail() {
   }
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="glass-card flex flex-col gap-1 rounded-2xl p-2">
-        <Button type="button" variant="secondary" size="sm" className="mb-1 justify-start" onClick={() => abrir(null)}>
-          <Plus size={14} /> Novo modelo
-        </Button>
+    <div className="grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      {/* Lista colada em linhas finas: nome e assunto; o escolhido fica em bg-raised. */}
+      <aside className="flex flex-col">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="font-mono text-caption text-text-tertiary">{modelos ? `${modelos.length} ${modelos.length === 1 ? "modelo" : "modelos"}` : "—"}</p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => abrir(null)}>
+            <Plus size={13} aria-hidden="true" /> Novo modelo
+          </Button>
+        </div>
         {modelos === null ? (
-          <p className="px-2 py-1 text-[12.5px] text-text-tertiary">Carregando...</p>
+          <div className="flex flex-col gap-1.5" aria-busy="true" aria-label="Carregando modelos">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+            ))}
+          </div>
         ) : modelos.length === 0 ? (
-          <p className="px-2 py-1 text-[12.5px] text-text-tertiary">Nenhum modelo ainda.</p>
+          <p className="py-2 text-small text-text-tertiary">Nenhum modelo ainda.</p>
         ) : (
-          modelos.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => abrir(m)}
-              className={cn("rounded-lg px-2.5 py-2 text-left hover:bg-hover", atual.id === m.id && "bg-accent-subtle")}
-            >
-              <span className="block truncate text-[13px] font-medium text-text-primary">{m.nome}</span>
-              <span className="block truncate text-[11.5px] text-text-tertiary">{m.assunto || "Sem assunto"}</span>
-            </button>
-          ))
+          <ul className="flex flex-col">
+            {modelos.map((m) => (
+              <li key={m.id} className="border-b border-border-subtle last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => abrir(m)}
+                  aria-current={atual.id === m.id ? "true" : undefined}
+                  className={cn("flex min-h-[52px] w-full flex-col justify-center rounded-[10px] px-2.5 py-2 text-left hover:bg-raised", atual.id === m.id && "bg-raised")}
+                >
+                  <span className="block truncate text-body font-medium text-text-primary">{m.nome}</span>
+                  <span className="block truncate text-caption text-text-tertiary">{m.assunto || "Sem assunto"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </aside>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <section className="glass-card flex flex-col gap-3 rounded-2xl p-4">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+        <section className="flex min-w-0 flex-col gap-3 rounded-[18px] border border-border-subtle bg-panel p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="em-nome">Nome do modelo</Label>
@@ -195,15 +211,15 @@ export function ModelosDeEmail() {
               <Label htmlFor="em-corpo" className="mb-0 mr-auto">Corpo</Label>
               {atual.modo === "simples" && (
                 <>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => inserir("**", "**", "texto")} aria-label="Negrito"><Bold size={14} /></Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => inserir("[", "](https://)", "texto do link")} aria-label="Link"><Link2 size={14} /></Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => inserir("\n- ", "", "item")} aria-label="Lista"><List size={14} /></Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => inserir("\n\n[[", "|https://]]\n\n", "Texto do botão")} aria-label="Botão"><MousePointerClick size={14} /></Button>
+                  <IconButton size="sm" tooltip onClick={() => inserir("**", "**", "texto")} aria-label="Negrito"><Bold /></IconButton>
+                  <IconButton size="sm" tooltip onClick={() => inserir("[", "](https://)", "texto do link")} aria-label="Link"><Link2 /></IconButton>
+                  <IconButton size="sm" tooltip onClick={() => inserir("\n- ", "", "item")} aria-label="Lista"><List /></IconButton>
+                  <IconButton size="sm" tooltip onClick={() => inserir("\n\n[[", "|https://]]\n\n", "Texto do botão")} aria-label="Botão"><MousePointerClick /></IconButton>
                 </>
               )}
               <span className="inline-flex items-center gap-1">
                 <Braces size={14} className="text-text-tertiary" aria-hidden />
-                <Select aria-label="Inserir variável" value="" onChange={(e) => e.target.value && inserir(`{{${e.target.value}}}`)} className="h-7 w-auto text-[12px]">
+                <Select aria-label="Inserir variável" value="" onChange={(e) => e.target.value && inserir(`{{${e.target.value}}}`)} className="h-7 w-auto text-caption">
                   <option value="">Variável…</option>
                   {VARIAVEIS_DO_CONTATO.map((v) => (
                     <option key={v.chave} value={v.chave}>{v.rotulo}</option>
@@ -217,35 +233,35 @@ export function ModelosDeEmail() {
               rows={14}
               value={atual.corpo}
               onChange={(e) => mudar({ corpo: e.target.value })}
-              className={atual.modo === "html" ? "font-mono text-[12px]" : undefined}
+              className={atual.modo === "html" ? "font-mono text-caption" : undefined}
             />
-            <p className="mt-1 text-[11px] text-text-tertiary">
+            <p className="mt-1 text-caption text-text-tertiary">
               Variável vazia sem padrão bloqueia o envio. Para ter padrão: {"{{contato.primeiro_nome|padrao:\"cliente\"}}"}. Campo
               personalizado: {"{{campo.chave}}"}. O rodapé com &quot;Não quero mais receber&quot; entra sempre.
             </p>
           </div>
           {msg && <Notice tone={msg.tom}>{msg.texto}</Notice>}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={ocupado || !sujo} onClick={() => void salvar()}>Salvar</Button>
+            <Button type="button" variant="primary" disabled={ocupado || !sujo} onClick={() => void salvar()}>Salvar</Button>
             <Button type="button" variant="secondary" disabled={ocupado} onClick={() => void testar()}>
-              <Send size={14} /> Enviar teste para mim
+              <Send size={14} aria-hidden="true" /> Enviar teste para mim
             </Button>
             {atual.id && (
               <Button type="button" variant="ghost" className="ml-auto text-danger hover:text-danger" onClick={() => void excluir()}>
-                <Trash2 size={14} /> Excluir
+                <Trash2 size={14} aria-hidden="true" /> Excluir
               </Button>
             )}
           </div>
         </section>
 
-        <section className="glass-card flex flex-col gap-2 rounded-2xl p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Prévia com dados de exemplo</p>
-          <p className="text-[13px] text-text-primary"><span className="text-text-tertiary">Assunto:</span> {previa.assunto || "—"}</p>
+        <section className="flex min-w-0 flex-col gap-2 rounded-[18px] border border-border-subtle bg-panel p-4">
+          <p className="font-mono text-caption text-text-tertiary">Prévia com dados de exemplo</p>
+          <p className="text-small text-text-primary"><span className="text-text-tertiary">Assunto:</span> {previa.assunto || "—"}</p>
           {previa.faltando.length > 0 && (
             <Notice tone="warning">Sem padrão e vazio no exemplo: {previa.faltando.join(", ")}. Num contato sem esse dado, o envio é bloqueado.</Notice>
           )}
-          {/* sandbox vazio: HTML do cliente nunca roda script dentro do app. */}
-          <iframe title="Prévia do e-mail" sandbox="" srcDoc={previa.html} className="h-[520px] w-full rounded-xl border border-border-subtle bg-white" />
+          {/* sandbox vazio: HTML do cliente nunca roda script dentro do app. Fundo branco de propósito: é o e-mail como chega. */}
+          <iframe title="Prévia do e-mail" sandbox="" srcDoc={previa.html} className="h-[520px] w-full rounded-[14px] border border-border-subtle bg-white" />
         </section>
       </div>
     </div>

@@ -2,11 +2,8 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import {
-  CheckCircle2, Circle, ArrowRight, PlayCircle, MessageSquare, Workflow,
-  UserCheck, Activity, AlertTriangle, MessagesSquare,
-} from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import type { Agent } from "@/lib/data/types";
 import type { AgentOverview } from "@/components/agent-studio/agent-operations-card";
@@ -107,74 +104,53 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
   const pausado = agent.status !== "active";
 
   return (
-    <div className="flex flex-col gap-5">
-      <section className="glass-card rounded-3xl p-5 sm:p-6">
+    <div className="flex flex-col gap-4">
+      <section className="rounded-[18px] border border-border-subtle bg-panel px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[12px] font-medium uppercase tracking-wide text-text-tertiary">O que este agente faz</p>
-            <p className="mt-1.5 max-w-[640px] text-[15px] leading-relaxed text-text-primary">
-              {carregado ? descreverFuncionamento(agent, ov) || "Sem dados ainda." : "Carregando..."}
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-caption text-text-tertiary">o que este agente faz</p>
+            <p className="mt-1 max-w-[640px] text-body text-text-primary">
+              {carregado ? descreverFuncionamento(agent, ov) || "Sem dados ainda." : "Carregando…"}
             </p>
           </div>
-          <div
-            className={cn(
-              "shrink-0 rounded-xl px-3 py-2 text-[12.5px] font-medium",
-              pausado
-                ? "bg-surface-3 text-text-secondary"
-                : faltam > 0
-                  ? "bg-warning-subtle text-warning"
-                  : "bg-success-subtle text-success"
-            )}
-          >
+          <Badge variant={pausado ? "neutral" : faltam > 0 ? "warning" : "success"} dot={!pausado && faltam === 0}>
             {pausado ? "Pausado: não responde" : faltam > 0 ? `Falta${faltam > 1 ? "m" : ""} ${faltam} passo${faltam > 1 ? "s" : ""}` : "No ar e completo"}
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-border-subtle pt-4">
-          <Link href={`/playground?agent=${agent.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            <PlayCircle size={14} /> Testar no Playground
-          </Link>
-          <Link href={`/agent-studio/${agent.id}/builder`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            <Workflow size={14} /> Editar o fluxo
-          </Link>
-          <Link href="/conversas" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-            <MessageSquare size={14} /> Ver conversas
-          </Link>
+          </Badge>
         </div>
       </section>
 
-      <section className="glass-card rounded-3xl p-5 sm:p-6">
-        <h2 className="font-display text-[15px] font-semibold text-text-primary">Para funcionar de verdade</h2>
-        <ul className="mt-3 flex flex-col">
+      <section className="rounded-[18px] border border-border-subtle bg-panel px-5 py-3">
+        <h2 className="flex h-9 items-center text-body font-medium text-text-primary">Para funcionar de verdade</h2>
+        <ul className="flex flex-col">
           {passos.map((p) => {
             const corpo = (
-              <div className="flex items-start gap-3 py-3">
+              <div className="flex min-h-[52px] items-center gap-3 py-2.5">
                 {p.feito ? (
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
+                  <CheckCircle2 size={17} aria-hidden="true" className="shrink-0 text-success" />
                 ) : (
-                  <Circle size={18} className="mt-0.5 shrink-0 text-text-tertiary" />
+                  <Circle size={17} aria-hidden="true" className="shrink-0 text-text-tertiary" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn("text-[13.5px] font-medium", p.feito ? "text-text-secondary" : "text-text-primary")}>{p.titulo}</span>
-                    {p.opcional && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] text-text-tertiary">opcional</span>}
+                    <span className={cn("text-small font-medium", p.feito ? "text-text-secondary" : "text-text-primary")}>{p.titulo}</span>
+                    {p.opcional && <span className="font-mono text-caption text-text-tertiary">opcional</span>}
                   </div>
-                  <p className="mt-0.5 text-[12.5px] text-text-tertiary">{p.detalhe}</p>
+                  <p className="mt-0.5 text-caption text-text-tertiary">{p.detalhe}</p>
                 </div>
-                {!p.feito && <ArrowRight size={15} className="mt-1 shrink-0 text-text-tertiary" />}
+                {!p.feito && <ChevronRight size={15} aria-hidden="true" className="shrink-0 text-text-tertiary" />}
               </div>
             );
-            const classe = "block border-t border-border-subtle first:border-t-0";
+            const classe = "-mx-2 block rounded-[12px] border-t border-border-subtle px-2 transition-colors first:border-t-0 hover:bg-raised";
             if (p.href) {
               return (
-                <li key={p.titulo}>
-                  <Link href={p.href} className={cn(classe, "transition-colors hover:bg-surface-2/60")}>{corpo}</Link>
+                <li key={p.titulo} className="group">
+                  <Link href={p.href} className={classe}>{corpo}</Link>
                 </li>
               );
             }
             return (
               <li key={p.titulo}>
-                <button type="button" onClick={() => p.aba && irParaAba(p.aba)} className={cn(classe, "w-full text-left transition-colors hover:bg-surface-2/60")}>
+                <button type="button" onClick={() => p.aba && irParaAba(p.aba)} className={cn(classe, "w-[calc(100%+1rem)] text-left")}>
                   {corpo}
                 </button>
               </li>
@@ -183,50 +159,51 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
         </ul>
       </section>
 
+      {/* Três números, sem ícone: conversas, quem espera e execuções (com os erros juntos). */}
       {ov && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Numero icone={<MessagesSquare size={14} />} rotulo="conversas nos 7 dias" valor={ov.conversas7d} />
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Numero rotulo="Conversas nos 7 dias" valor={ov.conversas7d} />
           <Numero
-            icone={<UserCheck size={14} />}
-            rotulo="esperando atendente"
+            rotulo="Esperando atendente"
             valor={ov.aguardandoHumano}
             alerta={ov.aguardandoHumano > 0}
             href="/conversas"
           />
-          <Numero icone={<Activity size={14} />} rotulo="execuções nas 24h" valor={ov.execucoes24h} />
           <Numero
-            icone={<AlertTriangle size={14} />}
-            rotulo="erros nas 24h"
-            valor={ov.erros24h}
-            alerta={ov.erros24h > 0}
+            rotulo="Execuções nas 24h"
+            valor={ov.execucoes24h}
+            sub={ov.erros24h > 0 ? `${ov.erros24h} com erro` : undefined}
             href={ov.erros24h > 0 ? `/agent-studio/${agent.id}/builder` : undefined}
           />
         </section>
       )}
 
-      <p className="text-[12px] text-text-tertiary">
-        Atualizado {formatRelativeDate(agent.updatedAt)}
-        {ov?.ultimaAtividadeAt ? `. Última conversa ${formatRelativeDate(ov.ultimaAtividadeAt)}.` : "."}
+      <p className="font-mono text-caption text-text-tertiary">
+        atualizado {formatRelativeDate(agent.updatedAt)}
+        {ov?.ultimaAtividadeAt ? ` · última conversa ${formatRelativeDate(ov.ultimaAtividadeAt)}` : ""}
       </p>
     </div>
   );
 }
 
 function Numero({
-  icone, rotulo, valor, alerta, href,
+  rotulo, valor, sub, alerta, href,
 }: {
-  icone: React.ReactNode;
   rotulo: string;
   valor: number;
+  sub?: string;
   alerta?: boolean;
   href?: string;
 }) {
   const corpo = (
-    <div className={cn("glass-card rounded-2xl px-4 py-4", alerta && "ring-1 ring-warning/30")}>
-      <div className="flex items-center gap-1.5 text-[11.5px] text-text-tertiary">{icone} {rotulo}</div>
-      <div className={cn("mt-1.5 font-display text-[26px] font-semibold tabular-nums", alerta ? "text-warning" : valor === 0 ? "text-text-tertiary" : "text-text-primary")}>
-        {valor}
-      </div>
+    <div className={cn("flex h-full flex-col gap-1 rounded-[18px] border border-border-subtle bg-panel px-5 py-4", href && "transition-colors hover:bg-raised")}>
+      <span className="text-small text-text-secondary">{rotulo}</span>
+      <span className="flex items-baseline justify-between gap-2">
+        <b className={cn("text-display font-medium tabular-nums tracking-tight", alerta ? "text-danger" : valor === 0 ? "text-text-tertiary" : "text-text-primary")}>
+          {valor}
+        </b>
+        {sub && <span className="font-mono text-caption text-danger">{sub}</span>}
+      </span>
     </div>
   );
   return href ? <Link href={href}>{corpo}</Link> : corpo;

@@ -1,0 +1,46 @@
+<!-- id: empresas | titulo: Empresas | grupo: Dados | menu: empresas | print: empresas -->
+<style>
+.t-empresas .d-tool { border-bottom: 0; gap: 8px; }
+.t-empresas .d-tool .d-in { width: 340px; }
+.t-empresas .lista { flex: 1; min-height: 0; overflow: hidden; padding: 6px 24px 0; }
+.t-empresas .lin { display: grid; grid-template-columns: 36px minmax(0,1fr) 150px 170px; align-items: center; gap: 16px; height: 64px; padding: 0 8px; border-bottom: 1px solid var(--bs); }
+.t-empresas .lin:last-child { border-bottom: 0; }
+.t-empresas .lin b { font-weight: 500; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-empresas .lin .neg { color: var(--t2); font-variant-numeric: tabular-nums; }
+.t-empresas .lin .neg.vazio { color: var(--t3); }
+.t-empresas .dono { display: flex; align-items: center; gap: 8px; color: var(--t2); white-space: nowrap; overflow: hidden; }
+.t-empresas .dono.vazio { color: var(--t3); }
+</style>
+<!--MOCK-->
+<div class="d-main t-empresas">
+  <div class="d-bar">
+    <h4>Empresas</h4>
+    <span class="cnt">86</span>
+    <div class="dir">
+      <button class="d-bt ghost ic" title="A conta por trás das pessoas: cinco contatos do mesmo lugar são uma conta só, e é nela que o negócio acontece."><svg><use href="#i-help"/></svg></button>
+      <button class="d-bt p"><svg><use href="#i-plus"/></svg>Nova empresa</button>
+    </div>
+  </div>
+
+  <div class="d-tool">
+    <div class="d-in"><svg><use href="#i-search"/></svg>Buscar por nome, CNPJ ou setor</div>
+    <span class="d-filtro"><svg><use href="#i-filter"/></svg>Filtros</span>
+  </div>
+
+  <div class="lista">
+    <div class="lin"><span class="d-av emp h-green">AC</span><b>Agência Cerrado</b><span class="neg">6 negócios</span><span class="dono"><span class="mini-av h-teal">MP</span>Matheus Paes</span></div>
+    <div class="lin"><span class="d-av emp h-cyan">CA</span><b>Clínica Atlântico</b><span class="neg">8 negócios</span><span class="dono"><span class="mini-av h-violet">DF</span>Diego Fontes</span></div>
+    <div class="lin"><span class="d-av emp h-rose">CA</span><b>Clínica Aurora</b><span class="neg">3 negócios</span><span class="dono"><span class="mini-av h-teal">MP</span>Matheus Paes</span></div>
+    <div class="lin"><span class="d-av emp h-amber">CI</span><b>Colégio Ipê</b><span class="neg">5 negócios</span><span class="dono"><span class="mini-av h-amber">CR</span>Camila Reis</span></div>
+    <div class="lin"><span class="d-av emp h-blue">GA</span><b>Grupo Aurora</b><span class="neg">13 negócios</span><span class="dono"><span class="mini-av h-teal">MP</span>Matheus Paes</span></div>
+    <div class="lin"><span class="d-av emp h-green">GB</span><b>Grupo Boa Safra</b><span class="neg">6 negócios</span><span class="dono"><span class="mini-av h-violet">DF</span>Diego Fontes</span></div>
+    <div class="lin"><span class="d-av emp h-slate">IA</span><b>Indústrias Atlântico</b><span class="neg">1 negócio</span><span class="dono vazio">Sem proprietário</span></div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Quatro dados por linha.</b> Logo, nome, quantos negócios e o dono. A tela responde "quais são as contas e com quem estão", sem tabela de sete colunas.</li>
+<li><b>CNPJ, setor, cidade e contatos saíram da linha.</b> Ficam na página da empresa. A busca continua achando por CNPJ ou setor.</li>
+<li><b>Filtros num botão só.</b> Setor, cidade e dono estão dentro de "Filtros". A explicação "a conta por trás das pessoas" fica no ícone de ajuda.</li>
+<li><b>Mais respiro.</b> Linhas mais altas, menos itens de uma vez e sem rodapé repetindo a contagem, que já aparece ao lado do título.</li>
+<!--/NOTAS-->

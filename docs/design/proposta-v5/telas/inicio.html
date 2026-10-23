@@ -1,0 +1,157 @@
+<!-- id: inicio | titulo: Início | grupo: Acompanhar | menu: inicio | print: inicio -->
+<style>
+.t-ini { margin-top: -40px; padding: 0 0 16px; gap: 14px; position: relative; }
+.t-ini .heroi { position: relative; height: 300px; flex: none; border-radius: 0 0 34px 34px; overflow: hidden; padding: 58px 28px 22px; display: flex; flex-direction: column; color: #121214;
+  background: radial-gradient(60% 80% at 85% 10%, #eef2b8 0%, transparent 60%), radial-gradient(55% 70% at 20% 30%, #d9dcf6 0%, transparent 65%), radial-gradient(50% 60% at 60% 90%, #cfe7da 0%, transparent 70%), linear-gradient(135deg, #e3e6ef, #c9cfe4); background-size: 140% 140%; }
+.t-ini .heroi canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .9; mix-blend-mode: multiply; pointer-events: none; }
+.t-ini .heroi > * { position: relative; }
+.t-ini .l1 { display: flex; align-items: flex-start; }
+.t-ini .ola { font-size: 38px; line-height: 1.08; letter-spacing: -0.035em; font-weight: 300; }
+.t-ini .ola b { font-weight: 700; display: block; }
+.t-ini .l1 .dir { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.t-ini .pilula { height: 38px; border-radius: 99px; background: #121214; color: #f2f2f4; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 13px; font-weight: 600; }
+.t-ini .pilula svg { width: 15px; height: 15px; }
+.t-ini .pilula.ic { width: 38px; padding: 0; justify-content: center; }
+.t-ini .eu { width: 64px; height: 38px; border-radius: 99px; overflow: hidden; }
+.t-ini .eu .foto { width: 100%; height: 100%; border-radius: 0; }
+.t-ini .dia { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.t-ini .preto { border-radius: 22px; background: #121214; color: #f2f2f4; padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; }
+.t-ini .preto small { font-size: 12.5px; color: #a8a8ad; }
+.t-ini .preto b { font-size: 30px; font-weight: 500; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; align-self: flex-end; }
+.t-ini .preto b em { font-style: normal; font-size: 15px; color: #8a8a90; margin-right: 4px; vertical-align: 8px; letter-spacing: 0; }
+.t-ini .eva { border-radius: 22px; background: rgba(18,18,20,.88); color: #f2f2f4; padding: 10px 18px 10px 8px; display: flex; align-items: center; gap: 6px; }
+.t-ini .eva canvas { width: 92px; height: 92px; flex: none; }
+.t-ini .eva .txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; line-height: 1.4; color: #d6d6da; }
+.t-ini .eva .txt small { font: 400 11px ui-monospace, "SF Mono", monospace; color: #8a8a90; }
+.t-ini .corpo { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 22px; }
+.t-ini .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.t-ini .agora { border-radius: 20px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); padding: 4px 18px; }
+.t-ini .agora div { height: 46px; display: flex; align-items: center; font-size: 13.5px; color: var(--t2); }
+.t-ini .agora div + div { border-top: 1px solid var(--bs); }
+.t-ini .agora div b { margin-left: auto; font-weight: 600; color: var(--t1); font-variant-numeric: tabular-nums; display: inline-flex; gap: 8px; align-items: center; }
+.t-ini .agora div b svg { width: 14px; height: 14px; color: var(--t3); }
+.t-ini .agora div b.dg { color: var(--dg); }
+.t-ini .atalhos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.t-ini .at { border-radius: 20px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); padding: 12px 14px; height: 94px; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+.t-ini .at small { font-size: 11.5px; color: var(--t3); }
+.t-ini .at b { font-size: 16px; font-weight: 500; letter-spacing: -0.01em; }
+.t-ini .at .bol { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--t2); display: grid; place-items: center; color: var(--t1); }
+.t-ini .at .bol svg { width: 13px; height: 13px; stroke-width: 2; }
+.t-ini .bloco { border-radius: 20px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+.t-ini .bloco h5 { font-size: 15px; font-weight: 500; letter-spacing: -0.01em; display: flex; align-items: center; }
+.t-ini .bloco h5 span { margin-left: auto; font: 400 11.5px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-ini .colunas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; height: 118px; }
+.t-ini .coluna { border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 8px 6px 6px; overflow: hidden; }
+.t-ini .coluna small { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t2); }
+.t-ini .coluna i { width: 100%; border-radius: 10px; display: block; }
+.t-ini .legenda { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 6px 16px; font-size: 11.5px; color: var(--t2); }
+.t-ini .legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.t-ini .legenda span::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
+.t-ini .menos { position: absolute; top: -7px; left: -7px; width: 22px; height: 22px; border-radius: 50%; background: #3a3a3e; color: #fff; display: none; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); z-index: 3; }
+.t-ini .menos svg { width: 11px; height: 11px; stroke-width: 2.6; }
+.t-ini .folha { position: absolute; left: 22px; right: 22px; bottom: 14px; border-radius: 26px; padding: 14px 16px 16px; display: none; z-index: 6; flex-direction: column; gap: 10px; }
+.t-ini .folha .alca { width: 36px; height: 4px; border-radius: 2px; background: var(--bd); align-self: center; }
+.t-ini .folha h5 { font-size: 15px; font-weight: 600; display: flex; }
+.t-ini .folha h5 span { margin-left: auto; color: var(--acfg); font-weight: 500; font-size: 13px; }
+.t-ini .opcoes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.t-ini .opcoes span { border-radius: 16px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 10px 12px; font-size: 12.5px; display: flex; flex-direction: column; gap: 14px; }
+.t-ini .opcoes span svg { width: 15px; height: 15px; color: var(--t2); }
+.t-ini .opcoes span.h { box-shadow: 0 0 0 1.5px var(--t1); }
+.t-ini .novo { display: none; }
+.t-ini .area { height: 86px; display: block; width: 100%; }
+</style>
+<!--ILHA-->
+<span class="pto"></span><span>1 esperando</span><span class="cinza mono">há 4 min</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-ini">
+  <div class="heroi" data-heroi>
+    <canvas data-fundo data-forca="3.2" data-niveis="14" data-tom="light"></canvas>
+    <div class="l1">
+      <div class="ola">Bom dia,<b>Matheus!</b></div>
+      <div class="dir"><span class="pilula" data-personalizar><svg><use href="#i-pencil"/></svg>Personalizar</span><span class="pilula ic"><svg><use href="#i-search"/></svg></span><span class="eu"><span class="foto" style="--f1:#d9b8a0;--f2:#23303f;--f3:#5c7088;--f4:#202a36"></span></span></div>
+    </div>
+    <div class="dia">
+      <div class="preto"><small>Na mesa hoje · 6 negócios</small><b><em>R$</em><span data-n="9000">9.000</span></b></div>
+      <div class="eva"><canvas data-orbe></canvas><div class="txt"><small>Eva · resumo do dia</small><span data-fala>Uma pessoa espera há 4 minutos. Ontem entrou uma venda de R$ 9 mil.</span></div></div>
+    </div>
+  </div>
+  <div class="corpo">
+    <div class="col">
+      <div class="agora">
+        <div>Esperando atendimento<b class="dg">1<svg><use href="#i-chevr"/></svg></b></div>
+        <div>Tarefas para hoje<b>3<svg><use href="#i-chevr"/></svg></b></div>
+      </div>
+      <div class="atalhos">
+        <div class="at"><span class="bol"><svg><use href="#i-plus"/></svg></span><small>Criar</small><b>Negócio</b></div>
+        <div class="at"><span class="bol"><svg><use href="#i-msg"/></svg></span><small>Abrir</small><b>Conversas</b></div>
+        <div class="at"><span class="bol"><svg><use href="#i-check"/></svg></span><small>Ver</small><b>Tarefas</b></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="bloco" data-w="funil"><span class="menos"><svg><use href="#i-x"/></svg></span>
+        <h5>Seu funil no mês<span>6 abertos</span></h5>
+        <div class="colunas">
+          <div class="coluna"><small>40%</small><i style="height:42%;background:#f2c6dc"></i></div>
+          <div class="coluna"><small>30%</small><i style="height:32%;background:#cfe7da"></i></div>
+          <div class="coluna"><small>15%</small><i style="height:18%;background:#eef2b8"></i></div>
+          <div class="coluna"><small>10%</small><i style="height:12%;background:#d9dcf6"></i></div>
+          <div class="coluna"><small>5%</small><i style="height:6%;background:#f2f2f4"></i></div>
+        </div>
+        <div class="legenda"><span style="--c:#f2c6dc">Novo</span><span style="--c:#cfe7da">Qualificado</span><span style="--c:#eef2b8">Proposta</span><span style="--c:#d9dcf6">Negociação</span><span style="--c:#f2f2f4">Ganho</span></div>
+      </div>
+      <div class="bloco novo" data-w="receita"><span class="menos"><svg><use href="#i-x"/></svg></span>
+        <h5>Receita por dia<span>30 dias</span></h5>
+        <svg class="area" viewBox="0 0 300 86" preserveAspectRatio="none" style="stroke:none"><defs><linearGradient id="gIni" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:#7ab8ff;stop-opacity:.45"/><stop offset="1" style="stop-color:#7ab8ff;stop-opacity:0"/></linearGradient></defs><path d="M0 70 C30 60 45 30 70 40 S110 75 140 55 S180 10 210 22 S260 50 300 30 V86 H0Z" style="fill:url(#gIni)"/><path d="M0 70 C30 60 45 30 70 40 S110 75 140 55 S180 10 210 22 S260 50 300 30" style="fill:none;stroke:#7ab8ff;stroke-width:2"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="folha vidro" data-folha>
+    <span class="alca"></span>
+    <h5>Adicionar ao Início<span data-pronto>Pronto</span></h5>
+    <div class="opcoes"><span data-opt><svg><use href="#i-trend"/></svg>Receita por dia</span><span><svg><use href="#i-kanban"/></svg>Onde o dinheiro está parado</span><span><svg><use href="#i-msg"/></svg>Vendas por canal</span><span><svg><use href="#i-list"/></svg>Últimas vendas</span></div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.inicio = function (c) {
+  var MOLA = "cubic-bezier(.32,.72,0,1)", heroi = c.q("[data-heroi]");
+  heroi.animate([{ backgroundPosition: "0% 0%" }, { backgroundPosition: "100% 60%" }, { backgroundPosition: "0% 0%" }], { duration: 9000, iterations: 1, easing: "ease-in-out" });
+  c.entra(".ola, .l1 .dir > *", { y: 14, passo: 70 });
+  c.entra(".dia > *", { d: 200, y: 16, passo: 90 });
+  var n = c.q("[data-n]"); c.conta(n, 9000, function (v) { return Math.round(v).toLocaleString("pt-BR"); });
+  c.entra(".agora, .at, .bloco:not(.novo)", { d: 320, passo: 60 });
+  c.qa(".coluna i").forEach(function (i, k) { i.style.transformOrigin = "bottom"; i.animate([{ transform: "scaleY(0)" }, { transform: "none" }], { duration: 900, delay: 500 + k * 70, easing: MOLA, fill: "backwards" }); });
+  var orbe = c.q("[data-orbe]"), fala = c.q("[data-fala]");
+  var cv = c.q("canvas[data-fundo]"); if (cv && cv._f) cv._f.pulso(cv.offsetWidth * 0.7, 40, 2.4);
+  var digita = function (txt) { return new Promise(function (ok) { var i = 0; (function p() { i += 2; fala.textContent = txt.slice(0, i); if (i < txt.length) setTimeout(p, 28); else ok(); })(); }); };
+  if (orbe && orbe._f) orbe._f.fala(2600);
+  var txt0 = fala.textContent; fala.textContent = "";
+  var orig = c.q("[data-ilha]").innerHTML;
+  return digita(txt0).then(function () { return c.espera(1100); })
+    .then(function () {
+      var p = c.q("[data-personalizar]"); p.animate([{ transform: "scale(1)" }, { transform: "scale(.94)" }, { transform: "scale(1)" }], { duration: 260 });
+      c.qa(".bloco:not(.novo), .at, .agora").forEach(function (b, k) { b.animate([{ transform: "rotate(-.5deg)" }, { transform: "rotate(.5deg)" }], { duration: 160 + (k % 3) * 20, iterations: 18, direction: "alternate", easing: "ease-in-out" }); });
+      c.qa(".menos").forEach(function (m) { m.style.display = "grid"; m.animate([{ transform: "scale(0)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.34,1.5,.5,1)" }); });
+      var f = c.q("[data-folha]"); f.style.display = "flex"; f.animate([{ transform: "translateY(110%)" }, { transform: "none" }], { duration: 620, easing: MOLA });
+      if (cv && cv._f) cv._f.pulso(cv.offsetWidth / 2, 280, 2);
+      return c.espera(1300);
+    })
+    .then(function () { var o = c.q("[data-opt]"); o.classList.add("h"); return c.espera(500); })
+    .then(function () {
+      var f = c.q("[data-folha]"); f.animate([{ transform: "none" }, { transform: "translateY(115%)" }], { duration: 480, easing: "ease-in", fill: "forwards" });
+      var nv = c.q(".bloco.novo"); nv.style.display = "flex"; c.entra([nv], { y: 18, s: .96 });
+      c.qa(".menos").forEach(function (m) { m.style.display = "none"; });
+      c.pulso(nv, 1.6);
+      c.ilha('<svg><use href="#i-check"/></svg><span class="txt"><b>Início personalizado</b><span>"Receita por dia" adicionado</span></span><span class="acao">Desfazer</span>', true);
+      return c.espera(2800);
+    })
+    .then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Boas-vindas de verdade.</b> Topo iridescente com as curvas se mexendo, "Bom dia, Matheus!" grande, sua foto e o que está na mesa hoje num cartão preto, como no exemplo do app de finanças.</li>
+<li><b>A Eva resume o dia.</b> A esfera de partículas é a presença da Eva: quando ela fala, a esfera pulsa e o resumo aparece sendo escrito. Duas frases, não seis alertas.</li>
+<li><b>Só o que pede ação.</b> "Esperando atendimento" e "Tarefas para hoje" com o número, três atalhos grandes e um bloco. Os outros avisos de hoje (negócios parados, agentes sem fluxo) ficam no resumo da Eva e nas telas de cada um.</li>
+<li><b>Cada um monta o seu.</b> "Personalizar" faz os blocos tremerem como no iPhone, abre a folha com os cartões que já existem no Dashboard e o escolhido entra no Início, com Desfazer na ilha.</li>
+<!--/NOTAS-->

@@ -1,0 +1,82 @@
+<!-- id: contato | titulo: Página do contato | grupo: Vender | menu: contatos | print: contato -->
+<style>
+.t-contato .pag { flex: 1; min-height: 0; overflow: hidden; width: 100%; max-width: 724px; margin: 0 auto; padding: 8px 0 0; display: flex; flex-direction: column; gap: 20px; }
+.t-contato .fh { display: flex; align-items: center; gap: 20px; }
+.t-contato .fh .foto { width: 96px; height: 96px; }
+.t-contato .fh .q { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.t-contato .fh h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.025em; white-space: nowrap; }
+.t-contato .fh .sub { font-size: 13px; color: var(--t3); white-space: nowrap; }
+.t-contato .fh .sub .d-link { display: inline; }
+.t-contato .etqs { display: flex; gap: 5px; margin-top: 8px; }
+.t-contato .etqs .chip { height: 22px; }
+.t-contato .redondos { margin-left: auto; display: flex; gap: 14px; flex: none; }
+.t-contato .rd { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: var(--t3); }
+.t-contato .rd > span { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); color: var(--t1); }
+.t-contato .rd > span svg { width: 17px; height: 17px; }
+.t-contato .rd.p > span { background: var(--ac); color: var(--onac); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.t-contato .rd.p { color: var(--t2); }
+.t-contato .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.t-contato .tile { height: 46px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 13px; white-space: nowrap; overflow: hidden; }
+.t-contato .tile svg { width: 15px; height: 15px; color: var(--t3); }
+.t-contato .tile svg.wa { color: var(--wa); }
+.t-contato .tile span { overflow: hidden; text-overflow: ellipsis; }
+.t-contato .bloco { display: flex; flex-direction: column; gap: 8px; }
+.t-contato .bloco .d-h5 .d-link { margin-left: auto; font-family: -apple-system, "Inter", sans-serif; font-size: 12px; }
+.t-contato .lemb { height: 48px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 0 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.t-contato .lemb .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-contato .lemb .v { font-variant-numeric: tabular-nums; color: var(--t2); width: 84px; text-align: right; flex: none; }
+.t-contato .lemb .hoje { color: var(--dg); font-weight: 500; font-size: 12px; }
+</style>
+<!--MOCK-->
+<div class="d-main t-contato">
+  <div class="d-bar">
+    <span class="d-migalha">Contatos<svg><use href="#i-chevr"/></svg><b>Fernanda Rocha</b></span>
+    <div class="dir">
+      <button class="d-bt ic" title="Mais: copiar link, apagar contato"><svg><use href="#i-more"/></svg></button>
+    </div>
+  </div>
+
+  <div class="pag">
+    <div class="fh">
+      <span class="foto" style="--f1:#c79a7e;--f2:#4a2e36;--f3:#8f5d6c;--f4:#3a2329"></span>
+      <div class="q">
+        <h2>Fernanda Rocha</h2>
+        <span class="sub">Diretora administrativa · <span class="d-link">Clínica Aurora</span></span>
+        <div class="etqs"><span class="chip">Lead quente</span><span class="chip">Indicação</span><span class="chip contorno"><svg><use href="#i-plus"/></svg>Etiqueta</span></div>
+      </div>
+      <div class="redondos">
+        <span class="rd p"><span><svg><use href="#i-wa"/></svg></span>WhatsApp</span>
+        <span class="rd"><span><svg><use href="#i-phone"/></svg></span>Ligar</span>
+        <span class="rd"><span><svg><use href="#i-mail"/></svg></span>E-mail</span>
+        <span class="rd"><span><svg><use href="#i-task"/></svg></span>Tarefa</span>
+      </div>
+    </div>
+
+    <div><span class="d-abas"><span class="on">Resumo</span><span>Atividade <em>14</em></span><span>Dados</span></span></div>
+
+    <div class="tiles">
+      <div class="tile"><svg class="wa"><use href="#i-wa"/></svg><span>(11) 98734-2210</span></div>
+      <div class="tile"><svg><use href="#i-mail"/></svg><span>fernanda@clinicaaurora.com.br</span></div>
+      <div class="tile"><svg><use href="#i-globe"/></svg><span>São Paulo/SP</span></div>
+      <div class="tile"><span class="mini-av h-teal">MP</span><span>Dono: Matheus Paes</span></div>
+    </div>
+
+    <div class="bloco">
+      <span class="d-h5">A fazer<span class="d-link">+1 tarefa</span></span>
+      <div class="lemb"><span class="d-chk"></span><span class="t">Ligar para alinhar a proposta</span><span class="hoje">Hoje</span></div>
+    </div>
+
+    <div class="bloco">
+      <span class="d-h5">Negócios · R$ 24.500 em aberto<span class="d-link">Ver os 3</span></span>
+      <div class="lemb"><span class="t">Plano anual · 12 licenças</span><span class="chip"><i style="background:var(--d-amber)"></i>Proposta</span><span class="v">R$ 18.000</span></div>
+      <div class="lemb"><span class="t">Agente no site da clínica</span><span class="chip"><i style="background:var(--d-violet)"></i>Qualificado</span><span class="v">R$ 6.500</span></div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Mesma ficha da lista de contatos.</b> Foto grande, nome, empresa, etiquetas e quatro botões redondos, com WhatsApp como o único em destaque. Copiar link e apagar ficam no "…".</li>
+<li><b>Resumo mostra só o que importa agora.</b> Os quatro dados de contato em blocos, a próxima tarefa e os negócios abertos com o total em jogo.</li>
+<li><b>Linha do tempo foi para a aba Atividade.</b> Notas, conversas do agente, mudanças de etapa e tarefas continuam lá, com o campo de nota e os filtros por tipo.</li>
+<li><b>Campos ficam na aba Dados.</b> Cargo, interesse, campos capturados no fluxo, anotações, "Aceita mensagens", sequências e "Personalizar campos" saíram da frente, mas seguem editáveis ali.</li>
+<!--/NOTAS-->

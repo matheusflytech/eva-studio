@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowDown, ArrowUp, Loader2, Package, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -13,10 +13,10 @@ import {
   type ProdutoDoCatalogo,
   type ResumoDosItens,
 } from "@/lib/produtos";
-import { BotaoDeIcone, BotaoDeSecao, Secao } from "./pecas";
+import { BotaoDeIcone } from "./pecas";
 import { mensagemDeErro } from "./use-ficha";
 
-// Produtos (itens) do negócio na ficha: tabela editável no lugar, busca no
+// Produtos (itens) do negócio na ficha: blocos com edição no lugar, busca no
 // catálogo, item avulso, total, MRR/ARR e a chave "usar valor manual".
 // As contas são do servidor: a tela manda o que mudou e mostra o que voltou.
 
@@ -73,14 +73,33 @@ export type ItensDoNegocio = ReturnType<typeof useItensDoNegocio>;
 const reais = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** "R$" pequeno e apagado na frente do número grande (v5). */
+function ValorEmBloco({ cents, className }: { cents: number; className?: string }) {
+  return (
+    <span className={cn("font-medium tabular-nums tracking-tight text-text-primary", className)}>
+      <span className="mr-0.5 text-caption font-normal text-text-tertiary">R$</span>
+      {reais(cents)}
+    </span>
+  );
+}
+
+/**
+ * Produtos em blocos (cartão lateral da ficha, v5): um bloco por item com o
+ * total, e o "+" para adicionar do catálogo ou avulso. Clicar num bloco abre
+ * a edição dele embaixo (quantidade, preço, desconto, ordem, remover). No fim,
+ * a chave "usar valor manual" e o total com MRR/ARR.
+ */
 export function ProdutosDoNegocio({ estado }: { estado: ItensDoNegocio }) {
   const { dados, enviar } = estado;
   const [adicionando, setAdicionando] = React.useState(false);
+  const [aberto, setAberto] = React.useState<string | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
 
   // Produtos não ativados no banco (ou ainda carregando): a seção não aparece.
   if (!dados || !dados.disponivel) return null;
   const { itens, resumo, valorManual } = dados;
+  const indiceAberto = itens.findIndex((x) => x.id === aberto);
+  const itemAberto = indiceAberto >= 0 ? itens[indiceAberto] : null;
 
   async function rodar(caminho: string, metodo: string, corpo?: unknown) {
     setErro(null);
@@ -97,15 +116,60 @@ export function ProdutosDoNegocio({ estado }: { estado: ItensDoNegocio }) {
   }
 
   return (
-    <Secao
-      titulo="Produtos"
-      contagem={itens.length}
-      acao={
-        <BotaoDeSecao onClick={() => setAdicionando((v) => !v)} aria-expanded={adicionando}>
-          <Plus size={13} aria-hidden /> Adicionar
-        </BotaoDeSecao>
-      }
-    >
+    <section aria-label="Produtos" className="flex flex-col gap-2">
+      <p className="font-mono text-caption text-text-tertiary">
+        Produtos{itens.length > 0 && <span className="ml-1.5 text-text-secondary">{itens.length}</span>}
+      </p>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-2">
+        {itens.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-expanded={aberto === item.id}
+            onClick={() => {
+              setAdicionando(false);
+              setAberto((v) => (v === item.id ? null : item.id));
+            }}
+            className={cn(
+              "flex min-w-0 flex-col gap-3 rounded-[14px] bg-raised px-3 py-2.5 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus",
+              aberto === item.id && "ring-1 ring-inset ring-border-strong"
+            )}
+          >
+            <span className="truncate text-caption text-text-secondary" title={item.name}>
+              {item.name}
+              {textoDaQuantidade(item.quantity) !== "1" && <span className="text-text-tertiary"> × {textoDaQuantidade(item.quantity)}</span>}
+            </span>
+            <ValorEmBloco cents={item.totalCents} className="text-body-lg" />
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-label="Adicionar produto"
+          title="Adicionar produto"
+          aria-expanded={adicionando}
+          onClick={() => {
+            setAberto(null);
+            setAdicionando((v) => !v);
+          }}
+          className={cn(
+            "grid min-h-16 place-items-center rounded-[14px] border border-dashed border-border-default text-text-secondary outline-none transition-colors hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus",
+            adicionando && "bg-hover text-text-primary"
+          )}
+        >
+          <Plus size={16} aria-hidden />
+        </button>
+      </div>
+
+      {itens.length === 0 && !adicionando && (
+        <p className="text-caption text-text-tertiary">
+          Nenhum produto. Adicione do catálogo ou um item avulso: o valor do negócio passa a ser a soma.{" "}
+          <Link href="/negocios/configurar?aba=produtos" className="text-accent-fg hover:underline">
+            Montar o catálogo
+          </Link>
+        </p>
+      )}
+
       {adicionando && (
         <Adicionar
           aoAdicionar={async (corpo) => {
@@ -118,94 +182,60 @@ export function ProdutosDoNegocio({ estado }: { estado: ItensDoNegocio }) {
       )}
 
       {erro && (
-        <p role="alert" className="mb-2 rounded-lg bg-danger/10 px-3 py-2 text-[12.5px] text-danger">
+        <p role="alert" className="rounded-[10px] bg-danger-subtle px-3 py-2 text-small text-danger">
           {erro}
         </p>
       )}
 
-      {itens.length === 0 ? (
-        !adicionando && (
-          <div className="flex flex-col items-start gap-1 rounded-xl border border-dashed border-border-subtle px-3 py-4 text-[13px] text-text-secondary">
-            <span className="flex items-center gap-2">
-              <Package size={15} aria-hidden className="text-text-tertiary" /> Nenhum produto neste negócio.
-            </span>
-            <span className="text-[12px] text-text-tertiary">
-              Adicione do catálogo ou um item avulso: o valor do negócio passa a ser a soma.{" "}
-              <Link href="/negocios/configurar?aba=produtos" className="text-accent-400 hover:underline">
-                Montar o catálogo
-              </Link>
-            </span>
-          </div>
-        )
-      ) : (
-        <>
-          <div className="-mx-1 overflow-x-auto">
-            <table className="w-full min-w-[560px] border-separate border-spacing-0 text-[13px]">
-              <thead>
-                <tr className="text-left text-[11.5px] text-text-tertiary">
-                  <th scope="col" className="px-1 pb-1.5 font-normal">Produto</th>
-                  <th scope="col" className="w-[76px] px-1 pb-1.5 font-normal">Qtd.</th>
-                  <th scope="col" className="w-[108px] px-1 pb-1.5 font-normal">Preço (R$)</th>
-                  <th scope="col" className="w-[124px] px-1 pb-1.5 font-normal">Desconto</th>
-                  <th scope="col" className="w-[104px] px-1 pb-1.5 text-right font-normal">Total</th>
-                  <th scope="col" className="w-[84px] px-1 pb-1.5"><span className="sr-only">Ações</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {itens.map((item, i) => (
-                  <LinhaDoItem
-                    key={`${item.id}:${item.quantity}:${item.unitPriceCents}:${item.discountType}:${item.discountValue}`}
-                    item={item}
-                    primeiro={i === 0}
-                    ultimo={i === itens.length - 1}
-                    onSalvar={(corpo) => rodar(`/${item.id}`, "PATCH", corpo)}
-                    onRemover={() => rodar(`/${item.id}`, "DELETE")}
-                    onSubir={() => mover(i, -1)}
-                    onDescer={() => mover(i, 1)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-3 border-t border-border-subtle pt-3">
-            <label className="flex max-w-[320px] cursor-pointer items-start gap-2.5 text-[12.5px] text-text-secondary">
-              <Switch
-                checked={valorManual}
-                onCheckedChange={(v) => rodar("", "PATCH", { valorManual: v })}
-                aria-label="Usar valor manual"
-                className="mt-0.5"
-              />
-              <span>
-                Usar valor manual
-                <span className="block text-[11.5px] text-text-tertiary">
-                  {valorManual
-                    ? "O valor do negócio é o digitado em Sobre o negócio, não a soma."
-                    : "Desligado: o valor do negócio é a soma dos produtos."}
-                </span>
-              </span>
-            </label>
-            <div className="text-right">
-              <div className="text-[11.5px] text-text-tertiary">Total dos produtos</div>
-              <div className="font-display text-[18px] font-semibold tabular-nums text-text-primary">{moeda(resumo.totalCents)}</div>
-              {resumo.temRecorrencia && (
-                <div className="mt-0.5 text-[12px] tabular-nums text-text-secondary" title="MRR: receita recorrente por mês (anual conta 1/12). ARR: MRR × 12.">
-                  MRR {moeda(resumo.mrrCents)} · ARR {moeda(resumo.arrCents)}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
+      {itemAberto && (
+        <EditorDoItem
+          key={`${itemAberto.id}:${itemAberto.quantity}:${itemAberto.unitPriceCents}:${itemAberto.discountType}:${itemAberto.discountValue}`}
+          item={itemAberto}
+          primeiro={indiceAberto === 0}
+          ultimo={indiceAberto === itens.length - 1}
+          onSalvar={(corpo) => rodar(`/${itemAberto.id}`, "PATCH", corpo)}
+          onRemover={async () => {
+            const falha = await rodar(`/${itemAberto.id}`, "DELETE");
+            if (!falha) setAberto(null);
+            return falha;
+          }}
+          onSubir={() => mover(indiceAberto, -1)}
+          onDescer={() => mover(indiceAberto, 1)}
+          onFechar={() => setAberto(null)}
+        />
       )}
-    </Secao>
+
+      {itens.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-border-subtle pt-2">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-caption text-text-tertiary">Total dos produtos</span>
+            <ValorEmBloco cents={resumo.totalCents} className="text-body" />
+          </div>
+          {resumo.temRecorrencia && (
+            <p className="text-right font-mono text-caption tabular-nums text-text-secondary" title="MRR: receita recorrente por mês (anual conta 1/12). ARR: MRR × 12.">
+              MRR {moeda(resumo.mrrCents)} · ARR {moeda(resumo.arrCents)}
+            </p>
+          )}
+          <label className="flex cursor-pointer items-start gap-2.5 text-caption text-text-secondary">
+            <Switch checked={valorManual} onCheckedChange={(v) => rodar("", "PATCH", { valorManual: v })} aria-label="Usar valor manual" className="mt-0.5" />
+            <span>
+              Usar valor manual
+              <span className="block text-text-tertiary">
+                {valorManual ? "O valor do negócio é o digitado em Sobre o negócio, não a soma." : "Desligado: o valor do negócio é a soma dos produtos."}
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
+    </section>
   );
 }
 
 const classeDaCelula =
-  "h-8 w-full rounded-md border border-transparent bg-transparent px-1.5 text-[13px] tabular-nums text-text-primary outline-none transition-colors " +
-  "hover:border-border-subtle hover:bg-surface-2 focus:border-accent-500/60 focus:bg-surface-2 focus:ring-2 focus:ring-accent-500/20";
+  "h-8 w-full rounded-[10px] border border-transparent bg-raised px-2 text-small tabular-nums text-text-primary outline-none transition-colors " +
+  "hover:border-border-subtle focus:border-accent-solid focus:ring-2 focus:ring-accent-solid/20";
 
-/** Campo de texto da tabela: salva ao sair (ou Enter), só se mudou; Esc desfaz. */
+/** Campo de texto do item: salva ao sair (ou Enter), só se mudou; Esc desfaz. */
 function Celula({
   valor,
   rotulo,
@@ -242,7 +272,8 @@ function Celula({
   );
 }
 
-function LinhaDoItem({
+/** Edição do item aberto: quantidade, preço, desconto, total, ordem e remover. */
+function EditorDoItem({
   item,
   primeiro,
   ultimo,
@@ -250,6 +281,7 @@ function LinhaDoItem({
   onRemover,
   onSubir,
   onDescer,
+  onFechar,
 }: {
   item: ItemDoNegocio;
   primeiro: boolean;
@@ -258,6 +290,7 @@ function LinhaDoItem({
   onRemover: () => Promise<string | null>;
   onSubir: () => void;
   onDescer: () => void;
+  onFechar: () => void;
 }) {
   const desconto = item.discountValue
     ? item.discountType === "percentual"
@@ -267,50 +300,60 @@ function LinhaDoItem({
   const detalhes = [item.sku, item.recurrence !== "unico" ? rotuloDaRecorrencia(item.recurrence) : "", !item.productId ? "Avulso" : ""]
     .filter(Boolean)
     .join(" · ");
+  const rotulo = "mb-1 block font-mono text-caption text-text-tertiary";
 
   return (
-    <tr className="align-middle">
-      <td className="border-t border-border-subtle px-1 py-1.5">
-        <div className="min-w-0">
-          <div className="truncate font-medium text-text-primary" title={item.name}>{item.name}</div>
-          {detalhes && <div className="truncate text-[11.5px] text-text-tertiary">{detalhes}</div>}
+    <div className="flex flex-col gap-3 rounded-[14px] border border-border-subtle p-3">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-small font-medium text-text-primary" title={item.name}>
+            {item.name}
+          </p>
+          {detalhes && <p className="truncate text-caption text-text-tertiary">{detalhes}</p>}
         </div>
-      </td>
-      <td className="border-t border-border-subtle px-1 py-1.5">
-        <Celula valor={textoDaQuantidade(item.quantity)} rotulo={`Quantidade de ${item.name}`} onSalvar={(v) => onSalvar({ quantity: v })} />
-      </td>
-      <td className="border-t border-border-subtle px-1 py-1.5">
-        <Celula valor={reais(item.unitPriceCents)} rotulo={`Preço unitário de ${item.name}`} onSalvar={(v) => onSalvar({ unitPrice: v || "0" })} />
-      </td>
-      <td className="border-t border-border-subtle px-1 py-1.5">
-        <div className="flex items-center gap-1">
-          <Celula valor={desconto} rotulo={`Desconto de ${item.name}`} onSalvar={(v) => onSalvar({ discount: v })} className="min-w-0" />
-          <select
-            aria-label={`Tipo de desconto de ${item.name}`}
-            value={item.discountType}
-            onChange={(e) => onSalvar({ discountType: e.target.value })}
-            className="h-8 shrink-0 rounded-md border border-transparent bg-transparent px-1 text-[12px] text-text-secondary outline-none hover:border-border-subtle hover:bg-surface-2 focus:ring-2 focus:ring-accent-500/20"
-          >
-            <option value="percentual">%</option>
-            <option value="valor">R$</option>
-          </select>
+        <BotaoDeIcone rotulo={`Subir ${item.name}`} onClick={onSubir} disabled={primeiro}>
+          <ArrowUp size={13} aria-hidden />
+        </BotaoDeIcone>
+        <BotaoDeIcone rotulo={`Descer ${item.name}`} onClick={onDescer} disabled={ultimo}>
+          <ArrowDown size={13} aria-hidden />
+        </BotaoDeIcone>
+        <BotaoDeIcone rotulo={`Remover ${item.name}`} onClick={onRemover} className="hover:bg-danger-subtle hover:text-danger">
+          <Trash2 size={13} aria-hidden />
+        </BotaoDeIcone>
+        <BotaoDeIcone rotulo="Fechar edição do produto" onClick={onFechar}>
+          <X size={14} aria-hidden />
+        </BotaoDeIcone>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className={rotulo}>Qtd.</span>
+          <Celula valor={textoDaQuantidade(item.quantity)} rotulo={`Quantidade de ${item.name}`} onSalvar={(v) => onSalvar({ quantity: v })} />
         </div>
-      </td>
-      <td className="border-t border-border-subtle px-1 py-1.5 text-right font-medium tabular-nums text-text-primary">{moeda(item.totalCents)}</td>
-      <td className="border-t border-border-subtle px-1 py-1.5">
-        <div className="flex justify-end gap-0.5">
-          <BotaoDeIcone rotulo={`Subir ${item.name}`} onClick={onSubir} disabled={primeiro}>
-            <ArrowUp size={13} aria-hidden />
-          </BotaoDeIcone>
-          <BotaoDeIcone rotulo={`Descer ${item.name}`} onClick={onDescer} disabled={ultimo}>
-            <ArrowDown size={13} aria-hidden />
-          </BotaoDeIcone>
-          <BotaoDeIcone rotulo={`Remover ${item.name}`} onClick={onRemover} className="hover:bg-danger/10 hover:text-danger">
-            <X size={14} aria-hidden />
-          </BotaoDeIcone>
+        <div>
+          <span className={rotulo}>Preço (R$)</span>
+          <Celula valor={reais(item.unitPriceCents)} rotulo={`Preço unitário de ${item.name}`} onSalvar={(v) => onSalvar({ unitPrice: v || "0" })} />
         </div>
-      </td>
-    </tr>
+        <div>
+          <span className={rotulo}>Desconto</span>
+          <div className="flex items-center gap-1">
+            <Celula valor={desconto} rotulo={`Desconto de ${item.name}`} onSalvar={(v) => onSalvar({ discount: v })} className="min-w-0" />
+            <select
+              aria-label={`Tipo de desconto de ${item.name}`}
+              value={item.discountType}
+              onChange={(e) => onSalvar({ discountType: e.target.value })}
+              className="h-8 shrink-0 rounded-[10px] border border-transparent bg-raised px-1 text-caption text-text-secondary outline-none hover:border-border-subtle focus:ring-2 focus:ring-accent-solid/20"
+            >
+              <option value="percentual">%</option>
+              <option value="valor">R$</option>
+            </select>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className={rotulo}>Total</span>
+          <span className="inline-flex h-8 items-center text-small font-medium tabular-nums text-text-primary">{moeda(item.totalCents)}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -352,7 +395,7 @@ function Adicionar({
   }
 
   return (
-    <div className="mb-3 rounded-xl border border-border-subtle bg-surface-2 p-3">
+    <div className="rounded-[14px] border border-border-subtle bg-raised p-3">
       {!avulso ? (
         <>
           <div className="relative">
@@ -364,14 +407,14 @@ function Adicionar({
               onKeyDown={(e) => e.key === "Escape" && aoFechar()}
               placeholder="Buscar no catálogo por nome ou código"
               aria-label="Buscar produto no catálogo"
-              className="h-9 w-full rounded-lg border border-border-default bg-surface-1 pl-8 pr-2 text-[13px] text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/20"
+              className="h-9 w-full rounded-lg border border-border-default bg-panel pl-8 pr-2 text-small text-text-primary outline-none placeholder:text-text-tertiary focus:border-accent-solid focus:ring-2 focus:ring-accent-solid/20"
             />
           </div>
           <ul className="mt-2 flex max-h-[240px] flex-col gap-0.5 overflow-y-auto" aria-label="Produtos encontrados">
             {resultados === null ? (
-              <li className="px-2 py-1.5 text-[12.5px] text-text-tertiary">Buscando...</li>
+              <li className="px-2 py-1.5 text-small text-text-tertiary">Buscando...</li>
             ) : resultados.length === 0 ? (
-              <li className="px-2 py-1.5 text-[12.5px] text-text-tertiary">
+              <li className="px-2 py-1.5 text-small text-text-tertiary">
                 {busca ? "Nada encontrado no catálogo." : "O catálogo está vazio."}
               </li>
             ) : (
@@ -381,27 +424,27 @@ function Adicionar({
                     type="button"
                     disabled={!!enviando}
                     onClick={() => escolher({ productId: p.id }, p.id)}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-[13px] outline-none hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-50"
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-small outline-none hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
                   >
                     <span className="min-w-0 truncate text-text-primary">
                       {p.name}
-                      {p.sku && <span className="ml-1.5 text-[11.5px] text-text-tertiary">{p.sku}</span>}
+                      {p.sku && <span className="ml-1.5 text-caption text-text-tertiary">{p.sku}</span>}
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5 tabular-nums text-text-secondary">
                       {enviando === p.id && <Loader2 size={13} className="animate-spin" aria-hidden />}
                       {moeda(p.priceCents)}
-                      {p.recurrence !== "unico" && <span className="text-[11px] text-text-tertiary">{rotuloDaRecorrencia(p.recurrence).toLowerCase()}</span>}
+                      {p.recurrence !== "unico" && <span className="text-caption text-text-tertiary">{rotuloDaRecorrencia(p.recurrence).toLowerCase()}</span>}
                     </span>
                   </button>
                 </li>
               ))
             )}
           </ul>
-          <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2 text-[12px]">
-            <button type="button" onClick={() => setAvulso(true)} className="rounded px-1 text-accent-400 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent-500/60">
+          <div className="mt-2 flex items-center justify-between border-t border-border-subtle pt-2 text-caption">
+            <button type="button" onClick={() => setAvulso(true)} className="rounded px-1 text-accent-fg outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
               + Item avulso (fora do catálogo)
             </button>
-            <button type="button" onClick={aoFechar} className="rounded px-1 text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60">
+            <button type="button" onClick={aoFechar} className="rounded px-1 text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus">
               Fechar
             </button>
           </div>
@@ -415,7 +458,7 @@ function Adicionar({
           }}
           className="flex flex-wrap items-end gap-2"
         >
-          <label className="min-w-[180px] flex-1 text-[11.5px] text-text-tertiary">
+          <label className="min-w-40 flex-1 text-caption text-text-tertiary">
             Nome do item
             <input
               autoFocus
@@ -423,27 +466,27 @@ function Adicionar({
               onChange={(e) => setNome(e.target.value)}
               maxLength={200}
               placeholder="Ex.: Frete, Taxa de instalação"
-              className="mt-0.5 h-9 w-full rounded-lg border border-border-default bg-surface-1 px-2 text-[13px] text-text-primary outline-none focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/20"
+              className="mt-0.5 h-9 w-full rounded-lg border border-border-default bg-panel px-2 text-small text-text-primary outline-none focus:border-accent-solid focus:ring-2 focus:ring-accent-solid/20"
             />
           </label>
-          <label className="w-[120px] text-[11.5px] text-text-tertiary">
+          <label className="w-[120px] text-caption text-text-tertiary">
             Preço (R$)
             <input
               value={preco}
               onChange={(e) => setPreco(e.target.value)}
               inputMode="decimal"
               placeholder="0,00"
-              className="mt-0.5 h-9 w-full rounded-lg border border-border-default bg-surface-1 px-2 text-[13px] tabular-nums text-text-primary outline-none focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/20"
+              className="mt-0.5 h-9 w-full rounded-lg border border-border-default bg-panel px-2 text-small tabular-nums text-text-primary outline-none focus:border-accent-solid focus:ring-2 focus:ring-accent-solid/20"
             />
           </label>
           <button
             type="submit"
             disabled={!nome.trim() || !!enviando}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-[13px] font-medium text-text-on-accent outline-none hover:bg-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-40"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent-solid px-3.5 text-small font-medium text-text-on-accent outline-none hover:bg-accent-solid-hover focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
           >
             {enviando && <Loader2 size={13} className="animate-spin" aria-hidden />} Adicionar
           </button>
-          <button type="button" onClick={() => setAvulso(false)} className="h-9 rounded-lg px-2 text-[12.5px] text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60">
+          <button type="button" onClick={() => setAvulso(false)} className="h-9 rounded-full px-2 text-small text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus">
             Voltar ao catálogo
           </button>
         </form>

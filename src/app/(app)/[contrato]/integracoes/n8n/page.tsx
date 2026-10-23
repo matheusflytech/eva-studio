@@ -39,10 +39,10 @@ function Copiar({ texto }: { texto: string }) {
 function Passo({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[12px] font-semibold text-text-primary">{n}</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised font-mono text-caption text-text-secondary ring-1 ring-inset ring-border-subtle">{n}</span>
       <div className="min-w-0 flex-1 pb-1">
-        <p className="text-[13px] font-medium text-text-primary">{titulo}</p>
-        <div className="mt-0.5 text-[12.5px] leading-relaxed text-text-secondary">{children}</div>
+        <p className="text-small font-medium text-text-primary">{titulo}</p>
+        <div className="mt-0.5 text-small leading-relaxed text-text-secondary">{children}</div>
       </div>
     </li>
   );
@@ -50,8 +50,8 @@ function Passo({ n, titulo, children }: { n: number; titulo: string; children: R
 
 function Codigo({ children }: { children: string }) {
   return (
-    <span className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-border-subtle bg-surface-3 px-2.5 py-1.5">
-      <code className="min-w-0 flex-1 break-all font-mono text-[11.5px] text-text-primary">{children}</code>
+    <span className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-border-subtle bg-raised px-2.5 py-1.5">
+      <code className="min-w-0 flex-1 break-all font-mono text-caption text-text-primary">{children}</code>
       <Copiar texto={children} />
     </span>
   );
@@ -83,16 +83,16 @@ export default function N8nPage() {
   }, []);
 
   return (
-    <div className="flex-1 p-8">
-      <Link href="/integracoes" className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 lg:px-6">
+      <Link href="/integracoes" className="mb-2 inline-flex items-center gap-1.5 self-start text-small font-medium text-text-secondary hover:text-text-primary">
         <ArrowLeft size={15} /> Integrações
       </Link>
 
-      <div className="mb-8 flex items-start gap-4">
+      <div className="mb-6 flex items-start gap-4">
         <LogoDaMarca marca="n8n" tamanho={44} />
         <div>
-          <h1 className="font-display text-xl font-semibold text-text-primary">n8n e webhooks</h1>
-          <p className="mt-1 max-w-2xl text-[13px] text-text-secondary">
+          <h1 className="text-heading font-semibold tracking-tight text-text-primary">n8n e webhooks</h1>
+          <p className="mt-0.5 max-w-2xl text-small text-text-tertiary">
             Ligue o Eva Studio ao n8n (ou a qualquer sistema) nos dois sentidos: o n8n lê e grava no CRM pela API, e o
             CRM avisa o n8n quando algo acontece.
           </p>
@@ -100,11 +100,11 @@ export default function N8nPage() {
       </div>
 
       <div className="mb-8 grid gap-4 lg:grid-cols-2">
-        <section className="glass-card rounded-3xl p-5">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Do n8n para o Eva</p>
+        <section className="rounded-[18px] border border-border-subtle bg-panel p-5">
+          <p className="mb-3 font-mono text-caption text-text-tertiary">Do n8n para o Eva</p>
           <ol className="flex flex-col gap-3">
             <Passo n={1} titulo="Crie uma chave de API">
-              Em <Link href="/integracoes" className="text-accent-fg hover:underline">Integrações → Chaves de API</Link>, só com os
+              Em <Link href="/integracoes?aba=api" className="text-accent-fg hover:underline">Integrações › API do contrato</Link>, só com os
               escopos que o fluxo precisa (por exemplo, contatos e negócios).
             </Passo>
             <Passo n={2} titulo="Crie a credencial no n8n">
@@ -125,8 +125,8 @@ export default function N8nPage() {
           </ol>
         </section>
 
-        <section className="glass-card rounded-3xl p-5">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Do Eva para o n8n</p>
+        <section className="rounded-[18px] border border-border-subtle bg-panel p-5">
+          <p className="mb-3 font-mono text-caption text-text-tertiary">Do Eva para o n8n</p>
           <ol className="flex flex-col gap-3">
             <Passo n={1} titulo="Crie um nó Webhook no n8n">
               Método POST. Copie a &quot;Production URL&quot; e ative o workflow (a &quot;Test URL&quot; só escuta enquanto o
@@ -146,8 +146,8 @@ export default function N8nPage() {
               sozinho por cerca de um dia e meio, sempre com o mesmo <code className="font-mono">webhook-id</code>: use-o para
               não processar repetido.
               <details className="mt-1.5">
-                <summary className="cursor-pointer text-[12px] text-accent-fg">Ver código para conferir no n8n</summary>
-                <pre className="mt-1.5 overflow-x-auto rounded-lg border border-border-subtle bg-surface-3 p-2.5 font-mono text-[11px] leading-relaxed text-text-secondary">
+                <summary className="cursor-pointer text-caption text-accent-fg">Ver código para conferir no n8n</summary>
+                <pre className="mt-1.5 overflow-x-auto rounded-[12px] bg-raised p-2.5 font-mono text-caption leading-relaxed text-text-secondary">
                   {VERIFICAR}
                 </pre>
               </details>
@@ -157,15 +157,15 @@ export default function N8nPage() {
       </div>
 
       <div className="mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">Webhooks de saída</p>
-        <p className="mt-1 max-w-2xl text-[12.5px] text-text-secondary">
+        <h2 className="text-title-sm font-semibold tracking-tight text-text-primary">Webhooks de saída</h2>
+        <p className="mt-0.5 max-w-2xl text-small text-text-tertiary">
           Endereços que recebem os eventos deste contrato. O corpo traz o objeto completo, no mesmo formato da API, e o que
           mudou em <code className="font-mono">previous</code>.
         </p>
       </div>
       <WebhooksPanel />
 
-      <p className="mt-8 max-w-2xl text-[12px] text-text-tertiary">
+      <p className="mt-8 max-w-2xl text-caption text-text-tertiary">
         Quer que um agente chame o n8n no meio da conversa? Use o bloco &quot;Enviar para o n8n&quot; no fluxo do agente, ou o
         modelo pronto &quot;Atendimento com n8n&quot; ao criar um agente. Para o seu fluxo responder depois, gere a URL de
         entrada na aba Avançado do agente.

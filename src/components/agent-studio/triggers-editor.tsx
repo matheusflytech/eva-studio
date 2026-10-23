@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, ChevronDown, CornerDownRight, Pencil, Plus, Sparkles, Trash2, Zap } from "lucide-react";
+import { ArrowRight, ChevronDown, CornerDownRight, Lightbulb, Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -146,7 +146,7 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
     return (
       <div className="flex flex-col gap-2.5 p-1" aria-busy="true" aria-label="Carregando gatilhos">
         {[0, 1].map((i) => (
-          <div key={i} className="h-[76px] animate-pulse rounded-2xl bg-surface-2" />
+          <div key={i} className="h-[76px] animate-pulse rounded-[14px] bg-raised" />
         ))}
       </div>
     );
@@ -156,7 +156,7 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
     <div className="flex flex-col gap-5">
       {triggers.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[12.5px] text-text-tertiary">
+          <p className="text-small text-text-tertiary">
             {triggers.filter((t) => t.active).length} de {triggers.length} ativos · sem gatilho, a mensagem segue o fluxo padrão.
           </p>
           <NovoGatilho onEscolher={(k) => abrir(null, emptyDraft(k))} />
@@ -164,9 +164,9 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
       )}
 
       {erro && (
-        <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl bg-danger-subtle px-4 py-3 text-small text-danger">
           <span>{erro}</span>
-          <button type="button" onClick={() => setErro(null)} className="shrink-0 text-[12px] underline-offset-2 hover:underline">
+          <button type="button" onClick={() => setErro(null)} className="shrink-0 text-caption underline-offset-2 hover:underline">
             Fechar
           </button>
         </div>
@@ -185,14 +185,14 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
               <li
                 key={t.id}
                 className={cn(
-                  "group flex flex-wrap items-start gap-3.5 rounded-2xl bg-surface-2 p-3.5 ring-1 ring-border-subtle transition-colors hover:ring-border-default sm:flex-nowrap",
+                  "group flex flex-wrap items-start gap-3.5 rounded-[14px] bg-raised p-3.5 ring-1 ring-border-subtle transition-colors hover:ring-border-default sm:flex-nowrap",
                   !t.active && "opacity-60"
                 )}
               >
                 <span
                   className={cn(
                     "mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl",
-                    t.active ? "bg-accent-soft text-accent-400" : "bg-surface-3 text-text-tertiary"
+                    t.active ? "bg-accent-subtle text-accent-fg" : "bg-hover text-text-tertiary"
                   )}
                 >
                   <Icon size={18} aria-hidden />
@@ -203,13 +203,13 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
                     <button
                       type="button"
                       onClick={() => abrir(t.id, paraRascunho(t))}
-                      className="truncate text-left text-[14px] font-medium text-text-primary outline-none hover:underline focus-visible:underline"
+                      className="truncate text-left text-body font-medium text-text-primary outline-none hover:underline focus-visible:underline"
                     >
                       {t.name}
                     </button>
                     {!t.active && <Badge>Pausado</Badge>}
                   </div>
-                  <p className="mt-0.5 text-[12px] text-text-tertiary">
+                  <p className="mt-0.5 text-caption text-text-tertiary">
                     {meta.short} · {describeMatch(t)}
                     {t.kind === "dm_keyword" &&
                       ` · ${t.channels.length === 0 ? "todos os canais" : t.channels.map((c) => ROTULO_CANAL.get(c) ?? c).join(", ")}`}
@@ -218,17 +218,17 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
                   {t.keywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {t.keywords.slice(0, 5).map((k) => (
-                        <span key={k} className="rounded-md bg-surface-3 px-2 py-0.5 font-mono text-[11.5px] text-text-secondary">
+                        <span key={k} className="rounded-md bg-hover px-2 py-0.5 font-mono text-caption text-text-secondary">
                           {k}
                         </span>
                       ))}
                       {t.keywords.length > 5 && (
-                        <span className="rounded-md px-1.5 py-0.5 text-[11.5px] text-text-tertiary">+{t.keywords.length - 5}</span>
+                        <span className="rounded-md px-1.5 py-0.5 text-caption text-text-tertiary">+{t.keywords.length - 5}</span>
                       )}
                     </div>
                   )}
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-text-tertiary">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-caption text-text-tertiary">
                     {t.replyText && (
                       <span className="flex min-w-0 max-w-full items-center gap-1.5">
                         <CornerDownRight size={13} aria-hidden className="shrink-0" />
@@ -256,7 +256,7 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
                       type="button"
                       onClick={() => abrir(t.id, paraRascunho(t))}
                       aria-label={`Editar ${t.name}`}
-                      className="ml-1 grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-surface-3 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+                      className="ml-1 grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-hover hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       <Pencil size={15} aria-hidden />
                     </button>
@@ -264,12 +264,12 @@ export function TriggersEditor({ agentId }: { agentId: string }) {
                       type="button"
                       onClick={() => setExcluindo(t)}
                       aria-label={`Excluir ${t.name}`}
-                      className="grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-danger/10 hover:text-danger focus-visible:ring-2 focus-visible:ring-danger/60"
+                      className="grid h-9 w-9 place-items-center rounded-lg text-text-tertiary outline-none hover:bg-danger-subtle hover:text-danger focus-visible:ring-2 focus-visible:ring-danger/60"
                     >
                       <Trash2 size={15} aria-hidden />
                     </button>
                   </div>
-                  <p className="text-[11.5px] tabular-nums text-text-tertiary sm:text-right">
+                  <p className="text-caption tabular-nums text-text-tertiary sm:text-right">
                     <span className="font-medium text-text-secondary">{t.triggerCount.toLocaleString("pt-BR")}</span>{" "}
                     {t.triggerCount === 1 ? "disparo" : "disparos"}
                     {ultimo && <span className="sm:block"><span className="sm:hidden"> · </span>último {ultimo}</span>}
@@ -330,10 +330,10 @@ function NovoGatilho({ onEscolher }: { onEscolher: (k: Kind) => void }) {
           const Icon = KINDS[k].icon;
           return (
             <DropdownMenuItem key={k} onSelect={() => onEscolher(k)} className="items-start">
-              <Icon size={16} aria-hidden className="mt-0.5 shrink-0 text-accent-400" />
+              <Icon size={16} aria-hidden className="mt-0.5 shrink-0 text-text-tertiary" />
               <span>
-                <span className="block text-[13px] font-medium text-text-primary">{KINDS[k].label}</span>
-                <span className="block text-[11.5px] leading-snug text-text-tertiary">{KINDS[k].description}</span>
+                <span className="block text-small font-medium text-text-primary">{KINDS[k].label}</span>
+                <span className="block text-caption leading-snug text-text-tertiary">{KINDS[k].description}</span>
               </span>
             </DropdownMenuItem>
           );
@@ -346,11 +346,11 @@ function NovoGatilho({ onEscolher }: { onEscolher: (k: Kind) => void }) {
 function EstadoVazio({ onEscolher, onIdeia }: { onEscolher: (k: Kind) => void; onIdeia: (d: Draft) => void }) {
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-3 rounded-2xl bg-surface-2/60 p-4 ring-1 ring-border-subtle">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-400">
+      <div className="flex items-start gap-3 rounded-[14px] bg-raised/60 p-4 ring-1 ring-border-subtle">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-raised text-text-secondary">
           <Zap size={16} aria-hidden />
         </span>
-        <p className="text-[13px] leading-relaxed text-text-secondary">
+        <p className="text-small leading-relaxed text-text-secondary">
           Nenhum gatilho ainda. Sem gatilho, toda mensagem segue o fluxo padrão do agente. Com eles, uma palavra, uma resposta a
           story ou uma menção já leva a pessoa direto para a resposta certa.
         </p>
@@ -364,17 +364,17 @@ function EstadoVazio({ onEscolher, onIdeia }: { onEscolher: (k: Kind) => void; o
               key={k}
               type="button"
               onClick={() => onEscolher(k)}
-              className="group flex flex-col items-start gap-3 rounded-2xl bg-surface-2 p-4 text-left ring-1 ring-border-subtle outline-none transition hover:-translate-y-0.5 hover:ring-accent-500/40 focus-visible:ring-2 focus-visible:ring-accent-500/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group flex flex-col items-start gap-3 rounded-[14px] bg-raised p-4 text-left ring-1 ring-border-subtle outline-none transition hover:-translate-y-0.5 hover:ring-accent-solid/40 focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none motion-reduce:hover:translate-y-0"
             >
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-accent-400">
+              <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-raised text-text-secondary">
                 <Icon size={18} aria-hidden />
               </span>
               <span>
-                <span className="flex items-center gap-1.5 text-[13.5px] font-medium text-text-primary">
+                <span className="flex items-center gap-1.5 text-small font-medium text-text-primary">
                   {KINDS[k].short}
                   <ArrowRight size={13} aria-hidden className="opacity-0 transition-opacity group-hover:opacity-100" />
                 </span>
-                <span className="mt-1 block text-[12px] leading-snug text-text-tertiary">{KINDS[k].description}</span>
+                <span className="mt-1 block text-caption leading-snug text-text-tertiary">{KINDS[k].description}</span>
               </span>
             </button>
           );
@@ -382,8 +382,8 @@ function EstadoVazio({ onEscolher, onIdeia }: { onEscolher: (k: Kind) => void; o
       </div>
 
       <div>
-        <p className="mb-2 flex items-center gap-1.5 text-[12.5px] text-text-tertiary">
-          <Sparkles size={13} aria-hidden /> Ideias para começar
+        <p className="mb-2 flex items-center gap-1.5 text-small text-text-tertiary">
+          <Lightbulb size={13} aria-hidden /> Ideias para começar
         </p>
         <div className="flex flex-wrap gap-2">
           {IDEAS.map((i) => (
@@ -391,7 +391,7 @@ function EstadoVazio({ onEscolher, onIdeia }: { onEscolher: (k: Kind) => void; o
               key={i.label}
               type="button"
               onClick={() => onIdeia(i.draft)}
-              className="min-h-9 rounded-full bg-surface-2 px-3.5 text-[12.5px] text-text-secondary ring-1 ring-border-subtle outline-none hover:text-text-primary hover:ring-border-default focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              className="min-h-9 rounded-full bg-raised px-3.5 text-small text-text-secondary ring-1 ring-border-subtle outline-none hover:text-text-primary hover:ring-border-default focus-visible:ring-2 focus-visible:ring-focus"
             >
               + {i.label}
             </button>

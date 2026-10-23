@@ -1,0 +1,79 @@
+<!-- id: integracoes | titulo: Integrações | grupo: Conta | menu: integracoes | print: integracoes -->
+<style>
+.t-integracoes { overflow: hidden; }
+.t-integracoes .d-pagina.estreita { padding: 18px 24px; gap: 30px; }
+.t-integracoes .d-kpi .s { font-size: 12px; }
+.t-integracoes .lista { display: flex; flex-direction: column; }
+.t-integracoes .lista .d-h5 { padding: 0 4px 8px; }
+.t-integracoes .lista .d-h5 .dir { margin-left: auto; }
+.t-integracoes .d-linha { min-height: 66px; padding: 12px 4px; gap: 14px; }
+.t-integracoes .d-linha + .d-linha::before { left: 50px; right: 4px; }
+.t-integracoes .d-ic { width: 34px; height: 34px; border-radius: 10px; }
+.t-integracoes .d-linha .col { gap: 3px; }
+.t-integracoes .d-linha .t { font-size: 14px; }
+.t-integracoes .uso { width: 150px; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; font-size: 12px; color: var(--t2); font-variant-numeric: tabular-nums; }
+.t-integracoes .uso .d-barra { width: 100%; }
+.t-integracoes .uso .d-barra > i { background: var(--wn); }
+.t-integracoes .uso.wn { color: var(--wn); }
+.t-integracoes .d-linha .dir .chip { min-width: 74px; justify-content: center; }
+</style>
+<!--MOCK-->
+<div class="d-main t-integracoes">
+  <div class="d-bar">
+    <h4>Integrações</h4>
+    <div class="dir">
+      <span class="d-bt ic" title="Mais: uso por agente, Entrar com OpenRouter, n8n e webhooks, onde fica o WhatsApp"><svg><use href="#i-more"/></svg></span>
+      <span class="d-bt"><svg><use href="#i-list"/></svg>Fila de resposta</span>
+      <span class="d-bt p"><svg><use href="#i-plus"/></svg>Nova credencial</span>
+    </div>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas">
+      <span class="on"><svg><use href="#i-eva"/></svg>IA</span>
+      <span><svg><use href="#i-mail"/></svg>E-mail</span>
+      <span><svg><use href="#i-plug"/></svg>Servidores MCP</span>
+      <span><svg><use href="#i-key"/></svg>API do contrato</span>
+    </div>
+  </div>
+
+  <div class="d-scroll">
+    <div class="d-pagina estreita">
+      <div class="d-kpis">
+        <div class="d-kpi"><span class="r">Tokens em outubro</span><span class="v">1,3 mi</span></div>
+        <div class="d-kpi"><span class="r">Custo estimado</span><span class="v">R$ 9,40</span></div>
+        <div class="d-kpi"><span class="r">Falhas</span><span class="v">1</span><span class="s">Groq, ontem</span></div>
+      </div>
+
+      <div class="lista">
+        <div class="d-h5">Chaves, na ordem em que respondem<span class="dir">4</span></div>
+        <div class="d-linha">
+          <span class="d-ic"><svg><use href="#i-key"/></svg></span>
+          <span class="col"><span class="t">Groq (balão do site)</span><span class="s">Groq · openai/gpt-oss-120b</span></span>
+          <span class="dir"><span class="uso">4,8 mil tokens</span><span class="chip">1º</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="d-ic"><svg><use href="#i-key"/></svg></span>
+          <span class="col"><span class="t">OpenAI produção</span><span class="s">OpenAI · gpt-4.1-mini</span></span>
+          <span class="dir"><span class="uso wn"><span class="d-barra"><i style="width:87%"></i></span>87% do limite</span><span class="chip">2º reserva</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="d-ic"><svg><use href="#i-key"/></svg></span>
+          <span class="col"><span class="t">OpenRouter (Matheus)</span><span class="s">OpenRouter</span></span>
+          <span class="dir"><span class="uso t3">sem uso</span><span class="chip contorno">fora da fila</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="d-ic"><svg><use href="#i-mail"/></svg></span>
+          <span class="col"><span class="t">Resend envios</span><span class="s">Resend</span></span>
+          <span class="dir"><span class="chip contorno">só e-mail</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>A fila virou um botão</b> Ordem das chaves, modelo, tempo limite e "Salvar conexão" ficam em "Fila de resposta". Na frente, cada chave só mostra a posição: 1º, reserva ou fora da fila.</li>
+<li><b>Uso do mês em três números</b> Tokens, custo e falhas ficam no topo. Chamadas, limite exato e custo por chave saíram da linha e aparecem ao abrir a chave, onde também ficam editar e apagar.</li>
+<li><b>Só o limite que preocupa aparece</b> A chave perto do teto mostra a barra em amarelo. As outras mostram só o total de tokens.</li>
+<li><b>Atalhos no "…"</b> Uso por agente, Entrar com OpenRouter, n8n e webhooks e o aviso de que WhatsApp fica em Configurações › Canais saíram da tela e ficam no menu. As abas perderam a contagem.</li>
+<!--/NOTAS-->

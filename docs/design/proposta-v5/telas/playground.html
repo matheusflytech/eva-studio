@@ -1,0 +1,50 @@
+<!-- id: playground | titulo: Playground | grupo: IA | menu: playground | print: playground -->
+<style>
+.t-playground { overflow: hidden; }
+.t-playground .agsel { gap: 8px; padding: 0 10px 0 6px; }
+.t-playground .agsel > svg:last-child { color: var(--t3); width: 14px; height: 14px; }
+.t-playground .msgs { flex: 1; min-height: 0; overflow: hidden; width: 100%; max-width: 680px; margin: 0 auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 12px; }
+.t-playground .ops { display: flex; gap: 6px; align-self: flex-start; margin-top: -4px; }
+.t-playground .ops .d-bt { color: var(--t3); }
+.t-playground .compor { flex: none; width: 100%; max-width: 680px; margin: 0 auto; padding: 8px 24px 24px; display: flex; gap: 8px; }
+.t-playground .compor .d-in { flex: 1; height: 44px; border-radius: 99px; padding: 0 18px; font-size: 14px; }
+.t-playground .compor .d-bt { height: 44px; width: 44px; padding: 0; justify-content: center; }
+</style>
+<!--MOCK-->
+<div class="d-main t-playground">
+  <div class="d-bar">
+    <h4>Playground</h4>
+    <span class="cnt">teste, nada é salvo</span>
+    <div class="dir">
+      <span class="d-bt agsel"><span class="sq md vv">V</span>Vendedor Virtual<svg><use href="#i-chevs"/></svg></span>
+      <span class="d-bt"><svg><use href="#i-refresh"/></svg>Reiniciar</span>
+    </div>
+  </div>
+
+  <div class="msgs">
+    <div class="d-b in">Olá! Sou o agente "Vendedor Virtual". Pergunte algo pra testar.</div>
+    <div class="d-b out">Oi, vi o curso de desenho no Instagram. Como funciona?</div>
+    <div class="d-b in">O Drawing Club tem aulas gravadas e um encontro ao vivo toda quinta. Quer ver o quê primeiro?</div>
+    <div class="ops">
+      <span class="d-bt sm">Turmas abertas</span>
+      <span class="d-bt sm">Valores</span>
+      <span class="d-bt sm">Falar com atendente</span>
+    </div>
+    <div class="d-b out">Valores</div>
+    <div class="d-b in">O plano anual sai em 12x de R$&nbsp;49,90 e o mensal custa R$&nbsp;79,90. Os dois liberam todas as aulas.</div>
+    <div class="d-b out">Tem certificado?</div>
+    <div class="digitando"><i></i><i></i><i></i></div>
+  </div>
+
+  <div class="compor">
+    <span class="d-in">Digite uma mensagem</span>
+    <span class="d-bt p"><svg><use href="#i-send"/></svg></span>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Lista de agentes vira um seletor</b> A coluna com os cinco agentes e suas descrições sai. Escolhe-se o agente no seletor da barra; a descrição aparece dentro dele.</li>
+<li><b>A conversa ocupa a tela</b> Sem cabeçalho duplicado do agente, a conversa fica numa coluna central, com espaço dos lados e a caixa de mensagem embaixo.</li>
+<li><b>Aviso em quatro palavras</b> A frase longa sobre contatos e Caixa de entrada vira "teste, nada é salvo" ao lado do título.</li>
+<li><b>Só duas ações</b> Trocar de agente e Reiniciar. Os botões de menu do fluxo continuam abaixo da mensagem, apagados depois de usados.</li>
+<!--/NOTAS-->

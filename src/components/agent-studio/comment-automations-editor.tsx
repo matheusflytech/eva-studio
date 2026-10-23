@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, MessageSquareText, Sparkles, RotateCcw } from "lucide-react";
+import { Plus, Trash2, MessageSquareText, FlaskConical, RotateCcw } from "lucide-react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,12 +101,12 @@ function CommentSimulator({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border-default bg-surface-2 p-4">
+    <div className="flex flex-col gap-3 rounded-[14px] border border-border-subtle bg-raised p-4">
       <div className="flex items-center gap-2">
-        <Sparkles size={14} className="text-accent-400" />
-        <p className="text-[13px] font-medium text-text-primary">Simulador de comentário</p>
+        <FlaskConical size={14} aria-hidden="true" className="text-text-tertiary" />
+        <p className="text-small font-medium text-text-primary">Simulador de comentário</p>
       </div>
-      <p className="text-[12px] text-text-tertiary">
+      <p className="text-caption text-text-tertiary">
         Digite um comentário como se alguém tivesse escrito num post seu — mostra qual automação bateria e deixa
         continuar a conversa pra testar o fluxo depois da DM, sem precisar de conta conectada.
       </p>
@@ -121,40 +121,40 @@ function CommentSimulator({ agentId }: { agentId: string }) {
           Simular
         </Button>
         {(messages.length > 0 || noMatch) && (
-          <button type="button" onClick={handleReset} className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-text-primary">
+          <button type="button" onClick={handleReset} className="shrink-0 rounded-lg p-2 text-text-tertiary hover:bg-hover hover:text-text-primary">
             <RotateCcw size={14} />
           </button>
         )}
       </div>
 
       {noMatch && (
-        <p className="text-[12.5px] text-text-tertiary">
+        <p className="text-small text-text-tertiary">
           Nenhuma automação ativa bateria com esse comentário — o contato só ficaria com o comentário público, sem DM.
         </p>
       )}
 
       {publicReply && (
-        <p className="rounded-lg border border-border-default bg-surface-3 px-3 py-2 text-[12.5px] text-text-secondary">
+        <p className="rounded-lg border border-border-default bg-hover px-3 py-2 text-small text-text-secondary">
           <span className="font-medium text-text-primary">Resposta pública no comentário: </span>
           {publicReply}
         </p>
       )}
 
       {messages.length > 0 && (
-        <div className="flex flex-col gap-2.5 rounded-xl border border-border-default bg-surface-3 p-3">
+        <div className="flex flex-col gap-2.5 rounded-[14px] border border-border-subtle bg-hover p-3">
           {messages.map((m) => (
             <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-2 text-[12.5px] leading-relaxed",
-                  m.role === "user" ? "bg-accent-500 text-text-on-accent" : "border border-border-subtle bg-surface-2 text-text-primary"
+                  "max-w-[85%] rounded-2xl px-3 py-2 text-small leading-relaxed",
+                  m.role === "user" ? "bg-accent-solid text-text-on-accent" : "border border-border-subtle bg-raised text-text-primary"
                 )}
               >
                 {m.text}
               </div>
             </div>
           ))}
-          {isTyping && <p className="text-[11.5px] text-text-tertiary">digitando...</p>}
+          {isTyping && <p className="text-caption text-text-tertiary">digitando…</p>}
           {/* div, não <form> — esse componente já vive dentro do <form> grande
               da página do agente; um <form> aninhado quebra o submit. */}
           <div className="flex items-center gap-1.5">
@@ -167,8 +167,8 @@ function CommentSimulator({ agentId }: { agentId: string }) {
                   handleContinue();
                 }
               }}
-              placeholder="Continuar a conversa..."
-              className="h-9 flex-1 rounded-lg border border-border-default bg-surface-2 px-3 text-[12.5px] text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-strong"
+              placeholder="Continuar a conversa…"
+              className="h-9 flex-1 rounded-lg border border-border-default bg-raised px-3 text-small text-text-primary placeholder:text-text-tertiary outline-none focus:border-border-strong"
             />
             <Button type="button" size="sm" onClick={() => handleContinue()} disabled={!draft.trim() || isTyping}>
               Enviar
@@ -240,11 +240,11 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
     await load();
   }
 
-  if (automations === null) return <p className="text-[13px] text-text-tertiary">Carregando...</p>;
+  if (automations === null) return <p className="text-small text-text-tertiary">Carregando…</p>;
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[12.5px] text-text-tertiary">
+      <p className="text-small text-text-tertiary">
         Igual o recurso de comentário do ManyChat: alguém comenta uma palavra-chave num post/reel seu, o Eva Studio
         responde no comentário (opcional) e manda uma mensagem privada — que já entra no fluxo normal do Builder
         a partir daí.
@@ -253,34 +253,34 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
       {automations.length > 0 && (
         <div className="flex flex-col gap-2">
           {automations.map((a) => (
-            <div key={a.id} className="rounded-xl border border-border-default bg-surface-2 px-3.5 py-3">
+            <div key={a.id} className="rounded-[14px] border border-border-subtle bg-raised px-3.5 py-3">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <MessageSquareText size={14} className="text-text-tertiary" />
-                  <p className="text-[13px] font-medium text-text-primary">{a.name}</p>
+                  <p className="text-small font-medium text-text-primary">{a.name}</p>
                   <Badge variant={a.active ? "success" : "neutral"}>{a.active ? "Ativa" : "Pausada"}</Badge>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => startEdit(a)} className="rounded-lg px-2 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-3 hover:text-text-primary">
+                  <button type="button" onClick={() => startEdit(a)} className="rounded-lg px-2 py-1.5 text-caption font-medium text-text-secondary hover:bg-hover hover:text-text-primary">
                     Editar
                   </button>
-                  <button type="button" onClick={() => handleDelete(a.id)} className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-3 hover:text-danger">
+                  <button type="button" onClick={() => handleDelete(a.id)} className="rounded-lg p-1.5 text-text-tertiary hover:bg-hover hover:text-danger">
                     <Trash2 size={14} />
                   </button>
                 </div>
               </div>
-              <p className="text-[11.5px] text-text-tertiary">
+              <p className="text-caption text-text-tertiary">
                 Gatilho: {a.keyword ? `"${a.keyword}"` : "qualquer comentário"} em {a.mediaId ? `post ${a.mediaId}` : "qualquer post"} ·{" "}
                 {a.triggerCount} disparo(s)
               </p>
-              <p className="mt-1 truncate text-[12px] text-text-secondary">DM: {a.dmMessage}</p>
+              <p className="mt-1 truncate text-caption text-text-secondary">DM: {a.dmMessage}</p>
             </div>
           ))}
         </div>
       )}
 
       {editingId ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-border-default bg-surface-2 p-3.5">
+        <div className="flex flex-col gap-3 rounded-[14px] border border-border-subtle bg-raised p-3.5">
           <div>
             <Label htmlFor="ca-name">Nome interno</Label>
             <Input id="ca-name" value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Ex: Comentou LINK no reel de lançamento" />
@@ -288,7 +288,7 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="ca-media">Id do post/reel (opcional)</Label>
-              <Input id="ca-media" className="font-mono text-[12.5px]" value={draft.mediaId} onChange={(e) => setDraft((d) => ({ ...d, mediaId: e.target.value }))} placeholder="Vazio = qualquer post" />
+              <Input id="ca-media" className="font-mono text-small" value={draft.mediaId} onChange={(e) => setDraft((d) => ({ ...d, mediaId: e.target.value }))} placeholder="Vazio = qualquer post" />
             </div>
             <div>
               <Label htmlFor="ca-keyword">Palavra-chave (opcional)</Label>
@@ -301,19 +301,19 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
           </div>
           <div>
             <Label htmlFor="ca-dm">Mensagem privada</Label>
-            <Textarea id="ca-dm" rows={3} value={draft.dmMessage} onChange={(e) => setDraft((d) => ({ ...d, dmMessage: e.target.value }))} placeholder="Ex: Oi! Vi que você quer o link, aqui está: ..." />
+            <Textarea id="ca-dm" rows={3} value={draft.dmMessage} onChange={(e) => setDraft((d) => ({ ...d, dmMessage: e.target.value }))} placeholder="Ex: Oi! Vi que você quer o link, aqui está: …" />
           </div>
-          <label className="flex items-center gap-2 text-[12.5px] text-text-secondary">
+          <label className="flex items-center gap-2 text-small text-text-secondary">
             <input type="checkbox" checked={draft.active} onChange={(e) => setDraft((d) => ({ ...d, active: e.target.checked }))} />
             Automação ativa
           </label>
-          {error && <p className="text-[12.5px] text-danger">{error}</p>}
+          {error && <p className="text-small text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setEditingId(null)}>
               Cancelar
             </Button>
             <Button type="button" size="sm" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Salvando..." : "Salvar automação"}
+              {isSaving ? "Salvando…" : "Salvar automação"}
             </Button>
           </div>
         </div>
@@ -321,7 +321,7 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
         <button
           type="button"
           onClick={startNew}
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-default py-2.5 text-[12.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-default py-2.5 text-small font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           <Plus size={14} /> Nova automação de comentário
         </button>

@@ -142,25 +142,25 @@ function MapaDeCampos({
 
   if (defs.length === 0) {
     return (
-      <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
+      <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-tertiary">
         Você ainda não criou campos {entidade === "deal" ? "do negócio" : "do contato"}.{" "}
-        <Link href="/negocios/configurar" className="text-accent-400 hover:underline">Criar campos</Link> para o agente poder preenchê-los.
+        <Link href="/negocios/configurar" className="text-accent-fg hover:underline">Criar campos</Link> para o agente poder preenchê-los.
       </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+      <label className="flex cursor-pointer items-start gap-2.5 text-small">
         <Checkbox checked={data.crmAutoFill !== false} onCheckedChange={(v) => onChange({ crmAutoFill: v === true })} />
         <span className="min-w-0">
           <span className="block font-medium text-text-primary">Preencher pelo nome da variável</span>
-          <span className="block text-[11.5px] text-text-tertiary">
+          <span className="block text-caption text-text-tertiary">
             Se uma pergunta guarda a resposta numa variável com o mesmo nome de um campo, o valor vai direto para o campo.
           </span>
         </span>
       </label>
-      <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-[11.5px] text-text-tertiary">
+      <div className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-tertiary">
         Nomes dos campos:{" "}
         {defs.map((d) => (
           <span key={d.id} className="mr-1.5 inline-block font-mono text-text-secondary" title={`${d.label} (${TIPO_POR_ID.get(d.type)?.rotulo})`}>
@@ -179,7 +179,7 @@ function MapaDeCampos({
                 className="h-9"
                 onChange={(e) => set(mapa.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))}
               >
-                <option value="">Campo...</option>
+                <option value="">Campo…</option>
                 {defs.map((d) => (
                   <option key={d.id} value={d.key}>{d.label}</option>
                 ))}
@@ -199,7 +199,7 @@ function MapaDeCampos({
           <button
             type="button"
             onClick={() => set([...mapa, { key: "", value: "" }])}
-            className="inline-flex w-fit items-center gap-1.5 text-[12px] text-accent-400 hover:underline"
+            className="inline-flex w-fit items-center gap-1.5 text-caption text-accent-fg hover:underline"
           >
             <Plus size={13} /> Adicionar valor
           </button>
@@ -247,7 +247,7 @@ export function CrmBlockFields({
             onChange={(e) => onChange({ crmDealAmount: e.target.value })}
             placeholder="{orcamento} ou 1500,00"
           />
-          <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+          <p className="mt-1.5 text-caption text-text-tertiary">
             Aceita variável. Entende vírgula decimal e ponto de milhar.
           </p>
         </div>
@@ -264,7 +264,7 @@ export function CrmBlockFields({
           <Label>Campos do negócio</Label>
           <MapaDeCampos entidade="deal" pipelineId={data.crmPipelineId ?? pipelines[0]?.id} data={data} onChange={onChange} />
         </div>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           O contato da conversa é vinculado ao negócio automaticamente. A probabilidade vem da etapa escolhida.
         </p>
       </div>
@@ -287,7 +287,7 @@ export function CrmBlockFields({
           </Select>
         </div>
         <MapaDeCampos entidade={alvo} data={data} onChange={onChange} />
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Valor vazio é ignorado: se o cliente ainda não respondeu, o que já está no campo não é apagado. Resposta que
           não combina com o tipo do campo (texto num campo de número) é descartada e aparece na aba Execuções.
         </p>
@@ -311,26 +311,26 @@ export function CrmBlockFields({
             id="node-lost-reason"
             value={data.crmLostReason ?? ""}
             onChange={(e) => onChange({ crmLostReason: e.target.value })}
-            placeholder="Preço, prazo, sumiu..."
+            placeholder="Preço, prazo, sumiu…"
           />
-          <p className="mt-1 text-[11.5px] text-text-tertiary">
+          <p className="mt-1 text-caption text-text-tertiary">
             Se bater com um motivo do funil, entra como ele; senão vira “Outro” com este texto como nota.
           </p>
         </div>
-        <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+        <label className="flex cursor-pointer items-start gap-2.5 text-small">
           <Checkbox
             checked={data.crmIgnorarObrigatorios === true}
             onCheckedChange={(v) => onChange({ crmIgnorarObrigatorios: v === true })}
           />
           <span className="min-w-0">
             <span className="block font-medium text-text-primary">Mover mesmo sem os campos obrigatórios da etapa</span>
-            <span className="block text-[11.5px] text-text-tertiary">
+            <span className="block text-caption text-text-tertiary">
               Desligado, o bloco falha quando faltar algum campo exigido pela etapa (ou o motivo da perda). Ligado, move e
               registra no histórico que pulou os obrigatórios.
             </span>
           </span>
         </label>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Age no negócio aberto mais recente do contato. Se ele não tiver negócio aberto, o bloco registra o erro
           na aba Execuções e o fluxo continua.
         </p>
@@ -389,7 +389,7 @@ export function CrmBlockFields({
             ))}
           </Select>
         </div>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Prazo é relativo de propósito: numa automação, data fixa nunca serve. Aceita &quot;+2 dias&quot;,
           &quot;3h&quot;, &quot;30m&quot;.
         </p>
@@ -418,21 +418,21 @@ export function CrmBlockFields({
             value={data.crmTagId ?? ""}
             onChange={(e) => onChange({ crmTagId: e.target.value })}
           >
-            <option value="">Selecione...</option>
+            <option value="">Selecione…</option>
             {tags.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </Select>
           {tags.length === 0 && (
-            <p className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 inline-flex items-center gap-1 text-caption text-text-tertiary">
               Nenhuma etiqueta ainda. Crie em{" "}
-              <Link href="/contatos" className="inline-flex items-center gap-1 text-accent-400 hover:underline">
+              <Link href="/contatos" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
                 Contatos <ExternalLink size={11} />
               </Link>
             </p>
           )}
         </div>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Aplicar uma etiqueta pode inscrever o contato numa sequência, se houver alguma com esse gatilho. É a ponte
           entre o fluxo e a régua de acompanhamento.
         </p>
@@ -453,7 +453,7 @@ export function CrmBlockFields({
             placeholder="Cliente pediu orçamento de {produto} pelo WhatsApp."
           />
         </div>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Aceita variáveis. Aparece na linha do tempo do contato e, se houver negócio aberto, também nele.
         </p>
       </div>
@@ -463,8 +463,8 @@ export function CrmBlockFields({
   if (iconKey === "crm-lookup") {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-[11.5px] text-text-tertiary">Sem configuração. Preenche estas variáveis:</p>
-        <ul className="flex flex-col gap-1 rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] text-text-secondary">
+        <p className="text-caption text-text-tertiary">Sem configuração. Preenche estas variáveis:</p>
+        <ul className="flex flex-col gap-1 rounded-[14px] bg-raised px-3 py-2.5 font-mono text-caption text-text-secondary">
           <li>{"{crm_empresa}"}</li>
           <li>{"{crm_tem_negocio}"} — &quot;sim&quot; ou &quot;nao&quot;</li>
           <li>{"{crm_negocio_id}"}</li>
@@ -473,7 +473,7 @@ export function CrmBlockFields({
           <li>{"{crm_tarefas_abertas}"}</li>
           <li>{"{crm_etiquetas}"}</li>
         </ul>
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Ligue um bloco de Condição depois deste para ramificar. Ex:{" "}
           <span className="font-mono">{'{crm_tem_negocio} == "sim"'}</span>
         </p>
@@ -501,9 +501,9 @@ export function CrmBlockFields({
       <div className="flex flex-col gap-4">
         <div>
           <Label>Ações liberadas</Label>
-          <div className="mt-1.5 flex flex-col gap-2 rounded-xl bg-surface-2 p-3">
+          <div className="mt-1.5 flex flex-col gap-2 rounded-[14px] bg-raised p-3">
             {ACTIONS.map((a) => (
-              <label key={a.id} className="flex cursor-pointer items-start gap-2.5 text-[12.5px]">
+              <label key={a.id} className="flex cursor-pointer items-start gap-2.5 text-small">
                 <Checkbox
                   checked={actions.includes(a.id)}
                   onCheckedChange={(v) =>
@@ -514,7 +514,7 @@ export function CrmBlockFields({
                 />
                 <span className="min-w-0">
                   <span className="block font-medium text-text-primary">{a.label}</span>
-                  <span className="block text-[11.5px] text-text-tertiary">{a.hint}</span>
+                  <span className="block text-caption text-text-tertiary">{a.hint}</span>
                 </span>
               </label>
             ))}
@@ -524,9 +524,9 @@ export function CrmBlockFields({
         {actions.includes("mover_etapa") && (
           <div>
             <Label>Etapas que a IA pode usar</Label>
-            <div className="mt-1.5 flex max-h-[180px] flex-col gap-1.5 overflow-y-auto rounded-xl bg-surface-2 p-3">
+            <div className="mt-1.5 flex max-h-[180px] flex-col gap-1.5 overflow-y-auto rounded-[14px] bg-raised p-3">
               {allStages.map((s) => (
-                <label key={s.id} className="flex cursor-pointer items-center gap-2.5 text-[12.5px]">
+                <label key={s.id} className="flex cursor-pointer items-center gap-2.5 text-small">
                   <Checkbox
                     checked={allowedStages.includes(s.id)}
                     onCheckedChange={(v) =>
@@ -547,7 +547,7 @@ export function CrmBlockFields({
                 </label>
               ))}
             </div>
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 text-caption text-text-tertiary">
               Nenhuma marcada significa nenhuma, não todas. Pense duas vezes antes de liberar as etapas de ganho e
               perda: uma conversa simpática é motivo suficiente pro modelo querer marcar Ganho.
             </p>
@@ -563,14 +563,14 @@ export function CrmBlockFields({
               onChange={(e) => onChange({ crmMaxAmount: e.target.value })}
               placeholder="10000"
             />
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 text-caption text-text-tertiary">
               Acima disso o negócio é criado mesmo assim (perder a oportunidade seria pior), mas já nasce com uma
               tarefa de revisão humana. Vazio = sem teto.
             </p>
           </div>
         )}
 
-        <p className="text-[11.5px] text-text-tertiary">
+        <p className="text-caption text-text-tertiary">
           Conecte este bloco na porta roxa embaixo de um Agente de IA. Diferente dos blocos de CRM comuns, aqui quem
           decide quando agir é o modelo, a partir da conversa.
         </p>

@@ -20,7 +20,7 @@ export function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 max-w-xs rounded-md bg-inverse px-2 py-1 text-caption text-inverse-fg",
+          "z-50 max-w-xs rounded-lg bg-inverse px-2 py-1 text-caption text-inverse-fg",
           "data-[state=delayed-open]:animate-[ds-fade-in_120ms_var(--ease-standard)]",
           className
         )}

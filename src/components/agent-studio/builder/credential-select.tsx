@@ -79,8 +79,8 @@ export function CredentialSelect({
 
   if (creating) {
     return (
-      <div className="rounded-xl border border-border-default bg-surface-2 p-2.5">
-        <p className="mb-2 text-[11.5px] font-medium text-text-primary">Nova credencial {TYPE_LABEL[type]}</p>
+      <div className="rounded-[14px] border border-border-subtle bg-raised p-2.5">
+        <p className="mb-2 text-caption font-medium text-text-primary">Nova credencial {TYPE_LABEL[type]}</p>
         <div className="flex flex-col gap-2">
           <Input placeholder="Nome (ex: Groq principal)" value={newName} onChange={(e) => setNewName(e.target.value)} />
           <Input
@@ -89,20 +89,20 @@ export function CredentialSelect({
             value={newSecret}
             onChange={(e) => setNewSecret(e.target.value)}
           />
-          {error && <p className="text-[11px] text-danger">{error}</p>}
+          {error && <p className="text-caption text-danger">{error}</p>}
           <div className="flex gap-1.5">
             <button
               type="button"
               disabled={saving}
               onClick={handleCreate}
-              className="flex-1 rounded-lg bg-accent-500 px-2 py-1.5 text-[12px] font-medium text-text-on-accent hover:bg-accent-600 disabled:opacity-60"
+              className="flex-1 rounded-lg bg-accent-solid px-2 py-1.5 text-caption font-medium text-text-on-accent hover:bg-accent-solid-hover disabled:opacity-60"
             >
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando…" : "Salvar"}
             </button>
             <button
               type="button"
               onClick={() => { setCreating(false); setError(null); }}
-              className="rounded-lg px-2 py-1.5 text-[12px] text-text-tertiary hover:text-text-primary"
+              className="rounded-lg px-2 py-1.5 text-caption text-text-tertiary hover:text-text-primary"
             >
               Cancelar
             </button>
@@ -119,19 +119,19 @@ export function CredentialSelect({
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="flex items-center gap-1 text-[11.5px] font-medium text-accent-400 hover:text-accent-500"
+          className="flex items-center gap-1 text-caption font-medium text-accent-fg hover:text-accent-fg"
         >
           <Plus size={12} /> Nova
         </button>
       </div>
       <Select value={value ?? ""} onChange={(e) => onChange(e.target.value || undefined)} disabled={options === null}>
-        <option value="">Escolha uma credencial...</option>
+        <option value="">Escolha uma credencial…</option>
         {(options ?? []).map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}
       </Select>
       {options?.length === 0 && (
-        <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+        <p className="mt-1.5 text-caption text-text-tertiary">
           Nenhuma credencial {TYPE_LABEL[type]} ainda — clique em &quot;Nova&quot; ou cadastre em Integrações.
         </p>
       )}

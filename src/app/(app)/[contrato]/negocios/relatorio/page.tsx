@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
-import { ArrowLeft, Loader2, Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Printer } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
 import { dataBR, dataHoraBR, diaSemFusoBR, reais } from "@/lib/exportar/csv";
@@ -76,7 +76,7 @@ const pct = (v: number | null) => (v === null ? "—" : `${(v * 100).toLocaleStr
 // pré-renderizada (sem ele o build falha).
 export default function RelatorioDoFunilPage() {
   return (
-    <React.Suspense fallback={<div className="p-8 text-[13px] text-text-tertiary">Carregando...</div>}>
+    <React.Suspense fallback={<div className="px-4 pt-1 text-small text-text-tertiary lg:px-6">Carregando...</div>}>
       <Relatorio />
     </React.Suspense>
   );
@@ -126,39 +126,43 @@ function Relatorio() {
   const voltar = `/negocios`;
 
   return (
-    <div className="relatorio-tela flex min-h-full flex-col gap-4 p-4 sm:p-6 print:block print:p-0">
+    <div className="relatorio-tela flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6 print:block print:p-0">
       <style>{ESTILO_DE_IMPRESSAO}</style>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex items-center gap-3">
-          <Link
-            href={voltar}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-1 px-3 text-[12.5px] font-medium text-text-secondary outline-none transition-colors hover:border-border-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-          >
-            <ArrowLeft size={14} aria-hidden /> Voltar
-          </Link>
-          <div>
-            <h1 className="font-display text-[17px] font-semibold text-text-primary">Prévia do relatório</h1>
-            <p className="text-[12px] text-text-tertiary">
-              Na janela de impressão, escolha <strong className="text-text-secondary">Salvar como PDF</strong> como destino. A folha já sai em A4 deitado.
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => window.print()} disabled={!dados} className="h-9 rounded-lg px-3.5 text-[13px]">
-          <Printer size={15} aria-hidden /> Imprimir / salvar PDF
+      {/* Barra da tela: voltar, título e a única ação (imprimir). Some na impressão. */}
+      <header className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
+        <Link
+          href={voltar}
+          aria-label="Voltar aos negócios"
+          title="Voltar aos negócios"
+          className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-2" })}
+        >
+          <ArrowLeft aria-hidden="true" />
+        </Link>
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Prévia do relatório</h1>
+        <span className="font-mono text-caption text-text-tertiary">A4 deitado</span>
+        <Button onClick={() => window.print()} disabled={!dados} className="ml-auto">
+          <Printer size={14} aria-hidden="true" /> Imprimir / salvar PDF
         </Button>
       </header>
+      <p className="-mt-2 text-small text-text-secondary print:hidden">
+        Na janela de impressão, escolha <strong className="font-medium text-text-primary">Salvar como PDF</strong> como destino.
+      </p>
 
       {erro ? (
-        <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger print:hidden">
+        <p role="alert" className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger print:hidden">
           {erro}
         </p>
       ) : !dados ? (
-        <div className="flex items-center gap-2 px-1 text-[13px] text-text-tertiary print:hidden" aria-busy="true">
-          <Loader2 size={15} className="animate-spin" aria-hidden /> Montando o relatório...
+        <div aria-busy="true" className="mx-auto w-full max-w-[297mm] print:hidden">
+          <span className="sr-only">Montando o relatório...</span>
+          <div className="h-[60dvh] animate-pulse rounded-[18px] bg-raised motion-reduce:animate-none" />
         </div>
       ) : (
-        <Documento dados={dados} />
+        // A folha tem largura de A4: no celular ela rola dentro deste contêiner, não a página.
+        <div className="-mx-4 overflow-x-auto px-4 lg:-mx-6 lg:px-6 print:m-0 print:overflow-visible print:p-0">
+          <Documento dados={dados} />
+        </div>
       )}
     </div>
   );
@@ -204,7 +208,7 @@ function Documento({ dados }: { dados: DadosDoRelatorio }) {
   const maiorConversao = Math.max(1, ...dados.conversao.map((c) => c.quantidade));
 
   return (
-    <article className="relatorio-folha mx-auto w-full max-w-[297mm] bg-white text-[10.5pt] leading-snug text-zinc-900 shadow-2xl ring-1 ring-black/10 print:max-w-none print:shadow-none print:ring-0">
+    <article className="relatorio-folha mx-auto w-full min-w-[760px] max-w-[297mm] overflow-hidden rounded-[18px] bg-white text-[10.5pt] leading-snug text-zinc-900 ring-1 ring-border-subtle print:min-w-0 print:max-w-none print:overflow-visible print:rounded-none print:ring-0">
       {/* ── Capa ───────────────────────────────────────────────── */}
       <section className="relatorio-capa px-[14mm] py-[12mm] print:p-0">
         <p className="text-[9pt] font-semibold uppercase tracking-[0.12em] text-zinc-500">{dados.organizacao || "Relatório"}</p>

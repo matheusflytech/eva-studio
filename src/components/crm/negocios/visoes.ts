@@ -8,8 +8,8 @@ import type { FiltroCrm } from "@/lib/filtro-crm";
 // ---------------------------------------------------------------------------
 
 export const VISOES_DE_NEGOCIO = [
-  { id: "todos", label: "Todos os negócios" },
-  { id: "meus", label: "Meus negócios" },
+  { id: "todos", label: "Todos" },
+  { id: "meus", label: "Meus" },
   { id: "atencao", label: "Precisam de atenção" },
   { id: "fechando", label: "Fechando este mês" },
 ] as const;

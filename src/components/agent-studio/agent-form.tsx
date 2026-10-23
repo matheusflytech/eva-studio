@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "@/lib/contrato/navegacao";
 import { Trash2, Check } from "lucide-react";
+import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -223,7 +224,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
           {isEdit ? (
             <KnowledgeBaseUploader agentId={agentId} docs={knowledgeBase} onChange={setKnowledgeBase} />
           ) : (
-            <p className="text-[13px] text-text-tertiary">Crie o agente primeiro pra poder anexar documentos.</p>
+            <p className="text-small text-text-tertiary">Crie o agente primeiro pra poder anexar documentos.</p>
           )}
         </Card>
       </Secao>
@@ -251,7 +252,9 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
-            <CardTitle>Ferramentas do n8n</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> Ferramentas do n8n
+            </CardTitle>
             <CardDescription>
               Só para quem usa um fluxo no n8n. O agente de IA do Builder usa as ferramentas que você liga a ele lá.
             </CardDescription>
@@ -275,7 +278,9 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       <Secao id="avancado" aba={aba}>
         <Card>
           <CardHeader>
-            <CardTitle>Ligar a um fluxo do n8n</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> Ligar a um fluxo do n8n
+            </CardTitle>
             <CardDescription>Opcional. Use se a resposta vem de um workflow seu em vez do Builder.</CardDescription>
           </CardHeader>
           <WebhookConfig
@@ -343,13 +348,15 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Secao>
       )}
 
-      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
 
+      {/* Barra flutuante de salvar. Exclusão é rara e sem volta: fica discreta,
+          em texto vermelho, não em botão cheio. */}
       {mostrarBarra && (
-        <div className="sticky bottom-0 mt-2 flex items-center justify-between gap-3 rounded-2xl border border-border-default bg-surface-2/95 p-3 backdrop-blur">
+        <div className="sticky bottom-4 z-10 mt-2 flex items-center justify-between gap-3 rounded-full border border-border-subtle bg-overlay/90 p-1.5 pl-2 shadow-overlay backdrop-blur-xl">
           {isEdit ? (
-            <Button type="button" variant="danger" size="md" onClick={handleDelete}>
-              <Trash2 size={15} /> Excluir agente
+            <Button type="button" variant="ghost" size="md" onClick={handleDelete} className="text-danger hover:text-danger">
+              <Trash2 size={14} aria-hidden="true" /> Excluir agente
             </Button>
           ) : (
             <Button type="button" variant="ghost" size="md" onClick={() => router.push("/agent-studio")}>
@@ -358,12 +365,12 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
           )}
           <div className="flex items-center gap-3">
             {salvo && (
-              <span className="inline-flex items-center gap-1 text-[12.5px] text-emerald-400">
-                <Check size={14} /> Salvo
+              <span className="inline-flex items-center gap-1 text-small text-success">
+                <Check size={14} aria-hidden="true" /> Salvo
               </span>
             )}
             <Button type="submit" size="md" disabled={isSubmitting}>
-              {isSubmitting ? "Salvando..." : isEdit ? "Salvar alterações" : "Criar agente"}
+              {isSubmitting ? "Salvando…" : isEdit ? "Salvar alterações" : "Criar agente"}
             </Button>
           </div>
         </div>

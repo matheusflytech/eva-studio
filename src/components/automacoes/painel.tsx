@@ -15,11 +15,12 @@ import { saidasDe, UNIDADES, type Definicao, type No, type Regra } from "@/lib/a
 import type { Pendencia } from "@/lib/automacoes/validar";
 import { camposDeData, FormularioDoCatalogo, variaveisDisponiveis } from "./campos";
 import { EditorDeRegra } from "./regra";
-import { visualDoPasso, type Opcoes } from "./comum";
+import { IconeDoPasso, visualDoPasso, type Opcoes } from "./comum";
 
 // ---------------------------------------------------------------------------
 // Painel à direita: configura o passo escolhido no canvas (ou o gatilho, ou as
-// configurações da automação). Cada mudança é uma operação pura (aplicar),
+// configurações da automação). v5: painel limpo, blocos em bg-raised sem
+// borda e texto na escala do tema. Cada mudança é uma operação pura (aplicar),
 // então desfazer/refazer e a validação valem para tudo.
 // ---------------------------------------------------------------------------
 
@@ -49,16 +50,20 @@ export interface ConfigDaAutomacao {
 
 function Cabecalho({ tipo, acao, titulo, descricao, fechar }: { tipo: string; acao?: string; titulo: string; descricao?: string; fechar: () => void }) {
   const v = visualDoPasso(tipo, acao);
-  const Icone = v.icone;
   return (
-    <div className="flex items-start gap-3 border-b border-border-subtle px-4 py-3">
-      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg)}>
-        <Icone size={17} />
+    <div className="flex items-start gap-3 border-b border-border-subtle px-4 py-3.5">
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]",
+          v.marca ? "border border-border-subtle bg-raised" : [CATEGORY_CLASSES[v.cor].subtle, CATEGORY_CLASSES[v.cor].fg]
+        )}
+      >
+        <IconeDoPasso visual={v} tamanho={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-tertiary">{v.categoria}</p>
-        <p className="truncate text-[14px] font-semibold text-text-primary">{titulo}</p>
-        {descricao && <p className="mt-0.5 text-[12px] leading-snug text-text-secondary">{descricao}</p>}
+        <p className="font-mono text-caption text-text-tertiary">{v.categoria}</p>
+        <p className="truncate text-body font-semibold tracking-tight text-text-primary">{titulo}</p>
+        {descricao && <p className="mt-0.5 text-caption text-text-secondary">{descricao}</p>}
       </div>
       <IconButton aria-label="Fechar painel" size="sm" type="button" onClick={fechar}>
         <X size={14} />
@@ -70,10 +75,10 @@ function Cabecalho({ tipo, acao, titulo, descricao, fechar }: { tipo: string; ac
 function Pendencias({ lista }: { lista: Pendencia[] }) {
   if (!lista.length) return null;
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-danger/30 bg-danger-subtle px-3 py-2">
+    <div className="flex flex-col gap-1 rounded-[14px] bg-danger-subtle px-3 py-2.5">
       {lista.map((p, i) => (
-        <p key={i} className={cn("flex gap-1.5 text-[12px]", p.nivel === "erro" ? "text-danger" : "text-warning")}>
-          <AlertCircle size={13} className="mt-0.5 shrink-0" /> {p.mensagem}
+        <p key={i} className={cn("flex gap-1.5 text-caption", p.nivel === "erro" ? "text-danger" : "text-warning")}>
+          <AlertCircle size={13} aria-hidden="true" className="mt-0.5 shrink-0" /> {p.mensagem}
         </p>
       ))}
     </div>
@@ -182,14 +187,14 @@ export function PainelDoPasso({
           <Pendencias lista={doNo} />
           {item && <FormularioDoCatalogo campos={item.campos} config={no.config ?? {}} mudar={(config) => atualizar({ config })} objeto={def.objeto} opcoes={opcoes} variaveis={variaveis} />}
           {rotulo}
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle px-3 py-2">
+          <div className="flex items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
             <div>
-              <p className="text-[12.5px] font-medium text-text-primary">Caminho de erro</p>
-              <p className="text-[11.5px] text-text-tertiary">Se a ação falhar de vez, segue por outro ramo em vez de parar.</p>
+              <p className="text-small font-medium text-text-primary">Caminho de erro</p>
+              <p className="text-caption text-text-tertiary">Se a ação falhar de vez, segue por outro ramo em vez de parar.</p>
             </div>
             <Switch checked={no.erro !== undefined} onCheckedChange={(v) => atualizar({ comErro: v })} />
           </div>
-          {item?.falaComCliente && <p className="text-[11.5px] text-text-tertiary">Fala com o cliente: respeita quem não aceita mensagens e só sai em horário comercial (seg–sáb, 8h–20h).</p>}
+          {item?.falaComCliente && <p className="text-caption text-text-tertiary">Fala com o cliente: respeita quem não aceita mensagens e só sai em horário comercial (seg–sáb, 8h–20h).</p>}
           <Apagar no={no} aplicar={aplicar} />
         </div>
       </div>
@@ -217,7 +222,7 @@ export function PainelDoPasso({
         <div className="flex flex-col gap-4 overflow-y-auto p-4">
           <Pendencias lista={doNo} />
           {no.caminhos.map((c, i) => (
-            <div key={c.id} className="flex flex-col gap-2 rounded-xl border border-border-subtle p-3">
+            <div key={c.id} className="flex flex-col gap-2 rounded-[14px] bg-raised p-3">
               <div className="flex items-center gap-1.5">
                 <Input
                   value={c.nome}
@@ -370,8 +375,8 @@ export function PainelDeConfiguracoes({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
-        <p className="text-[14px] font-semibold text-text-primary">Configurações</p>
+      <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3.5">
+        <p className="text-body font-semibold tracking-tight text-text-primary">Configurações</p>
         <IconButton aria-label="Fechar painel" size="sm" type="button" onClick={fechar}>
           <X size={14} />
         </IconButton>
@@ -391,16 +396,16 @@ export function PainelDeConfiguracoes({
           {config.reinscricao === "intervalo" && (
             <div className="mt-2 flex items-center gap-2">
               <Input type="number" min={1} aria-label="Horas" className="w-24" value={config.reinscricaoHoras ?? 24} onChange={(e) => mudar({ reinscricaoHoras: Number(e.target.value) || 24 })} />
-              <span className="text-[12.5px] text-text-secondary">horas depois da última vez</span>
+              <span className="text-small text-text-secondary">horas depois da última vez</span>
             </div>
           )}
           {config.reinscricao === "uma_vez" && def.gatilho && ["varredura"].includes(gatilhoDoTipo(def.gatilho.tipo)?.modo ?? "") && (
-            <p className="mt-1 text-[11.5px] text-warning">Este gatilho é do relógio (parado, data, agendado): com “só uma vez”, cada registro entra uma única vez na vida.</p>
+            <p className="mt-1 text-caption text-warning">Este gatilho é do relógio (parado, data, agendado): com “só uma vez”, cada registro entra uma única vez na vida.</p>
           )}
         </div>
         <div>
           <Label>Objetivo (sai da automação quando...)</Label>
-          <p className="mb-2 text-[11.5px] text-text-tertiary">Quem passar a atender sai na hora, mesmo no meio de uma espera. Ex.: o negócio foi ganho, o cliente respondeu.</p>
+          <p className="mb-2 text-caption text-text-tertiary">Quem passar a atender sai na hora, mesmo no meio de uma espera. Ex.: o negócio foi ganho, o cliente respondeu.</p>
           <EditorDeRegra regra={config.objetivo ?? { grupos: [] }} mudar={(r) => mudar({ objetivo: r.grupos.length ? r : null })} objeto={def.objeto} opcoes={opcoes} vazio="Sem objetivo: todo mundo vai até o fim." />
         </div>
       </div>

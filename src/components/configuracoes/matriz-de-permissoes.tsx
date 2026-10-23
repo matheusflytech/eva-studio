@@ -42,13 +42,13 @@ export function MatrizDePermissoes({
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border-subtle">
-      <table className="w-full text-[12.5px]">
-        <thead className="bg-surface-2 text-[11px] uppercase tracking-wide text-text-tertiary">
+    <div className="overflow-x-auto rounded-[14px] border border-border-subtle">
+      <table className="w-full text-small">
+        <thead className="bg-raised font-mono text-caption text-text-tertiary">
           <tr>
-            <th className="sticky left-0 bg-surface-2 px-3 py-2 text-left font-semibold">Módulo</th>
+            <th className="sticky left-0 bg-raised px-3 py-2 text-left font-normal">Módulo</th>
             {colunas.map((a) => (
-              <th key={a} className="px-2 py-2 font-semibold">
+              <th key={a} className="px-2 py-2 font-normal">
                 {ACOES_ROTULO[a]}
               </th>
             ))}
@@ -57,7 +57,7 @@ export function MatrizDePermissoes({
         <tbody>
           {MODULOS.map((m) => (
             <tr key={m.id} className="border-t border-border-subtle">
-              <td className="sticky left-0 bg-surface-1 px-3 py-2">
+              <td className="sticky left-0 bg-overlay px-3 py-2">
                 <button
                   type="button"
                   disabled={somenteLeitura}

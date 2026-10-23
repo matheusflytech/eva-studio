@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import { Check, Copy, Mail, RefreshCw, Trash2 } from "lucide-react";
-import { Input, Label } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { CabecalhoDaSecao, EsqueletoDeLista, LinhaDeConfig, RodapeDaSecao } from "@/components/configuracoes/secao";
 
 interface Registro {
   record: string;
@@ -67,7 +68,8 @@ function Copiar({ texto }: { texto: string }) {
 // Integrações → E-mail. O contrato envia pela conta Resend da Eva, como ele
 // mesmo: verifica o domínio (registros SPF/DKIM/MX no DNS do cliente) e
 // escolhe o remetente. Sem domínio verificado nenhum e-mail sai (é o que
-// segura a entrega na caixa de entrada, não no spam).
+// segura a entrega na caixa de entrada, não no spam). v5: linhas "rótulo |
+// campo", como em Configurações.
 // ---------------------------------------------------------------------------
 export function EmailPanel() {
   const [estado, setEstado] = React.useState<Estado | null>(null);
@@ -117,70 +119,87 @@ export function EmailPanel() {
     }
   }
 
-  if (!estado) return null;
+  if (!estado) return <EsqueletoDeLista />;
   const d = estado.dominio;
   const situacao = d ? SITUACAO[d.status] ?? { rotulo: d.status, variant: "neutral" as const } : null;
 
   return (
-    <div className="mb-8">
-      <div className="mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">E-mail</p>
-        <p className="mt-1 max-w-2xl text-[12.5px] text-text-secondary">
-          Os e-mails dos fluxos, réguas e disparos saem com o domínio do contrato. Verifique o domínio uma vez e escolha
-          o remetente.
-        </p>
-      </div>
+    <div>
+      <CabecalhoDaSecao
+        nivel={2}
+        titulo="E-mail"
+        descricao="Os e-mails dos fluxos, réguas e disparos saem com o domínio do contrato. Verifique o domínio uma vez e escolha o remetente."
+      />
 
-      <div className="glass-card flex flex-col gap-4 rounded-2xl p-4">
+      <div className="flex flex-col gap-2 empty:hidden [&:not(:empty)]:pb-4">
         {!estado.configurado && (
           <Notice tone="warning">O envio de e-mail ainda não foi configurado neste ambiente (chave da Resend da plataforma).</Notice>
         )}
-        {!estado.disponivel && (
-          <Notice tone="warning">O e-mail ainda não foi ativado no banco deste ambiente. Nenhum e-mail sai até lá.</Notice>
-        )}
+        {!estado.disponivel && <Notice tone="warning">O e-mail ainda não foi ativado no banco deste ambiente. Nenhum e-mail sai até lá.</Notice>}
         {msg && <Notice tone={msg.tom}>{msg.texto}</Notice>}
+      </div>
 
-        {estado.disponivel && !d && (
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[240px] flex-1">
-              <Label htmlFor="email-dominio">Domínio de envio</Label>
-              <Input id="email-dominio" placeholder="suaempresa.com.br" value={novo} onChange={(e) => setNovo(e.target.value)} />
-            </div>
-            <Button type="button" disabled={ocupado || !novo.trim() || !estado.configurado} onClick={() => void chamar("POST", { dominio: novo }, "Domínio adicionado. Crie os registros abaixo no DNS e peça a verificação.")}>
-              <Mail size={14} /> Adicionar domínio
+      {estado.disponivel && !d && (
+        <LinhaDeConfig rotulo="Domínio de envio" htmlFor="email-dominio" descricao="O endereço depois do @ nos e-mails que saem do contrato.">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input id="email-dominio" placeholder="suaempresa.com.br" value={novo} onChange={(e) => setNovo(e.target.value)} className="sm:flex-1" />
+            <Button
+              type="button"
+              disabled={ocupado || !novo.trim() || !estado.configurado}
+              onClick={() => void chamar("POST", { dominio: novo }, "Domínio adicionado. Crie os registros abaixo no DNS e peça a verificação.")}
+            >
+              <Mail size={14} aria-hidden="true" /> Adicionar domínio
             </Button>
           </div>
-        )}
+        </LinhaDeConfig>
+      )}
 
-        {d && situacao && (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-[14px] font-semibold text-text-primary">{d.dominio}</p>
-              <Badge variant={situacao.variant}>{situacao.rotulo}</Badge>
-              <div className="ml-auto flex gap-2">
+      {d && situacao && (
+        <>
+          <LinhaDeConfig rotulo="Domínio de envio" descricao="Sem domínio verificado nenhum e-mail sai: é o que segura a entrega na caixa de entrada.">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-body font-semibold text-text-primary">{d.dominio}</span>
+              <Badge variant={situacao.variant} dot>
+                {situacao.rotulo}
+              </Badge>
+              <div className="ml-auto flex gap-1">
                 {d.status !== "verified" && (
-                  <Button type="button" variant="secondary" size="sm" disabled={ocupado} onClick={() => void chamar("POST", { acao: "verificar" }, "Verificação pedida. Se o DNS ainda não propagou, tente de novo em alguns minutos.")}>
-                    <RefreshCw size={14} /> Verificar agora
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={ocupado}
+                    onClick={() => void chamar("POST", { acao: "verificar" }, "Verificação pedida. Se o DNS ainda não propagou, tente de novo em alguns minutos.")}
+                  >
+                    <RefreshCw size={14} aria-hidden="true" /> Verificar agora
                   </Button>
                 )}
-                <Button type="button" variant="ghost" size="sm" disabled={ocupado} onClick={() => {
-                  if (confirm(`Remover ${d.dominio}? Os e-mails param de sair até um domínio novo ser verificado.`)) void chamar("DELETE");
-                }}>
-                  <Trash2 size={14} /> Remover
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={ocupado}
+                  onClick={() => {
+                    if (confirm(`Remover ${d.dominio}? Os e-mails param de sair até um domínio novo ser verificado.`)) void chamar("DELETE");
+                  }}
+                >
+                  <Trash2 size={14} aria-hidden="true" /> Remover
                 </Button>
               </div>
             </div>
+          </LinhaDeConfig>
 
-            {d.status !== "verified" && d.registros.length > 0 && (
-              <div className="overflow-x-auto rounded-xl border border-border-subtle">
-                <table className="w-full text-left text-[12px]">
-                  <thead className="bg-surface-2 text-text-tertiary">
+          {d.status !== "verified" && d.registros.length > 0 && (
+            <LinhaDeConfig rotulo="Registros no DNS" descricao="Crie estes registros no painel do seu domínio e peça a verificação.">
+              <div className="overflow-x-auto rounded-[14px] border border-border-subtle">
+                <table className="w-full text-left text-caption">
+                  <thead className="bg-raised font-mono text-text-tertiary">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Para</th>
-                      <th className="px-3 py-2 font-medium">Tipo</th>
-                      <th className="px-3 py-2 font-medium">Nome</th>
-                      <th className="px-3 py-2 font-medium">Valor</th>
-                      <th className="px-3 py-2 font-medium">Prioridade</th>
+                      <th className="px-3 py-2 font-normal">Para</th>
+                      <th className="px-3 py-2 font-normal">Tipo</th>
+                      <th className="px-3 py-2 font-normal">Nome</th>
+                      <th className="px-3 py-2 font-normal">Valor</th>
+                      <th className="px-3 py-2 font-normal">Prioridade</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -190,10 +209,14 @@ export function EmailPanel() {
                         <td className="px-3 py-2 text-text-secondary">{r.record}</td>
                         <td className="px-3 py-2 font-mono">{r.type}</td>
                         <td className="px-3 py-2 font-mono break-all">
-                          <span className="inline-flex items-center gap-1">{r.name} <Copiar texto={r.name} /></span>
+                          <span className="inline-flex items-center gap-1">
+                            {r.name} <Copiar texto={r.name} />
+                          </span>
                         </td>
                         <td className="max-w-[320px] px-3 py-2 font-mono break-all">
-                          <span className="inline-flex items-start gap-1">{r.value} <Copiar texto={r.value} /></span>
+                          <span className="inline-flex items-start gap-1">
+                            {r.value} <Copiar texto={r.value} />
+                          </span>
                         </td>
                         <td className="px-3 py-2">{r.priority ?? "—"}</td>
                         <td className="px-3 py-2">
@@ -204,33 +227,40 @@ export function EmailPanel() {
                   </tbody>
                 </table>
               </div>
-            )}
+            </LinhaDeConfig>
+          )}
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <Label htmlFor="email-nome">Nome do remetente</Label>
-                <Input id="email-nome" placeholder="Nome da empresa" value={rem.remetenteNome} onChange={(e) => setRem({ ...rem, remetenteNome: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="email-local">Endereço</Label>
-                <div className="flex items-center gap-1.5">
-                  <Input id="email-local" value={rem.remetenteLocal} onChange={(e) => setRem({ ...rem, remetenteLocal: e.target.value })} />
-                  <span className="shrink-0 text-[12.5px] text-text-tertiary">@{d.dominio}</span>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="email-responder">Respostas vão para</Label>
-                <Input id="email-responder" placeholder="vendas@suaempresa.com.br" value={rem.responderPara} onChange={(e) => setRem({ ...rem, responderPara: e.target.value })} />
-              </div>
+          <LinhaDeConfig rotulo="Nome do remetente" htmlFor="email-nome" descricao="O que a pessoa vê na caixa de entrada.">
+            <Input
+              id="email-nome"
+              placeholder="Nome da empresa"
+              value={rem.remetenteNome}
+              onChange={(e) => setRem({ ...rem, remetenteNome: e.target.value })}
+              className="max-w-md"
+            />
+          </LinhaDeConfig>
+          <LinhaDeConfig rotulo="Endereço" htmlFor="email-local">
+            <div className="flex max-w-md items-center gap-1.5">
+              <Input id="email-local" value={rem.remetenteLocal} onChange={(e) => setRem({ ...rem, remetenteLocal: e.target.value })} />
+              <span className="shrink-0 text-small text-text-tertiary">@{d.dominio}</span>
             </div>
-            <div>
-              <Button type="button" variant="secondary" size="sm" disabled={ocupado} onClick={() => void chamar("PATCH", rem, "Remetente salvo.")}>
-                Salvar remetente
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+          </LinhaDeConfig>
+          <LinhaDeConfig rotulo="Respostas vão para" htmlFor="email-responder" descricao="Quando a pessoa responde o e-mail.">
+            <Input
+              id="email-responder"
+              placeholder="vendas@suaempresa.com.br"
+              value={rem.responderPara}
+              onChange={(e) => setRem({ ...rem, responderPara: e.target.value })}
+              className="max-w-md"
+            />
+          </LinhaDeConfig>
+          <RodapeDaSecao>
+            <Button type="button" disabled={ocupado} onClick={() => void chamar("PATCH", rem, "Remetente salvo.")}>
+              Salvar remetente
+            </Button>
+          </RodapeDaSecao>
+        </>
+      )}
     </div>
   );
 }

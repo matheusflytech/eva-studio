@@ -22,9 +22,9 @@ export function IssuesPanel({
 
   if (issues.length === 0) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[12.5px] text-text-tertiary">
-        <CheckCircle2 size={14} className="text-success" />
-        Fluxo completo
+      <span className="inline-flex items-center gap-1.5 font-mono text-caption text-text-tertiary">
+        <CheckCircle2 size={13} aria-hidden="true" className="text-success" />
+        <span className="hidden sm:inline">fluxo completo</span>
       </span>
     );
   }
@@ -34,7 +34,8 @@ export function IssuesPanel({
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-warning-subtle px-3 py-1.5 text-[12.5px] font-medium text-warning transition-colors hover:bg-hover"
+        aria-expanded={aberto}
+        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-warning-subtle px-3 text-small font-medium text-warning transition-colors hover:bg-hover"
       >
         <AlertTriangle size={14} />
         {resumoDasPendencias(issues)}
@@ -42,8 +43,8 @@ export function IssuesPanel({
       </button>
 
       {aberto && (
-        // glass-card-solid: sem ele o canvas aparece por baixo do painel.
-        <div className="glass-card glass-card-solid absolute right-0 top-full z-20 mt-2 w-[330px] rounded-2xl p-2">
+        // bg-overlay: sem ele o canvas aparece por baixo do painel.
+        <div className="absolute right-0 top-full z-20 mt-2 w-[min(330px,calc(100vw-2rem))] rounded-[14px] border border-border-subtle bg-overlay p-1.5 shadow-overlay">
           <div className="max-h-[300px] overflow-y-auto">
             {issues.map((issue, i) => (
               <button
@@ -53,12 +54,12 @@ export function IssuesPanel({
                   onSelect(issue.nodeId);
                   setAberto(false);
                 }}
-                className="flex w-full flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-2"
+                className="flex w-full flex-col gap-0.5 rounded-[10px] px-3 py-2 text-left transition-colors hover:bg-hover"
               >
-                <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-primary">
+                <span className="flex items-center gap-1.5 text-small font-medium text-text-primary">
                   <span
                     className={cn(
-                      "rounded-sm px-1 text-[10px] font-medium",
+                      "rounded-full px-1.5 text-caption font-medium",
                       issue.nivel === "erro" ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning"
                     )}
                   >
@@ -66,11 +67,11 @@ export function IssuesPanel({
                   </span>
                   {issue.label}
                 </span>
-                <span className="text-[11.5px] text-text-tertiary">{issue.motivo}</span>
+                <span className="text-caption text-text-tertiary">{issue.motivo}</span>
               </button>
             ))}
           </div>
-          <p className="border-t border-border-subtle px-3 pb-1 pt-2 text-[11px] text-text-tertiary">
+          <p className="border-t border-border-subtle px-3 pb-1 pt-2 text-caption text-text-tertiary">
             O fluxo continua salvando enquanto você monta. O que está marcado como “não funciona” trava a conversa quando ela passar por ali; aviso é só um alerta.
           </p>
         </div>

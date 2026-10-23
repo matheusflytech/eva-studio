@@ -1,71 +1,60 @@
 "use client";
 
+import { useTelaLarga } from "@/lib/use-tela-larga";
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowLeft, Building2, Mail, Phone, RefreshCw, Trash2, TriangleAlert, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronRight, Link2, ListTodo, Mail, MapPin, MoreHorizontal, Phone, RefreshCw, Trash2, TriangleAlert, UserRound } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Button } from "@/components/ui/button";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { IconButton } from "@/components/ui/icon-button";
 import { Notice } from "@/components/ui/notice";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PhoneNumber } from "@/components/ui/phone-number";
-import { LogoDaMarca } from "@/components/ui/marca";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { focusRing } from "@/components/ui/styles";
+import { useToast } from "@/components/ui/toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "@/lib/contrato/navegacao";
 import { linkDoWhatsAppWeb } from "@/lib/telefone";
+import { cn } from "@/lib/utils";
 import { ContactActivity } from "@/components/crm/contact-activity";
 import { LinhaDoTempoView, NovaNota } from "@/components/crm/negocio/atividade";
-import { IconeDoCanal, dataLonga } from "@/components/crm/negocio/pecas";
-import { rotuloDoCanal, rotuloDoStatus, type LinhaDoTempo } from "@/components/crm/negocio/linha-do-tempo";
+import { dataLonga } from "@/components/crm/negocio/pecas";
+import type { LinhaDoTempo } from "@/components/crm/negocio/linha-do-tempo";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 import { CHANNEL_LABEL, nomeDoContato, type Contact, type TagRow } from "./tipos";
 import { DadosDoContato } from "./dados-do-contato";
+import { EtiquetasDoContato } from "./etiquetas-do-contato";
+import { FotoDoContato } from "./foto-do-contato";
+import { Bloco, cidadeDo, linkDeLigar } from "./ficha-do-contato";
 
-interface NegocioDoContato {
-  id: string;
-  name: string;
-  amountCents: number;
-  stage: string;
-  stageType: string;
-  pipeline: string;
-  closedAt: string | null;
-}
-interface ConversaDoContato {
-  id: string;
-  channel: string;
-  status: string;
-  updatedAt: string;
-}
-interface ReguaDoContato {
-  id: string;
-  sequenceName: string;
-  status: string;
-}
 interface Ficha {
   contact: Contact;
-  deals: NegocioDoContato[];
-  conversations: ConversaDoContato[];
-  enrollments: ReguaDoContato[];
 }
 
-const reais = (cents: number) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+type AbaDaPagina = "resumo" | "atividade" | "dados";
 
 // ---------------------------------------------------------------------------
-// Página completa do contato (/contatos/<id>), no molde da ficha do negócio:
-// à esquerda todos os campos (editam no lugar), no centro a história inteira
-// (linha do tempo com notas, tarefas, conversas e o caminho de cada negócio
-// dele) e à direita com o que ele está ligado. A gaveta da lista continua
-// para o ajuste rápido; o link desta página é o que se manda para alguém.
+// Página completa do contato (/contatos/<id>), no mesmo espírito da ficha da
+// lista: foto grande, nome, cargo · empresa, etiquetas e quatro botões
+// redondos (WhatsApp em destaque). Abaixo, três abas: Resumo (dados em
+// blocos, tarefas, negócios, conversas e réguas), Atividade (nota + linha do
+// tempo inteira, com os filtros por tipo) e Dados (os campos que editam no
+// lugar). Copiar link e apagar ficam no "…". O link desta página é o que se
+// manda para alguém.
 // ---------------------------------------------------------------------------
 export function PaginaDoContato({ contactId }: { contactId: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [estado, setEstado] = React.useState<"carregando" | "ok" | "nao_encontrado" | "erro">("carregando");
   const [ficha, setFicha] = React.useState<Ficha | null>(null);
   const [tags, setTags] = React.useState<TagRow[]>([]);
   const [linha, setLinha] = React.useState<LinhaDoTempo>({ itens: [], conversas: [] });
   const [linhaFalhou, setLinhaFalhou] = React.useState(false);
-  const [aba, setAba] = React.useState("historia");
+  const [aba, setAba] = React.useState<AbaDaPagina>("resumo");
+  const largo = useTelaLarga();
+  // Botão redondo "Tarefa": vai ao Resumo e abre o campo de nova tarefa.
+  const [pedidoDeTarefa, setPedidoDeTarefa] = React.useState(0);
   const [erro, setErro] = React.useState<string | null>(null);
   // "Agora" estável por carga: os rótulos "Hoje"/"Ontem" não pulam a cada render.
   const [agora, setAgora] = React.useState(() => new Date());
@@ -109,7 +98,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
     };
   }, [carregar]);
 
-  // Tarefa criada ou concluída na aba "Tarefas e notas": a história recarrega.
+  // Tarefa criada ou concluída no Resumo: a linha do tempo recarrega.
   // Estável e só quando o número muda (o efeito do ContactActivity roda a cada
   // função nova; uma seta solta aqui viraria laço de recarga).
   const tarefasAbertas = React.useRef<number | null>(null);
@@ -122,7 +111,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
   );
 
   const contato = ficha?.contact;
-  // Busca global (⌘K): ações deste contato primeiro, como na gaveta.
+  // Busca global (⌘K): ações deste contato primeiro, como na ficha.
   const registro = React.useMemo<RegistroEmFoco | null>(() => {
     if (!contato) return null;
     return {
@@ -149,6 +138,15 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
     });
     if (r.ok) router.push("/contatos");
     else if (r.erro) setErro(r.erro);
+  }
+
+  async function copiarLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast({ title: "Link copiado", tone: "success" });
+    } catch {
+      toast({ title: "Não foi possível copiar o link.", tone: "danger" });
+    }
   }
 
   if (estado === "carregando") return <Esqueleto />;
@@ -182,182 +180,219 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
 
   const nome = nomeDoContato(contato);
   const whatsapp = linkDoWhatsAppWeb(contato.phone);
-  const abertos = ficha.deals.filter((d) => d.stageType === "open");
-  const fechados = ficha.deals.filter((d) => d.stageType !== "open");
+  const cidade = cidadeDo(contato);
+  const mudouContato = (c: Contact) => setFicha((f) => (f ? { ...f, contact: c } : f));
+  const canais = [...new Set(contato.channels.map((ch) => CHANNEL_LABEL[ch.channel] ?? ch.channel))];
+  const abas: { value: AbaDaPagina; label: string }[] = [
+    { value: "resumo", label: "Resumo" },
+    { value: "atividade", label: linha.itens.length > 0 ? `Atividade ${linha.itens.length}` : "Atividade" },
+    ...(largo ? [] : [{ value: "dados" as const, label: "Dados" }]),
+  ];
+  // No desktop largo os dados ficam na coluna da direita, sempre à vista.
+  const abaVisivel: AbaDaPagina = largo && aba === "dados" ? "resumo" : aba;
 
   return (
-    <div className="flex flex-col gap-4 pb-6">
-      <Link href="/contatos" className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary">
-        <ArrowLeft size={15} aria-hidden /> Contatos
-      </Link>
+    <div className="flex flex-col gap-5 px-4 pb-8 pt-2 lg:px-6">
+      <div className="flex items-center gap-2">
+        <nav aria-label="Caminho" className="flex min-w-0 items-center gap-1 text-small">
+          <Link href="/contatos" className={cn("rounded-full px-1 text-text-secondary hover:text-text-primary", focusRing)}>
+            Contatos
+          </Link>
+          <ChevronRight size={14} aria-hidden className="shrink-0 text-text-tertiary" />
+          <span className="truncate font-semibold text-text-primary" aria-current="page">
+            {nome}
+          </span>
+        </nav>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton aria-label="Mais ações do contato" variant="secondary" className="ml-auto">
+              <MoreHorizontal aria-hidden />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => void copiarLink()}>
+              <Link2 aria-hidden /> Copiar link
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem tone="danger" onSelect={() => void apagar()}>
+              <Trash2 aria-hidden /> Apagar contato
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-      <header className="flex flex-wrap items-start gap-4">
-        <Avatar name={nome} size="lg" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-xl font-semibold text-text-primary">{nome}</h1>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-text-secondary">
-            {contato.company ? (
-              <span className="inline-flex items-center gap-1">
-                <Building2 size={13} aria-hidden /> {contato.company.name}
-              </span>
-            ) : (
-              <span className="text-text-tertiary">Sem empresa</span>
-            )}
-            {contato.phone && <PhoneNumber value={contato.phone} />}
-            {contato.email && <span className="truncate">{contato.email}</span>}
-            <span className="text-text-tertiary">Desde {dataLonga(contato.createdAt)}</span>
-          </p>
-          {(contato.tags.length > 0 || contato.channels.length > 0) && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {contato.tags.map((t) => (
-                <Badge key={t.id}>{t.name}</Badge>
-              ))}
-              {contato.channels.map((ch) => (
-                <Badge key={ch.id} variant="info">{CHANNEL_LABEL[ch.channel] ?? ch.channel}</Badge>
-              ))}
+      <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <header className="flex flex-wrap items-center gap-5">
+          <FotoDoContato nome={nome} semente={contato.id} tamanho="xl" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h1 className="truncate text-heading font-semibold tracking-tight text-text-primary">{nome}</h1>
+            <p className="truncate text-small text-text-tertiary">
+              {contato.jobTitle && <>{contato.jobTitle} · </>}
+              {contato.company ? (
+                <Link href={`/empresas/${contato.company.id}`} className="text-accent-fg hover:underline">
+                  {contato.company.name}
+                </Link>
+              ) : (
+                "Sem empresa"
+              )}
+            </p>
+            <EtiquetasDoContato contact={contato} tags={tags} onChanged={mudouContato} className="mt-1.5" />
+          </div>
+          <div className="flex shrink-0 gap-3.5">
+            {/* Sem o círculo de destaque (acento): o logo oficial já tem a cor dele. */}
+            <AcaoRedonda rotulo="WhatsApp" href={whatsapp} externo>
+              <LogoOficial marca="whatsapp" tamanho={16} />
+            </AcaoRedonda>
+            <AcaoRedonda rotulo="Ligar" href={contato.phone ? linkDeLigar(contato.phone) : null}>
+              <Phone aria-hidden />
+            </AcaoRedonda>
+            <AcaoRedonda rotulo="E-mail" href={contato.email ? `mailto:${contato.email}` : null}>
+              <Mail aria-hidden />
+            </AcaoRedonda>
+            <AcaoRedonda
+              rotulo="Tarefa"
+              onClick={() => {
+                setAba("resumo");
+                setPedidoDeTarefa((n) => n + 1);
+              }}
+            >
+              <ListTodo aria-hidden />
+            </AcaoRedonda>
+          </div>
+        </header>
+
+        {erro && <Notice tone="danger">{erro}</Notice>}
+
+        <SegmentedControl label="Seções do contato" options={abas} value={abaVisivel} onChange={setAba} className="self-start" />
+
+        {abaVisivel === "resumo" && (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Bloco icone={<Phone aria-hidden />} vazio="Sem telefone" className="h-11.5">{contato.phone}</Bloco>
+                <Bloco icone={<Mail aria-hidden />} vazio="Sem e-mail" className="h-11.5">{contato.email}</Bloco>
+                {cidade ? (
+                  <Bloco icone={<MapPin aria-hidden />} className="h-11.5">{cidade}</Bloco>
+                ) : (
+                  <Bloco icone={<CalendarDays aria-hidden />} className="h-11.5">Desde {dataLonga(contato.createdAt)}</Bloco>
+                )}
+                <Bloco icone={<UserRound aria-hidden />} className="h-11.5">{contato.owner?.name ? `Dono: ${contato.owner.name}` : "Sem proprietário"}</Bloco>
+              </div>
+              {canais.length > 0 && <p className="font-mono text-caption text-text-tertiary">Canais: {canais.join(" · ")}</p>}
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {whatsapp && (
-            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-default bg-panel px-3 text-body font-medium text-text-primary hover:bg-raised">
-              <LogoDaMarca marca="whatsapp" solto tamanho={15} /> WhatsApp Web
-            </a>
-          )}
-          {contato.phone && (
-            <a href={`tel:${contato.phone.replace(/[^\d+]/g, "")}`} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-default bg-panel px-3 text-body font-medium text-text-primary hover:bg-raised">
-              <Phone size={14} aria-hidden /> Ligar
-            </a>
-          )}
-          {contato.email && (
-            <a href={`mailto:${contato.email}`} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-default bg-panel px-3 text-body font-medium text-text-primary hover:bg-raised">
-              <Mail size={14} aria-hidden /> E-mail
-            </a>
-          )}
-          <Button variant="ghost" className="text-danger hover:text-danger" onClick={() => void apagar()}>
-            <Trash2 size={14} aria-hidden /> Apagar
-          </Button>
-        </div>
-      </header>
+            <ContactActivity
+              contactId={contato.id}
+              secoes={["tarefas", "negocios", "conversas", "sequencias"]}
+              pedidoDeTarefa={pedidoDeTarefa}
+              onCountsChange={aoMudarTarefas}
+            />
+          </div>
+        )}
 
-      {erro && <Notice tone="danger">{erro}</Notice>}
-
-      {/* Mesma grade da ficha do negócio: no celular empilha (dados, ligações, história). */}
-      <div
-        className={
-          "grid items-start gap-4 [grid-template-areas:'dados'_'ligacoes'_'historia'] " +
-          "lg:grid-cols-[320px_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:[grid-template-areas:'dados_historia'_'ligacoes_historia'] " +
-          "xl:grid-cols-[320px_minmax(0,1fr)_300px] xl:grid-rows-[auto] xl:[grid-template-areas:'dados_historia_ligacoes']"
-        }
-      >
-        <section aria-label="Dados do contato" className="min-w-0 rounded-2xl border border-border-subtle bg-surface-1 p-4 [grid-area:dados]">
-          <h2 className="mb-3 text-[13px] font-semibold text-text-primary">Dados</h2>
-          <DadosDoContato
-            contact={contato}
-            tags={tags}
-            onChanged={(c) => setFicha((f) => (f ? { ...f, contact: c } : f))}
-          />
-        </section>
-
-        <section aria-label="História do contato" className="min-w-0 rounded-2xl border border-border-subtle bg-surface-1 p-4 [grid-area:historia]">
-          <Tabs value={aba} onValueChange={setAba}>
-            <TabsList aria-label="Seções">
-              <TabsTrigger value="historia">História</TabsTrigger>
-              <TabsTrigger value="tarefas">Tarefas e notas</TabsTrigger>
-            </TabsList>
-            <TabsContent value="historia" className="mt-4 outline-none">
-              <NovaNota vinculo={{ contactId: contato.id }} onCriada={carregar} compacto />
-              <LinhaDoTempoView itens={linha.itens} falhou={linhaFalhou} agora={agora} rotulos={{ etapas: "Negócios" }} />
-            </TabsContent>
-            <TabsContent value="tarefas" className="mt-4 outline-none">
-              <ContactActivity contactId={contato.id} onCountsChange={aoMudarTarefas} />
-            </TabsContent>
-          </Tabs>
-        </section>
-
-        <div className="flex min-w-0 flex-col gap-4 [grid-area:ligacoes]">
-          <section aria-label="Negócios" className="rounded-2xl border border-border-subtle bg-surface-1 p-4">
-            <h2 className="mb-2 text-[13px] font-semibold text-text-primary">Negócios</h2>
-            {ficha.deals.length === 0 ? (
-              <p className="text-[12.5px] text-text-tertiary">Nenhum negócio com este contato.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {[...abertos, ...fechados].map((d) => (
-                  <li key={d.id}>
-                    <Link href={`/negocios/${d.id}`} className="block rounded-xl border border-border-subtle px-3 py-2 hover:border-border-default">
-                      <p className="truncate text-[13px] font-medium text-text-primary">{d.name || "Negócio sem nome"}</p>
-                      <p className="mt-0.5 flex items-center justify-between gap-2 text-[12px] text-text-tertiary">
-                        <span className="truncate">
-                          {d.pipeline} ·{" "}
-                          <span className={d.stageType === "won" ? "text-success" : d.stageType === "lost" ? "text-danger" : "text-text-secondary"}>
-                            {d.stage}
-                          </span>
-                        </span>
-                        <span className="tabular-nums">{reais(d.amountCents)}</span>
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {abaVisivel === "atividade" && (
+          <section aria-label="Linha do tempo do contato" className="flex flex-col gap-3">
+            <NovaNota vinculo={{ contactId: contato.id }} onCriada={carregar} compacto />
+            <LinhaDoTempoView itens={linha.itens} falhou={linhaFalhou} agora={agora} rotulos={{ etapas: "Negócios" }} />
           </section>
+        )}
 
-          <section aria-label="Conversas" className="rounded-2xl border border-border-subtle bg-surface-1 p-4">
-            <h2 className="mb-2 text-[13px] font-semibold text-text-primary">Conversas</h2>
-            {ficha.conversations.length === 0 ? (
-              <p className="text-[12.5px] text-text-tertiary">Nenhuma conversa ainda.</p>
-            ) : (
-              <ul className="flex flex-col gap-1.5">
-                {ficha.conversations.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`/conversas?c=${c.id}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-hover">
-                      <IconeDoCanal canal={c.channel} tamanho={15} />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-text-primary">{rotuloDoCanal(c.channel)}</span>
-                      <span className="text-[11.5px] text-text-tertiary">{rotuloDoStatus(c.status)}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {abaVisivel === "dados" && (
+          <section aria-label="Dados do contato">
+            <DadosDoContato contact={contato} onChanged={mudouContato} />
           </section>
-
-          {ficha.enrollments.length > 0 && (
-            <section aria-label="Réguas" className="rounded-2xl border border-border-subtle bg-surface-1 p-4">
-              <h2 className="mb-2 text-[13px] font-semibold text-text-primary">Réguas</h2>
-              <ul className="flex flex-col gap-1.5">
-                {ficha.enrollments.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-2 text-[13px]">
-                    <span className="truncate text-text-primary">{e.sequenceName}</span>
-                    <Badge variant={e.status === "active" ? "success" : "neutral"}>{e.status === "active" ? "Ativa" : "Parada"}</Badge>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
+        )}
+      </div>
+      {largo && (
+        <aside aria-label="Dados do contato" className="flex flex-col gap-3 self-start xl:sticky xl:top-2">
+          <h2 className="font-mono text-caption text-text-tertiary">Dados</h2>
+          <div className="rounded-[18px] border border-border-subtle bg-panel p-4">
+            <DadosDoContato contact={contato} onChanged={mudouContato} />
+          </div>
+        </aside>
+      )}
       </div>
     </div>
   );
 }
 
+/** Botão redondo grande com o nome embaixo (WhatsApp em destaque). */
+function AcaoRedonda({
+  rotulo,
+  href,
+  externo,
+  destaque,
+  onClick,
+  children,
+}: {
+  rotulo: string;
+  href?: string | null;
+  externo?: boolean;
+  destaque?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  const circulo = cn(
+    "grid size-10.5 place-items-center rounded-full transition-colors duration-120 [&_svg]:size-4",
+    destaque ? "bg-accent-solid text-text-on-accent group-hover:bg-accent-solid-hover" : "bg-raised text-text-primary ring-1 ring-border-default group-hover:bg-hover"
+  );
+  const casca = cn("group flex flex-col items-center gap-1.5 rounded-xl text-caption", destaque ? "text-text-secondary" : "text-text-tertiary", focusRing);
+  const conteudo = (
+    <>
+      <span className={circulo}>{children}</span>
+      {rotulo}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={casca}>
+        {conteudo}
+      </button>
+    );
+  }
+  if (!href) {
+    return (
+      <span className={cn(casca, "cursor-not-allowed opacity-40")} title={`${rotulo}: sem dado no contato`} aria-disabled="true">
+        {conteudo}
+      </span>
+    );
+  }
+  return (
+    <a href={href} className={casca} {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+      {conteudo}
+    </a>
+  );
+}
+
 function VoltarParaContatos() {
   return (
-    <Link href="/contatos" className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium text-text-secondary hover:bg-surface-2 hover:text-text-primary">
+    <Link href="/contatos" className={cn("inline-flex h-9 items-center gap-2 rounded-full px-4 text-body font-medium text-text-secondary hover:bg-hover hover:text-text-primary", focusRing)}>
       <ArrowLeft size={15} aria-hidden /> Contatos
     </Link>
   );
 }
 
 function Esqueleto() {
-  const bloco = (c: string) => <span aria-hidden className={`block animate-pulse rounded-lg bg-surface-2 motion-reduce:animate-none ${c}`} />;
+  const bloco = (c: string) => <span aria-hidden className={`block animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none ${c}`} />;
   return (
-    <div className="flex flex-col gap-4" role="status" aria-label="Carregando contato">
-      {bloco("h-4 w-24")}
-      {bloco("h-12 w-80 max-w-full")}
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_300px]">
-        {bloco("h-[420px] rounded-2xl")}
-        {bloco("h-[520px] rounded-2xl")}
-        {bloco("hidden h-[300px] rounded-2xl xl:block")}
+    <div className="flex flex-col gap-5 px-4 pt-2 lg:px-6" role="status" aria-label="Carregando contato">
+      {bloco("h-5 w-40")}
+      <div className="mx-auto flex w-full max-w-[724px] flex-col gap-5">
+        <div className="flex items-center gap-5">
+          <span aria-hidden className="size-24 animate-pulse rounded-full bg-raised motion-reduce:animate-none" />
+          <div className="flex flex-1 flex-col gap-2">
+            {bloco("h-7 w-64 max-w-full")}
+            {bloco("h-4 w-48 max-w-full")}
+          </div>
+        </div>
+        {bloco("h-8 w-64")}
+        <div className="grid grid-cols-2 gap-2">
+          {bloco("h-11.5")}
+          {bloco("h-11.5")}
+          {bloco("h-11.5")}
+          {bloco("h-11.5")}
+        </div>
+        {bloco("h-40")}
       </div>
       <span className="sr-only">Carregando...</span>
     </div>

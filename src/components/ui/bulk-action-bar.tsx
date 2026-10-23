@@ -51,7 +51,7 @@ export function BulkActionBar({
       role="toolbar"
       aria-label="Ações em massa"
       className={cn(
-        "fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-lg border border-border-default bg-overlay px-2 py-1.5 text-small text-text-primary shadow-overlay",
+        "fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full border border-border-subtle bg-overlay px-3 py-1.5 text-small text-text-primary shadow-overlay",
         "motion-safe:animate-[ds-fade-in_160ms_var(--ease-standard)]",
         className
       )}

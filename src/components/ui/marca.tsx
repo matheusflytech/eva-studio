@@ -1,11 +1,12 @@
 import * as React from "react";
 import { Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoOficial, ladoDoLogo } from "./logo-oficial";
 
 // ---------------------------------------------------------------------------
-// Logos das marcas dos canais e integrações. Caminhos SVG do Simple Icons
-// (simple-icons@13.21.0, licença CC0), embutidos para não depender de rede
-// nem de pacote. Cor = a cor oficial da marca, a mesma do Simple Icons.
+// Logos das marcas dos canais e integrações. O desenho vem de
+// ui/logo-oficial.tsx (logos oficiais coloridos); aqui ficam o nome e a cor
+// de cada marca (Simple Icons, CC0) e o caminho monocromático antigo.
 // Uso de marca: só para identificar o canal, como pedem os guias da Meta,
 // do Telegram e do TikTok (sem alterar o desenho).
 // ---------------------------------------------------------------------------
@@ -22,15 +23,10 @@ export const MARCAS = {
 
 export type Marca = keyof typeof MARCAS | "site";
 
-/** Fundo do ícone quando a marca usa degradê (o do Instagram atual). */
-const FUNDO: Partial<Record<keyof typeof MARCAS, string>> = {
-  instagram: "radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%)",
-};
-
 /**
- * Logo da marca. Em quadrado com o fundo na cor da marca e o desenho branco
- * (padrão "app icon"), ou só o desenho na cor da marca (`solto`). O TikTok é
- * preto: no tema escuro o quadrado ganha borda para não sumir.
+ * Logo da marca. Desenha o logo oficial colorido (ui/logo-oficial.tsx): em
+ * quadrado neutro, o mesmo do "site" (padrão "app icon", o logo já tem a cor dele) ou
+ * só o logo (`solto`). O "site" não tem marca e fica com o globo.
  */
 export function LogoDaMarca({
   marca,
@@ -57,19 +53,15 @@ export function LogoDaMarca({
       </span>
     );
   }
-  const { nome, cor, d } = MARCAS[marca];
-  const svg = (
-    <svg role="img" aria-label={nome} viewBox="0 0 24 24" width={icone} height={icone} fill={solto ? cor : "#ffffff"}>
-      <path d={d} />
-    </svg>
-  );
-  if (solto) return <span className={cn("inline-flex shrink-0", className)}>{svg}</span>;
+  const { nome } = MARCAS[marca];
+  const logo = <LogoOficial marca={marca} tamanho={solto ? icone : ladoDoLogo(marca, icone)} titulo={nome} />;
+  if (solto) return <span className={cn("inline-flex shrink-0", className)}>{logo}</span>;
   return (
     <span
-      className={cn("inline-flex shrink-0 items-center justify-center rounded-xl", marca === "tiktok" && "ring-1 ring-border-subtle", className)}
-      style={{ width: tamanho, height: tamanho, background: FUNDO[marca] ?? cor }}
+      className={cn("inline-flex shrink-0 items-center justify-center rounded-xl bg-surface-3", className)}
+      style={{ width: tamanho, height: tamanho }}
     >
-      {svg}
+      {logo}
     </span>
   );
 }

@@ -4,11 +4,22 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import {
-  RefreshCw, Plus, X, Pencil, ArrowLeft, ArrowRight, Check, LayoutGrid,
+  RefreshCw, Plus, X, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Ellipsis, ListFilter,
   Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel, FilterX,
   Download, FileSpreadsheet, FileText, MoreHorizontal,
 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { MarcaEva } from "@/components/layout/marca-eva";
+import { pulsar } from "@/lib/fundo/eventos";
 import { useAuth } from "@/lib/auth/auth-context";
 import { dataHoraBR, hojeSP, slugDoArquivo, type Celula } from "@/lib/exportar/csv";
 import {
@@ -25,10 +36,12 @@ import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { AreaChart } from "@/components/charts/area-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
+import { BarraEmPilha, Porcentagens } from "@/components/charts/proporcao";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
-import { BarraDeFiltros } from "@/components/dashboard/barra-de-filtros";
+import { PainelDeFiltros, SeletorDePeriodo, contarFiltros, periodoCurto } from "@/components/dashboard/barra-de-filtros";
+import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
 import { rotulosDasOpcoes, useOpcoesDoDashboard, type OpcoesDoDashboard } from "@/components/dashboard/opcoes";
 import {
   ROTULO_CANAL,
@@ -235,7 +248,7 @@ function linhasDoTopo(globais: FiltrosGlobais, dados: Dados | null, opcoes: Opco
 // pré-renderizada (sem ele o build falha).
 export default function DashboardPage() {
   return (
-    <React.Suspense fallback={<div className="flex-1 p-8 text-[13px] text-text-tertiary">Carregando...</div>}>
+    <React.Suspense fallback={<div className="flex-1 px-6 pt-1 text-small text-text-tertiary">Carregando…</div>}>
       <Painel />
     </React.Suspense>
   );
@@ -445,102 +458,162 @@ function Painel() {
     baixarArquivo(csvDoCartao(r.tabela), `${slugDoArquivo(w.titulo || "cartao")}-${hojeSP()}.csv`);
   }
 
-  return (
-    <div className="flex-1 p-8 print:p-0">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4 print:mb-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary">
-            Dashboard<span className="hidden print:inline">{organizacao ? ` · ${organizacao}` : ""}</span>
-          </h1>
-          {/* Na folha impressa: período e filtros no lugar da explicação da tela. */}
-          <div className="hidden text-[12px] text-text-secondary print:block">
-            <p>Período: {descreverPeriodo(globais, dados)}</p>
-            {filtrosAtivos.length > 0 && <p>{filtrosAtivos.map(([r, v]) => `${r}: ${v}`).join(" · ")}</p>}
-            {carregadoEm !== null && <p className="text-text-tertiary">Gerado em {dataHoraBR(new Date(carregadoEm))}</p>}
-          </div>
-          <p className="mt-1 text-[14px] text-text-secondary print:hidden">
-            {editando
-              ? "Clique num cartão pra editar, use o + pra adicionar. Salva sozinho."
-              : "O painel da sua operação. Você monta os cartões que quiser."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          {estadoSalvar !== "parado" && (
-            <span className="text-[12px] text-text-tertiary">
-              {estadoSalvar === "salvando" ? "Salvando..." : "Salvo."}
-            </span>
-          )}
-          {!editando && atualizadoEm && (
-            <span className="text-[12px] text-text-tertiary">Atualizado: {atualizadoEm}</span>
-          )}
-          {editando && (
-            <button
-              type="button"
-              onClick={restaurarPadrao}
-              title="Voltar ao painel padrão"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-text-tertiary transition-colors hover:text-text-primary"
-            >
-              <RotateCcw size={14} /> Padrão
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={carregarDados}
-            title="Recarregar os números"
-            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary"
-          >
-            <RefreshCw size={14} className={cn(carregando && "animate-spin")} />
-          </button>
-          <button
-            type="button"
-            onClick={montarPainelDoFunil}
-            title="Acrescenta os cartões de funil que ainda não estão no painel"
-            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary"
-          >
-            <Funnel size={14} /> Painel do funil
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              disabled={exportando}
-              title="Baixar o painel em PDF ou os dados dos cartões"
-              className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-2 text-[13px] font-medium text-text-secondary outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60 disabled:opacity-50"
-            >
-              <Download size={14} className={cn(exportando && "animate-pulse")} /> Exportar
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[240px]">
-              <DropdownMenuItem onSelect={imprimir}>
-                <FileText size={15} /> Relatório (PDF)
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => { void exportarTodos(); }} disabled={!widgets?.length}>
-                <FileSpreadsheet size={15} /> Todos os cartões (CSV)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <p className="px-3 pb-1.5 text-[11.5px] text-text-tertiary">
-                No PDF, escolha &ldquo;Salvar como PDF&rdquo; na janela de impressão.
-              </p>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            type="button"
-            onClick={() => { setEditando((v) => !v); setSelecionado(null); }}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-medium transition-colors",
-              editando
-                ? "bg-ice text-bg-base"
-                : "bg-surface-2 text-text-secondary hover:text-text-primary"
-            )}
-          >
-            {editando ? <><Check size={14} /> Concluir</> : <><Pencil size={14} /> Editar painel</>}
-          </button>
-        </div>
-      </header>
+  // ── Resumo (fora da edição): poucos números grandes, a curva e duas
+  // leituras curtas, montados a partir dos cartões do próprio painel, na
+  // ordem dele. O resto dos cartões fica em "Ver mais". ──
+  const resumo = React.useMemo(() => {
+    const ws = widgets ?? [];
+    const fixa = (w: Widget) => w.fonte !== "custom" && fontePorChave.has(w.fonte);
+    const numeros = ws.filter((w) => w.tipo === "numero" && fixa(w));
+    const principal = numeros.find((w) => fontePorChave.get(w.fonte)?.formato === "dinheiro") ?? numeros[0] ?? null;
+    const apoio = numeros.filter((w) => w !== principal).slice(0, 2);
+    const curva = ws.find((w) => w.tipo === "linha" && fixa(w) && fontePorChave.get(w.fonte)?.tipo === "serie") ?? null;
+    const base = ws
+      .filter((w) => (w.tipo === "barras" || w.tipo === "pizza") && fixa(w) && fontePorChave.get(w.fonte)?.tipo === "quebra")
+      .slice(0, 2);
+    const usados = [principal, ...apoio, curva, ...base].filter((w): w is Widget => !!w);
+    const ids = new Set(usados.map((w) => w.id));
+    return { principal, apoio, curva, base, usados, resto: ws.filter((w) => !ids.has(w.id)) };
+  }, [widgets, fontePorChave]);
 
-      <div className="print:hidden">
-        <BarraDeFiltros globais={globais} aoMudar={mudarGlobais} opcoes={opcoes} aoSalvarCartao={salvarDoConstrutor} />
+  const [verResto, setVerResto] = React.useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = React.useState(false);
+  const [iaAberta, setIaAberta] = React.useState(false);
+  const nFiltros = contarFiltros(globais);
+
+  // O número principal mudou numa recarga (entrou venda, mudou filtro): o fundo reage.
+  const heroi = React.useRef<HTMLElement | null>(null);
+  const valorPrincipal = resumo.principal ? dados?.numeros[resumo.principal.fonte] ?? null : null;
+  const valorAnterior = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    if (valorPrincipal === null) return;
+    if (valorAnterior.current !== null && valorAnterior.current !== valorPrincipal) pulsar(heroi.current, 1.6);
+    valorAnterior.current = valorPrincipal;
+  }, [valorPrincipal]);
+
+  const semCartoes = (widgets ?? []).length === 0;
+  const carregandoResumo = !dados && carregando;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-5 px-4 pb-6 pt-1 lg:px-6 print:p-0">
+      {/* Na folha impressa: título, período e filtros no lugar da barra. */}
+      <div className="hidden print:block">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">
+          Dashboard{organizacao ? ` · ${organizacao}` : ""}
+        </h1>
+        <div className="text-caption text-text-secondary">
+          <p>Período: {descreverPeriodo(globais, dados)}</p>
+          {filtrosAtivos.length > 0 && <p>{filtrosAtivos.map(([r, v]) => `${r}: ${v}`).join(" · ")}</p>}
+          {carregadoEm !== null && <p className="text-text-tertiary">Gerado em {dataHoraBR(new Date(carregadoEm))}</p>}
+        </div>
       </div>
 
+      {/* Barra da tela: título, período em cápsula; à direita Filtros, "…" e Editar painel. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Dashboard</h1>
+        <span className="font-mono text-caption tabular-nums text-text-tertiary" aria-live="polite">
+          {estadoSalvar === "salvando" ? "salvando…" : estadoSalvar === "salvo" ? "salvo" : !editando && atualizadoEm ? `atualizado ${atualizadoEm}` : ""}
+        </span>
+        <SeletorDePeriodo
+          globais={globais}
+          aoMudar={mudarGlobais}
+          aoPersonalizar={() => setFiltrosAbertos(true)}
+          className="order-last w-full sm:order-none sm:ml-2 sm:w-auto"
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setFiltrosAbertos((v) => !v)}
+            aria-expanded={filtrosAbertos}
+            aria-label={nFiltros ? `Filtros, ${nFiltros} ligados` : "Filtros"}
+          >
+            <ListFilter size={14} aria-hidden="true" />
+            Filtros
+            {nFiltros > 0 && <span className="font-mono text-caption tabular-nums text-accent-fg">{nFiltros}</span>}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label="Mais: atualizar, painel do funil, filtrar com a Eva, exportar" variant="secondary" disabled={exportando}>
+                <Ellipsis className={cn(exportando && "animate-pulse")} />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem onSelect={() => void carregarDados()}>
+                <RefreshCw className={cn(carregando && "animate-spin")} aria-hidden="true" /> Atualizar os números
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setIaAberta(true)}>
+                <MarcaEva size={15} className="text-text-tertiary" /> Filtrar com a Eva
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={montarPainelDoFunil} title="Acrescenta os cartões de funil que ainda não estão no painel">
+                <Funnel aria-hidden="true" /> Acrescentar o painel do funil
+              </DropdownMenuItem>
+              {editando && (
+                <DropdownMenuItem onSelect={() => void restaurarPadrao()}>
+                  <RotateCcw aria-hidden="true" /> Voltar ao painel padrão
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Exportar · no PDF, escolha &ldquo;Salvar como PDF&rdquo;</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={imprimir}>
+                <FileText aria-hidden="true" /> Relatório (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportarTodos()} disabled={!widgets?.length}>
+                <FileSpreadsheet aria-hidden="true" /> Todos os cartões (CSV)
+              </DropdownMenuItem>
+              {/* Os cartões do resumo não têm menu próprio: o CSV de cada um mora aqui. */}
+              {!editando &&
+                resumo.usados.map((w) => (
+                  <DropdownMenuItem key={w.id} onSelect={() => void exportarCartao(w)}>
+                    <Download aria-hidden="true" /> {w.titulo || fontePorChave.get(w.fonte)?.rotulo || "Cartão"} (CSV)
+                  </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setEditando((v) => !v);
+              setSelecionado(null);
+            }}
+            className="border-transparent bg-inverse font-semibold text-inverse-fg hover:bg-inverse hover:opacity-90"
+          >
+            {editando ? (
+              <>
+                <Check size={14} aria-hidden="true" /> Concluir
+              </>
+            ) : (
+              "Editar painel"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {filtrosAbertos && (
+        <div className="rounded-[18px] border border-border-subtle bg-panel p-4 print:hidden">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-body font-semibold text-text-primary">Filtros do painel</h2>
+            <IconButton aria-label="Fechar filtros" size="sm" onClick={() => setFiltrosAbertos(false)}>
+              <X />
+            </IconButton>
+          </div>
+          <PainelDeFiltros globais={globais} aoMudar={mudarGlobais} opcoes={opcoes} />
+        </div>
+      )}
+
+      {iaAberta && (
+        <div className="rounded-[18px] border border-border-subtle bg-panel p-4 print:hidden">
+          <PainelFiltrarComIa
+            globais={globais}
+            opcoes={opcoes}
+            aoMudar={mudarGlobais}
+            aoFechar={() => setIaAberta(false)}
+            aoSalvarCartao={salvarDoConstrutor}
+          />
+        </div>
+      )}
+
       {historicoRecente && (
-        <p className="mb-4 rounded-2xl bg-surface-2 px-4 py-3 text-[12.5px] leading-relaxed text-text-secondary ring-1 ring-border-subtle">
+        <p className="rounded-[14px] bg-raised px-4 py-3 text-small leading-relaxed text-text-secondary">
           {dados?.historicoDesde
             ? `O histórico de etapas começou em ${new Date(dados.historicoDesde).toLocaleDateString("pt-BR")}. `
             : "O histórico de etapas começa a ser gravado a partir de agora. "}
@@ -549,62 +622,146 @@ function Painel() {
         </p>
       )}
 
-      <div className={cn("flex gap-4", editando && widgetSelecionado && "items-start")}>
-        <div className="dash-grade grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {(widgets ?? []).map((w, i) => (
-            <Cartao
-              key={w.id}
-              widget={w}
-              fonte={fontePorChave.get(w.fonte)}
-              dados={dados}
-              globais={globais}
-              opcoes={opcoes}
-              rotulos={rotulos}
-              editando={editando}
-              selecionado={selecionado === w.id}
-              primeiro={i === 0}
-              ultimo={i === (widgets ?? []).length - 1}
-              onSelecionar={() => setSelecionado(w.id)}
-              onRemover={() => remover(w.id)}
-              onMover={(d) => mover(w.id, d)}
-              onBaixarCsv={() => exportarCartao(w)}
-            />
-          ))}
+      {editando ? (
+        <>
+          <p className="font-mono text-caption text-text-tertiary print:hidden">Clique num cartão para editar; use o + para adicionar. Salva sozinho.</p>
+          <div className={cn("flex gap-4", widgetSelecionado && "items-start")}>
+            <div className="dash-grade grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {(widgets ?? []).map((w, i) => (
+                <Cartao
+                  key={w.id}
+                  widget={w}
+                  fonte={fontePorChave.get(w.fonte)}
+                  dados={dados}
+                  globais={globais}
+                  opcoes={opcoes}
+                  rotulos={rotulos}
+                  editando
+                  selecionado={selecionado === w.id}
+                  primeiro={i === 0}
+                  ultimo={i === (widgets ?? []).length - 1}
+                  onSelecionar={() => setSelecionado(w.id)}
+                  onRemover={() => remover(w.id)}
+                  onMover={(d) => mover(w.id, d)}
+                  onBaixarCsv={() => exportarCartao(w)}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setAdicionando(true)}
+                className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-[18px] border border-dashed border-border-default text-text-tertiary transition-colors hover:border-accent-solid/50 hover:text-accent-fg print:hidden"
+              >
+                <Plus size={20} aria-hidden="true" />
+                <span className="text-small font-medium">Adicionar cartão</span>
+              </button>
+            </div>
 
-          {editando && (
-            <button
-              type="button"
-              onClick={() => setAdicionando(true)}
-              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-3xl border border-dashed print:hidden border-border-default text-text-tertiary transition-colors hover:border-accent-500/50 hover:text-accent-400"
-            >
-              <Plus size={22} />
-              <span className="text-[13px] font-medium">Adicionar painel</span>
-            </button>
+            {widgetSelecionado && (
+              <Propriedades
+                widget={widgetSelecionado}
+                fonte={fontePorChave.get(widgetSelecionado.fonte)}
+                catalogo={catalogo}
+                onChange={(m) => alterar(widgetSelecionado.id, m)}
+                rotulos={rotulos}
+                onEditarConsulta={() => setConstrutor({ editandoId: widgetSelecionado.id })}
+                onRemover={() => remover(widgetSelecionado.id)}
+                onFechar={() => setSelecionado(null)}
+              />
+            )}
+          </div>
+        </>
+      ) : semCartoes && widgets !== null ? (
+        <div className="rounded-[18px] border border-border-subtle bg-panel px-5 py-10 text-center">
+          <p className="text-body font-medium text-text-primary">Painel vazio.</p>
+          <p className="mt-1 text-small text-text-secondary">Entre em &ldquo;Editar painel&rdquo; e adicione o primeiro cartão.</p>
+          <Button variant="secondary" className="mt-4" onClick={() => setEditando(true)}>
+            Editar painel
+          </Button>
+        </div>
+      ) : carregandoResumo || widgets === null ? (
+        <div className="flex flex-col gap-5" aria-busy="true">
+          <div className="h-[84px] w-72 max-w-full animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+          <div className="h-[260px] animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />
+        </div>
+      ) : (
+        <>
+          {(resumo.principal || resumo.apoio.length > 0) && (
+            <section ref={heroi} aria-label="Números do período" className="flex flex-wrap items-end gap-x-8 gap-y-4">
+              {resumo.principal && (
+                <NumeroPrincipal
+                  widget={resumo.principal}
+                  fonte={fontePorChave.get(resumo.principal.fonte)!}
+                  dados={dados}
+                  periodo={periodoCurto(globais, dados?.periodo)}
+                  selo={seloDeFiltro(fontePorChave.get(resumo.principal.fonte)!, globais, dados, opcoes.funis.length)}
+                />
+              )}
+              {resumo.apoio.length > 0 && (
+                <div className="flex flex-wrap gap-x-7 gap-y-3 pb-1.5">
+                  {resumo.apoio.map((w) => {
+                    const f = fontePorChave.get(w.fonte)!;
+                    return (
+                      <div key={w.id} className="flex flex-col gap-0.5" title={f.explicacao}>
+                        <b className="text-heading font-normal tracking-[-0.03em] tabular-nums text-text-primary">
+                          {formatar(dados?.numeros[f.chave] ?? null, f.formato)}
+                        </b>
+                        <span className="font-mono text-caption text-text-tertiary">{w.titulo || f.rotulo}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           )}
-        </div>
 
-        {editando && widgetSelecionado && (
-          <Propriedades
-            widget={widgetSelecionado}
-            fonte={fontePorChave.get(widgetSelecionado.fonte)}
-            catalogo={catalogo}
-            onChange={(m) => alterar(widgetSelecionado.id, m)}
-            rotulos={rotulos}
-            onEditarConsulta={() => setConstrutor({ editandoId: widgetSelecionado.id })}
-            onRemover={() => remover(widgetSelecionado.id)}
-            onFechar={() => setSelecionado(null)}
-          />
-        )}
-      </div>
+          {resumo.curva && (
+            <Curva widget={resumo.curva} fonte={fontePorChave.get(resumo.curva.fonte)!} dados={dados} />
+          )}
 
-      {(widgets ?? []).length === 0 && !editando && (
-        <div className="glass-card rounded-3xl px-6 py-16 text-center">
-          <LayoutGrid size={30} className="mx-auto mb-4 text-text-tertiary" />
-          <h2 className="font-display text-lg font-semibold text-text-primary">Painel vazio</h2>
-          <p className="mx-auto mt-2 max-w-sm text-[13.5px] text-text-secondary">
-            Entre em &ldquo;Editar painel&rdquo; e adicione o primeiro cartão.
-          </p>
-        </div>
+          {resumo.base.length > 0 && (
+            <div className={cn("grid gap-7", resumo.base.length > 1 && "md:grid-cols-[1.4fr_1fr]")}>
+              {resumo.base.map((w) => (
+                <LeituraCurta key={w.id} widget={w} fonte={fontePorChave.get(w.fonte)!} dados={dados} />
+              ))}
+            </div>
+          )}
+
+          {resumo.resto.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setVerResto((v) => !v)}
+                aria-expanded={verResto}
+                className="inline-flex w-fit items-center gap-1 text-small font-medium text-accent-fg hover:underline print:hidden"
+              >
+                {verResto ? "Mostrar menos" : `Ver mais ${resumo.resto.length} ${resumo.resto.length === 1 ? "cartão" : "cartões"}`}
+                {verResto ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+              </button>
+              {/* Na impressão o painel sai inteiro. */}
+              <div className={cn("dash-grade grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3", !verResto && "hidden print:grid")}>
+                {resumo.resto.map((w, i) => (
+                  <Cartao
+                    key={w.id}
+                    widget={w}
+                    fonte={fontePorChave.get(w.fonte)}
+                    dados={dados}
+                    globais={globais}
+                    opcoes={opcoes}
+                    rotulos={rotulos}
+                    editando={false}
+                    selecionado={false}
+                    primeiro={i === 0}
+                    ultimo={i === resumo.resto.length - 1}
+                    onSelecionar={() => setSelecionado(w.id)}
+                    onRemover={() => remover(w.id)}
+                    onMover={(d) => mover(w.id, d)}
+                    onBaixarCsv={() => exportarCartao(w)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {adicionando && (
@@ -632,6 +789,89 @@ function Painel() {
   );
 }
 
+// ── Resumo ─────────────────────────────────────────────────────────────────
+
+/** Fontes cujas séries e quebras vêm em reais (o resto é contagem). */
+const EM_REAIS = new Set(["receitaPorDia", "porEtapa"]);
+
+const reaisInteiros = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const reaisCurtos = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 });
+
+/** O número que conta a história: grande e leve, sem ícone e sem legenda longa. */
+function NumeroPrincipal({
+  widget, fonte, dados, periodo, selo,
+}: {
+  widget: Widget;
+  fonte: Fonte;
+  dados: Dados | null;
+  periodo: string;
+  selo: string | null;
+}) {
+  const valor = dados?.numeros[fonte.chave] ?? null;
+  const dinheiro = fonte.formato === "dinheiro" && valor !== null;
+  return (
+    <div className="flex min-w-0 flex-col" title={fonte.explicacao}>
+      <span className="font-mono text-caption text-text-tertiary">
+        {widget.titulo || fonte.rotulo} · {periodo}
+      </span>
+      <p className="mt-1.5 text-[44px] font-light leading-none tracking-[-0.05em] tabular-nums text-text-primary sm:text-[64px]">
+        {dinheiro ? (
+          <>
+            <span className="mr-1.5 align-top text-title font-normal tracking-normal text-text-tertiary">R$</span>
+            {Math.round(valor / 100).toLocaleString("pt-BR")}
+          </>
+        ) : (
+          formatar(valor, fonte.formato)
+        )}
+      </p>
+      {selo && <span className="mt-2 font-mono text-caption text-text-tertiary">{selo}</span>}
+    </div>
+  );
+}
+
+/** A série do período como curva limpa (média de 3 dias; o dia a dia aparece na dica). */
+function Curva({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dados: Dados | null }) {
+  const serie = dados?.series[fonte.chave] ?? [];
+  const emReais = EM_REAIS.has(fonte.chave);
+  return (
+    <section aria-label={widget.titulo || fonte.rotulo} title={fonte.explicacao}>
+      <h2 className="mb-2 font-mono text-caption text-text-tertiary">{widget.titulo || fonte.rotulo}</h2>
+      {serie.some((p) => p.value > 0) ? (
+        <AreaChart data={serie} height={260} suavizar formatarValor={emReais ? reaisInteiros : undefined} />
+      ) : (
+        <Vazio />
+      )}
+    </section>
+  );
+}
+
+/** Quebra em uma leitura: barra única (etapas) ou três porcentagens (canais, motivos). */
+function LeituraCurta({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dados: Dados | null }) {
+  const partes = (dados?.quebras[fonte.chave] ?? []).map((p) => ({ ...p, label: rotular(p.label) }));
+  const emReais = EM_REAIS.has(fonte.chave);
+  const total = partes.reduce((s, p) => s + p.value, 0);
+  return (
+    <section aria-label={widget.titulo || fonte.rotulo} title={fonte.explicacao} className="min-w-0">
+      <h2 className="mb-3 flex items-baseline gap-2 text-small font-medium text-text-secondary">
+        {widget.titulo || fonte.rotulo}
+        {widget.tipo === "barras" && total > 0 && (
+          <span className="ml-auto font-mono text-caption font-normal tabular-nums text-text-tertiary">
+            {emReais ? reaisCurtos(total) : total.toLocaleString("pt-BR")} no total
+          </span>
+        )}
+      </h2>
+      {total === 0 ? (
+        <Vazio />
+      ) : widget.tipo === "barras" ? (
+        <BarraEmPilha data={partes} formatarValor={emReais ? reaisCurtos : undefined} />
+      ) : (
+        <Porcentagens data={partes} />
+      )}
+    </section>
+  );
+}
+
 // ── Cartão ─────────────────────────────────────────────────────────────────
 
 function Cartao({
@@ -655,20 +895,24 @@ function Cartao({
 }) {
   const span =
     widget.largura === 3 ? "md:col-span-2 xl:col-span-3" : widget.largura === 2 ? "md:col-span-2" : "";
+  // O que antes era texto embaixo de cada cartão (de onde sai o número) vira a dica do título.
+  const explicacao =
+    widget.fonte === "custom" && widget.consulta ? descreverConsulta(widget.consulta, rotulos) : fonte?.explicacao;
+  const selo = fonte && !editando ? seloDeFiltro(fonte, globais, dados, opcoes.funis.length) : null;
 
   return (
     <div
       onClick={editando ? onSelecionar : undefined}
       className={cn(
-        "glass-card relative flex flex-col rounded-3xl p-5",
+        "relative flex flex-col rounded-[18px] border border-border-subtle bg-panel p-5",
         span,
         widget.largura >= 2 ? "dash-largo" : "dash-estreito",
-        editando && "cursor-pointer",
-        selecionado && "ring-2 ring-accent-500/60"
+        editando && "cursor-pointer hover:border-border-default",
+        selecionado && "ring-2 ring-accent-solid/60"
       )}
     >
       {editando && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-lg bg-surface-3/90 p-0.5 print:hidden">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-full border border-border-subtle bg-overlay p-0.5 print:hidden">
           <BotaoMini onClick={(e) => { e.stopPropagation(); onMover(-1); }} disabled={primeiro} titulo="Mover pra trás">
             <ArrowLeft size={12} />
           </BotaoMini>
@@ -684,49 +928,40 @@ function Cartao({
       {!editando && (
         <div className="absolute right-3 top-3 z-10 print:hidden">
           <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label={`Opções do cartão ${widget.titulo}`}
-              title="Opções do cartão"
-              className="rounded-md p-1 text-text-tertiary outline-none transition-colors hover:bg-surface-2 hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
-            >
-              <MoreHorizontal size={15} />
+            <DropdownMenuTrigger asChild>
+              <IconButton aria-label={`Opções do cartão ${widget.titulo}`} size="sm">
+                <MoreHorizontal />
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onBaixarCsv}>
-                <Download size={14} /> Baixar CSV
+                <Download aria-hidden="true" /> Baixar CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       )}
 
-      <h2 className="pr-16 text-[12.5px] text-text-tertiary print:text-[13px] print:font-medium print:text-text-primary">{widget.titulo}</h2>
+      <h2 className="pr-16 text-small font-medium text-text-secondary print:text-text-primary" title={explicacao}>
+        {widget.titulo}
+      </h2>
 
       {widget.fonte === "custom" && widget.consulta ? (
-        <div className="mt-2 flex-1">
+        <div className="mt-3 flex-1">
           <ConteudoDeConsulta consulta={widget.consulta} tipo={tipoDeConsulta(widget.tipo)} globais={globais} />
         </div>
       ) : !fonte ? (
-        <p className="mt-3 text-[12.5px] text-text-tertiary">Fonte não encontrada.</p>
+        <p className="mt-3 text-small text-text-tertiary">Fonte não encontrada.</p>
       ) : (
-        <div className="mt-2 flex-1">
+        <div className="mt-3 flex-1">
           <Conteudo widget={widget} fonte={fonte} dados={dados} />
         </div>
       )}
 
-      {fonte && !editando && (() => {
-        const selo = seloDeFiltro(fonte, globais, dados, opcoes.funis.length);
-        return selo ? (
-          <p className="mt-2 inline-flex w-fit items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-[10.5px] text-text-tertiary ring-1 ring-border-subtle">
-            <FilterX size={10} /> {selo}
-          </p>
-        ) : null;
-      })()}
-      {fonte && !editando && (
-        <p className="mt-2 text-[11px] text-text-tertiary">{fonte.explicacao}</p>
-      )}
-      {widget.fonte === "custom" && widget.consulta && !editando && (
-        <p className="mt-2 text-[11px] text-text-tertiary">{descreverConsulta(widget.consulta, rotulos)}</p>
+      {selo && (
+        <p className="mt-3 inline-flex w-fit items-center gap-1 font-mono text-caption text-text-tertiary">
+          <FilterX size={11} aria-hidden="true" /> {selo}
+        </p>
       )}
     </div>
   );
@@ -750,7 +985,7 @@ function BotaoMini({
       onClick={onClick}
       className={cn(
         "rounded-md p-1 text-text-tertiary transition-colors disabled:opacity-30",
-        perigo ? "hover:bg-danger/15 hover:text-danger" : "hover:bg-surface-2 hover:text-text-primary"
+        perigo ? "hover:bg-danger/15 hover:text-danger" : "hover:bg-hover hover:text-text-primary"
       )}
     >
       {children}
@@ -759,12 +994,12 @@ function BotaoMini({
 }
 
 function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dados: Dados | null }) {
-  if (!dados) return <p className="text-[12.5px] text-text-tertiary">Carregando...</p>;
+  if (!dados) return <p className="text-small text-text-tertiary">Carregando...</p>;
 
   if (widget.tipo === "numero") {
     const valor = dados.numeros[fonte.chave] ?? null;
     return (
-      <p className="font-display text-[30px] font-semibold leading-tight text-text-primary tabular-nums">
+      <p className="text-display font-light tracking-[-0.04em] text-text-primary tabular-nums">
         {formatar(valor, fonte.formato)}
       </p>
     );
@@ -773,7 +1008,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
   if (widget.tipo === "linha") {
     const serie = dados.series[fonte.chave] ?? [];
     if (!serie.some((p) => p.value > 0)) return <Vazio />;
-    return <AreaChart data={serie} height={190} />;
+    return <AreaChart data={serie} height={190} formatarValor={EM_REAIS.has(fonte.chave) ? reaisInteiros : undefined} />;
   }
 
   if (widget.tipo === "pizza") {
@@ -795,15 +1030,15 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
       <div className="flex flex-col gap-2.5 pt-1">
         {itens.slice(0, 10).map((i) => (
           <div key={i.label}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-[12.5px]">
+            <div className="mb-1 flex items-center justify-between gap-3 text-small">
               <span className="truncate text-text-secondary">{rotular(i.label)}</span>
-              <span className="shrink-0 tabular-nums text-text-tertiary">
+              <span className="shrink-0 font-mono text-caption tabular-nums text-text-tertiary">
                 {i.value.toLocaleString("pt-BR")}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-surface-3">
+            <div className="h-1.5 rounded-full bg-hover">
               <div
-                className="h-1.5 rounded-full bg-accent-500/70"
+                className="h-1.5 rounded-full bg-accent-solid"
                 style={{ width: `${Math.max(2, (i.value / maior) * 100)}%` }}
               />
             </div>
@@ -821,7 +1056,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
     <div className="-mx-2 overflow-x-auto pt-1">
       <table className="w-full min-w-[440px] border-collapse">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide text-text-tertiary">
+          <tr className="text-left font-mono text-caption text-text-tertiary">
             <th className="px-2 pb-2 font-medium">{porEtapa ? "Parado desde" : "Quando"}</th>
             <th className="px-2 pb-2 font-medium">Negócio</th>
             <th className="px-2 pb-2 font-medium">{porEtapa ? "Etapa" : "Contato"}</th>
@@ -830,7 +1065,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
         </thead>
         <tbody>
           {linhas.slice(0, 8).map((l) => (
-            <tr key={l.id} className="border-t border-border-subtle text-[12.5px]">
+            <tr key={l.id} className="border-t border-border-subtle text-small">
               <td className="whitespace-nowrap px-2 py-2 text-text-tertiary">
                 {l.quando ? formatRelativeDate(l.quando) : "—"}
               </td>
@@ -845,7 +1080,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
       </table>
       <Link
         href="/negocios"
-        className="mt-3 inline-flex items-center gap-1.5 px-2 text-[12px] font-medium text-accent-400 hover:text-accent-300"
+        className="mt-3 inline-flex items-center gap-1.5 px-2 text-small font-medium text-accent-fg hover:underline"
       >
         Abrir o funil <ArrowRight size={12} />
       </Link>
@@ -855,7 +1090,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
 
 function Vazio() {
   return (
-    <p className="rounded-2xl bg-surface-2 px-4 py-7 text-center text-[12px] text-text-tertiary">
+    <p className="rounded-[14px] bg-raised px-4 py-7 text-center text-small text-text-tertiary">
       Sem dados no período.
     </p>
   );
@@ -882,9 +1117,9 @@ function Propriedades({
   const grupos = [...new Set(catalogo.map((f) => f.grupo))];
 
   return (
-    <aside className="glass-card glass-card-solid sticky top-8 hidden w-[300px] shrink-0 flex-col rounded-3xl lg:flex print:hidden">
+    <aside className="border border-border-default bg-overlay shadow-overlay sticky top-8 hidden w-[300px] shrink-0 flex-col rounded-[18px] lg:flex print:hidden">
       <header className="flex items-center justify-between border-b border-border-subtle p-4">
-        <p className="text-[13px] font-semibold text-text-primary">Propriedades</p>
+        <p className="text-small font-semibold text-text-primary">Propriedades</p>
         <button
           type="button"
           onClick={onFechar}
@@ -909,11 +1144,11 @@ function Propriedades({
         {ehCustom ? (
           <div>
             <Label>O que o cartão mostra</Label>
-            <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-[12px] text-text-secondary">{descreverConsulta(widget.consulta!, rotulos)}</p>
+            <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-secondary">{descreverConsulta(widget.consulta!, rotulos)}</p>
             <button
               type="button"
               onClick={onEditarConsulta}
-              className="mt-2 w-full rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+              className="mt-2 h-8 w-full rounded-full border border-border-subtle bg-raised px-3 text-small font-medium text-text-secondary transition-colors hover:text-text-primary"
             >
               Editar o que ele mede
             </button>
@@ -944,7 +1179,7 @@ function Propriedades({
               </optgroup>
             ))}
           </Select>
-          {fonte && <p className="mt-1.5 text-[11.5px] text-text-tertiary">{fonte.explicacao}</p>}
+          {fonte && <p className="mt-1.5 text-caption text-text-tertiary">{fonte.explicacao}</p>}
         </div>
         )}
 
@@ -959,10 +1194,10 @@ function Propriedades({
                   type="button"
                   onClick={() => onChange({ tipo: t })}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium transition-colors",
+                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-small font-medium transition-colors",
                     widget.tipo === t
-                      ? "bg-accent-soft text-accent-300 ring-1 ring-accent-500/40"
-                      : "bg-surface-2 text-text-secondary hover:text-text-primary"
+                      ? "bg-inverse text-inverse-fg"
+                      : "border border-border-subtle bg-raised text-text-secondary hover:text-text-primary"
                   )}
                 >
                   <Icone size={13} /> {NOME_DO_TIPO[t]}
@@ -971,7 +1206,7 @@ function Propriedades({
             })}
           </div>
           {tiposPermitidos.length === 1 && (
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 text-caption text-text-tertiary">
               Esta fonte só faz sentido assim.
             </p>
           )}
@@ -986,10 +1221,10 @@ function Propriedades({
                 type="button"
                 onClick={() => onChange({ largura: l })}
                 className={cn(
-                  "flex-1 rounded-xl px-3 py-2 text-[12.5px] font-medium transition-colors",
+                  "h-8 flex-1 rounded-full px-3 text-small font-medium transition-colors",
                   widget.largura === l
-                    ? "bg-accent-soft text-accent-300 ring-1 ring-accent-500/40"
-                    : "bg-surface-2 text-text-secondary hover:text-text-primary"
+                    ? "bg-inverse text-inverse-fg"
+                    : "border border-border-subtle bg-raised text-text-secondary hover:text-text-primary"
                 )}
               >
                 {l === 1 ? "1/3" : l === 2 ? "2/3" : "Cheia"}
@@ -1003,7 +1238,7 @@ function Propriedades({
         <button
           type="button"
           onClick={onRemover}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
+          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3 text-small font-medium text-text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
         >
           <X size={13} /> Remover cartão
         </button>
@@ -1031,15 +1266,15 @@ function EscolherFonte({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onFechar} />
-      <div className="glass-card glass-card-solid relative z-10 flex max-h-[80vh] w-full max-w-[560px] flex-col overflow-hidden rounded-3xl">
+      <div className="absolute inset-0 bg-backdrop" onClick={onFechar} />
+      <div className="border border-border-default bg-overlay shadow-overlay relative z-10 flex max-h-[80vh] w-full max-w-[560px] flex-col overflow-hidden rounded-[18px]">
         <header className="border-b border-border-subtle p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-display text-[16px] font-semibold text-text-primary">
+              <h2 className="text-body-lg font-semibold text-text-primary">
                 O que você quer ver?
               </h2>
-              <p className="mt-1 text-[12.5px] text-text-secondary">
+              <p className="mt-1 text-small text-text-secondary">
                 Escolha o número primeiro. O formato do cartão você ajusta depois.
               </p>
             </div>
@@ -1064,26 +1299,26 @@ function EscolherFonte({
           <button
             type="button"
             onClick={onMontar}
-            className="mb-2 flex w-full items-start gap-3 rounded-xl bg-accent-soft px-3 py-3 text-left ring-1 ring-accent-500/30 transition-colors hover:ring-accent-500/60"
+            className="mb-2 flex w-full items-start gap-3 rounded-[14px] bg-raised px-3 py-3 text-left ring-1 ring-border-subtle transition-colors hover:ring-border-strong"
           >
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-500/20 text-accent-300">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-solid text-text-on-accent">
               <Plus size={14} />
             </span>
             <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-text-primary">Montar do meu jeito</span>
-              <span className="block text-[11.5px] text-text-secondary">
+              <span className="block text-small font-medium text-text-primary">Montar do meu jeito</span>
+              <span className="block text-caption text-text-secondary">
                 Some, conte ou tire a média de qualquer valor ou campo seu, separe por etapa, responsável ou mês, e filtre.
               </span>
             </span>
           </button>
           {grupos.length === 0 ? (
-            <p className="px-3 py-8 text-center text-[12.5px] text-text-tertiary">
+            <p className="px-3 py-8 text-center text-small text-text-tertiary">
               Nada com “{busca}”.
             </p>
           ) : (
             grupos.map((g) => (
               <div key={g} className="mb-2 last:mb-0">
-                <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+                <p className="px-3 py-1.5 font-mono text-caption text-text-tertiary">
                   {g}
                 </p>
                 <div className="flex flex-col gap-0.5">
@@ -1094,14 +1329,14 @@ function EscolherFonte({
                         key={f.chave}
                         type="button"
                         onClick={() => onEscolher(f)}
-                        className="group flex items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
+                        className="group flex items-start gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-hover"
                       >
-                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-text-secondary">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-border-subtle bg-raised text-text-secondary">
                           <Icone size={13} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-[13px] text-text-primary">{f.rotulo}</span>
-                          <span className="block text-[11.5px] text-text-tertiary">{f.explicacao}</span>
+                          <span className="block text-small text-text-primary">{f.rotulo}</span>
+                          <span className="block text-caption text-text-tertiary">{f.explicacao}</span>
                         </span>
                       </button>
                     );

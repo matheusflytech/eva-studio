@@ -37,7 +37,7 @@ export function VariablesEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[12.5px] text-text-tertiary">
+      <p className="text-small text-text-tertiary">
         Métricas que esse agente vai acompanhar — aparecem como séries selecionáveis no Dashboard.
       </p>
 
@@ -46,13 +46,13 @@ export function VariablesEditor({
           {variables.map((v) => (
             <div
               key={v.id}
-              className="flex items-center justify-between rounded-xl border border-border-default bg-surface-2 px-3.5 py-2.5"
+              className="flex items-center justify-between rounded-[14px] border border-border-subtle bg-raised px-3.5 py-2.5"
             >
               <div className="flex items-center gap-2.5">
                 <Variable size={14} className="text-text-tertiary" />
                 <div>
-                  <p className="text-[13px] font-medium text-text-primary">{v.name}</p>
-                  {v.unit && <p className="text-[11.5px] text-text-tertiary">{v.unit}</p>}
+                  <p className="text-small font-medium text-text-primary">{v.name}</p>
+                  {v.unit && <p className="text-caption text-text-tertiary">{v.unit}</p>}
                 </div>
               </div>
               <button
@@ -84,7 +84,7 @@ export function VariablesEditor({
         <button
           type="button"
           onClick={add}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-default bg-surface-2 text-text-tertiary transition-colors hover:border-border-strong hover:text-text-primary"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-border-subtle bg-raised text-text-tertiary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           <Plus size={16} />
         </button>

@@ -5,12 +5,17 @@ import Link from "@/components/contrato/link";
 import { useRouter } from "@/lib/contrato/navegacao";
 import {
   Sun, Building2, HeartPulse, ShoppingBag, Briefcase, GraduationCap, Sparkles,
-  ArrowRight, ArrowLeft, Check, Loader2, MessageSquare, Handshake, PlayCircle, SlidersHorizontal,
+  ArrowRight, ArrowLeft, Check, ChevronRight, Handshake, PlayCircle,
 } from "lucide-react";
-import { Input, Label } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { LogoOficial } from "@/components/ui/logo-oficial";
+import { Input, Field } from "@/components/ui/input";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import { focusRing } from "@/components/ui/styles";
 import { PACOTES, type PacoteDeNicho } from "@/lib/niche-packs";
-import { COR_DA_ETAPA, TIPO_POR_ID } from "@/lib/custom-fields";
+import { TIPO_POR_ID } from "@/lib/custom-fields";
+import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
+import type { CategoryColor } from "@/lib/design-system/tokens";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +30,17 @@ const ICONES: Record<PacoteDeNicho["icone"], React.ComponentType<{ size?: number
   sun: Sun, building: Building2, heart: HeartPulse, shopping: ShoppingBag,
   briefcase: Briefcase, graduation: GraduationCap, blank: Sparkles,
 };
+
+// Cor guardada na etapa do pacote → cor de dado do tema (a mesma do quadro de
+// Negócios). Ganho é verde e perda é vermelha, como antes, venha a cor que vier.
+const COR_DE_DADO: Record<string, CategoryColor> = {
+  slate: "slate", blue: "blue", violet: "violet", amber: "amber", emerald: "green", rose: "rose", cyan: "cyan",
+};
+function corDaEtapaDoPacote(cor: string | undefined, tipo: string): CategoryColor {
+  if (tipo === "won") return "green";
+  if (tipo === "lost") return "rose";
+  return COR_DE_DADO[cor ?? "slate"] ?? "slate";
+}
 
 interface Resumo {
   funilId: string;
@@ -73,34 +89,43 @@ export default function ComecarPage() {
     router.push("/inicio");
   }
 
+  const NOMES_DOS_PASSOS = ["Seu tipo de negócio", "Confirme", "Pronto"] as const;
+
   return (
-    <div className="flex-1 p-4 sm:p-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center gap-2 text-[12px] text-text-tertiary">
-          {[1, 2, 3].map((n) => (
-            <React.Fragment key={n}>
-              <span
-                className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full text-[11.5px] font-semibold",
-                  passo >= n ? "bg-accent-500 text-text-on-accent" : "bg-surface-3 text-text-tertiary"
-                )}
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+        {/* Progresso em três traços e o nome do passo em mono: diz onde está
+            sem virar enfeite. */}
+        <div className="flex items-center gap-3 pt-3">
+          <ol aria-label="Passos" className="flex items-center gap-1.5">
+            {[1, 2, 3].map((n) => (
+              <li
+                key={n}
+                aria-current={passo === n ? "step" : undefined}
+                className={cn("h-1 w-8 rounded-full transition-colors duration-200", passo >= n ? "bg-inverse" : "bg-hover")}
               >
-                {passo > n ? <Check size={13} /> : n}
-              </span>
-              {n < 3 && <span className={cn("h-px w-8", passo > n ? "bg-accent-500" : "bg-border-default")} />}
-            </React.Fragment>
-          ))}
-          <span className="ml-2">{passo === 1 ? "Seu tipo de negócio" : passo === 2 ? "Confirme" : "Pronto"}</span>
+                <span className="sr-only">
+                  Passo {n}: {NOMES_DOS_PASSOS[n - 1]}
+                  {passo > n ? " (feito)" : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <span className="font-mono text-caption text-text-tertiary">
+            {passo} de 3 · {NOMES_DOS_PASSOS[passo - 1]}
+          </span>
         </div>
 
         {passo === 1 && (
           <>
-            <h1 className="font-display text-2xl font-semibold text-text-primary">Que tipo de negócio é o seu?</h1>
-            <p className="mt-1.5 max-w-xl text-[14.5px] text-text-secondary">
-              Cada negócio guarda dados diferentes. Escolha o mais parecido e o app monta o funil, os campos e um atendimento de WhatsApp. Você muda o que quiser depois.
-            </p>
+            <div className="flex flex-col gap-1.5">
+              <h1 className="text-heading font-semibold tracking-tight text-text-primary">Que tipo de negócio é o seu?</h1>
+              <p className="max-w-xl text-body text-text-secondary">
+                Cada negócio guarda dados diferentes. Escolha o mais parecido e o app monta o funil, os campos e um atendimento de WhatsApp. Você muda o que quiser depois.
+              </p>
+            </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PACOTES.map((p) => {
                 const Icone = ICONES[p.icone];
                 return (
@@ -108,116 +133,127 @@ export default function ComecarPage() {
                     key={p.id}
                     type="button"
                     onClick={() => { setEscolhido(p); setPasso(2); }}
-                    className="glass-card group flex flex-col rounded-3xl p-5 text-left transition-colors hover:border-accent-500/50"
+                    className={cn(
+                      "group flex flex-col rounded-[18px] border border-border-subtle bg-panel p-4 text-left transition-colors duration-120 hover:border-border-default hover:bg-raised",
+                      focusRing
+                    )}
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-3 text-text-secondary group-hover:text-accent-300">
-                      <Icone size={19} />
+                    <span className="flex size-10 items-center justify-center rounded-[14px] bg-raised text-text-secondary transition-colors group-hover:bg-hover group-hover:text-text-primary">
+                      <Icone size={18} aria-hidden />
                     </span>
-                    <span className="mt-3 text-[15px] font-semibold text-text-primary">{p.nome}</span>
-                    <span className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">{p.descricao}</span>
+                    <span className="mt-3 text-body-lg font-semibold text-text-primary">{p.nome}</span>
+                    <span className="mt-1 text-small leading-relaxed text-text-secondary">{p.descricao}</span>
                   </button>
                 );
               })}
             </div>
 
-            <button type="button" onClick={pular} className="mt-6 text-[13px] text-text-tertiary hover:text-text-primary">
+            <Button variant="ghost" className="self-start" onClick={pular}>
               Prefiro configurar tudo sozinho
-            </button>
+            </Button>
           </>
         )}
 
         {passo === 2 && escolhido && (
           <>
-            <button type="button" onClick={() => setPasso(1)} className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-text-tertiary hover:text-text-primary">
-              <ArrowLeft size={14} /> Escolher outro
-            </button>
-            <h1 className="font-display text-2xl font-semibold text-text-primary">{escolhido.nome}</h1>
-            <p className="mt-1.5 text-[14.5px] text-text-secondary">É isto que vai ser criado para você:</p>
-
-            <div className="mt-5 max-w-sm">
-              <Label htmlFor="empresa">Nome da sua empresa</Label>
-              <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ex.: Solar Campinas" />
-              <p className="mt-1.5 text-[12px] text-text-tertiary">Aparece na mensagem de abertura do atendimento.</p>
+            <div className="flex flex-col gap-1.5">
+              <Button variant="ghost" size="sm" className="-ml-2 self-start" onClick={() => setPasso(1)}>
+                <ArrowLeft size={14} aria-hidden /> Escolher outro
+              </Button>
+              <h1 className="text-heading font-semibold tracking-tight text-text-primary">{escolhido.nome}</h1>
+              <p className="text-body text-text-secondary">É isto que vai ser criado para você:</p>
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              <section className="glass-card rounded-3xl p-5">
-                <h2 className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary"><Handshake size={15} /> Funil: {escolhido.funil.nome}</h2>
+            <Field label="Nome da sua empresa" hint="Aparece na mensagem de abertura do atendimento." className="max-w-sm">
+              <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ex.: Solar Campinas" />
+            </Field>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <section aria-labelledby="resumo-funil" className="rounded-[18px] border border-border-subtle bg-panel p-4">
+                <h2 id="resumo-funil" className="font-mono text-caption uppercase tracking-wider text-text-tertiary">Funil</h2>
+                <p className="mt-1 text-body font-semibold text-text-primary">{escolhido.funil.nome}</p>
                 <ol className="mt-3 flex flex-col gap-1.5">
-                  {escolhido.funil.etapas.map((e) => {
-                    const cor = e.type === "won" ? COR_DA_ETAPA.emerald : e.type === "lost" ? COR_DA_ETAPA.rose : COR_DA_ETAPA[e.color ?? "slate"] ?? COR_DA_ETAPA.slate;
-                    return (
-                      <li key={e.name} className="flex items-center gap-2 text-[13px] text-text-secondary">
-                        <span className={cn("h-2 w-2 rounded-full", cor.ponto)} /> {e.name}
-                      </li>
-                    );
-                  })}
+                  {escolhido.funil.etapas.map((e) => (
+                    <li key={e.name} className="flex items-center gap-2 text-small text-text-secondary">
+                      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", CATEGORY_CLASSES[corDaEtapaDoPacote(e.color, e.type)].solid)} /> {e.name}
+                    </li>
+                  ))}
                 </ol>
               </section>
 
-              <section className="glass-card rounded-3xl p-5">
-                <h2 className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary"><SlidersHorizontal size={15} /> Campos</h2>
+              <section aria-labelledby="resumo-campos" className="rounded-[18px] border border-border-subtle bg-panel p-4">
+                <h2 id="resumo-campos" className="font-mono text-caption uppercase tracking-wider text-text-tertiary">Campos</h2>
                 {escolhido.campos.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-text-tertiary">Nenhum por enquanto. Você cria os seus em Negócios {">"} Personalizar.</p>
+                  <p className="mt-3 text-small text-text-tertiary">Nenhum por enquanto. Você cria os seus em Negócios {">"} Personalizar.</p>
                 ) : (
                   <ul className="mt-3 flex flex-col gap-1.5">
                     {escolhido.campos.map((c) => (
-                      <li key={c.label} className="flex items-baseline justify-between gap-2 text-[13px]">
+                      <li key={c.label} className="flex items-baseline justify-between gap-2 text-small">
                         <span className="text-text-secondary">{c.label}</span>
-                        <span className="shrink-0 text-[11.5px] text-text-tertiary">{TIPO_POR_ID.get(c.type)?.rotulo}</span>
+                        <span className="shrink-0 font-mono text-caption text-text-tertiary">{TIPO_POR_ID.get(c.type)?.rotulo}</span>
                       </li>
                     ))}
                   </ul>
                 )}
               </section>
 
-              <section className="glass-card rounded-3xl p-5">
-                <h2 className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary"><MessageSquare size={15} /> Atendimento no WhatsApp</h2>
-                <p className="mt-3 text-[13px] leading-relaxed text-text-secondary">
-                  Um agente que recebe o cliente, pergunta:
-                </p>
-                <ul className="mt-2 flex flex-col gap-1 text-[12.5px] text-text-secondary">
-                  <li>• o nome</li>
+              <section aria-labelledby="resumo-atendimento" className="rounded-[18px] border border-border-subtle bg-panel p-4">
+                <h2 id="resumo-atendimento" className="font-mono text-caption uppercase tracking-wider text-text-tertiary">Atendimento no WhatsApp</h2>
+                <p className="mt-3 text-small leading-relaxed text-text-secondary">Um agente que recebe o cliente, pergunta:</p>
+                <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-small text-text-secondary marker:text-text-tertiary">
+                  <li>o nome</li>
                   {escolhido.campos.filter((c) => c.pergunta).map((c) => (
-                    <li key={c.label}>• {c.label.toLowerCase()}</li>
+                    <li key={c.label}>{c.label.toLowerCase()}</li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+                <p className="mt-2 text-small leading-relaxed text-text-secondary">
                   Abre o negócio no funil já preenchido e chama uma pessoa da equipe. Não precisa de chave de IA.
                 </p>
               </section>
             </div>
 
-            {erro && <p className="mt-4 text-[13px] text-danger">{erro}</p>}
+            {erro && <Notice tone="danger">{erro}</Notice>}
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button onClick={aplicar} disabled={busy}>
-                {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Montar o meu CRM
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={aplicar} loading={busy}>
+                {!busy && <Check size={14} aria-hidden />} Montar o meu CRM
               </Button>
-              <button type="button" onClick={() => setPasso(1)} className="text-[13px] text-text-tertiary hover:text-text-primary">Voltar</button>
+              <Button variant="ghost" onClick={() => setPasso(1)}>
+                Voltar
+              </Button>
             </div>
           </>
         )}
 
         {passo === 3 && resumo && escolhido && (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/12 text-emerald-300">
-              <Check size={24} />
-            </div>
-            <h1 className="mt-4 font-display text-2xl font-semibold text-text-primary">Tudo pronto</h1>
-            <p className="mt-1.5 max-w-xl text-[14.5px] text-text-secondary">
-              Criei o funil &quot;{resumo.funilNome}&quot;, {resumo.campos.length} campo(s) e o seu atendimento. Falta só uma coisa: ligar o WhatsApp.
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <Passo href={`/agent-studio/${resumo.agenteId}?aba=canais`} icone={<MessageSquare size={17} />} titulo="Conectar o WhatsApp" texto="Leia o QR code com o número da empresa. É o que faz o atendimento começar a valer." destaque />
-              <Passo href={`/playground?agent=${resumo.agenteId}`} icone={<PlayCircle size={17} />} titulo="Testar o atendimento" texto="Converse com ele como se fosse um cliente e veja o negócio nascer no funil." />
-              <Passo href="/negocios" icone={<Handshake size={17} />} titulo="Ver o funil" texto="As etapas e os campos que foram criados. Dá para editar tudo em Personalizar." />
-              <Passo href={`/agent-studio/${resumo.agenteId}/builder`} icone={<Sparkles size={17} />} titulo="Ajustar as perguntas" texto="Mude o texto, acrescente perguntas ou troque por um agente de IA." />
+            <div className="flex flex-col gap-1.5">
+              <span className="flex size-10 items-center justify-center rounded-full bg-success-subtle text-success">
+                <Check size={20} aria-hidden />
+              </span>
+              <h1 className="mt-2 text-heading font-semibold tracking-tight text-text-primary">Tudo pronto</h1>
+              <p className="max-w-xl text-body text-text-secondary">
+                Criei o funil &quot;{resumo.funilNome}&quot;, {resumo.campos.length} {resumo.campos.length === 1 ? "campo" : "campos"} e o seu atendimento. Falta só uma coisa: ligar o WhatsApp.
+              </p>
             </div>
 
-            <Link href="/inicio" className="mt-6 inline-flex items-center gap-1.5 text-[13px] text-text-tertiary hover:text-text-primary">
-              Ir para o início <ArrowRight size={13} />
+            {/* O primeiro passo é o que faz o atendimento valer: vai na frente,
+                como a única ação principal; os outros são caminhos de volta. */}
+            <Passo
+              href={`/agent-studio/${resumo.agenteId}?aba=canais`}
+              icone={<LogoOficial marca="whatsapp" tamanho={18} />}
+              titulo="Conectar o WhatsApp"
+              texto="Leia o QR code com o número da empresa. É o que faz o atendimento começar a valer."
+              destaque
+            />
+            <ul className="flex flex-col rounded-[18px] border border-border-subtle bg-panel px-2">
+              <Passo href={`/playground?agent=${resumo.agenteId}`} icone={<PlayCircle size={16} aria-hidden />} titulo="Testar o atendimento" texto="Converse com ele como se fosse um cliente e veja o negócio nascer no funil." />
+              <Passo href="/negocios" icone={<Handshake size={16} aria-hidden />} titulo="Ver o funil" texto="As etapas e os campos que foram criados. Dá para editar tudo em Personalizar." />
+              <Passo href={`/agent-studio/${resumo.agenteId}/builder`} icone={<Sparkles size={16} aria-hidden />} titulo="Ajustar as perguntas" texto="Mude o texto, acrescente perguntas ou troque por um agente de IA." />
+            </ul>
+
+            <Link href="/inicio" className={cn(buttonVariants({ variant: "ghost" }), "self-start")}>
+              Ir para o início <ArrowRight size={13} aria-hidden />
             </Link>
           </>
         )}
@@ -226,20 +262,41 @@ export default function ComecarPage() {
   );
 }
 
+/**
+ * Próximo passo depois de montar. O destacado é um bloco próprio com a seta
+ * na ação principal; os demais são linhas finas de uma lista.
+ */
 function Passo({ href, icone, titulo, texto, destaque }: { href: string; icone: React.ReactNode; titulo: string; texto: string; destaque?: boolean }) {
+  if (destaque) {
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "group flex flex-wrap items-center gap-3.5 rounded-[18px] border border-border-subtle bg-panel p-4 transition-colors duration-120 hover:bg-raised",
+          focusRing
+        )}
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-raised text-text-primary">{icone}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-body font-semibold text-text-primary">{titulo}</span>
+          <span className="mt-0.5 block text-small leading-relaxed text-text-secondary">{texto}</span>
+        </span>
+        <span className={buttonVariants({ variant: "primary" })}>
+          Conectar <ArrowRight size={14} aria-hidden />
+        </span>
+      </Link>
+    );
+  }
   return (
-    <Link
-      href={href}
-      className={cn(
-        "glass-card group flex gap-3.5 rounded-2xl p-4 transition-colors hover:border-accent-500/50",
-        destaque && "ring-1 ring-accent-500/40"
-      )}
-    >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-text-secondary group-hover:text-accent-300">{icone}</span>
-      <span className="min-w-0">
-        <span className="block text-[14px] font-medium text-text-primary">{titulo}</span>
-        <span className="mt-0.5 block text-[12.5px] leading-relaxed text-text-secondary">{texto}</span>
-      </span>
-    </Link>
+    <li className="border-b border-border-subtle last:border-b-0">
+      <Link href={href} className={cn("group flex min-h-14.5 items-center gap-3 rounded-xl px-2 py-2.5 transition-colors duration-120 hover:bg-raised", focusRing)}>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-raised text-text-secondary group-hover:text-text-primary">{icone}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-body font-medium text-text-primary">{titulo}</span>
+          <span className="block text-caption leading-relaxed text-text-tertiary">{texto}</span>
+        </span>
+        <ChevronRight size={15} aria-hidden className="shrink-0 text-text-tertiary opacity-0 transition-opacity group-hover:opacity-100" />
+      </Link>
+    </li>
   );
 }

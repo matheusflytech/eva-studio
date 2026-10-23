@@ -72,14 +72,14 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
     carregar();
   }
 
-  if (carregando) return <p className="text-[14px] text-text-tertiary">Carregando...</p>;
+  if (carregando) return <p className="text-body text-text-tertiary">Carregando...</p>;
 
   const sugestoes = SUGESTOES[entity].filter((s) => !campos.some((c) => c.label.toLowerCase() === s.label.toLowerCase()));
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-[560px] text-[13.5px] text-text-secondary">
+        <p className="max-w-[560px] text-small text-text-secondary">
           {entity === "deal"
             ? "Os dados que o seu negócio precisa guardar em cada negociação. Aparecem ao abrir o negócio, e os marcados aparecem como etiqueta no cartão do funil."
             : "Os dados que você quer saber de cada pessoa, além de nome, e-mail e telefone."}
@@ -89,7 +89,7 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
         </Button>
       </div>
 
-      {erro && <div className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{erro}</div>}
+      {erro && <div className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">{erro}</div>}
 
       {campos.length === 0 ? (
         <EmptyState
@@ -99,24 +99,24 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
       ) : (
         <ListaOrdenavel itens={campos} onReordenar={reordenar}>
           {(c, alca) => (
-            <div className="flex items-center gap-2 rounded-2xl bg-surface-2 p-2.5 ring-1 ring-border-subtle">
+            <div className="flex items-center gap-2 rounded-[14px] bg-raised p-2.5 ring-1 ring-border-subtle">
               {alca}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-[13.5px] font-medium text-text-primary">{c.label}</span>
+                  <span className="truncate text-small font-medium text-text-primary">{c.label}</span>
                   {c.required && <Badge>Obrigatório</Badge>}
                   {c.showOnCard && <Badge>No cartão</Badge>}
                   {c.pipelineId && <Badge>{funis.find((f) => f.id === c.pipelineId)?.name ?? "Um funil"}</Badge>}
                 </div>
-                <div className="mt-0.5 truncate text-[12px] text-text-tertiary">
+                <div className="mt-0.5 truncate text-caption text-text-tertiary">
                   {TIPO_POR_ID.get(c.type)?.rotulo}
                   {c.options.length > 0 && `: ${c.options.map((o) => o.label).join(", ")}`}
                 </div>
               </div>
-              <button type="button" onClick={() => setEditando(c)} aria-label="Editar campo" className="rounded-lg p-2 text-text-tertiary hover:bg-surface-3 hover:text-text-primary">
+              <button type="button" onClick={() => setEditando(c)} aria-label="Editar campo" className="rounded-lg p-2 text-text-tertiary hover:bg-hover hover:text-text-primary">
                 <Pencil size={15} />
               </button>
-              <button type="button" onClick={() => setExcluindo(c)} aria-label="Excluir campo" className="rounded-lg p-2 text-text-tertiary hover:bg-danger/10 hover:text-danger">
+              <button type="button" onClick={() => setExcluindo(c)} aria-label="Excluir campo" className="rounded-lg p-2 text-text-tertiary hover:bg-danger-subtle hover:text-danger">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -126,14 +126,14 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
 
       {sugestoes.length > 0 && campos.length < 40 && (
         <div>
-          <p className="mb-2 text-[12.5px] text-text-tertiary">Ideias para começar</p>
+          <p className="mb-2 text-small text-text-tertiary">Ideias para começar</p>
           <div className="flex flex-wrap gap-2">
             {sugestoes.map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => { setRascunhoNovo(s); setEditando("novo"); }}
-                className="rounded-full bg-surface-2 px-3 py-1.5 text-[12.5px] text-text-secondary ring-1 ring-border-subtle hover:text-text-primary"
+                className="rounded-full bg-raised px-3 py-1.5 text-small text-text-secondary ring-1 ring-border-subtle hover:text-text-primary"
               >
                 + {s.label}
               </button>
@@ -171,11 +171,11 @@ function ConfirmarExclusaoDeCampo({ campo, aoCancelar, aoExcluido }: { campo: De
       titulo={`Excluir o campo "${campo.label}"?`}
       descricao="O campo deixa de aparecer nas telas."
       extra={
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface-2 p-3 text-[13px] text-text-secondary">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[14px] bg-raised p-3 text-small text-text-secondary">
           <input type="checkbox" checked={limpar} onChange={(e) => setLimpar(e.target.checked)} className="mt-0.5 h-4 w-4" />
           <span>
             Apagar também os valores já preenchidos.
-            <span className="block text-[12px] text-text-tertiary">Sem marcar, os valores ficam guardados e voltam se você criar de novo um campo com o mesmo nome.</span>
+            <span className="block text-caption text-text-tertiary">Sem marcar, os valores ficam guardados e voltam se você criar de novo um campo com o mesmo nome.</span>
           </span>
         </label>
       }
@@ -276,18 +276,18 @@ function CampoModal({
                   onClick={() => setTipo(t.id)}
                   className={cn(
                     "rounded-xl px-3 py-2.5 text-left ring-1 transition-colors disabled:cursor-not-allowed",
-                    tipo === t.id ? "bg-accent-500/12 ring-accent-500/50" : "bg-surface-2 ring-border-subtle",
+                    tipo === t.id ? "bg-accent-subtle ring-accent-solid" : "bg-raised ring-border-subtle",
                     editandoExistente && tipo !== t.id && "opacity-40",
                     !editandoExistente && tipo !== t.id && "hover:ring-border-strong"
                   )}
                 >
-                  <div className="text-[13px] font-medium text-text-primary">{t.rotulo}</div>
-                  <div className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-text-tertiary">{t.descricao}</div>
+                  <div className="text-small font-medium text-text-primary">{t.rotulo}</div>
+                  <div className="mt-0.5 line-clamp-2 text-caption leading-snug text-text-tertiary">{t.descricao}</div>
                 </button>
               ))}
             </div>
             {editandoExistente && (
-              <p className="mt-2 text-[12px] text-text-tertiary">O tipo não muda depois de criado, para não perder o que já foi preenchido. Se precisar de outro tipo, crie um campo novo.</p>
+              <p className="mt-2 text-caption text-text-tertiary">O tipo não muda depois de criado, para não perder o que já foi preenchido. Se precisar de outro tipo, crie um campo novo.</p>
             )}
           </div>
 
@@ -303,7 +303,7 @@ function CampoModal({
                       className="h-10"
                       onChange={(e) => setOpcoes((lista) => lista.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
                     />
-                    <button type="button" aria-label="Remover opção" onClick={() => setOpcoes((lista) => lista.filter((_, j) => j !== i))} className="rounded-lg p-2 text-text-tertiary hover:bg-danger/10 hover:text-danger">
+                    <button type="button" aria-label="Remover opção" onClick={() => setOpcoes((lista) => lista.filter((_, j) => j !== i))} className="rounded-lg p-2 text-text-tertiary hover:bg-danger-subtle hover:text-danger">
                       <X size={15} />
                     </button>
                   </div>
@@ -321,7 +321,7 @@ function CampoModal({
                   </Button>
                 </div>
               </div>
-              {editandoExistente && <p className="mt-2 text-[12px] text-text-tertiary">Renomear uma opção atualiza o nome em todos os cadastros. Remover uma opção não apaga o que já foi escolhido.</p>}
+              {editandoExistente && <p className="mt-2 text-caption text-text-tertiary">Renomear uma opção atualiza o nome em todos os cadastros. Remover uma opção não apaga o que já foi escolhido.</p>}
             </div>
           )}
 
@@ -342,19 +342,19 @@ function CampoModal({
             </div>
           )}
 
-          <div className="flex flex-col gap-3 rounded-2xl bg-surface-2 p-4">
-            <label className="flex items-center justify-between gap-4 text-[13.5px] text-text-primary">
+          <div className="flex flex-col gap-3 rounded-[14px] bg-raised p-4">
+            <label className="flex items-center justify-between gap-4 text-small text-text-primary">
               <span>
                 Preenchimento obrigatório
-                <span className="block text-[12px] text-text-tertiary">Ao criar ou editar à mão, não deixa salvar vazio. O agente de IA nunca é bloqueado por isto.</span>
+                <span className="block text-caption text-text-tertiary">Ao criar ou editar à mão, não deixa salvar vazio. O agente de IA nunca é bloqueado por isto.</span>
               </span>
               <Switch checked={obrigatorio} onCheckedChange={setObrigatorio} />
             </label>
             {entity === "deal" && (
-              <label className="flex items-center justify-between gap-4 text-[13.5px] text-text-primary">
+              <label className="flex items-center justify-between gap-4 text-small text-text-primary">
                 <span>
                   Mostrar no cartão do funil
-                  <span className="block text-[12px] text-text-tertiary">Aparece como etiqueta no cartão. Use com moderação para o cartão não ficar cheio.</span>
+                  <span className="block text-caption text-text-tertiary">Aparece como etiqueta no cartão. Use com moderação para o cartão não ficar cheio.</span>
                 </span>
                 <Switch checked={noCartao} onCheckedChange={setNoCartao} />
               </label>
@@ -369,11 +369,11 @@ function CampoModal({
                 {obrigatorio && <span className="ml-1 text-danger">*</span>}
               </Label>
               <CampoEditor id="cf-previa" def={previa} valor={valorPrevia} onChange={setValorPrevia} />
-              {ajuda && <p className="mt-1.5 text-[12px] text-text-tertiary">{ajuda}</p>}
+              {ajuda && <p className="mt-1.5 text-caption text-text-tertiary">{ajuda}</p>}
             </div>
           </div>
 
-          {erro && <p className="text-[13px] text-danger">{erro}</p>}
+          {erro && <p className="text-small text-danger">{erro}</p>}
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={aoFechar}>Cancelar</Button>

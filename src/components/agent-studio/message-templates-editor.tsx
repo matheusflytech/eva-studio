@@ -92,11 +92,11 @@ export function MessageTemplatesEditor({ agentId }: { agentId: string }) {
     setTemplates((prev) => (prev ?? []).filter((t) => t.id !== id));
   }
 
-  if (templates === null) return <p className="text-[13px] text-text-tertiary">Carregando...</p>;
+  if (templates === null) return <p className="text-small text-text-tertiary">Carregando…</p>;
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[12.5px] text-text-tertiary">
+      <p className="text-small text-text-tertiary">
         Fora da janela de 24h, o WhatsApp oficial só aceita mensagens de modelo já aprovado no Meta Business Manager.
         Cadastre aqui o mesmo texto e nome que você registrou lá — o Builder vai deixar escolher um desses modelos em
         blocos de Mensagem, pra usar automaticamente quando a conversa estiver fora da janela.
@@ -107,31 +107,31 @@ export function MessageTemplatesEditor({ agentId }: { agentId: string }) {
           {templates.map((t) => (
             <div
               key={t.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-2 px-3.5 py-2.5"
+              className="flex items-center justify-between gap-3 rounded-[14px] border border-border-subtle bg-raised px-3.5 py-2.5"
             >
               <div className="flex min-w-0 items-center gap-2.5">
                 <FileText size={14} className="shrink-0 text-text-tertiary" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-[13px] font-medium text-text-primary">{t.name}</p>
+                    <p className="truncate text-small font-medium text-text-primary">{t.name}</p>
                     <Badge variant="neutral">{CATEGORY_LABEL[t.category] ?? t.category}</Badge>
                     {!t.metaTemplateName && <Badge variant="danger">sem nome Meta</Badge>}
                   </div>
-                  <p className="truncate text-[11.5px] text-text-tertiary">{t.bodyText}</p>
+                  <p className="truncate text-caption text-text-tertiary">{t.bodyText}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={() => startEdit(t)}
-                  className="rounded-lg px-2 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-surface-3 hover:text-text-primary"
+                  className="rounded-lg px-2 py-1.5 text-caption font-medium text-text-secondary hover:bg-hover hover:text-text-primary"
                 >
                   Editar
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(t.id)}
-                  className="rounded-lg p-1.5 text-text-tertiary hover:bg-surface-3 hover:text-danger"
+                  className="rounded-lg p-1.5 text-text-tertiary hover:bg-hover hover:text-danger"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -142,7 +142,7 @@ export function MessageTemplatesEditor({ agentId }: { agentId: string }) {
       )}
 
       {editingId ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-border-default bg-surface-2 p-3.5">
+        <div className="flex flex-col gap-3 rounded-[14px] border border-border-subtle bg-raised p-3.5">
           <div>
             <Label htmlFor="tpl-name">Nome interno</Label>
             <Input
@@ -189,24 +189,24 @@ export function MessageTemplatesEditor({ agentId }: { agentId: string }) {
             <Label htmlFor="tpl-meta-name">Nome exato do template no Meta Business Manager</Label>
             <Input
               id="tpl-meta-name"
-              className="font-mono text-[12.5px]"
+              className="font-mono text-small"
               value={draft.metaTemplateName}
               onChange={(e) => setDraft((d) => ({ ...d, metaTemplateName: e.target.value }))}
               placeholder="ex: confirmacao_pedido"
             />
-            <p className="mt-1.5 text-[11.5px] text-text-tertiary">
+            <p className="mt-1.5 text-caption text-text-tertiary">
               Precisa ser idêntico ao registrado na Meta — e as variáveis acima têm que estar na mesma ordem dos{" "}
               {"{{1}}"}, {"{{2}}"} do template aprovado lá. Sem isso preenchido, o modelo fica só de referência (o
               envio real fica bloqueado com aviso).
             </p>
           </div>
-          {error && <p className="text-[12.5px] text-danger">{error}</p>}
+          {error && <p className="text-small text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setEditingId(null)}>
               Cancelar
             </Button>
             <Button type="button" size="sm" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Salvando..." : "Salvar modelo"}
+              {isSaving ? "Salvando…" : "Salvar modelo"}
             </Button>
           </div>
         </div>
@@ -214,7 +214,7 @@ export function MessageTemplatesEditor({ agentId }: { agentId: string }) {
         <button
           type="button"
           onClick={startNew}
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-default py-2.5 text-[12.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-default py-2.5 text-small font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
         >
           <Plus size={14} /> Novo modelo
         </button>

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, ImageOff, X } from "lucide-react";
+import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { normalizeText, TRIGGER_LIMITS } from "@/lib/server/triggers";
 import type { StoryOption } from "./trigger-kinds";
@@ -25,18 +26,18 @@ export function Field({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <label htmlFor={id} className="text-[13px] font-medium text-text-secondary">
+        <label htmlFor={id} className="text-small font-medium text-text-secondary">
           {label}
         </label>
         {aside}
       </div>
       {children}
       {error ? (
-        <p id={`${id}-erro`} role="alert" className="mt-1.5 text-[12.5px] text-danger">
+        <p id={`${id}-erro`} role="alert" className="mt-1.5 text-small text-danger">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-ajuda`} className="mt-1.5 text-[12px] leading-relaxed text-text-tertiary">
+        <p id={`${id}-ajuda`} className="mt-1.5 text-caption leading-relaxed text-text-tertiary">
           {hint}
         </p>
       ) : null}
@@ -72,17 +73,17 @@ export function Segmented<T extends string>({
             aria-checked={ativo}
             onClick={() => onChange(o.value)}
             className={cn(
-              "min-h-11 rounded-xl px-3.5 py-2.5 text-left ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-500/60",
+              "min-h-11 rounded-xl px-3.5 py-2.5 text-left ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus",
               ativo
-                ? "bg-accent-soft text-text-primary ring-accent-500/50"
-                : "bg-surface-2 text-text-secondary ring-border-subtle hover:text-text-primary hover:ring-border-default"
+                ? "bg-accent-subtle text-text-primary ring-accent-solid/50"
+                : "bg-raised text-text-secondary ring-border-subtle hover:text-text-primary hover:ring-border-default"
             )}
           >
-            <span className="flex items-center gap-1.5 text-[13px] font-medium">
-              {ativo && <Check size={13} className="text-accent-400" aria-hidden />}
+            <span className="flex items-center gap-1.5 text-small font-medium">
+              {ativo && <Check size={13} className="text-accent-fg" aria-hidden />}
               {o.label}
             </span>
-            <span className="mt-0.5 block text-[11.5px] leading-snug text-text-tertiary">{o.hint}</span>
+            <span className="mt-0.5 block text-caption leading-snug text-text-tertiary">{o.hint}</span>
           </button>
         );
       })}
@@ -140,15 +141,15 @@ export function KeywordInput({
       <div
         onClick={() => inputRef.current?.focus()}
         className={cn(
-          "flex min-h-11 w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border bg-surface-2 px-2 py-1.5 transition-colors",
-          "focus-within:border-accent-500/60 focus-within:ring-2 focus-within:ring-accent-500/20",
+          "flex min-h-11 w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border bg-raised px-2 py-1.5 transition-colors",
+          "focus-within:border-focus focus-within:ring-2 focus-within:ring-focus",
           invalid ? "border-danger/60" : "border-border-default"
         )}
       >
         {value.map((k) => (
           <span
             key={k}
-            className="inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-soft py-1 pl-2.5 pr-1 text-[12.5px] font-medium text-accent-400"
+            className="inline-flex max-w-full items-center gap-1 rounded-lg bg-accent-subtle py-1 pl-2.5 pr-1 text-small font-medium text-accent-fg"
           >
             <span className="truncate">{k}</span>
             <button
@@ -158,7 +159,7 @@ export function KeywordInput({
                 e.stopPropagation();
                 onChange(value.filter((x) => x !== k));
               }}
-              className="grid h-5 w-5 place-items-center rounded-md text-accent-400/80 outline-none hover:bg-accent-500/20 hover:text-accent-400 focus-visible:ring-2 focus-visible:ring-accent-500/60"
+              className="grid h-5 w-5 place-items-center rounded-md text-accent-fg/80 outline-none hover:bg-accent-subtle hover:text-accent-fg focus-visible:ring-2 focus-visible:ring-focus"
             >
               <X size={12} aria-hidden />
             </button>
@@ -185,10 +186,10 @@ export function KeywordInput({
             }
           }}
           onBlur={() => adicionar(texto)}
-          className="h-8 min-w-[10ch] flex-1 bg-transparent px-1.5 text-sm text-text-primary outline-none placeholder:text-text-tertiary"
+          className="h-8 min-w-[10ch] flex-1 bg-transparent px-1.5 text-body text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </div>
-      <p aria-live="polite" className={cn("mt-1.5 text-[12px]", aviso ? "text-text-secondary" : "sr-only")}>
+      <p aria-live="polite" className={cn("mt-1.5 text-caption", aviso ? "text-text-secondary" : "sr-only")}>
         {aviso ?? `${value.length} de ${TRIGGER_LIMITS.keywords} palavras`}
       </p>
     </div>
@@ -225,7 +226,8 @@ export function ChannelChips({
             onClick={() => onChange(on ? value.filter((x) => x !== c.id) : [...value, c.id])}
             className={chip(on)}
           >
-            {on && <Check size={13} aria-hidden />} {c.label}
+            {on && <Check size={13} aria-hidden />}
+            {marcaDoCanal(c.id) && <LogoOficial marca={marcaDoCanal(c.id)!} tamanho={13} />} {c.label}
           </button>
         );
       })}
@@ -235,10 +237,10 @@ export function ChannelChips({
 
 function chip(on: boolean) {
   return cn(
-    "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-[12.5px] font-medium ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-500/60",
+    "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 text-small font-medium ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus",
     on
-      ? "bg-accent-soft text-accent-400 ring-accent-500/50"
-      : "bg-surface-2 text-text-secondary ring-border-subtle hover:text-text-primary hover:ring-border-default"
+      ? "bg-accent-subtle text-accent-fg ring-accent-solid/50"
+      : "bg-raised text-text-secondary ring-border-subtle hover:text-text-primary hover:ring-border-default"
   );
 }
 
@@ -263,12 +265,12 @@ export function StoryPicker({
     <div className="flex flex-col gap-3">
       <div className="flex gap-2.5 overflow-x-auto pb-1" role="radiogroup" aria-label="Story">
         <button type="button" role="radio" aria-checked={!value} onClick={() => onChange("")} className={storyTile(!value)}>
-          <span className="text-[12.5px] font-medium text-text-primary">Qualquer</span>
-          <span className="text-[11px] text-text-tertiary">story</span>
+          <span className="text-small font-medium text-text-primary">Qualquer</span>
+          <span className="text-caption text-text-tertiary">story</span>
         </button>
         {loading &&
           Array.from({ length: 3 }, (_, i) => (
-            <span key={i} aria-hidden className="h-[104px] w-[64px] shrink-0 animate-pulse rounded-xl bg-surface-3" />
+            <span key={i} aria-hidden className="h-[104px] w-[64px] shrink-0 animate-pulse rounded-xl bg-hover" />
           ))}
         {stories.map((s) => (
           <button
@@ -289,7 +291,7 @@ export function StoryPicker({
           </button>
         ))}
       </div>
-      {!loading && reason && <p className="text-[12px] text-text-tertiary">{reason} Você ainda pode informar o ID do story.</p>}
+      {!loading && reason && <p className="text-caption text-text-tertiary">{reason} Você ainda pode informar o ID do story.</p>}
       <div>
         <label htmlFor="gatilho-story-id" className="sr-only">
           ID do story
@@ -302,13 +304,13 @@ export function StoryPicker({
           aria-invalid={!!error || undefined}
           aria-describedby={error ? "gatilho-story-id-erro" : undefined}
           className={cn(
-            "h-10 w-full rounded-xl border bg-surface-2 px-3.5 font-mono text-[12.5px] text-text-primary outline-none placeholder:font-sans placeholder:text-text-tertiary",
-            "focus:border-accent-500/60 focus:ring-2 focus:ring-accent-500/20",
+            "h-10 w-full rounded-xl border bg-raised px-3.5 font-mono text-small text-text-primary outline-none placeholder:font-sans placeholder:text-text-tertiary",
+            "focus:border-focus focus:ring-2 focus:ring-focus",
             error ? "border-danger/60" : "border-border-default"
           )}
         />
         {error && (
-          <p id="gatilho-story-id-erro" role="alert" className="mt-1.5 text-[12.5px] text-danger">
+          <p id="gatilho-story-id-erro" role="alert" className="mt-1.5 text-small text-danger">
             {error}
           </p>
         )}
@@ -319,8 +321,8 @@ export function StoryPicker({
 
 function storyTile(on: boolean) {
   return cn(
-    "relative grid h-[104px] w-[64px] shrink-0 place-items-center content-center rounded-xl ring-1 transition outline-none focus-visible:ring-2 focus-visible:ring-accent-500/60",
-    on ? "bg-accent-soft ring-2 ring-accent-500" : "bg-surface-2 ring-border-subtle hover:ring-border-strong"
+    "relative grid h-[104px] w-[64px] shrink-0 place-items-center content-center rounded-xl ring-1 transition outline-none focus-visible:ring-2 focus-visible:ring-focus",
+    on ? "bg-accent-subtle ring-2 ring-accent-solid" : "bg-raised ring-border-subtle hover:ring-border-strong"
   );
 }
 
@@ -328,16 +330,16 @@ function storyTile(on: boolean) {
 export function ReplyPreview({ text, kind }: { text: string; kind: string }) {
   const entrada = kind === "story_mention" ? "Mencionou você no story" : kind === "story_reply" ? "Respondeu seu story" : "promo";
   return (
-    <div aria-hidden className="rounded-2xl bg-bg-base/60 p-4 ring-1 ring-border-subtle">
-      <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Prévia</p>
+    <div aria-hidden className="rounded-2xl bg-page/60 p-4 ring-1 ring-border-subtle">
+      <p className="mb-3 font-mono text-caption text-text-tertiary">Prévia</p>
       <div className="flex flex-col gap-2">
-        <span className="max-w-[80%] self-start rounded-2xl rounded-bl-md bg-surface-3 px-3.5 py-2 text-[13px] text-text-secondary">
+        <span className="max-w-[80%] self-start rounded-2xl rounded-bl-md bg-hover px-3.5 py-2 text-small text-text-secondary">
           {kind === "dm_keyword" ? entrada : <em className="not-italic text-text-tertiary">{entrada}</em>}
         </span>
         <span
           className={cn(
-            "max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-[13px]",
-            text ? "bg-accent-500 text-text-on-accent" : "border border-dashed border-border-default bg-surface-2 text-text-tertiary"
+            "max-w-[85%] self-end whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-small",
+            text ? "bg-accent-solid text-text-on-accent" : "border border-dashed border-border-default bg-raised text-text-tertiary"
           )}
         >
           {text || "Sua resposta aparece aqui"}

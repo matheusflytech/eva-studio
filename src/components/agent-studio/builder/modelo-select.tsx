@@ -97,7 +97,7 @@ export function ModeloSelect({
               setTentativa((t) => t + 1);
             }}
             disabled={carregando}
-            className="inline-flex items-center gap-1 text-[11.5px] text-accent-fg hover:underline disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-caption text-accent-fg hover:underline disabled:opacity-50"
           >
             <RefreshCw className={carregando ? "size-3 animate-spin" : "size-3"} aria-hidden />
             Atualizar lista
@@ -131,7 +131,7 @@ export function ModeloSelect({
           <option value={OUTRO}>Outro modelo (digitar o id)…</option>
         </Select>
       )}
-      <p className="mt-1 text-[11px] text-text-tertiary">
+      <p className="mt-1 text-caption text-text-tertiary">
         {carregando
           ? "Buscando os modelos da sua chave…"
           : erro

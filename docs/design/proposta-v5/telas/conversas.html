@@ -1,0 +1,166 @@
+<!-- id: conversas | titulo: Caixa de entrada | grupo: Atender | menu: conversas | print: conversas -->
+<style>
+.t-conversas { flex-direction: row; }
+.t-conversas .lista { width: 300px; flex: none; border-right: 1px solid var(--bs); display: flex; flex-direction: column; }
+.t-conversas .lh { padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--bs); }
+.t-conversas .caixa { position: relative; }
+.t-conversas .caixa-btn { display: flex; align-items: center; gap: 10px; width: calc(100% + 12px); padding: 4px 6px; margin: 0 -6px; border-radius: 6px; text-align: left; }
+.t-conversas .caixa-btn:hover { background: var(--hv); }
+.t-conversas .caixa-btn .tt { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+.t-conversas .caixa-btn .ss { font-size: 12px; color: var(--t3); }
+.t-conversas .caixa-btn .ss b { color: var(--dg); font-weight: 500; }
+.t-conversas .caixa-btn > svg { margin-left: auto; color: var(--t3); }
+.t-conversas .menu { top: calc(100% + 4px); left: -6px; width: 300px; }
+.t-conversas .menu .busca { display: flex; gap: 8px; align-items: center; color: var(--t3); padding: 6px 8px; border-bottom: 1px solid var(--bs); margin: -4px -4px 4px; font-size: 13px; }
+.t-conversas .menu .busca svg { width: 14px; height: 14px; }
+.t-conversas .menu .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.t-conversas .menu .nm small { font-size: 12px; color: var(--t3); }
+.t-conversas .menu .cnt { font-size: 12px; color: var(--acfg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.t-conversas .menu .ok { width: 16px; color: var(--acfg); }
+.t-conversas .menu hr { border: 0; border-top: 1px solid var(--bs); margin: 4px -4px; }
+.t-conversas .menu .rod { font-size: 12px; color: var(--t3); padding: 6px 8px; display: flex; gap: 8px; align-items: center; }
+.t-conversas .menu .rod svg { width: 14px; height: 14px; }
+.t-conversas .busca2 { display: flex; gap: 6px; }
+.t-conversas .busca2 .d-in { flex: 1; }
+.t-conversas .row { display: flex; gap: 10px; padding: 10px 12px 10px 10px; border-bottom: 1px solid var(--bs); position: relative; }
+.t-conversas .row.on { background: var(--acsub); }
+
+.t-conversas .row .un { position: absolute; left: 3px; top: 24px; width: 6px; height: 6px; border-radius: 50%; background: var(--ac); }
+.t-conversas .row .c { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.t-conversas .row .l1 { display: flex; gap: 8px; align-items: baseline; }
+.t-conversas .row .nome { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-conversas .row .nome.b { font-weight: 600; }
+.t-conversas .row .hora { margin-left: auto; font-size: 12px; color: var(--t3); font-variant-numeric: tabular-nums; flex: none; }
+.t-conversas .row .hora.b { color: var(--acfg); font-weight: 600; }
+.t-conversas .row .prev { color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-conversas .row .prev.b { color: var(--t2); }
+.t-conversas .row .meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; }
+.t-conversas .row .meta svg { width: 13px; height: 13px; }
+.t-conversas .row .meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--bd); flex: none; }
+.t-conversas .row .meta .canal { display: inline-flex; gap: 4px; align-items: center; }
+.t-conversas .meio { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.t-conversas .th > div { min-width: 0; white-space: nowrap; }
+.t-conversas .th .sub { overflow: hidden; }
+.t-conversas .th { height: 56px; flex: none; padding: 0 14px; border-bottom: 1px solid var(--bs); display: flex; align-items: center; gap: 10px; }
+.t-conversas .th .nome { font-size: 14px; font-weight: 600; }
+.t-conversas .th .sub { font-size: 12px; color: var(--t3); display: flex; gap: 6px; align-items: center; }
+.t-conversas .th .sub svg { width: 13px; height: 13px; }
+.t-conversas .th .acoes { margin-left: auto; display: flex; gap: 6px; }
+.t-conversas .msgs { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.t-conversas .dia { align-self: center; font-size: 12px; color: var(--t3); margin: 2px 0 8px; }
+.t-conversas .quem { align-self: flex-end; margin-top: 8px; }
+.t-conversas .evento { align-self: center; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--t3); margin: 10px 0; }
+.t-conversas .evento::before, .t-conversas .evento::after { content: ""; width: 40px; height: 1px; background: var(--bs); }
+.t-conversas .comp { border-top: 1px solid var(--bs); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+.t-conversas .comp .abas { display: flex; gap: 14px; font-size: 12px; font-weight: 500; color: var(--t3); }
+.t-conversas .comp .abas .on { color: var(--t1); }
+.t-conversas .comp .campo { border: 1px solid var(--bd); border-radius: 8px; padding: 8px 8px 8px 12px; display: flex; align-items: center; gap: 6px; color: var(--t3); }
+.t-conversas .comp .campo .d-bt.p { margin-left: auto; height: 28px; }
+.t-conversas .ctx { width: 236px; flex: none; border-left: 1px solid var(--bs); padding: 14px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+.t-conversas .ctx .quem2 { display: flex; gap: 10px; align-items: center; }
+.t-conversas .ctx .quem2 b { font-size: 14px; font-weight: 600; display: block; }
+.t-conversas .ctx .quem2 span { font-size: 12px; color: var(--t3); }
+.t-conversas .ctx .d-kv { grid-template-columns: 64px 1fr; }
+.t-conversas .neg { border: 1px solid var(--bs); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.t-conversas .neg .t { display: flex; justify-content: space-between; font-weight: 500; }
+.t-conversas .trilha { display: flex; gap: 3px; }
+.t-conversas .trilha i { flex: 1; height: 4px; border-radius: 2px; background: var(--hv); }
+.t-conversas .trilha i.on { background: var(--d-violet); }
+.t-conversas .tarefa { display: flex; gap: 8px; align-items: center; }
+.t-conversas .tarefa span { margin-left: auto; font-size: 12px; color: var(--dg); font-weight: 500; }
+</style>
+<!--ILHA-->
+<span class="pto"></span><span>2 esperando</span><span class="cinza mono">mais antiga há 4 min</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-conversas">
+  <div class="lista">
+    <div class="lh">
+      <div class="caixa">
+        <button class="caixa-btn" aria-haspopup="menu" aria-expanded="false" data-caixa-btn>
+          <span class="sq dc">D</span>
+          <span style="min-width:0"><span class="tt">Site Drawing Club</span><br><span class="ss">9 conversas · <b>2 esperando</b></span></span>
+          <svg><use href="#i-chevs"/></svg>
+        </button>
+        <div class="d-pop menu" role="menu" data-caixa-menu hidden>
+          <div class="busca"><svg><use href="#i-search"/></svg>Buscar caixa…</div>
+          <button class="d-mi" role="menuitemradio"><span class="sq md todas"><svg><use href="#i-inbox"/></svg></span><span class="nm">Todas as caixas<small>21 conversas</small></span><span class="cnt">3</span><span class="ok"></span></button>
+          <hr>
+          <button class="d-mi" role="menuitemradio"><span class="sq md vv">V</span><span class="nm">Vendedor Virtual<small>Site da Eva Holding</small></span><span class="cnt">1</span><span class="ok"></span></button>
+          <button class="d-mi foco" role="menuitemradio" aria-checked="true"><span class="sq md dc">D</span><span class="nm">Site Drawing Club<small>Chat do site</small></span><span class="cnt">2</span><span class="ok"><svg><use href="#i-check"/></svg></span></button>
+          <button class="d-mi" role="menuitemradio"><span class="sq md dl">L</span><span class="nm">Demo Lucas<small>Sem canal conectado</small></span><span class="cnt"></span><span class="ok"></span></button>
+          <hr>
+          <div class="rod"><svg><use href="#i-gear"/></svg>Gerenciar agentes</div>
+        </div>
+      </div>
+      <div class="busca2"><span class="d-in"><svg><use href="#i-search"/></svg>Buscar nome, telefone, mensagem</span><span class="d-bt"><svg><use href="#i-filter"/></svg>Filtros</span><span class="d-bt ic" title="Som desligado"><svg><use href="#i-bell"/></svg></span></div>
+      <div class="d-abas" style="align-self:flex-start;margin-bottom:10px"><span class="on">Todas</span><span>Esperando <em class="dg">2</em></span><span>Minhas <em>1</em></span></div>
+    </div>
+    <div class="row on"><span class="un"></span><span class="d-av h-rose">MC</span><span class="c"><span class="l1"><span class="nome b">Mariana Couto</span><span class="hora b">14:32</span></span><span class="prev b">Quero saber se o curso tem certificado</span><span class="meta"><span class="chip esp"><i></i>Esperando</span></span></span></div>
+    <div class="row"><span class="d-av h-teal">JP</span><span class="c"><span class="l1"><span class="nome">Juliana Prado</span><span class="hora">13:48</span></span><span class="prev">Agente: As inscrições fecham sexta.</span><span class="meta"><span class="canal"><svg><use href="#i-bot"/></svg>Agente</span></span></span></div>
+    <div class="row"><span class="un"></span><span class="d-av h-violet">AS</span><span class="c"><span class="l1"><span class="nome b">Ana Beatriz Sá</span><span class="hora b">13:10</span></span><span class="prev b">Tem desconto pra turma?</span><span class="meta"><span class="chip esp"><i></i>Esperando</span></span></span></div>
+    <div class="row"><span class="d-av h-blue">RT</span><span class="c"><span class="l1"><span class="nome">Rafael Teixeira</span><span class="hora">12:05</span></span><span class="prev">Você: Te mando o link da matrícula</span><span class="meta"><span class="canal t2"><span class="mini-av h-teal">MP</span>Matheus</span></span></span></div>
+    <div class="row"><span class="d-av h-amber">+55</span><span class="c"><span class="l1"><span class="nome">(11) 98422-1307</span><span class="hora">Ontem</span></span><span class="prev">Agente: Oi! Como posso ajudar?</span><span class="meta"><span class="canal"><svg><use href="#i-bot"/></svg>Agente</span></span></span></div>
+    <div class="row"><span class="d-av h-green">BL</span><span class="c"><span class="l1"><span class="nome">Bruno Lacerda</span><span class="hora">Ontem</span></span><span class="prev">Agente: Obrigado pelo contato!</span><span class="meta"><span>Encerrada</span></span></span></div>
+  </div>
+  <div class="meio">
+    <div class="th">
+      <span class="d-av h-rose">MC</span>
+      <div><div class="nome">Mariana Couto</div><div class="sub"><span class="chip esp" style="height:18px"><i></i>Esperando há 4 min</span><svg><use href="#i-globe"/></svg>Site</div></div>
+      <div class="acoes"><span class="d-bt p"><svg><use href="#i-hand"/></svg>Assumir</span><span class="d-bt ic" title="Resolver"><svg><use href="#i-done"/></svg></span><span class="d-bt ic"><svg><use href="#i-more"/></svg></span></div>
+    </div>
+    <div class="msgs">
+      <span class="dia">Hoje</span>
+      <div class="d-b in">Oi! Vi o curso de desenho no site.<small>14:28</small></div>
+      <span class="quem"><span class="chip ia"><svg><use href="#i-spark"/></svg>Agente de IA</span></span>
+      <div class="d-b out">Oi, Mariana! O Drawing Club tem turmas de manhã e à noite, com aulas ao vivo e gravadas. Quer que eu te mande a grade?<small>14:28</small></div>
+      <div class="d-b in" style="margin-top:8px">Quero saber se o curso tem certificado<small>14:32</small></div>
+      <span class="evento">O agente passou a conversa para a equipe · 14:32</span>
+      <span class="digitando" title="Mariana está digitando"><i></i><i></i><i></i></span>
+    </div>
+    <div class="comp">
+      <div class="abas"><span class="on">Responder</span><span>Nota interna</span><span>Respostas prontas</span></div>
+      <div class="campo">Escreva para Mariana…<span class="d-bt sm ghost ic"><svg><use href="#i-clip"/></svg></span><span class="d-bt p"><svg><use href="#i-send"/></svg>Enviar</span></div>
+    </div>
+  </div>
+  <div class="ctx">
+    <div class="quem2"><span class="d-av h-rose">MC</span><div><b>Mariana Couto</b><span>Lead desde hoje · Site</span></div></div>
+    <div class="d-sec"><h5>Contato</h5><dl class="d-kv"><dt>E-mail</dt><dd>mariana.couto@gmail.com</dd><dt>Telefone</dt><dd class="num">(11) 98422-1307</dd></dl></div>
+    <div class="d-sec"><h5>Negócio</h5><div class="neg"><div class="t"><span>Curso anual</span><span class="num">R$ 1.497</span></div><div class="trilha"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span class="chip h-violet" style="align-self:flex-start"><i style="background:var(--d-violet)"></i>Qualificado</span></div></div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+
+document.addEventListener("click", function (e) {
+  var btn = e.target.closest && e.target.closest("[data-caixa-btn]");
+  document.querySelectorAll("[data-caixa-menu]").forEach(function (m) {
+    var dono = m.parentNode.querySelector("[data-caixa-btn]");
+    if (btn && dono === btn) { m.hidden = !m.hidden; btn.setAttribute("aria-expanded", m.hidden ? "false" : "true"); }
+    else if (!m.contains(e.target)) { m.hidden = true; if (dono) dono.setAttribute("aria-expanded", "false"); }
+  });
+});
+window.ANIMA.conversas = function (c) {
+  c.entra(".row", { passo: 50 });
+  var msgs = c.qa(".msgs > *:not(.dia)"); msgs.forEach(function (m) { m.style.display = "none"; });
+  var mostra = function (el, d) { el.style.display = ""; el.animate([{ opacity: 0, transform: "translateY(10px) scale(.97)" }, { opacity: 1, transform: "none" }], { duration: 420, easing: "cubic-bezier(.32,.72,0,1)" }); };
+  var dig = c.q(".msgs .digitando"); var esp = c.q(".row.on .chip.esp"); if (esp) esp.style.visibility = "hidden";
+  var orig = c.q("[data-ilha]").innerHTML;
+  var q = msgs.filter(function (m) { return !m.classList.contains("digitando"); });
+  return c.espera(500).then(function () { mostra(q[0]); return c.espera(700); })
+    .then(function () { dig.style.display = ""; mostra(dig); return c.espera(900); })
+    .then(function () { dig.style.display = "none"; mostra(q[1]); mostra(q[2]); return c.espera(900); })
+    .then(function () { dig.style.display = ""; mostra(dig); dig.style.alignSelf = "flex-start"; return c.espera(1100); })
+    .then(function () { dig.style.display = "none"; mostra(q[3]); return c.espera(600); })
+    .then(function () { mostra(q[4]); if (esp) { esp.style.visibility = ""; esp.animate([{ transform: "scale(.6)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 500, easing: "cubic-bezier(.34,1.4,.5,1)" }); }
+      c.ilha('<span class="av" style="background:#b5456a">MC</span><span class="txt"><b>Mariana Couto quer falar com alguém</b><span>Site Drawing Club · agora</span></span><span class="acao">Assumir</span>', true);
+      return c.espera(2800); })
+    .then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Seletor de caixa no lugar do título.</b> Os dois &lt;select&gt; nativos viram um botão com a cor do site e quantos estão esperando. O menu mostra cada agente.</li>
+<li><b>Linha enxuta.</b> Nome, prévia, hora e só o status (Esperando, com quem está). Canal e etapa do negócio saem da linha e ficam na conversa aberta.</li>
+<li><b>Três abas, o resto em Filtros.</b> Todas, Esperando e Minhas. "Com o agente", encerradas, canal e testes ficam em Filtros.</li>
+<li><b>Cliente em dois blocos.</b> Contato e negócio. Tarefas e etiquetas abrem no "…" do cliente. Clique em "Ver animação" para ver a conversa chegando.</li>
+<!--/NOTAS-->

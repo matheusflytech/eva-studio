@@ -1,0 +1,199 @@
+<!-- id: contatos | titulo: Contatos | grupo: Vender | menu: contatos | print: contatos -->
+<style>
+.t-ct { flex-direction: row; }
+.t-ct .col-lista { width: 360px; flex: none; display: flex; flex-direction: column; min-height: 0; }
+.t-ct .cab { padding: 10px 24px 0; }
+.t-ct .cab .mono { font-size: 11px; color: var(--t3); letter-spacing: .06em; text-transform: uppercase; }
+.t-ct .cab h4 { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; margin-top: 1px; }
+.t-ct .ferr { display: flex; align-items: center; gap: 6px; padding: 12px 24px 10px; }
+.t-ct .ferr .dir { margin-left: auto; display: flex; gap: 4px; }
+.t-ct .vis { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--t3); }
+.t-ct .vis.on { background: var(--rs); color: var(--t1); box-shadow: inset 0 0 0 1px var(--bs); }
+.t-ct .vis svg { width: 15px; height: 15px; }
+.t-ct .lista { flex: 1; min-height: 0; overflow: hidden; padding: 0 16px 0 24px; }
+.t-ct .sec { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t3); letter-spacing: .06em; text-transform: uppercase; padding: 10px 0 4px; }
+.t-ct .p { display: grid; grid-template-columns: 38px 1fr 18px; align-items: center; gap: 12px; height: 58px; border-bottom: 1px solid var(--bs); padding: 0 8px; margin: 0 -8px; border-radius: 12px; }
+.t-ct .p.on { background: var(--rs); border-color: transparent; }
+.t-ct .p .nm b { display: block; font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-ct .p .nm span { font-size: 12px; color: var(--t3); white-space: nowrap; }
+.t-ct .p .ct { font-size: 12px; color: var(--t2); line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-ct .p .ct span { display: block; color: var(--t3); overflow: hidden; text-overflow: ellipsis; }
+.t-ct .p > svg { color: var(--t3); width: 15px; height: 15px; }
+.t-ct .p .foto { width: 38px; height: 38px; }
+/* painel da direita */
+.t-ct .painel { flex: 1; min-width: 0; margin: 10px 16px 16px 0; border-radius: 22px; background: var(--cartao); box-shadow: var(--cartao-sh), 0 0 0 1px var(--cartao-bd); position: relative; overflow: hidden; }
+.t-ct .vista { position: absolute; inset: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.t-ct .vista h3 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.t-ct .ag-top { display: flex; align-items: center; justify-content: space-between; }
+.t-ct .tl { display: flex; flex-direction: column; position: relative; }
+.t-ct .tl::before { content: ""; position: absolute; left: 15px; top: 8px; bottom: 8px; width: 1px; background: var(--bd); }
+.t-ct .it { display: flex; align-items: center; gap: 10px; min-height: 44px; position: relative; font-size: 13px; }
+.t-ct .it .bol { width: 31px; height: 31px; border-radius: 50%; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); display: grid; place-items: center; color: var(--t2); flex: none; z-index: 1; }
+.t-ct .it .bol svg { width: 14px; height: 14px; }
+.t-ct .it .lk { color: var(--acfg); font-weight: 500; display: inline-flex; gap: 5px; align-items: center; }
+.t-ct .it .lk .foto { width: 20px; height: 20px; }
+.t-ct .it .dt { font: 400 11px ui-monospace, "SF Mono", monospace; color: var(--t2); background: var(--rs); border-radius: 99px; padding: 2px 8px; box-shadow: inset 0 0 0 1px var(--bs); margin-left: 4px; white-space: nowrap; }
+.t-ct .emb { margin: 0 0 6px 41px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 10px 12px; font-size: 12px; color: var(--t2); }
+.t-ct .emb b { display: block; color: var(--t1); font-size: 13px; margin-bottom: 3px; }
+.t-ct .evt { margin: 0 0 6px 41px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
+.t-ct .dia { width: 38px; text-align: center; border-radius: 9px; background: var(--hv); padding: 4px 0; font: 600 10px ui-monospace, monospace; color: var(--t3); line-height: 1.15; }
+.t-ct .dia b { display: block; font-size: 15px; color: var(--t1); font-family: -apple-system, "Inter", sans-serif; }
+.t-ct .add { height: 38px; border-radius: 12px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--t2); flex: none; }
+.t-ct .add svg { width: 13px; height: 13px; }
+/* ficha */
+.t-ct .ficha { opacity: 0; pointer-events: none; }
+.t-ct .fh { display: flex; gap: 18px; align-items: center; padding: 4px 0 6px; }
+.t-ct .fh .foto { width: 92px; height: 92px; }
+.t-ct .fh h3 { font-size: 22px; }
+.t-ct .fh .sub { font-size: 12.5px; color: var(--t3); margin: 2px 0 8px; }
+.t-ct .fh .sub a { color: var(--acfg); text-decoration: none; }
+.t-ct .redondos { display: flex; gap: 6px; }
+.t-ct .redondos span { width: 32px; height: 32px; border-radius: 10px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bd); display: grid; place-items: center; color: var(--t1); }
+.t-ct .redondos svg { width: 15px; height: 15px; }
+.t-ct .etqs { display: flex; gap: 5px; margin-top: 8px; position: relative; }
+.t-ct .etqs .chip { height: 22px; }
+.t-ct .etqs .chip svg { width: 10px; height: 10px; opacity: .7; }
+.t-ct .pop { position: absolute; left: 90px; top: 28px; width: 160px; border-radius: 14px; padding: 6px; z-index: 4; display: none; }
+.t-ct .pop span { display: block; padding: 6px 10px; border-radius: 9px; font-size: 13px; color: var(--t2); }
+.t-ct .pop span.h { background: var(--hv); color: var(--t1); }
+.t-ct .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.t-ct .tile { height: 44px; border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: 13px; white-space: nowrap; overflow: hidden; }
+.t-ct .tile svg { width: 15px; height: 15px; color: var(--t3); }
+.t-ct .tile span { overflow: hidden; text-overflow: ellipsis; }
+.t-ct .bloco-t { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.t-ct .lemb { border-radius: 14px; background: var(--rs); box-shadow: inset 0 0 0 1px var(--bs); padding: 10px 12px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.t-ct .lemb .foto { width: 20px; height: 20px; }
+.t-ct .cursor { position: absolute; left: 0; top: 0; width: 18px; height: 18px; z-index: 20; pointer-events: none; opacity: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.t-ct .cursor svg { width: 18px; height: 18px; fill: #fff; stroke: #111; stroke-width: 1.2; }
+</style>
+<!--ILHA-->
+<span class="pto azul"></span><span>3 atividades hoje</span><span class="cinza mono">próxima 14:00</span>
+<!--/ILHA-->
+<!--MOCK-->
+<div class="d-main t-ct">
+  <div class="col-lista">
+    <div class="cab"><span class="mono" data-total>1.284 no total</span><h4>Contatos</h4></div>
+    <div class="ferr">
+      <span class="d-filtro"><svg><use href="#i-filter"/></svg>Filtrar por<svg><use href="#i-chev"/></svg></span>
+      <span class="d-filtro">A–Z<svg><use href="#i-chev"/></svg></span>
+      <span class="d-filtro" data-filtro-etq hidden></span>
+      <div class="dir"><span class="vis on" title="Lista"><svg><use href="#i-list"/></svg></span><span class="vis" title="Tabela"><svg><use href="#i-table"/></svg></span></div>
+    </div>
+    <div class="lista" data-lista>
+      <div class="sec">Fixados</div>
+      <div class="p" data-e="Cliente"><span class="foto" style="--f1:#d8b49a;--f2:#2d3a4f;--f3:#6a7d96;--f4:#2c3442"></span><span class="nm"><b>Tiago Fonseca</b><span>Cliente · Fonseca Arquitetura</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="p" data-e="Lead quente"><span class="foto" style="--f1:#c79a7e;--f2:#4a2e36;--f3:#8f5d6c;--f4:#3a2329"></span><span class="nm"><b>Fernanda Rocha</b><span>Lead quente · Clínica Aurora</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="sec">C</div>
+      <div class="p" data-e="Lead quente"><span class="foto" style="--f1:#e0c0a6;--f2:#203a3a;--f3:#4f8a86;--f4:#1d3333"></span><span class="nm"><b>Carlos Henrique Lima</b><span>Lead quente · Colégio Ipê</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="p" data-e="Parceiro"><span class="foto" style="--f1:#b88c70;--f2:#3b3326;--f3:#8a7550;--f4:#2f291f"></span><span class="nm"><b>Camila Reis</b><span>Parceiro · Agência Ipê</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="sec">J</div>
+      <div class="p" data-e="Lead quente"><span class="foto" style="--f1:#d4a98c;--f2:#2a2f4a;--f3:#5e66a0;--f4:#22263b"></span><span class="nm"><b>Juliana Castro</b><span>Lead quente · Grupo Boa Safra</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="sec">M</div>
+      <div class="p" data-e="Indicação"><span class="foto" style="--f1:#caa088;--f2:#3a2a20;--f3:#7a5a44;--f4:#2b2019"></span><span class="nm"><b>Marcos Vinícius Teles</b><span>Indicação · Grupo Aurora</span></span><svg><use href="#i-more"/></svg></div>
+      <div class="p" data-e="Cliente"><span class="foto" style="--f1:#e3c3ab;--f2:#352a42;--f3:#76649a;--f4:#28203a"></span><span class="nm"><b>Mariana Couto</b><span>Cliente · Drawing Club</span></span><svg><use href="#i-more"/></svg></div>
+    </div>
+  </div>
+  <div class="painel">
+    <div class="vista agenda" data-agenda>
+      <div class="ag-top"><h3>Próximas atividades</h3><span class="d-filtro"><svg><use href="#i-filter"/></svg>Filtrar</span></div>
+      <div><span class="d-filtro on"><svg><use href="#i-cal"/></svg>Esta semana</span></div>
+      <div class="tl">
+        <div class="it"><span class="bol"><svg><use href="#i-phone"/></svg></span>Ligar para <span class="lk"><span class="foto" style="--f1:#c79a7e;--f2:#4a2e36;--f3:#8f5d6c;--f4:#3a2329"></span>Fernanda Rocha</span> sobre a proposta<span class="dt">hoje 14:00</span></div>
+        <div class="it"><span class="bol"><svg><use href="#i-users"/></svg></span>Reunião com <span class="lk"><span class="foto" style="--f1:#e0c0a6;--f2:#203a3a;--f3:#4f8a86;--f4:#1d3333"></span>Carlos Henrique</span><span class="dt">amanhã 10:00</span></div>
+        <div class="emb"><b>Renovação do contrato</b>Revisar o uso do último semestre e levar a proposta de 12 licenças com a implantação inclusa.</div>
+        <div class="it"><span class="bol"><svg><use href="#i-wa"/></svg></span><span class="lk"><span class="foto" style="--f1:#d4a98c;--f2:#2a2f4a;--f3:#5e66a0;--f4:#22263b"></span>Juliana</span> não responde há 2 dias<span class="dt">follow-up</span></div>
+        <div class="it"><span class="bol"><svg><use href="#i-cal"/></svg></span>Próximos compromissos</div>
+        <div class="evt"><span class="dia">NOV<b>03</b></span><span style="flex:1"><b class="b6">Renovação · Fonseca Arquitetura</b><br><span class="t3 sm12">09:30 · com Tiago Fonseca</span></span></div>
+      </div>
+      <div class="add"><svg><use href="#i-plus"/></svg>Adicionar tarefa</div>
+    </div>
+    <div class="vista ficha" data-ficha>
+      <div class="fh">
+        <span class="foto" style="--f1:#c79a7e;--f2:#4a2e36;--f3:#8f5d6c;--f4:#3a2329"></span>
+        <div style="min-width:0">
+          <h3>Fernanda Rocha</h3>
+          <div class="sub">Diretora administrativa · <a>Clínica Aurora</a></div>
+          <div class="redondos"><span title="Ligar"><svg><use href="#i-phone"/></svg></span><span class="wa" title="WhatsApp"><svg><use href="#i-wa"/></svg></span><span title="E-mail"><svg><use href="#i-mail"/></svg></span><span title="Tarefa"><svg><use href="#i-task"/></svg></span></div>
+          <div class="etqs" data-etqs><span class="chip"><svg><use href="#i-x"/></svg>Lead quente</span><span class="chip contorno" data-add-etq><svg><use href="#i-plus"/></svg>Etiqueta</span>
+            <div class="pop vidro" data-pop><span>Cliente</span><span data-op>Indicação</span><span>Parceiro</span><span>Evento</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><svg><use href="#i-phone"/></svg><span>(11) 98734-2211</span></div>
+        <div class="tile"><svg><use href="#i-mail"/></svg><span>fernanda@clinicaaurora.com.br</span></div>
+        <div class="tile"><svg><use href="#i-globe"/></svg><span>São Paulo/SP</span></div>
+        <div class="tile"><svg><use href="#i-user"/></svg><span>Dono: Matheus Paes</span></div>
+      </div>
+      <div class="bloco-t">Tarefas</div>
+      <div class="lemb"><span class="d-chk"></span>Ligar para <span class="lk" style="color:var(--acfg);font-weight:500">Fernanda</span> sobre a proposta<span class="dt" style="margin-left:auto;font:400 11px ui-monospace,monospace;color:var(--t2);background:var(--hv);border-radius:99px;padding:2px 8px">hoje 14:00</span></div>
+      <div class="add"><svg><use href="#i-plus"/></svg>Adicionar tarefa</div>
+      <div class="bloco-t">Negócios</div>
+      <div class="lemb"><span class="dot" style="background:var(--d-blue)"></span>Clínica Aurora · Piloto<span class="t3 sm12" style="margin-left:auto">R$ 4.800 · Qualificado</span></div>
+    </div>
+    <span class="cursor" data-cursor><svg viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1 3.5 7-2.6 1.2-3.4-7.1L5 19z"/></svg></span>
+  </div>
+</div>
+<!--/MOCK-->
+<!--SCRIPT-->
+window.ANIMA.contatos = function (c) {
+  var MOLA = "cubic-bezier(.32,.72,0,1)";
+  var cur = c.q("[data-cursor]"), painel = c.q(".painel"), root = c.root;
+  var k = function () { return (root.getBoundingClientRect().width / root.offsetWidth) || 1; };
+  var pos = { x: 300, y: 300 };
+  var vai = function (el, dx, dy) {
+    var r = el.getBoundingClientRect(), p = painel.getBoundingClientRect(), s = k();
+    var nx = (r.left - p.left) / s + (dx == null ? 16 : dx), ny = (r.top - p.top) / s + (dy == null ? r.height / s / 2 : dy);
+    var a = cur.animate([{ transform: "translate(" + pos.x + "px," + pos.y + "px)", opacity: 1 }, { transform: "translate(" + nx + "px," + ny + "px)", opacity: 1 }], { duration: 650, easing: MOLA, fill: "forwards" });
+    pos = { x: nx, y: ny }; return c.espera(680);
+  };
+  var clica = function () { cur.animate([{ scale: "1" }, { scale: ".8" }, { scale: "1" }], { duration: 220 }); return c.espera(240); };
+  c.entra(".p", { passo: 40 }); c.entra(".agenda .it, .agenda .emb, .agenda .evt", { d: 150, passo: 60 });
+  var orig = c.q("[data-ilha]").innerHTML;
+  var side = root.querySelector('[data-etq="Lead quente"]');
+  return c.espera(900).then(function () { return vai(side, 30); })
+    .then(clica).then(function () {
+      side.classList.add("on");
+      var f = c.q("[data-filtro-etq]"); f.hidden = false; f.className = "d-filtro on"; f.innerHTML = 'Etiqueta: Lead quente<svg><use href="#i-x"/></svg>';
+      c.entra([f], { y: 0, s: .8 });
+      c.qa(".p").forEach(function (p) { if (p.dataset.e !== "Lead quente") p.animate([{ opacity: 1 }, { opacity: 0, height: "0px", marginTop: "0px" }], { duration: 350, easing: MOLA, fill: "forwards" }); });
+      c.qa(".sec").forEach(function (s) { s.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: "forwards" }); });
+      c.conta(c.q("[data-total]"), 128, function (v) { return Math.round(v) + " com Lead quente"; }, 600);
+      return c.espera(800);
+    })
+    .then(function () { return vai(c.qa(".p")[1], 120); })
+    .then(clica).then(function () {
+      c.qa(".p")[1].classList.add("on");
+      var ag = c.q("[data-agenda]"), fi = c.q("[data-ficha]");
+      ag.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(-24px)" }], { duration: 320, fill: "forwards", easing: MOLA });
+      fi.style.pointerEvents = "auto";
+      fi.animate([{ opacity: 0, transform: "translateX(40px)" }, { opacity: 1, transform: "none" }], { duration: 560, delay: 120, fill: "forwards", easing: MOLA });
+      c.entra(fi.querySelectorAll(".tile, .lemb, .add, .bloco-t"), { d: 300, passo: 45 });
+      return c.espera(1100);
+    })
+    .then(function () { return vai(c.q("[data-add-etq]"), 20); })
+    .then(clica).then(function () {
+      var pop = c.q("[data-pop]"); pop.style.display = "block";
+      pop.animate([{ opacity: 0, transform: "scale(.94) translateY(-4px)" }, { opacity: 1, transform: "none" }], { duration: 300, easing: MOLA });
+      return c.espera(450);
+    })
+    .then(function () { return vai(c.q("[data-op]"), 30); })
+    .then(function () { c.q("[data-op]").classList.add("h"); return clica(); })
+    .then(function () {
+      var pop = c.q("[data-pop]"); pop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: "forwards" });
+      var novo = document.createElement("span"); novo.className = "chip"; novo.innerHTML = '<svg><use href="#i-x"/></svg>Indicação';
+      var et = c.q("[data-etqs]"); et.insertBefore(novo, c.q("[data-add-etq]")); c.entra([novo], { y: 0, s: .7 });
+      cur.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 300, fill: "forwards" });
+      c.ilha('<span class="av" style="background:#8f5d6c">FR</span><span class="txt"><b>Fernanda Rocha agora é Indicação</b><span>etiqueta aplicada por Matheus Paes</span></span><span class="acao">Desfazer</span>', true);
+      return c.espera(3000);
+    })
+    .then(function () { c.ilha(orig, false); });
+};
+<!--/SCRIPT-->
+<!--NOTAS-->
+<li><b>Modelo do vídeo (Alloy).</b> Preto profundo, lista com foto, nome, etiquetas e contato em duas linhas, e um painel arredondado ao lado. Sem a tabela de 12 colunas como tela inicial: ela continua no botão "Tabela".</li>
+<li><b>O menu conhece a tela.</b> Em Contatos, o item do menu abre as visões (Todos, Meus, Sem proprietário), as etiquetas e os segmentos. No rodapé, o cartão "Sem etiqueta 41" e o botão "Novo contato".</li>
+<li><b>Próximas atividades no painel.</b> Sem contato aberto, o painel mostra as ligações, reuniões e follow-ups da semana, com quem e quando, como a "Upcoming Activity" do vídeo.</li>
+<li><b>Ficha que desliza.</b> Clicar num contato troca o painel pela ficha: foto grande, botões redondos (ligar, WhatsApp, e-mail, tarefa), etiquetas com menu de vidro, dados em blocos, tarefas e negócios.</li>
+<li><b>Veja a cena.</b> Em "Ver animação": escolher a etiqueta no menu filtra a lista, abrir a Fernanda mostra a ficha, e a etiqueta nova é aplicada com Desfazer na ilha.</li>
+<!--/NOTAS-->

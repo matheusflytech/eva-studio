@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4 · Gravura</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: #e9e6df; color: #1b1b1e; }
+  .etiqueta { background: rgba(255,255,255,.7); color: #1b1b1e; }
+  .nota { color: #77736a; }
+  .cartao { background: #f6f4ef; box-shadow: 0 40px 100px -40px rgba(40,34,20,.35), 0 0 0 1px rgba(27,27,30,.06); }
+  .marca { position: relative; background: #1b1b1e; color: #f6f4ef; margin-left: 2px; }
+  .louro { position: absolute; left: -23px; top: -22px; width: 80px; height: 80px; pointer-events: none; }
+  .louro path { fill: none; stroke: #8f7b4e; stroke-width: 1.3; stroke-linecap: round; stroke-dasharray: 220; stroke-dashoffset: 220; animation: traca 1.6s .4s cubic-bezier(.4,0,.2,1) forwards; }
+  .louro path:nth-child(even) { animation-delay: .55s; }
+  @keyframes traca { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { .louro path { animation-duration: 3.2s; } }
+  .form h1 { font-family: "Times New Roman", Georgia, serif; font-weight: 400; font-size: 34px; letter-spacing: -.01em; }
+  .form .sub, .form .rodape { color: #7d786d; }
+  .form .campo { border: 1px solid rgba(27,27,30,.12); background: #fffdf9; color: #1b1b1e; }
+  .form .campo:focus { border-color: #1b1b1e; box-shadow: 0 0 0 4px rgba(27,27,30,.07); }
+  .form .botao { background: #1b1b1e; color: #f6f4ef; }
+  .palco { background: #f1eee7; border-left: 1px solid rgba(27,27,30,.06); }
+  .lema { position: absolute; right: 34px; top: 30px; z-index: 2; font: 400 13px/1.6 "Times New Roman", serif; letter-spacing: .32em; color: #8f8879; text-align: right; }
+</style>
+</head>
+<body>
+  <a class="etiqueta" href="index.html">← Proposta 4 · Gravura</a>
+  <div class="cartao">
+    <form class="form" onsubmit="return false">
+      <div class="marca"><svg viewBox="0 0 380 400" width="20" height="20" aria-label="Eva"><path fill="currentColor" fill-rule="evenodd" d="M118 48Q132 15 165 15Q199 15 213 46L358 381H310L247 240L190 381H88Q20 381 21 318Q22 292 34 266ZM161 92Q167 80 173 92L221 186L158 323Q154 333 143 333H92Q67 333 76 306Z"/></svg>
+        <svg class="louro" viewBox="0 0 80 80" aria-hidden="true">
+          <path d="M40 72 C 18 66 8 48 12 26"/><path d="M40 72 C 62 66 72 48 68 26"/>
+          <path d="M14 46 q -8 -3 -9 -11 q 8 1 9 11"/><path d="M66 46 q 8 -3 9 -11 q -8 1 -9 11"/>
+          <path d="M12 34 q -7 -5 -6 -13 q 7 3 6 13"/><path d="M68 34 q 7 -5 6 -13 q -7 3 -6 13"/>
+          <path d="M20 58 q -9 0 -13 -7 q 8 -1 13 7"/><path d="M60 58 q 9 0 13 -7 q -8 -1 -13 7"/>
+          <path d="M29 67 q -8 3 -15 -2 q 7 -4 15 2"/><path d="M51 67 q 8 3 15 -2 q -7 -4 -15 2"/>
+        </svg>
+      </div>
+      <h1>Entrar</h1>
+      <p class="sub">Acesse o painel da Eva Holding.</p>
+      <div><label>E-mail</label><input class="campo" placeholder="voce@empresa.com"></div>
+      <div><label>Senha</label><input class="campo" type="password" placeholder="••••••••"></div>
+      <button class="botao">Entrar</button>
+      <p class="rodape">Ainda não tem conta? <b>Criar conta</b></p>
+    </form>
+    <div class="palco" id="palco"><canvas id="c"></canvas><div class="lema">ALEA IACTA EST</div></div>
+  </div>
+  <p class="nota">César de frente em gravura de cédula: linhas horizontais finas que engrossam na sombra, sobre papel cor de mármore. Uma coroa de louros se desenha em volta da marca ao abrir. Passe o mouse: as linhas ondulam a partir da mão, como água, e assentam de novo.</p>
+
+<script src="cesar.js"></script>
+<script src="base.js"></script>
+<script>
+(async () => {
+  const canvas = document.getElementById("c"), palco = document.getElementById("palco");
+  const busto = await carregarBusto(CESAR_FRENTE, 360);
+  const mao = new Ponteiro(palco);
+  let W = 0, H = 0, escala = 1, ox = 0, oy = 0;
+  const g = prepararCanvas(canvas, (w, h) => { W = w; H = h; escala = (h * 0.9) / busto.h; ox = (w - busto.w * escala) / 2 + 20; oy = h - busto.h * escala; });
+  const ondas = []; let ultimo = { x: -1e4, y: -1e4 };
+  const t0 = performance.now();
+  function quadro(t) {
+    mao.passo(0.3);
+    const tempo = (t - t0) / 1000;
+    // cada passada da mão solta uma onda (anel que cresce e some)
+    if (mao.forca > 0.3 && Math.hypot(mao.x - ultimo.x, mao.y - ultimo.y) > 26) { ondas.push({ x: mao.x, y: mao.y, t: tempo }); ultimo = { x: mao.x, y: mao.y }; }
+    while (ondas.length && tempo - ondas[0].t > 2.4) ondas.shift();
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = "#1b1b1e"; g.lineCap = "round";
+    const PASSO = 5, revela = Math.min(1, tempo / (CALMO ? 2.6 : 1.3)); // as linhas se desenham de cima para baixo ao abrir
+    for (let y = 0; y < H * revela; y += PASSO) {
+      let prev = null;
+      for (let x = 0; x <= W; x += 3) {
+        const v = busto.em((x - ox) / escala, (y - oy) / escala);
+        const dentro = x > ox && x < ox + busto.w * escala && y > oy && v > 0.1; // o preto da foto vira papel
+        let dy = 0;
+        for (const o of ondas) {
+          const idade = (tempo - o.t) * (CALMO ? 0.5 : 1), d = Math.hypot(x - o.x, y - o.y), frente = idade * 260;
+          const k = Math.exp(-Math.pow((d - frente) / 34, 2)) * Math.exp(-idade * 1.6);
+          dy += Math.sin((d - frente) / 9) * 7 * k;
+        }
+        // sombra = linha mais grossa; papel fora do busto = traço finíssimo
+        const esp = dentro ? 0.25 + Math.pow(1 - v, 1.4) * 3.1 : 0.22;
+        const yy = y + dy - (dentro ? (v - 0.5) * 1.6 : 0);
+        if (prev) { g.lineWidth = (esp + prev.e) / 2; g.globalAlpha = dentro ? 0.92 : 0.25; g.beginPath(); g.moveTo(prev.x, prev.y); g.lineTo(x, yy); g.stroke(); }
+        prev = { x, y: yy, e: esp };
+      }
+    }
+    g.globalAlpha = 1;
+    requestAnimationFrame(quadro);
+  }
+  requestAnimationFrame(quadro);
+})();
+</script>
+</body>
+</html>

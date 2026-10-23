@@ -92,8 +92,8 @@ function ToastView({ toast, onClose }: { toast: ToastItem; onClose: () => void }
       onFocus={() => setPausado(true)}
       onBlur={() => setPausado(false)}
       className={cn(
-        "pointer-events-auto flex items-start gap-2.5 rounded-lg border border-border-default bg-overlay px-3 py-2.5 shadow-overlay",
-        "animate-[ds-pop-in_200ms_var(--ease-standard)]"
+        "pointer-events-auto flex items-start gap-2.5 rounded-[18px] border border-border-subtle bg-overlay px-3.5 py-3 shadow-overlay",
+        "origin-bottom animate-[ds-menu-in_320ms_cubic-bezier(.32,.72,0,1)]"
       )}
     >
       {icones[tone] && <span className="mt-0.5">{icones[tone]}</span>}
@@ -108,7 +108,7 @@ function ToastView({ toast, onClose }: { toast: ToastItem; onClose: () => void }
             toast.action?.onClick();
             onClose();
           }}
-          className="mt-px shrink-0 rounded-sm text-small font-medium text-accent-fg hover:underline"
+          className="mt-px shrink-0 rounded-full text-small font-semibold text-accent-fg hover:underline"
         >
           {toast.action.label}
         </button>

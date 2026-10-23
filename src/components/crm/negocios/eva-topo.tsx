@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CalendarClock, CheckCircle2, MessageCircle, Phone, TrendingUp, X } from "lucide-react";
+import { LogoOficial } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -142,17 +143,20 @@ export function DiaDeHoje({
   total,
   onAcao,
   onVerTodos,
+  empilhado = false,
 }: {
   acontecimentos: Acontecimento[];
   atencao: ItemDeAtencao[];
   total: number;
   onAcao: (item: ItemDeAtencao) => void;
   onVerTodos: () => void;
+  /** Uma coluna só (dentro da gaveta "Seu dia" do quadro). */
+  empilhado?: boolean;
 }) {
   if (acontecimentos.length === 0 && atencao.length === 0) return null;
   return (
-    <section aria-label="Seu dia" className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="rounded-lg border border-border-subtle bg-panel">
+    <section aria-label="Seu dia" className={cn("grid shrink-0 gap-3", !empilhado && "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]")}>
+      <div className="rounded-[18px] border border-border-subtle bg-panel">
         <h2 className="flex h-10 items-center border-b border-border-subtle px-4 text-body font-semibold text-text-primary">Desde ontem</h2>
         {acontecimentos.length === 0 ? (
           <p className="px-4 py-3 text-small text-text-tertiary">Tudo quieto nas últimas horas.</p>
@@ -160,7 +164,7 @@ export function DiaDeHoje({
           <ol className="px-4">
             {acontecimentos.map((a) => (
               <li key={a.id} className="flex gap-3 border-t border-border-subtle py-2 first:border-t-0">
-                <span className="w-12 shrink-0 text-caption tabular-nums text-text-tertiary">{a.quando}</span>
+                <span className="w-12 shrink-0 font-mono text-caption tabular-nums text-text-tertiary">{a.quando}</span>
                 <span className="min-w-0 text-small text-text-secondary">
                   {a.partes.map((p, i) =>
                     p.forte ? (
@@ -178,7 +182,7 @@ export function DiaDeHoje({
         )}
       </div>
 
-      <div className="rounded-lg border border-border-subtle bg-panel">
+      <div className="rounded-[18px] border border-border-subtle bg-panel">
         <div className="flex h-10 items-center justify-between gap-3 border-b border-border-subtle px-4">
           <h2 className="text-body font-semibold text-text-primary">Pede sua atenção hoje</h2>
           {total > atencao.length && (
@@ -214,7 +218,11 @@ export function DiaDeHoje({
                     <p className="truncate text-caption text-text-secondary">{item.motivo}</p>
                   </div>
                   <Button variant="secondary" size="sm" onClick={() => onAcao(item)}>
-                    <Icone size={14} aria-hidden="true" className={item.acao === "retorno" ? "text-danger" : "text-text-tertiary"} />
+                    {item.acao === "whatsapp" ? (
+                      <LogoOficial marca="whatsapp" tamanho={14} />
+                    ) : (
+                      <Icone size={14} aria-hidden="true" className={item.acao === "retorno" ? "text-danger" : "text-text-tertiary"} />
+                    )}
                     {item.rotulo}
                   </Button>
                 </li>

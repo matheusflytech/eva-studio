@@ -1,14 +1,26 @@
 "use client";
 
+import * as React from "react";
 import Link from "@/components/contrato/link";
-import { Radio, ArrowRight } from "lucide-react";
-import { LogoDaMarca } from "@/components/ui/marca";
-import { CredentialsPanel } from "@/components/integrations/credentials-panel";
-import { ConexaoIaPanel } from "@/components/integrations/conexao-ia-panel";
-import { UsoIaPanel } from "@/components/integrations/uso-ia-panel";
+import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CentralDeIa } from "@/components/integrations/central-de-ia";
 import { EmailPanel } from "@/components/integrations/email-panel";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
+import { useContrato, usePathname, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
+import { apiDoContrato } from "@/lib/contrato/rotas";
+import { MarcaEva } from "@/components/layout/marca-eva";
+import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 
 // ---------------------------------------------------------------------------
 // Integrações.
@@ -26,65 +38,118 @@ import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 //
 // Sobrou o que é real e tem banco atrás: credenciais de IA e e-mail,
 // servidores MCP e chaves de API.
+//
+// v5: quatro abas (IA, E-mail, Servidores MCP, API do contrato), com a aba na
+// URL (?aba=email...). Os atalhos (uso por agente, Entrar com OpenRouter, n8n
+// e webhooks, onde fica o WhatsApp) moram no "…" da barra.
 // ---------------------------------------------------------------------------
 
-export default function IntegracoesPage() {
+type Aba = "ia" | "email" | "mcp" | "api";
+
+const ABAS: { value: Aba; label: string; icon: React.ReactNode }[] = [
+  { value: "ia", label: "IA", icon: <MarcaEva size={14} /> },
+  { value: "email", label: "E-mail", icon: <Mail aria-hidden="true" /> },
+  { value: "mcp", label: "Servidores MCP", icon: <Plug aria-hidden="true" /> },
+  { value: "api", label: "API do contrato", icon: <KeyRound aria-hidden="true" /> },
+];
+
+function Integracoes() {
+  const contrato = useContrato();
+  const router = useRouter();
+  const pathname = usePathname();
+  const pedida = useSearchParams().get("aba");
+  const aba: Aba = ABAS.find((a) => a.value === pedida)?.value ?? "ia";
+  const [novaAberta, setNovaAberta] = React.useState(false);
+  const [filaAberta, setFilaAberta] = React.useState(false);
+  const [porAgenteAberto, setPorAgenteAberto] = React.useState(false);
+
   return (
-    <div className="flex-1 p-8">
-      <div className="mb-6">
-        <h1 className="font-display text-2xl font-semibold text-text-primary">Integrações</h1>
-        <p className="mt-1 max-w-2xl text-[14px] text-text-secondary">
-          As chaves e os servidores que seus agentes usam: provedores de IA, envio de e-mail, ferramentas MCP e
-          o acesso à API do Eva Studio.
-        </p>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+      {/* Barra da tela: título e, à direita, "…", a fila e a ação principal. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Integrações</h1>
+        <div className="ml-auto flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton variant="secondary" aria-label="Mais: uso por agente, OpenRouter, n8n e webhooks, canais">
+                <Ellipsis />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem
+                onSelect={() => {
+                  if (aba !== "ia") router.replace(`${pathname}?aba=ia`);
+                  setPorAgenteAberto(true);
+                }}
+              >
+                <BarChart3 /> Uso de IA por agente
+              </DropdownMenuItem>
+              {/* Navegação de página inteira: o servidor guarda o verificador PKCE
+                  num cookie e manda para o login do OpenRouter. */}
+              <DropdownMenuItem asChild>
+                <a href={apiDoContrato(contrato, "/api/ia/openrouter/start")}>
+                  <LogIn /> Entrar com OpenRouter
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/integracoes/n8n">
+                  <LogoOficial marca="n8n" tamanho={ladoDoLogo("n8n", 16)} /> n8n e webhooks
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* Canal não se conecta aqui; dizer isso vale mais que um cartão que não faz nada. */}
+              <DropdownMenuItem asChild className="h-auto items-start py-2">
+                <Link href="/configuracoes?aba=canais">
+                  <Radio className="mt-0.5" />
+                  <span className="flex flex-col">
+                    <span>WhatsApp, Instagram, Telegram, site</span>
+                    <span className="text-caption text-text-tertiary">A conexão fica em Configurações › Canais</span>
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {aba === "ia" && (
+            <>
+              <Button variant="secondary" onClick={() => setFilaAberta(true)}>
+                <ListOrdered size={14} aria-hidden="true" /> Fila de resposta
+              </Button>
+              <Button onClick={() => setNovaAberta(true)}>
+                <Plus size={14} aria-hidden="true" /> Nova credencial
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Canal não se conecta aqui, e dizer isso em voz alta vale mais do que
-          um cartão bonito que não faz nada. */}
-      <Link
-        href="/integracoes/n8n"
-        className="glass-card group mb-4 flex items-center gap-4 rounded-2xl px-5 py-4 transition-colors hover:border-border-strong"
-      >
-        <LogoDaMarca marca="n8n" tamanho={44} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-medium text-text-primary">n8n e webhooks</p>
-          <p className="mt-0.5 text-[12.5px] text-text-secondary">
-            Passo a passo para ligar o n8n nos dois sentidos, e os webhooks que avisam quando um negócio é ganho, um contato
-            é criado ou chega mensagem.
-          </p>
-        </div>
-        <ArrowRight size={16} className="shrink-0 text-text-tertiary transition-colors group-hover:text-text-primary" />
-      </Link>
+      <div className="-mx-4 overflow-x-auto px-4 lg:-mx-6 lg:px-6">
+        <SegmentedControl label="Integrações" value={aba} onChange={(v) => router.replace(`${pathname}?aba=${v}`)} options={ABAS} />
+      </div>
 
-      <Link
-        href="/configuracoes?aba=canais"
-        className="glass-card group mb-8 flex items-center gap-4 rounded-2xl px-5 py-4 transition-colors hover:border-border-strong"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-text-secondary">
-          <Radio size={19} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-medium text-text-primary">
-            Procurando WhatsApp, Instagram, Telegram ou o widget do site?
-          </p>
-          <p className="mt-0.5 text-[12.5px] text-text-secondary">
-            A conexão dos canais fica em Configurações → Canais. Cada agente escolhe, na aba dele, por quais canais
-            atende.
-          </p>
-        </div>
-        <ArrowRight size={16} className="shrink-0 text-text-tertiary transition-colors group-hover:text-text-primary" />
-      </Link>
-
-      <ConexaoIaPanel />
-      <UsoIaPanel />
-      <EmailPanel />
-
-      <CredentialsPanel />
-
-      <div className="mt-8">
-        <McpServersPanel />
-        <ApiKeysPanel />
+      <div className="w-full pt-2">
+        {aba === "ia" && (
+          <CentralDeIa
+            novaAberta={novaAberta}
+            setNovaAberta={setNovaAberta}
+            filaAberta={filaAberta}
+            setFilaAberta={setFilaAberta}
+            porAgenteAberto={porAgenteAberto}
+            setPorAgenteAberto={setPorAgenteAberto}
+          />
+        )}
+        {aba === "email" && <EmailPanel />}
+        {aba === "mcp" && <McpServersPanel />}
+        {aba === "api" && <ApiKeysPanel nivelDoTitulo={2} />}
       </div>
     </div>
+  );
+}
+
+export default function IntegracoesPage() {
+  // useSearchParams exige Suspense: sem ele o Next recusa gerar a página.
+  return (
+    <React.Suspense fallback={<div className="flex-1" />}>
+      <Integracoes />
+    </React.Suspense>
   );
 }

@@ -1,0 +1,105 @@
+<!-- id: tarefas | titulo: Tarefas | grupo: Vender | menu: tarefas | print: tarefas -->
+<style>
+.t-tarefas { overflow: hidden; }
+.t-tarefas .d-sub .sobra { font: 400 12px ui-monospace, "SF Mono", monospace; color: var(--t3); }
+.t-tarefas .corpo { flex: 1; min-height: 0; overflow: hidden; padding: 10px 24px 0; display: flex; flex-direction: column; gap: 22px; max-width: 820px; }
+.t-tarefas .agora { padding: 18px 20px; flex-direction: row; align-items: center; gap: 14px; }
+.t-tarefas .agora .col { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.t-tarefas .agora .t { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.t-tarefas .agora .s { font-size: 12.5px; color: var(--t3); }
+.t-tarefas .agora .s b { color: var(--dg); font-weight: 500; }
+.t-tarefas .agora .d-ic { width: 36px; height: 36px; border-radius: 11px; }
+.t-tarefas .agora .d-ic svg { width: 17px; height: 17px; }
+.t-tarefas .d-sec { gap: 4px; }
+.t-tarefas .d-sec > h5 { padding: 0 0 4px; }
+.t-tarefas .d-linha { min-height: 54px; padding: 6px 4px; gap: 14px; }
+.t-tarefas .d-linha + .d-linha::before { left: 36px; }
+.t-tarefas .ok-bt { width: 20px; height: 20px; display: grid; place-items: center; color: var(--t3); flex: none; }
+.t-tarefas .ok-bt svg { width: 19px; height: 19px; }
+.t-tarefas .prazo { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--t2); }
+.t-tarefas .prazo.fixo { color: var(--t1); font-weight: 600; }
+.t-tarefas .prazo.dg { color: var(--dg); font-weight: 500; }
+.t-tarefas .mais { padding: 0 4px; }
+</style>
+<!--MOCK-->
+<div class="d-main t-tarefas">
+  <div class="d-bar">
+    <h4>Tarefas</h4>
+    <span class="cnt">27 hoje · <span class="down b5">24 atrasadas</span></span>
+    <div class="dir">
+      <span class="d-bt"><svg><use href="#i-plus"/></svg>Nova tarefa<kbd class="d-kbd">T</kbd></span>
+      <span class="d-bt ic" title="Adiar o que não cabe hoje, negócios sem próximo passo, capacidade do dia"><svg><use href="#i-more"/></svg></span>
+      <span class="d-bt p"><svg><use href="#i-play"/></svg>Começar pela ordem</span>
+    </div>
+  </div>
+  <div class="d-sub">
+    <div class="d-abas">
+      <span class="on">Meu dia <em>27</em></span>
+      <span>Todas as tarefas</span>
+    </div>
+    <div class="dir">
+      <span class="sobra">sobram 24 min até 18h</span>
+      <span class="d-bt sm"><svg><use href="#i-filter"/></svg>Filtros</span>
+    </div>
+  </div>
+
+  <div class="corpo">
+    <div class="d-sec">
+      <h5>Agora</h5>
+      <div class="d-painel agora">
+        <span class="d-ic"><svg class="wa"><use href="#i-wa"/></svg></span>
+        <span class="col">
+          <span class="t">Responder Ana Ribeiro</span>
+          <span class="s">Loja Atlântico · <b>esperando resposta</b></span>
+        </span>
+        <span class="d-bt"><svg><use href="#i-msg"/></svg>Abrir conversa</span>
+      </div>
+    </div>
+
+    <div class="d-sec">
+      <h5>Com hora marcada</h5>
+      <div>
+        <div class="d-linha">
+          <span class="ok-bt"><svg><use href="#i-circle"/></svg></span>
+          <span class="col"><span class="t">Reunião de diagnóstico</span><span class="s">Reunião · Clínica Aurora</span></span>
+          <span class="dir"><span class="prazo fixo">10:00</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="ok-bt"><svg><use href="#i-circle"/></svg></span>
+          <span class="col"><span class="t">Ligar para fechar a renovação</span><span class="s">Ligação · Mercado Primavera</span></span>
+          <span class="dir"><span class="prazo fixo">15:30</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-sec">
+      <h5>Em seguida</h5>
+      <div>
+        <div class="d-linha">
+          <span class="ok-bt"><svg><use href="#i-circle"/></svg></span>
+          <span class="col"><span class="t">Agendar demonstração</span><span class="s">E-mail · Loja Atlântico</span></span>
+          <span class="dir"><span class="prazo dg">desde 13/10</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="ok-bt"><svg><use href="#i-circle"/></svg></span>
+          <span class="col"><span class="t">Confirmar decisor</span><span class="s">Tarefa · Mercado Primavera</span></span>
+          <span class="dir"><span class="prazo dg">desde 15/10</span></span>
+        </div>
+        <div class="d-linha">
+          <span class="ok-bt"><svg><use href="#i-circle"/></svg></span>
+          <span class="col"><span class="t">Retornar sobre a proposta</span><span class="s">Ligação · Negócio 8</span></span>
+          <span class="dir"><span class="prazo dg">desde 16/10</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mais"><span class="d-link">Mais 21 para hoje<svg><use href="#i-chev"/></svg></span></div>
+  </div>
+</div>
+<!--/MOCK-->
+<!--NOTAS-->
+<li><b>Uma tarefa em destaque: a de agora</b> O topo mostra só o que fazer já, com o botão de um clique. As outras vêm em fila curta, e o resto do dia abre em "Mais 21 para hoje".</li>
+<li><b>Linha com três coisas</b> Concluir, o que é e para quem, e o prazo. Duração, prioridade e as marcas de IA e Automação ficam no detalhe; o botão Ligar ou E-mail aparece ao passar o mouse.</li>
+<li><b>Lateral de capacidade e filas sai</b> A capacidade vira "sobram 24 min até 18h" na sub-barra. As filas por tipo (e-mails, ligações, reuniões) ficam em Filtros e dentro de "Começar pela ordem".</li>
+<li><b>Atalhos raros no "…"</b> "Adiar para amanhã 9h" e "11 negócios sem próximo passo" saem da tela e ficam no menu "…". A frase de criar tarefa vira o botão "Nova tarefa" (tecla T).</li>
+<!--/NOTAS-->

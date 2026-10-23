@@ -28,12 +28,12 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MarcaAjuda } from "./marca-ajuda";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 import { ThemeToggle } from "@/components/ui/theme";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
+import { MarcaEva } from "@/components/layout/marca-eva";
 
 interface NavItem {
   href: string;
@@ -107,8 +107,8 @@ function BotaoBuscar({ collapsed }: { collapsed: boolean }) {
       title={`Buscar (${mac ? "⌘K" : "Ctrl+K"})`}
       aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
       className={cn(
-        "mt-3 flex h-8 items-center gap-2 rounded-md border border-border-subtle px-2.5 text-small text-text-tertiary transition-colors",
-        "hover:border-border-default hover:text-text-primary",
+        "mt-3 flex h-[34px] items-center gap-2 rounded-[10px] bg-raised px-2.5 text-small text-text-secondary transition-colors",
+        "hover:bg-hover hover:text-text-primary",
         collapsed && "justify-center px-0"
       )}
     >
@@ -118,7 +118,7 @@ function BotaoBuscar({ collapsed }: { collapsed: boolean }) {
       ) : (
         <>
           <span>Buscar</span>
-          <span className="ml-auto text-caption">{mac ? "⌘K" : "Ctrl K"}</span>
+          <span className="ml-auto font-mono text-caption text-text-tertiary">{mac ? "⌘K" : "Ctrl K"}</span>
         </>
       )}
     </button>
@@ -169,16 +169,15 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   return (
     <aside
       className={cn(
-        "glass-card flex h-full shrink-0 flex-col rounded-3xl bg-surface-1/90 p-3 transition-[width] duration-200",
-        mobile ? "glass-card-solid w-full" : collapsed ? "w-[76px]" : "w-[248px]"
+        "flex h-full shrink-0 flex-col border-r border-border-subtle bg-panel/75 px-3 py-3.5 backdrop-blur-sm transition-[width] duration-200",
+        mobile ? "w-full bg-panel" : collapsed ? "w-[68px]" : "w-[240px]"
       )}
     >
-      <div className="mb-3 flex items-center justify-between border-b border-border-subtle px-1 pb-3 pt-1">
+      <div className="mb-1 flex items-center justify-between px-1 pb-2">
         {!collapsed && (
           <Link href="/inicio" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/eva-mark.png" alt="" width={22} height={22} />
-            <span className="font-display text-[14px] font-bold text-text-primary">Eva</span>
+            <MarcaEva size={20} className="text-text-primary" />
+            <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
           </Link>
         )}
         <button
@@ -190,13 +189,12 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         </button>
       </div>
 
-      <OrgSwitcher collapsed={collapsed} />
-
       <BotaoBuscar collapsed={collapsed} />
 
-      <nav className="mt-5 flex flex-1 flex-col gap-5 overflow-y-auto">
+      <nav className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
+        {!collapsed && <p className="-mb-3 px-2.5 font-mono text-caption text-text-tertiary">Navegação</p>}
         {NAV_PRINCIPAL.map((group, i) => (
-          <div key={i} className="flex flex-col gap-1">
+          <div key={i} className="flex flex-col gap-0.5">
             {group.items.map((item) => (
               <SidebarNavItem
                 key={item.href}
@@ -208,14 +206,14 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </div>
         ))}
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5 border-t border-border-subtle pt-3">
           <button
             type="button"
             onClick={alternarMais}
             aria-expanded={mostrarMais}
             title="Mais ferramentas"
             className={cn(
-              "flex items-center gap-2 rounded-xl px-2.5 py-2 text-[12px] font-semibold uppercase tracking-wide text-text-tertiary transition-colors hover:text-text-primary",
+              "flex items-center gap-2 rounded-[10px] px-2.5 py-1.5 font-mono text-caption text-text-tertiary transition-colors hover:text-text-primary",
               collapsed && "justify-center px-0"
             )}
           >
@@ -231,9 +229,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 
           {mostrarMais &&
             NAV_AVANCADO.map((group, i) => (
-              <div key={i} className="mb-2 flex flex-col gap-1">
+              <div key={i} className="mb-2 flex flex-col gap-0.5">
                 {group.label && !collapsed && (
-                  <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-tertiary/70">
+                  <p className="px-2.5 pb-1 pt-1 font-mono text-caption text-text-tertiary/80">
                     {group.label}
                   </p>
                 )}
@@ -245,23 +243,13 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         </div>
       </nav>
 
-      {/* Atalho do tema no rodapé; a escolha completa (e "canvas sempre
-          escuro") fica em Configurações → Sua conta. O menu é navy nos dois
-          temas, então o botão aparece sempre no esquema escuro. */}
-      <div className={cn("mt-2 flex gap-1 border-t border-border-subtle pt-2", collapsed ? "flex-col items-center" : "items-center")}>
-        <Link
-          href="/ajuda"
-          title="Eva Help — tudo que dá pra fazer no app"
-          className={cn(
-            "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-medium text-text-tertiary transition-colors",
-            "hover:bg-surface-2 hover:text-text-primary",
-            collapsed && "justify-center px-0"
-          )}
-        >
-          <MarcaAjuda size={17} className="shrink-0" />
-          {!collapsed && <span>Eva Help</span>}
-        </Link>
-        <ThemeToggle className={cn(!collapsed && "ml-auto")} />
+      {/* Rodapé: você e o contrato (abre o menu da conta por cima da tela) e o
+          atalho do tema. A escolha completa fica em Configurações → Sua conta. */}
+      <div className={cn("mt-2 flex gap-1.5 pt-2", collapsed ? "flex-col items-center" : "items-center")}>
+        <div className="min-w-0 flex-1">
+          <OrgSwitcher collapsed={collapsed} />
+        </div>
+        <ThemeToggle />
       </div>
     </aside>
   );
