@@ -3,7 +3,9 @@ import { prisma } from "@/lib/db/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_COM_ACESSO, comFallbackLegado, ehPapelDeSistema } from "@/lib/server/contratos";
 import type { SessionContext } from "@/lib/server/permissions";
-import type { PapelDeSistema } from "@/lib/permissoes/catalogo";
+import { PAPEIS_DE_SISTEMA, type PapelDeSistema } from "@/lib/permissoes/catalogo";
+import { registrarHistorico } from "@/lib/server/historico";
+import type { Mudancas } from "@/lib/historico/tipos";
 
 // ---------------------------------------------------------------------------
 // Membros de um contrato: listar, convidar, mudar papel/grupos/equipes e
@@ -23,6 +25,34 @@ export class ErroDeMembro extends Error {
   ) {
     super(message);
   }
+}
+
+const nomeDoPapel = (p: string) => PAPEIS_DE_SISTEMA.find((x) => x.id === p)?.nome ?? p;
+
+/** O que mudou no acesso, já em nomes (papel, papel personalizado, grupos, equipes). */
+async function mudancasDoAcesso(
+  orgId: string,
+  antes: { role: string; roleId: string | null; groupIds: string[]; teamIds: string[] },
+  depois: { role?: string; roleId?: string | null; groupIds?: string[]; teamIds?: string[] }
+): Promise<Mudancas> {
+  const m: Mudancas = {};
+  const mesmos = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+  if (depois.role !== undefined && depois.role !== antes.role) m.papel = { de: nomeDoPapel(antes.role), para: nomeDoPapel(depois.role) };
+  const roleMudou = depois.roleId !== undefined && depois.roleId !== antes.roleId;
+  const gruposMudaram = depois.groupIds !== undefined && !mesmos(depois.groupIds, antes.groupIds);
+  const equipesMudaram = depois.teamIds !== undefined && !mesmos(depois.teamIds, antes.teamIds);
+  if (!roleMudou && !gruposMudaram && !equipesMudaram) return m;
+  const [papeis, grupos, equipes] = await Promise.all([
+    roleMudou ? prisma.customRole.findMany({ where: { orgId, id: { in: [antes.roleId, depois.roleId].filter((x): x is string => !!x) } }, select: { id: true, name: true } }) : [],
+    gruposMudaram ? prisma.permissionGroup.findMany({ where: { orgId, id: { in: [...antes.groupIds, ...depois.groupIds!] } }, select: { id: true, name: true } }) : [],
+    equipesMudaram ? prisma.team.findMany({ where: { orgId, id: { in: [...antes.teamIds, ...depois.teamIds!] } }, select: { id: true, name: true } }) : [],
+  ]);
+  const nomes = new Map([...papeis, ...grupos, ...equipes].map((x) => [x.id, x.name]));
+  const lista = (ids: string[]) => ids.map((id) => nomes.get(id) ?? "removido");
+  if (roleMudou) m.papel_personalizado = { de: antes.roleId ? (nomes.get(antes.roleId) ?? "removido") : null, para: depois.roleId ? (nomes.get(depois.roleId) ?? "removido") : null };
+  if (gruposMudaram) m.grupos = { de: lista(antes.groupIds), para: lista(depois.groupIds!) };
+  if (equipesMudaram) m.equipes = { de: lista(antes.teamIds), para: lista(depois.teamIds!) };
+  return m;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -221,6 +251,11 @@ export async function alterarMembro(ctx: SessionContext, input: AlteracaoDeMembr
   if (novoPapel !== undefined) {
     await prisma.profile.updateMany({ where: { id: alvo.id, orgId: ctx.orgId }, data: { role: novoPapel } });
   }
+
+  const mudancas = await mudancasDoAcesso(ctx.orgId, alvo, { role: novoPapel, roleId, groupIds, teamIds }).catch(() => ({}));
+  if (Object.keys(mudancas).length > 0) {
+    await registrarHistorico({ orgId: ctx.orgId, acao: "membro.mudou_acesso", objeto: "member", objetoId: alvo.id, objetoNome: alvo.name || alvo.email, mudancas, detalhes: { email: alvo.email } });
+  }
 }
 
 export async function removerMembro(ctx: SessionContext, userId: string) {
@@ -248,6 +283,7 @@ export async function removerMembro(ctx: SessionContext, userId: string) {
       throw new ErroDeMembro("Remover membros precisa do SQL de contratos aplicado.", 409);
     }
   );
+  await registrarHistorico({ orgId: ctx.orgId, acao: "membro.removeu", objeto: "member", objetoId: alvo.id, objetoNome: alvo.name || alvo.email, detalhes: { email: alvo.email, papel: nomeDoPapel(alvo.role) } });
 }
 
 export interface Convite {
@@ -289,6 +325,7 @@ export async function convidarMembro(ctx: SessionContext, input: Convite, origem
       create: { orgId: ctx.orgId, userId: existente.id, role, roleId, status: "convidado", invitedById: ctx.userId },
       update: { role, roleId, status: "convidado", invitedById: ctx.userId, groupIds: [] },
     });
+    await registrarHistorico({ orgId: ctx.orgId, acao: "membro.convidou", objeto: "member", objetoId: existente.id, objetoNome: nome, detalhes: { email, papel: nomeDoPapel(role) } });
     return { userId: existente.id, email, novo: false };
   }
 
@@ -309,5 +346,6 @@ export async function convidarMembro(ctx: SessionContext, input: Convite, origem
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     throw e;
   }
+  await registrarHistorico({ orgId: ctx.orgId, acao: "membro.convidou", objeto: "member", objetoId: userId, objetoNome: nome, detalhes: { email, papel: nomeDoPapel(role) } });
   return { userId, email, novo: true };
 }

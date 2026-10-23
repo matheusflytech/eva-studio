@@ -4,6 +4,8 @@ const db = vi.hoisted(() => ({ apiKey: { findMany: vi.fn(), create: vi.fn() } })
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 const auth = vi.hoisted(() => ({ requirePermission: vi.fn(), ctxPode: vi.fn(() => true) }));
 vi.mock("@/lib/server/permissions", () => auth);
+const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn() }));
+vi.mock("@/lib/server/historico", () => hist);
 
 import { POST, GET } from "./route";
 import { permissoesDoPapelDeSistema } from "@/lib/permissoes/catalogo";
@@ -25,6 +27,12 @@ describe("chaves de API por contrato", () => {
     expect(auth.requirePermission).toHaveBeenCalledWith("api:gerenciar");
     expect(db.apiKey.create.mock.calls[0][0].data).toMatchObject({ orgId: "o1", name: "n8n", scopes: ["deals:read"], createdById: "u1" });
     expect(db.apiKey.create.mock.calls[0][0].data.expiresAt.toISOString()).toBe(quando);
+    // Auditoria: nome e começo da chave, nunca a chave nem o hash.
+    const linha = hist.registrarHistorico.mock.calls[0][0];
+    expect(linha).toMatchObject({ orgId: "o1", acao: "chave_api.criou", objeto: "api_key", objetoId: "k1", objetoNome: "n8n", detalhes: { prefixo: "evs_live_x", escopos: ["deals:read"] } });
+    const { apiKey } = await res.json();
+    expect(JSON.stringify(linha)).not.toContain(apiKey.key);
+    expect(JSON.stringify(linha)).not.toContain(db.apiKey.create.mock.calls[0][0].data.keyHash);
   });
 
   it("a chave não pode mais do que quem cria", async () => {

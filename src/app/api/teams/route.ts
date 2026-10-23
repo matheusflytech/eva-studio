@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { registrarNaConta } from "@/lib/server/historico-conta";
 import { membrosValidos, nomeValido } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
 import { ehMembroDoContrato, ehTabelaAusente } from "@/lib/server/contratos";
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     data: { orgId: ctx.orgId, name, leaderId, members: { create: memberIds.map((userId) => ({ userId })) } },
     include: { members: { select: { userId: true } } },
   });
+  await registrarNaConta(ctx.orgId, "equipe.criou", "team", equipe.id, null, { nome: equipe.name, foto: {} });
   return NextResponse.json(
     { equipe: { id: equipe.id, name: equipe.name, leaderId: equipe.leaderId, memberIds: equipe.members.map((m) => m.userId) } },
     { status: 201 }

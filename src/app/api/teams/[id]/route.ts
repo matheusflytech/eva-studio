@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { fotoDaEquipe, fotoSegura, registrarNaConta } from "@/lib/server/historico-conta";
 import { membrosValidos, nomeValido } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
 import { ehMembroDoContrato } from "@/lib/server/contratos";
@@ -39,6 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (lider && !memberIds.includes(lider)) memberIds.push(lider);
   }
 
+  const antes = await fotoSegura(fotoDaEquipe(ctx.orgId, id));
   await prisma.$transaction([
     prisma.team.update({ where: { id }, data }),
     ...(memberIds
@@ -50,6 +52,7 @@ export async function PATCH(request: Request, { params }: Params) {
         ]
       : []),
   ]);
+  await registrarNaConta(ctx.orgId, "equipe.alterou", "team", id, antes, await fotoSegura(fotoDaEquipe(ctx.orgId, id)));
   return NextResponse.json({ ok: true });
 }
 
@@ -57,7 +60,9 @@ export async function DELETE(_request: Request, { params }: Params) {
   const ctx = await requirePermission("membros:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
+  const antes = await fotoSegura(fotoDaEquipe(ctx.orgId, id));
   const { count } = await prisma.team.deleteMany({ where: { id, orgId: ctx.orgId } });
   if (count === 0) return NextResponse.json({ error: "Equipe não encontrada." }, { status: 404 });
+  await registrarNaConta(ctx.orgId, "equipe.apagou", "team", id, null, antes);
   return NextResponse.json({ ok: true });
 }

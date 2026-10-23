@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { registrarNaConta } from "@/lib/server/historico-conta";
 import { PAPEIS_DE_SISTEMA, permissoesDoPapelDeSistema, limparEscopos } from "@/lib/permissoes/catalogo";
 import { dadosDoPapel, type Corpo } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
@@ -56,5 +57,6 @@ export async function POST(request: Request) {
       dataScope: d.dataScope ?? {},
     },
   });
+  await registrarNaConta(ctx.orgId, "papel.criou", "role", papel.id, null, { nome: papel.name, foto: {} });
   return NextResponse.json({ papel }, { status: 201 });
 }

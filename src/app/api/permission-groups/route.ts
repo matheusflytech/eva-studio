@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { registrarNaConta } from "@/lib/server/historico-conta";
 import { limparPermissoes } from "@/lib/permissoes/catalogo";
 import { descricao, nomeValido } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
@@ -32,5 +33,6 @@ export async function POST(request: Request) {
   const grupo = await prisma.permissionGroup.create({
     data: { orgId: ctx.orgId, name, description: descricao(body.description), permissions: limparPermissoes(body.permissions) },
   });
+  await registrarNaConta(ctx.orgId, "grupo.criou", "permission_group", grupo.id, null, { nome: grupo.name, foto: {} });
   return NextResponse.json({ grupo }, { status: 201 });
 }

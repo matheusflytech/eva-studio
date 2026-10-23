@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { fotoDoPapel, fotoSegura, registrarNaConta } from "@/lib/server/historico-conta";
 import { dadosDoPapel, type Corpo } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
 
@@ -18,7 +19,9 @@ export async function PATCH(request: Request, { params }: Params) {
   const r = await dadosDoPapel(ctx.orgId, body as Corpo, false);
   if ("erro" in r) return NextResponse.json({ error: r.erro }, { status: 400 });
 
+  const antes = await fotoSegura(fotoDoPapel(ctx.orgId, id));
   const papel = await prisma.customRole.update({ where: { id }, data: r.dados });
+  await registrarNaConta(ctx.orgId, "papel.alterou", "role", id, antes, await fotoSegura(fotoDoPapel(ctx.orgId, id)));
   return NextResponse.json({ papel });
 }
 
@@ -28,7 +31,9 @@ export async function DELETE(_request: Request, { params }: Params) {
   const ctx = await requirePermission("membros:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
+  const antes = await fotoSegura(fotoDoPapel(ctx.orgId, id));
   const { count } = await prisma.customRole.deleteMany({ where: { id, orgId: ctx.orgId } });
   if (count === 0) return NextResponse.json({ error: "Papel não encontrado." }, { status: 404 });
+  await registrarNaConta(ctx.orgId, "papel.apagou", "role", id, null, antes);
   return NextResponse.json({ ok: true });
 }

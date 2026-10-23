@@ -20,6 +20,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("./inscricao", () => insc);
 vi.mock("./executor", () => executor);
+const hist = vi.hoisted(() => ({ limparHistoricoVencido: vi.fn(async () => 4) }));
+vi.mock("@/lib/server/historico", () => hist);
 
 import { rodarAutomacoes } from "./varreduras";
 import { ErroDaAutomacao, publicarAutomacao } from "./gerenciar";
@@ -96,6 +98,16 @@ describe("varreduras", () => {
     expect(parada.where.status).toEqual({ in: ["pendente", "esperando"] });
     expect(AGORA.getTime() - (parada.where.createdAt.lt as Date).getTime()).toBe(30 * 60_000);
     expect(parada.data).toMatchObject({ status: "cancelada", proximaEm: null });
+  });
+
+  it("à hora cheia: limpa passos e eventos de 90 dias e o histórico de 2 anos", async () => {
+    db.automacao.findMany.mockResolvedValue([]);
+    db.automacaoPasso.deleteMany.mockResolvedValue({ count: 1 });
+    db.eventoDeDominio.deleteMany.mockResolvedValue({ count: 2 });
+    const horaCheia = new Date("2026-10-21T13:00:00Z");
+    const r = await rodarAutomacoes({ agora: horaCheia });
+    expect(hist.limparHistoricoVencido).toHaveBeenCalledWith(horaCheia);
+    expect(r.limpos).toBe(7);
   });
 
   it("sem as tabelas: devolve zeros", async () => {

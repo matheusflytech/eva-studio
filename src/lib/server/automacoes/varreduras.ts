@@ -7,6 +7,7 @@ import type { Definicao } from "@/lib/automacoes/tipos";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { inscrever, type AutomacaoParaInscrever } from "./inscricao";
 import { executarExecucao } from "./executor";
+import { limparHistoricoVencido } from "@/lib/server/historico";
 
 // ---------------------------------------------------------------------------
 // Passo do relógio das automações (a cada minuto):
@@ -200,7 +201,9 @@ export async function rodarAutomacoes(opcoes: { orcamentoMs?: number; agora?: Da
       const corte = new Date(agora.getTime() - RETENCAO_DIAS * 86_400_000);
       const passos = await prisma.automacaoPasso.deleteMany({ where: { execucao: { terminadaEm: { lt: corte } } } });
       const eventos = await prisma.eventoDeDominio.deleteMany({ where: { processadoEm: { lt: corte } } });
-      r.limpos = passos.count + eventos.count;
+      // Histórico de alterações: 2 anos (tem prazo próprio; sem a tabela, 0).
+      const historico = await limparHistoricoVencido(agora);
+      r.limpos = passos.count + eventos.count + historico;
     }
   } catch (e) {
     // Sem as tabelas (SQL não aplicado): nada a fazer.

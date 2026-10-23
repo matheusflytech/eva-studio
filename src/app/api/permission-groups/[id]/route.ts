@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { fotoDoGrupo, fotoSegura, registrarNaConta } from "@/lib/server/historico-conta";
 import { limparPermissoes } from "@/lib/permissoes/catalogo";
 import { descricao, nomeValido } from "@/lib/server/papeis";
 import { lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
@@ -25,7 +26,9 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.description !== undefined) data.description = descricao(body.description);
   if (body.permissions !== undefined) data.permissions = limparPermissoes(body.permissions);
 
+  const antes = await fotoSegura(fotoDoGrupo(ctx.orgId, id));
   const grupo = await prisma.permissionGroup.update({ where: { id }, data });
+  await registrarNaConta(ctx.orgId, "grupo.alterou", "permission_group", id, antes, await fotoSegura(fotoDoGrupo(ctx.orgId, id)));
   return NextResponse.json({ grupo });
 }
 
@@ -35,7 +38,9 @@ export async function DELETE(_request: Request, { params }: Params) {
   const ctx = await requirePermission("membros:gerenciar");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
+  const antes = await fotoSegura(fotoDoGrupo(ctx.orgId, id));
   const { count } = await prisma.permissionGroup.deleteMany({ where: { id, orgId: ctx.orgId } });
   if (count === 0) return NextResponse.json({ error: "Grupo não encontrado." }, { status: 404 });
+  await registrarNaConta(ctx.orgId, "grupo.apagou", "permission_group", id, null, antes);
   return NextResponse.json({ ok: true });
 }
