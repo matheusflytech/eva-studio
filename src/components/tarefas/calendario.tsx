@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion, type Transition, type Variants } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, HandCoins } from "lucide-react";
+import Link from "@/components/contrato/link";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +25,9 @@ import {
   densidade,
   diaDaChave,
   eventosDasTarefas,
+  eventosDosNegocios,
   horaDoEvento,
+  intervaloDaGrade,
   partesDoResumo,
   resumirDia,
   semanasDoMes,
@@ -33,7 +36,9 @@ import {
   tituloDoDia,
   type EventoDoCalendario,
   type Mes,
+  type NegocioComPrevisao,
 } from "./calendario-dados";
+import { valorCurto } from "@/components/crm/negocios/modelo";
 import { buscarTarefas, FiltroDeQuem, type Resposta } from "./lista";
 import { LinhaDeTarefa } from "./linha";
 import { useConcluirTarefa } from "./concluir";
@@ -45,9 +50,10 @@ import { BlocoDeHorario, IconeDoTipo, SemTarefas, TituloDeGrupo, type Moldura } 
 // com a densidade do dia. Clicar abre o dia no painel lateral com as linhas
 // de tarefa de sempre (concluir, adiar, ligar).
 //
-// Os dados chegam como EventoDoCalendario (calendario-dados.ts). Hoje a única
-// fonte é a lista de tarefas; a agenda espelhada (Google/Outlook) entraria
-// como mais uma fonte em `eventos` abaixo, sem mexer na grade nem no painel.
+// Os dados chegam como EventoDoCalendario (calendario-dados.ts). Fontes: as
+// tarefas com prazo na grade do mês e os fechamentos previstos dos negócios
+// abertos; a agenda espelhada (Google/Outlook) entraria como mais uma fonte em
+// `eventos` abaixo, sem mexer na grade nem no painel.
 
 /** Eventos listados dentro do cartão do dia antes do "+N". */
 const NO_CARTAO = 3;
@@ -58,12 +64,53 @@ const ESMAECER: Transition = { duration: 0.18, ease: [0.32, 0.72, 0, 1] };
 
 const TINTA = ["", "bg-accent-subtle/40", "bg-accent-subtle/70", "bg-accent-subtle"] as const;
 
+/** Faixa dos fechamentos previstos (cor de dado, não de estado). */
+const FAIXA_DO_FECHAMENTO = CATEGORY_CLASSES.green.solid;
+
+/** Negócios por página e páginas no máximo por mês (POST /api/deals/busca). */
+const NEGOCIOS_POR_PAGINA = 100;
+const PAGINAS_DE_NEGOCIOS = 5;
+
+/**
+ * Negócios abertos com previsão de fechamento no intervalo, pela busca da
+ * lista de Negócios (filtro e escopo do servidor). "Minhas" mostra só os de
+ * quem está vendo; equipe e todas mostram os que a pessoa pode ver.
+ */
+async function buscarFechamentos(intervalo: { de: string; ate: string }, meuId: string | null): Promise<NegocioComPrevisao[] | null> {
+  const rapidos: unknown[] = [
+    { campo: "tipoEtapa", op: "qualquer", valores: ["open"] },
+    { campo: "previsao", op: "entre", valor: intervalo.de, ate: intervalo.ate },
+  ];
+  if (meuId) rapidos.push({ campo: "responsavel", op: "qualquer", valores: [meuId] });
+  const todos: NegocioComPrevisao[] = [];
+  try {
+    for (let page = 1; page <= PAGINAS_DE_NEGOCIOS; page++) {
+      const res = await fetch("/api/deals/busca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filtro: { rapidos }, sort: "previsao", dir: "asc", page, pageSize: NEGOCIOS_POR_PAGINA }),
+      });
+      if (!res.ok) return null;
+      const d = (await res.json()) as { deals?: NegocioComPrevisao[]; total?: number };
+      const pagina = d.deals ?? [];
+      todos.push(...pagina);
+      if (todos.length >= (d.total ?? 0) || pagina.length < NEGOCIOS_POR_PAGINA) break;
+    }
+    return todos;
+  } catch {
+    return null;
+  }
+}
+
 export function Calendario({ versao, onMudou, moldura }: { versao: number; onMudou: () => void; moldura: Moldura }) {
   const toast = useToast();
   const reduzir = useReducedMotion();
   const [visao, setVisao] = React.useState<VisaoDeTarefas>("minhas");
   const [visoes, setVisoes] = React.useState<VisaoDeTarefas[]>(["minhas"]);
   const [tarefas, setTarefas] = React.useState<TarefaDaTela[] | null>(null);
+  const [negocios, setNegocios] = React.useState<NegocioComPrevisao[]>([]);
+  // Quem está vendo (para "Minhas" nos fechamentos): undefined enquanto carrega.
+  const [meuId, setMeuId] = React.useState<string | null | undefined>(undefined);
   const [erro, setErro] = React.useState<string | null>(null);
   const [agora, setAgora] = React.useState(() => new Date());
   const [mes, setMes] = React.useState<Mes>(() => {
@@ -88,17 +135,38 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     [visao]
   );
 
-  const carregar = React.useCallback(() => buscarTarefas(visao).then(aplicar), [visao, aplicar]);
+  // Só a grade do mês visível (abertas e feitas): a rota filtra pelo prazo.
+  const intervalo = React.useMemo(() => intervaloDaGrade(mes), [mes]);
+  const carregar = React.useCallback(() => buscarTarefas(visao, intervalo).then(aplicar), [visao, intervalo, aplicar]);
 
-  // A rota não filtra por data: a mesma busca da lista (abertas e feitas) e o
-  // mês é recortado aqui.
   React.useEffect(() => {
     let vivo = true;
-    buscarTarefas(visao).then((r) => vivo && aplicar(r));
+    buscarTarefas(visao, intervalo).then((r) => vivo && aplicar(r));
     return () => {
       vivo = false;
     };
-  }, [visao, versao, aplicar]);
+  }, [visao, intervalo, versao, aplicar]);
+
+  React.useEffect(() => {
+    let vivo = true;
+    fetch("/api/members")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => vivo && setMeuId(d?.me?.userId ?? null))
+      .catch(() => vivo && setMeuId(null));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  // Fechamentos previstos: falhar aqui não derruba o calendário (só somem).
+  React.useEffect(() => {
+    if (meuId === undefined) return;
+    let vivo = true;
+    buscarFechamentos(intervalo, visao === "minhas" ? meuId : null).then((lista) => vivo && setNegocios(lista ?? []));
+    return () => {
+      vivo = false;
+    };
+  }, [intervalo, visao, meuId, versao]);
 
   const mudou = React.useCallback(() => {
     carregar();
@@ -124,7 +192,10 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   // Fontes do calendário. Agenda externa: concatenar aqui os eventos dela
   // (origem "agenda") quando a integração existir. Sem agenda conectada não
   // há botão de conectar (o recurso ainda não existe).
-  const eventos = React.useMemo<EventoDoCalendario[]>(() => (tarefas ? eventosDasTarefas(tarefas, agora) : []), [tarefas, agora]);
+  const eventos = React.useMemo<EventoDoCalendario[]>(
+    () => (tarefas ? [...eventosDasTarefas(tarefas, agora), ...eventosDosNegocios(negocios)] : []),
+    [tarefas, negocios, agora]
+  );
   const porDia = React.useMemo(() => agruparPorDia(eventos), [eventos]);
   const semanas = React.useMemo(() => semanasDoMes(mes), [mes]);
   const hoje = diaEmSP(agora);
@@ -166,6 +237,12 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     tarefas === null ? null : (
       <>
         {doMes.tarefas} {doMes.tarefas === 1 ? "aberta" : "abertas"} no mês
+        {doMes.fechamentos > 0 && (
+          <>
+            {" "}
+            · {doMes.fechamentos} {doMes.fechamentos === 1 ? "fechamento previsto" : "fechamentos previstos"} ({valorCurto(doMes.valorCents)})
+          </>
+        )}
         {doMes.atrasadas > 0 && (
           <span className="text-danger">
             {" "}
@@ -325,6 +402,17 @@ function ListaDoDia({
       {eventos.map((e) =>
         e.tarefa ? (
           <LinhaDeTarefa key={e.id} tarefa={e.tarefa} agora={agora} onConcluir={onConcluir} onReabrir={onReabrir} onMudou={onMudou} />
+        ) : e.negocio ? (
+          <li key={e.id} className="py-0.5">
+            <Link href={`/negocios/${e.negocio.id}`} className={cn("block rounded-[14px]", focusRing)} aria-label={`Abrir o negócio ${e.titulo}`}>
+              <BlocoDeHorario
+                hora="prev."
+                titulo={e.titulo}
+                detalhe={[valorCurto(e.negocio.valorCents), e.negocio.etapa, e.negocio.empresa].filter(Boolean).join(" · ")}
+                faixa={FAIXA_DO_FECHAMENTO}
+              />
+            </Link>
+          </li>
         ) : (
           <li key={e.id} className="py-0.5">
             <BlocoDeHorario
@@ -398,10 +486,19 @@ function DiaDoCalendario({
                 aria-hidden="true"
                 className={cn(
                   "absolute inset-y-0.5 left-0 w-[2px] rounded-full",
-                  e.cor ? CATEGORY_CLASSES[e.cor].solid : e.feita ? "bg-border-strong" : e.atrasada ? "bg-danger-solid" : "bg-accent-solid"
+                  e.cor
+                    ? CATEGORY_CLASSES[e.cor].solid
+                    : e.origem === "negocio"
+                      ? FAIXA_DO_FECHAMENTO
+                      : e.feita
+                        ? "bg-border-strong"
+                        : e.atrasada
+                          ? "bg-danger-solid"
+                          : "bg-accent-solid"
                 )}
               />
               {e.tipo && <IconeDoTipo tipo={e.tipo} className="size-3" />}
+              {e.origem === "negocio" && <HandCoins aria-hidden="true" className="size-3 shrink-0 text-text-tertiary" />}
               {!e.diaTodo && <span className="shrink-0 font-mono text-caption tabular-nums text-text-tertiary">{horaDoEvento(e)}</span>}
               <span className={cn("truncate text-caption", e.feita ? "text-text-tertiary line-through" : "text-text-primary")}>{e.titulo}</span>
             </span>

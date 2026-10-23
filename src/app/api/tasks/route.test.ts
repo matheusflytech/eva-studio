@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
-  task: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  task: { create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   contact: { findFirst: vi.fn() },
   deal: { findFirst: vi.fn() },
   profile: { findFirst: vi.fn() },
@@ -11,7 +11,7 @@ vi.mock("@/lib/server/permissions", () => ({
   requirePermission: vi.fn(async () => ({ orgId: "org", userId: "u", role: "owner" })),
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 import { PATCH } from "./[taskId]/route";
 
 const req = (body: unknown, method = "POST") =>
@@ -82,5 +82,13 @@ describe("PATCH /api/tasks/[taskId]", () => {
     const res = await PATCH(req({ assignedToId: "p-outra" }, "PATCH"), params);
     expect(res.status).toBe(404);
     expect(db.task.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/tasks com intervalo", () => {
+  it("intervalo inválido → 400, sem buscar", async () => {
+    const res = await GET(new Request("http://x/api/tasks?de=2026-10-31&ate=2026-10-01"));
+    expect(res.status).toBe(400);
+    expect(db.task.findMany).not.toHaveBeenCalled();
   });
 });

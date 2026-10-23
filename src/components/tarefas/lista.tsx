@@ -47,9 +47,11 @@ export type Resposta =
   | { ok: false; erro: string };
 
 /** Mesma busca serve à lista e ao Calendário (a rota não filtra por data: traz até 300, abertas primeiro). */
-export async function buscarTarefas(visao: VisaoDeTarefas): Promise<Resposta> {
+/** `intervalo` (dias de SP, inclusivos): só prazos no intervalo — o mês do calendário. */
+export async function buscarTarefas(visao: VisaoDeTarefas, intervalo?: { de: string; ate: string }): Promise<Resposta> {
   try {
-    const res = await fetch(`/api/tasks?visao=${visao}&status=todas`);
+    const q = new URLSearchParams({ visao, status: "todas", ...intervalo });
+    const res = await fetch(`/api/tasks?${q}`);
     const dados = await res.json().catch(() => ({}));
     return res.ok ? { ok: true, dados } : { ok: false, erro: dados.error ?? "Não foi possível carregar as tarefas." };
   } catch {

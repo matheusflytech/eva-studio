@@ -5,14 +5,24 @@ import type { TarefaDaTela } from "@/lib/tarefas/tela";
 import type { TipoDeTarefa } from "@/lib/tarefas/tipos";
 
 // Dados do Calendário de Tarefas, sem React (testável). O calendário não
-// desenha tarefas: desenha EVENTOS. Hoje a única fonte é a lista de tarefas
-// (adaptador eventosDasTarefas); quando a agenda da pessoa (Google Agenda,
-// Outlook) for espelhada, entra outra fonte que devolve EventoDoCalendario com
-// origem "agenda", e a grade, o resumo do dia e o painel lateral não mudam.
+// desenha tarefas: desenha EVENTOS. Fontes: as tarefas (eventosDasTarefas) e
+// os fechamentos previstos dos negócios abertos (eventosDosNegocios); quando a
+// agenda da pessoa (Google Agenda, Outlook) for espelhada, entra outra fonte
+// que devolve EventoDoCalendario com origem "agenda", e a grade, o resumo do
+// dia e o painel lateral não mudam.
 // Tudo no relógio de São Paulo; semana começa no domingo (como o calendário
 // de parede).
 
-export type OrigemDoEvento = "tarefa" | "agenda";
+export type OrigemDoEvento = "tarefa" | "negocio" | "agenda";
+
+/** O negócio por trás de um fechamento previsto (origem "negocio"). */
+export interface NegocioDoEvento {
+  id: string;
+  valorCents: number;
+  etapa: string;
+  funil: string;
+  empresa: string | null;
+}
 
 export interface EventoDoCalendario {
   id: string;
@@ -30,6 +40,8 @@ export interface EventoDoCalendario {
   feita: boolean;
   /** A tarefa original (para concluir, adiar etc. no painel do dia). */
   tarefa: TarefaDaTela | null;
+  /** Fechamento previsto: o negócio (link para a ficha, valor e etapa). */
+  negocio?: NegocioDoEvento;
 }
 
 export const SEMANA_CURTA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"] as const;
@@ -87,6 +99,45 @@ export function semanasDoMes(m: Mes): Dia[][] {
   return Array.from({ length: linhas }, (_, s) => Array.from({ length: 7 }, (_, d) => somarDias(inicio, s * 7 + d)));
 }
 
+/** Primeiro e último dia (AAAA-MM-DD, SP) da grade do mês: o intervalo que o calendário busca. */
+export function intervaloDaGrade(m: Mes): { de: string; ate: string } {
+  const semanas = semanasDoMes(m);
+  return { de: chaveDoDia(semanas[0][0]), ate: chaveDoDia(semanas[semanas.length - 1][6]) };
+}
+
+/** O que o calendário lê de cada negócio (POST /api/deals/busca). */
+export interface NegocioComPrevisao {
+  id: string;
+  name: string;
+  amountCents: number;
+  expectedClosingAt: string | null;
+  stage: { name: string };
+  pipeline?: { name: string } | null;
+  company?: { name: string } | null;
+}
+
+/** Adaptador: negócios abertos com previsão → fechamentos previstos (dia todo). */
+export function eventosDosNegocios(negocios: NegocioComPrevisao[]): EventoDoCalendario[] {
+  const eventos: EventoDoCalendario[] = [];
+  for (const n of negocios) {
+    if (!n.expectedClosingAt) continue;
+    eventos.push({
+      id: `negocio:${n.id}`,
+      titulo: n.name,
+      inicio: new Date(n.expectedClosingAt),
+      fim: null,
+      diaTodo: true,
+      origem: "negocio",
+      tipo: null,
+      atrasada: false,
+      feita: false,
+      tarefa: null,
+      negocio: { id: n.id, valorCents: n.amountCents, etapa: n.stage.name, funil: n.pipeline?.name ?? "", empresa: n.company?.name ?? null },
+    });
+  }
+  return eventos;
+}
+
 /** Adaptador: tarefas com prazo → eventos. Sem prazo não tem dia no calendário. */
 export function eventosDasTarefas(tarefas: TarefaDaTela[], agora: Date): EventoDoCalendario[] {
   const eventos: EventoDoCalendario[] = [];
@@ -136,6 +187,10 @@ export interface ResumoDoDia {
   atrasadas: number;
   /** Tarefas de reunião em aberto. */
   reunioes: number;
+  /** Fechamentos previstos de negócios abertos. */
+  fechamentos: number;
+  /** Soma dos valores dos fechamentos previstos. */
+  valorCents: number;
   /** Eventos da agenda externa (quando houver). */
   agenda: number;
   feitas: number;
@@ -143,8 +198,13 @@ export interface ResumoDoDia {
 }
 
 export function resumirDia(eventos: EventoDoCalendario[]): ResumoDoDia {
-  const r: ResumoDoDia = { tarefas: 0, atrasadas: 0, reunioes: 0, agenda: 0, feitas: 0, total: eventos.length };
+  const r: ResumoDoDia = { tarefas: 0, atrasadas: 0, reunioes: 0, fechamentos: 0, valorCents: 0, agenda: 0, feitas: 0, total: eventos.length };
   for (const e of eventos) {
+    if (e.origem === "negocio") {
+      r.fechamentos++;
+      r.valorCents += e.negocio?.valorCents ?? 0;
+      continue;
+    }
     if (e.origem === "agenda") {
       r.agenda++;
       continue;
@@ -167,6 +227,7 @@ export function partesDoResumo(r: ResumoDoDia): { texto: string; tom: "normal" |
   const partes: { texto: string; tom: "normal" | "danger" }[] = [];
   if (r.tarefas) partes.push({ texto: plural(r.tarefas, "tarefa", "tarefas"), tom: "normal" });
   if (r.reunioes) partes.push({ texto: plural(r.reunioes, "reunião", "reuniões"), tom: "normal" });
+  if (r.fechamentos) partes.push({ texto: plural(r.fechamentos, "fechamento", "fechamentos"), tom: "normal" });
   if (r.agenda) partes.push({ texto: plural(r.agenda, "na agenda", "na agenda"), tom: "normal" });
   if (r.atrasadas) partes.push({ texto: plural(r.atrasadas, "atrasada", "atrasadas"), tom: "danger" });
   if (!partes.length && r.feitas) partes.push({ texto: plural(r.feitas, "feita", "feitas"), tom: "normal" });
@@ -180,7 +241,7 @@ export function textoDoResumo(r: ResumoDoDia): string {
 
 /** 0 (nada em aberto) a 3 (dia cheio): quanto o cartão do dia se tinge. */
 export function densidade(r: ResumoDoDia): 0 | 1 | 2 | 3 {
-  const n = r.tarefas + r.agenda;
+  const n = r.tarefas + r.fechamentos + r.agenda;
   if (n === 0) return 0;
   if (n <= 2) return 1;
   if (n <= 5) return 2;

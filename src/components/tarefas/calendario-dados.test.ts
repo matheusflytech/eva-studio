@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { TarefaDaTela } from "@/lib/tarefas/tela";
+import { diaEmSP as diaEmSPDe } from "@/lib/tarefas/calendario";
 import {
   agruparPorDia,
   chaveDoDia,
   compararMeses,
   densidade,
   eventosDasTarefas,
+  eventosDosNegocios,
   horaDoEvento,
+  intervaloDaGrade,
+  partesDoResumo,
   resumirDia,
   semanasDoMes,
   somarMeses,
@@ -115,4 +119,59 @@ describe("eventos das tarefas", () => {
 
 it("título do dia em pt-BR", () => {
   expect(tituloDoDia({ ano: 2026, mes: 10, dia: 22 })).toBe("quinta-feira, 22 de outubro");
+});
+
+describe("intervalo da grade", () => {
+  it("vai do domingo da primeira semana ao sábado da última (dias de SP)", () => {
+    // Outubro de 2026: começa numa quinta (domingo antes = 27/09) e termina num sábado (31/10).
+    expect(intervaloDaGrade({ ano: 2026, mes: 10 })).toEqual({ de: "2026-09-27", ate: "2026-10-31" });
+    // Novembro de 2026: 01/11 é domingo; 30/11 é segunda (sábado depois = 05/12).
+    expect(intervaloDaGrade({ ano: 2026, mes: 11 })).toEqual({ de: "2026-11-01", ate: "2026-12-05" });
+  });
+});
+
+describe("fechamentos previstos", () => {
+  const negocio = {
+    id: "d1",
+    name: "Plano anual",
+    amountCents: 1_850_000,
+    expectedClosingAt: "2026-10-30T12:00:00.000Z",
+    stage: { name: "Proposta" },
+    pipeline: { name: "Vendas" },
+    company: { name: "Padaria Bom Pão" },
+  };
+
+  it("negócio com previsão vira evento de dia todo no dia de SP", () => {
+    const [e] = eventosDosNegocios([negocio]);
+    expect(e).toMatchObject({
+      id: "negocio:d1",
+      titulo: "Plano anual",
+      origem: "negocio",
+      diaTodo: true,
+      feita: false,
+      atrasada: false,
+      tarefa: null,
+      tipo: null,
+      negocio: { id: "d1", valorCents: 1_850_000, etapa: "Proposta", funil: "Vendas", empresa: "Padaria Bom Pão" },
+    });
+    expect(chaveDoDia(diaEmSPDe(e.inicio))).toBe("2026-10-30");
+  });
+
+  it("sem previsão não entra", () => {
+    expect(eventosDosNegocios([{ ...negocio, expectedClosingAt: null }])).toEqual([]);
+  });
+
+  it("entra no resumo do dia como fechamento, com o valor somado", () => {
+    const eventos = eventosDosNegocios([negocio, { ...negocio, id: "d2", amountCents: 150_000 }]);
+    const r = resumirDia(eventos);
+    expect(r).toMatchObject({ fechamentos: 2, valorCents: 2_000_000, tarefas: 0, total: 2 });
+    expect(partesDoResumo(r).map((p) => p.texto)).toEqual(["2 fechamentos"]);
+    expect(densidade(r)).toBe(1);
+  });
+
+  it("dia todo vem antes das tarefas com hora", () => {
+    const tarefaComHora = eventosDasTarefas([tarefa({ id: "t9", dueAt: "2026-10-30T13:00:00.000Z" })], new Date("2026-10-20T13:00:00Z"));
+    const dia = agruparPorDia([...tarefaComHora, ...eventosDosNegocios([negocio])]).get("2026-10-30") ?? [];
+    expect(dia.map((e) => e.origem)).toEqual(["negocio", "tarefa"]);
+  });
 });

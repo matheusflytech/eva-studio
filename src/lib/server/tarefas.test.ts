@@ -24,7 +24,7 @@ const auth = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/server/permissions", () => auth);
 
-import { adiarTarefa, aplicarEmMassa, carregarTarefaVisivel, concluirTarefa, quickAdd, ErroDeTarefa } from "./tarefas";
+import { adiarTarefa, aplicarEmMassa, carregarTarefaVisivel, concluirTarefa, intervaloDoPrazo, listarTarefas, quickAdd, ErroDeTarefa } from "./tarefas";
 import { gravarDetalhes, lerDetalhes } from "./tarefas-detalhes";
 import { POST as concluirRota } from "@/app/api/tasks/[taskId]/concluir/route";
 import { PATCH } from "@/app/api/tasks/[taskId]/route";
@@ -246,5 +246,30 @@ describe("quick add", () => {
 
   it("texto vazio → erro", async () => {
     await expect(quickAdd(ctxTodos, "amanhã 14h", {}, AGORA)).rejects.toBeInstanceOf(ErroDeTarefa);
+  });
+});
+
+describe("lista por intervalo de prazo (calendário)", () => {
+  it("dias de SP viram [meia-noite do primeiro, meia-noite do dia seguinte ao último)", () => {
+    expect(intervaloDoPrazo("2026-09-27", "2026-10-31")).toEqual({
+      gte: new Date("2026-09-27T03:00:00.000Z"),
+      lt: new Date("2026-11-01T03:00:00.000Z"),
+    });
+  });
+
+  it("sem os dois dias: sem intervalo; data inválida, invertida ou longa demais: inválido", () => {
+    expect(intervaloDoPrazo(null, null)).toBeNull();
+    expect(intervaloDoPrazo("2026-10-01", null)).toBe("invalido");
+    expect(intervaloDoPrazo("2026-13-01", "2026-10-31")).toBe("invalido");
+    expect(intervaloDoPrazo("2026-10-31", "2026-10-01")).toBe("invalido");
+    expect(intervaloDoPrazo("2026-01-01", "2026-12-31")).toBe("invalido");
+  });
+
+  it("com intervalo, filtra por dueAt e busca até 500", async () => {
+    db.task.findMany.mockResolvedValue([]);
+    await listarTarefas(ctxTodos, { visao: "minhas", status: "todas", prazo: intervaloDoPrazo("2026-09-27", "2026-10-31") as { gte: Date; lt: Date } });
+    const args = db.task.findMany.mock.calls.at(-1)?.[0];
+    expect(args.where).toMatchObject({ orgId: "o1", assignedToId: { in: ["u1"] }, dueAt: { gte: new Date("2026-09-27T03:00:00.000Z"), lt: new Date("2026-11-01T03:00:00.000Z") } });
+    expect(args.take).toBe(500);
   });
 });
