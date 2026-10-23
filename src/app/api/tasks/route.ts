@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/server/permissions";
 import { createTask, parseRelativeDue, statusDaReferencia } from "@/lib/server/crm";
 import { JSON_INVALIDO, conferirReferencias, erro, lerCorpo, texto } from "@/lib/server/api-validacao";
-import { listarTarefas } from "@/lib/server/tarefas";
+import { intervaloDoPrazo, listarTarefas } from "@/lib/server/tarefas";
 import { visoesPermitidas } from "@/lib/tarefas/escopo";
 import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
 import { lerPrazoDaTela } from "@/lib/tarefas/conclusao";
@@ -11,14 +11,18 @@ import { lerPrazoDaTela } from "@/lib/tarefas/conclusao";
 //   ?visao=minhas|equipe|todas  (padrão: minhas; limitado ao escopo de negócios do papel)
 //   ?scope=minhas|todas         (nome antigo, ainda aceito)
 //   ?status=abertas|feitas|todas  (padrão: abertas)
+//   ?de=AAAA-MM-DD&ate=AAAA-MM-DD (dias de SP, inclusivos): só prazos no intervalo (calendário)
 export async function GET(request: Request) {
   const ctx = await requirePermission("tarefas:ver");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const params = new URL(request.url).searchParams;
+  const prazo = intervaloDoPrazo(params.get("de"), params.get("ate"));
+  if (prazo === "invalido") return erro("Intervalo de datas inválido.");
   const { visao, tarefas } = await listarTarefas(ctx, {
     visao: params.get("visao") ?? params.get("scope"),
     status: params.get("status"),
+    prazo,
   });
   return NextResponse.json({ visao, visoes: visoesPermitidas(ctx.escopo?.negocios), tasks: tarefas });
 }

@@ -98,11 +98,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Ilha dinâmica: o que pede atenção agora e os avisos com ação. */}
-          <div className="hidden h-11 shrink-0 items-center justify-center lg:flex" data-print-ocultar>
-            <Ilha />
-          </div>
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* Notificações: descem do topo só quando acontece algo (nada fixo aqui). */}
+          <Ilha />
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pt-5">
             {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
             <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
               <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>

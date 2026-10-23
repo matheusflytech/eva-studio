@@ -13,7 +13,7 @@ import { calcularAdiamento, empurrarPrevisao, type OpcaoDeAdiar } from "@/lib/ta
 import { textoDoResultado, type PedidoDeConclusao } from "@/lib/tarefas/conclusao";
 import { resolverVisao, responsaveisDaVisao, tarefaNoEscopo, type VisaoDeTarefas } from "@/lib/tarefas/escopo";
 import { interpretarQuickAdd, type QuickAdd } from "@/lib/tarefas/quick-add";
-import { diaEmSP, noDia, proximoDiaDaSemana } from "@/lib/tarefas/calendario";
+import { diaEmSP, diasEntre, noDia, proximoDiaDaSemana, somarDias, type Dia } from "@/lib/tarefas/calendario";
 import {
   DECISOES,
   ORIGENS,
@@ -142,6 +142,34 @@ export interface FiltroDaLista {
   visao?: string | null;
   status?: string | null;
   limite?: number;
+  /** Só tarefas com prazo neste intervalo (o mês do calendário). */
+  prazo?: { gte: Date; lt: Date } | null;
+}
+
+/** O calendário pede no máximo a grade de um mês (6 semanas) com folga. */
+const MAX_DIAS_DO_INTERVALO = 62;
+
+function lerDia(texto: string): Dia | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  if (!m) return null;
+  const d = { ano: Number(m[1]), mes: Number(m[2]), dia: Number(m[3]) };
+  const t = new Date(Date.UTC(d.ano, d.mes - 1, d.dia));
+  return t.getUTCMonth() === d.mes - 1 && t.getUTCDate() === d.dia ? d : null;
+}
+
+/**
+ * `?de=AAAA-MM-DD&ate=AAAA-MM-DD` (dias de SP, os dois inclusivos) → intervalo
+ * de prazo. Sem os dois: null (lista de sempre). Data inválida, invertida ou
+ * intervalo maior que ~2 meses: "invalido".
+ */
+export function intervaloDoPrazo(de: string | null, ate: string | null): { gte: Date; lt: Date } | null | "invalido" {
+  if (!de && !ate) return null;
+  const a = lerDia(de ?? "");
+  const b = lerDia(ate ?? "");
+  if (!a || !b) return "invalido";
+  const dias = diasEntre(a, b);
+  if (dias < 0 || dias > MAX_DIAS_DO_INTERVALO) return "invalido";
+  return { gte: noDia(a), lt: noDia(somarDias(b, 1)) };
 }
 
 export async function listarTarefas(ctx: CtxDeTarefas, filtro: FiltroDaLista): Promise<{ visao: VisaoDeTarefas; tarefas: TarefaDaTela[] }> {
@@ -153,13 +181,15 @@ export async function listarTarefas(ctx: CtxDeTarefas, filtro: FiltroDaLista): P
   const status = filtro.status ?? "abertas";
   if (status === "abertas") where.doneAt = null;
   if (status === "feitas") where.doneAt = { not: null };
+  if (filtro.prazo) where.dueAt = { gte: filtro.prazo.gte, lt: filtro.prazo.lt };
 
   const tarefas = await prisma.task.findMany({
     where,
     include: INCLUDE_DA_TELA,
     // Em aberto primeiro; sem prazo no fim.
     orderBy: [{ doneAt: { sort: "asc", nulls: "first" } }, { dueAt: { sort: "asc", nulls: "last" } }],
-    take: Math.min(Math.max(filtro.limite ?? 300, 1), 500),
+    // Com intervalo (calendário) o mês inteiro cabe: até 500.
+    take: Math.min(Math.max(filtro.limite ?? (filtro.prazo ? 500 : 300), 1), 500),
   });
   return { visao, tarefas: await serializarTarefas(ctx.orgId, tarefas) };
 }

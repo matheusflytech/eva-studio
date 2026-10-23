@@ -1,7 +1,8 @@
 /**
  * Escolha de tema (claro/escuro) — lógica pura, sem React.
  *
- * Preferência do usuário: "light" (padrão: a Eva é clara, com menu escuro), "dark" ou "system". Fica salva em
+ * Preferência do usuário: "light" (padrão: a Eva é clara, com menu escuro) ou "dark". Não segue o tema do
+ * sistema operacional (decisão do produto, 23/10/2026): quem tinha "system" salvo volta ao claro. Fica salva em
  * localStorage e também num cookie, para o servidor poder ler um dia sem
  * mudar o formato. O tema resolvido vai no atributo data-theme do <html>.
  *
@@ -12,7 +13,7 @@
  * para garantir que os dois não divergem.
  */
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "eva-theme";
@@ -24,17 +25,16 @@ export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 export const PREFERENCIA_PADRAO: ThemePreference = "light";
 
 export function parseThemePreference(valor: unknown): ThemePreference {
-  return valor === "light" || valor === "dark" || valor === "system" ? valor : PREFERENCIA_PADRAO;
+  return valor === "light" || valor === "dark" ? valor : PREFERENCIA_PADRAO;
 }
 
-export function resolveTheme(pref: ThemePreference, sistemaEscuro: boolean): ResolvedTheme {
-  if (pref === "system") return sistemaEscuro ? "dark" : "light";
+export function resolveTheme(pref: ThemePreference): ResolvedTheme {
   return pref;
 }
 
-/** Ciclo do botão de alternar: segue o sistema → claro → escuro → sistema. */
+/** Botão de alternar: claro ↔ escuro. */
 export function nextThemePreference(pref: ThemePreference): ThemePreference {
-  return pref === "system" ? "light" : pref === "light" ? "dark" : "system";
+  return pref === "light" ? "dark" : "light";
 }
 
 /** Lê a preferência de um header Cookie ("a=1; eva-theme=dark"). */
@@ -55,7 +55,7 @@ export function serializeThemeCookie(pref: ThemePreference): string {
  * Script inline do <head>. ES5 de propósito (roda antes de qualquer bundle) e
  * todo envolto em try: localStorage pode lançar em aba anônima/bloqueada.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark|system)/);p=m?m[1]:${JSON.stringify("light")}}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);p=m?m[1]:${JSON.stringify("light")}}var r=document.documentElement;r.setAttribute("data-theme",p==="dark"?"dark":"light")}catch(e){}})();`;
 
 /*
  * Canvas do builder. Por padrão acompanha o tema (claro no claro, escuro no

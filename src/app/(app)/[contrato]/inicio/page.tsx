@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowRight, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, Search, SquareCheck, Workflow, Bot } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, Search, SquareCheck, Workflow, Bot } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { FundoVivo } from "@/components/layout/fundo-vivo";
@@ -13,6 +13,7 @@ import { iniciais } from "@/components/inbox/tipos";
 import { buttonVariants } from "@/components/ui/button";
 import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { Calendario } from "@/components/tarefas/calendario";
 
 // ---------------------------------------------------------------------------
 // Início.
@@ -47,19 +48,31 @@ interface Payload {
   agentes: AgenteResumo[];
 }
 
-type IdDoBloco = "agentes" | "ajustes" | "atalhos";
+type IdDoBloco = "agentes" | "ajustes" | "atalhos" | "calendario";
 const BLOCOS: { id: IdDoBloco; rotulo: string; Icone: React.ComponentType<{ size?: number; className?: string }> }[] = [
   { id: "atalhos", rotulo: "Atalhos", Icone: ArrowRight },
   { id: "agentes", rotulo: "Seus agentes", Icone: Bot },
   { id: "ajustes", rotulo: "Ajustes pendentes", Icone: Workflow },
+  { id: "calendario", rotulo: "Calendário", Icone: CalendarDays },
 ];
-const PADRAO: IdDoBloco[] = ["atalhos", "agentes"];
+const PADRAO: IdDoBloco[] = ["atalhos", "agentes", "calendario"];
 const CHAVE = "eva.inicio.blocos";
+// Bloco novo entra uma vez em quem já tinha personalizado o Início; se a
+// pessoa tirar depois, fica fora.
+const NOVOS: IdDoBloco[] = ["calendario"];
+const CHAVE_DOS_OFERECIDOS = "eva.inicio.oferecidos";
 
 function lerBlocos(): IdDoBloco[] {
   try {
     const v = JSON.parse(localStorage.getItem(CHAVE) ?? "null");
-    if (Array.isArray(v)) return v.filter((b): b is IdDoBloco => BLOCOS.some((x) => x.id === b));
+    if (Array.isArray(v)) {
+      const salvos = v.filter((b): b is IdDoBloco => BLOCOS.some((x) => x.id === b));
+      const oferecidos: unknown = JSON.parse(localStorage.getItem(CHAVE_DOS_OFERECIDOS) ?? "[]");
+      const ja = Array.isArray(oferecidos) ? oferecidos : [];
+      const faltam = NOVOS.filter((b) => !ja.includes(b) && !salvos.includes(b));
+      localStorage.setItem(CHAVE_DOS_OFERECIDOS, JSON.stringify(NOVOS));
+      return [...salvos, ...faltam];
+    }
   } catch {
     // armazenamento bloqueado: usa o padrão
   }
@@ -110,6 +123,7 @@ export default function InicioPage() {
     setBlocos(novos);
     try {
       localStorage.setItem(CHAVE, JSON.stringify(novos));
+      localStorage.setItem(CHAVE_DOS_OFERECIDOS, JSON.stringify(NOVOS));
     } catch {
       // sem armazenamento: vale só nesta visita
     }
@@ -135,7 +149,7 @@ export default function InicioPage() {
   const fora = BLOCOS.filter((b) => !blocos.includes(b.id));
 
   return (
-    <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6">
+    <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6 lg:-mt-5">
       {/* Topo iridescente com as curvas vivas por cima, como uma tela de boas-vindas. */}
       {/* No escuro o topo vira um iridescente fundo (mesmas luzes, apagadas) com
           texto claro; os cartões pretos de dentro viram vidro. */}
@@ -263,6 +277,15 @@ export default function InicioPage() {
         </div>
       )}
 
+      {/* Calendário: o mesmo da aba de Tarefas, em largura toda. */}
+      {!carregando && !semAgente && !comecar && blocos.includes("calendario") && (
+        <div className="px-6">
+          <Bloco editando={editando} onTirar={() => tirar("calendario")} semMoldura>
+            <CalendarioDoInicio />
+          </Bloco>
+        </div>
+      )}
+
       {/* Folha de "Personalizar": os blocos que estão fora do Início. */}
       {editando && (
         <div className="sticky bottom-4 z-20 mx-6 rounded-[26px] border border-border-subtle bg-overlay/90 p-4 shadow-overlay backdrop-blur-xl motion-safe:animate-[ds-pop-in_300ms_var(--ease-standard)]">
@@ -343,5 +366,34 @@ function Atalho({ href, rotulo, titulo, Icone }: { href: string; rotulo: string;
       <span className="text-caption text-text-tertiary">{rotulo}</span>
       <b className="text-body-lg font-medium tracking-tight text-text-primary">{titulo}</b>
     </Link>
+  );
+}
+
+/** O Calendário de Tarefas no Início: título, contagem do mês, filtro e atalho para a aba completa. */
+function CalendarioDoInicio() {
+  const [versao, setVersao] = React.useState(0);
+  const mudou = React.useCallback(() => setVersao((v) => v + 1), []);
+  return (
+    <Calendario
+      versao={versao}
+      onMudou={mudou}
+      moldura={({ contagem, lateral, conteudo }) => (
+        <section aria-labelledby="inicio-calendario" className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 id="inicio-calendario" className="text-body font-medium text-text-primary">
+              Calendário
+            </h2>
+            {contagem && <span className="font-mono text-caption text-text-tertiary">{contagem}</span>}
+            <div className="ml-auto flex items-center gap-2">
+              {lateral}
+              <Link href="/tarefas?aba=calendario" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                Abrir em Tarefas <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+          {conteudo}
+        </section>
+      )}
+    />
   );
 }

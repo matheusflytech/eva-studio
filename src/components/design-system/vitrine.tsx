@@ -212,7 +212,6 @@ function Moldura({ children }: { children: React.ReactNode }) {
 function SeletorDeTema() {
   const { preference, setPreference } = useTheme();
   const opcoes: [ThemePreference, string][] = [
-    ["system", "Sistema"],
     ["light", "Claro"],
     ["dark", "Escuro"],
   ];
