@@ -121,7 +121,8 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
 
       <section className="rounded-[18px] border border-border-subtle bg-panel px-5 py-3">
         <h2 className="flex h-9 items-center text-body font-medium text-text-primary">Para funcionar de verdade</h2>
-        <ul className="flex flex-col">
+        {/* Tela bem larga: duas colunas de passos, para a lista não virar uma faixa comprida. */}
+        <ul className="grid grid-cols-1 gap-x-8 2xl:grid-cols-2">
           {passos.map((p) => {
             const corpo = (
               <div className="flex min-h-[52px] items-center gap-3 py-2.5">

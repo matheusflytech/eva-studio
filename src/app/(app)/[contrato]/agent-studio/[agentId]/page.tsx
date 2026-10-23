@@ -59,7 +59,7 @@ function AgentePagina() {
       {/* Desktop largo: conteúdo à esquerda e a orbe com os dados do agente
           numa coluna à direita (a mesma do Playground), sem faixa vazia. */}
       <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="flex min-w-0 max-w-4xl flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
 
         {/* Abas em cápsula; a pergunta de cada uma fica no título (passar o mouse). */}
         <nav aria-label="Seções do agente" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">

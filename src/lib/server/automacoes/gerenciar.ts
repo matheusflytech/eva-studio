@@ -5,6 +5,8 @@ import { validar, podePublicar, type Pendencia } from "@/lib/automacoes/validar"
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { inscrever } from "./inscricao";
 import { executarExecucao } from "./executor";
+import { apagarDadosDoTeste, conferirCondicoes, criarRegistroDeTeste } from "./teste-real";
+import { planoDoTeste } from "@/lib/automacoes/teste";
 
 // ---------------------------------------------------------------------------
 // Ciclo de vida da automação: publicar (versão nova, imutável), pausar,
@@ -102,4 +104,66 @@ export async function testarAutomacao(orgId: string, id: string, objetoId: strin
     if (!r || r.status !== "pendente") break;
   }
   return { execucaoId: x.execucaoId };
+}
+
+/** Telefone do teste: só dígitos, com DDI (55 quando vier só DDD + número). */
+export function telefoneDoTeste(bruto: unknown): string | null {
+  const d = String(bruto ?? "").replace(/\D/g, "");
+  if (d.length === 10 || d.length === 11) return `55${d}`;
+  return d.length >= 12 && d.length <= 13 ? d : null;
+}
+
+/**
+ * Teste de verdade: cria um registro de teste que cumpre o gatilho e as
+ * condições e roda o rascunho nele com as ações de verdade. O WhatsApp só vai
+ * para o telefone do teste. Roda até terminar ou parar numa espera (curta);
+ * a tela chama `continuarTeste` quando a espera vence.
+ */
+export async function testarDeVerdade(orgId: string, id: string, contato: { telefone?: unknown; email?: unknown }, userId: string | null) {
+  const a = await carregar(orgId, id);
+  const def = a.rascunho as unknown as Definicao;
+  // Só pede o que o fluxo usa: sem passo de WhatsApp, o contato de teste fica sem telefone.
+  const plano = planoDoTeste(def);
+  const telefone = telefoneDoTeste(contato.telefone);
+  if (plano.precisaWhatsApp && !telefone) throw new ErroDaAutomacao("Este fluxo manda WhatsApp: informe o número do teste com DDD (ex.: 47 99999-9999).", 400);
+  const email = typeof contato.email === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contato.email.trim()) ? contato.email.trim() : "";
+  if (plano.precisaEmail && !email) throw new ErroDaAutomacao("Este fluxo manda e-mail: informe o e-mail que recebe o teste.", 400);
+  const erros = validar(def).filter((p) => p.nivel === "erro" && p.no !== "gatilho" && !/falta /.test(p.mensagem));
+  if (erros.length) throw new ErroDaAutomacao("Corrija a estrutura antes de testar.", 422, erros);
+  const versao = await prisma.automacaoVersao.upsert({
+    where: { automacaoId_numero: { automacaoId: id, numero: VERSAO_DE_TESTE } },
+    create: { automacaoId: id, numero: VERSAO_DE_TESTE, definicao: def as object, publicadaPor: userId },
+    update: { definicao: def as object, publicadaPor: userId },
+  });
+  const registro = await criarRegistroDeTeste(orgId, id, def, { telefone: telefone ?? "", email });
+  const conferido = await conferirCondicoes(orgId, def, registro.objetoId);
+  const x = await inscrever({ ...a, versaoPublicadaId: versao.id }, registro.objetoId, { origem: "teste-real", teste: true, gatilho: { ...registro.gatilho, por: userId } });
+  if (!x.inscrita) throw new ErroDaAutomacao(`Não deu para testar: ${x.motivo}.`, 409);
+  await prisma.automacaoExecucao.update({
+    where: { id: x.execucaoId },
+    data: { variaveis: { passos: {}, __testeReal: { telefone: telefone ?? "", email, criados: registro.criados, ...conferido } } as object },
+  });
+  for (let i = 0; i < 5; i++) {
+    const r = await executarExecucao(x.execucaoId);
+    if (!r || r.status !== "pendente") break;
+  }
+  return { execucaoId: x.execucaoId, objeto: def.objeto, objetoId: registro.objetoId, ...conferido };
+}
+
+/** A tela chama quando a espera curta do teste venceu. Seguro chamar à toa. */
+export async function continuarTeste(orgId: string, automacaoId: string, execucaoId: string) {
+  const e = await prisma.automacaoExecucao.findFirst({ where: { id: execucaoId, automacaoId, orgId, teste: true }, select: { id: true } });
+  if (!e) throw new ErroDaAutomacao("Teste não encontrado.", 404);
+  const r = await executarExecucao(execucaoId);
+  return { status: r?.status ?? null };
+}
+
+export async function apagarTeste(orgId: string, automacaoId: string, execucaoId: string) {
+  const e = await prisma.automacaoExecucao.findFirst({ where: { id: execucaoId, automacaoId, orgId, teste: true }, select: { id: true, status: true } });
+  if (!e) throw new ErroDaAutomacao("Teste não encontrado.", 404);
+  // Para o teste antes de apagar o registro (senão a próxima batida cancela sozinha).
+  if (e.status === "pendente" || e.status === "esperando") {
+    await prisma.automacaoExecucao.update({ where: { id: e.id }, data: { status: "cancelada", erro: "Dados do teste apagados.", proximaEm: null, terminadaEm: new Date() } });
+  }
+  return apagarDadosDoTeste(orgId, execucaoId);
 }

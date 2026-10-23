@@ -87,6 +87,14 @@ describe("eventos pendentes (relógio)", () => {
     expect(await entregarEventosPendentes()).toEqual({ entregues: 0 });
   });
 
+  it("evento de teste de automação: fica gravado como entregue, mas não vai a nenhum consumidor", async () => {
+    await comAtor({ tipo: "automacao", automacaoId: "a1", teste: true }, () => publicarEvento({ orgId: "o1", tipo: "deal.created", objeto: "deal", objetoId: "d1" }));
+    await rodarDepois();
+    expect(db.eventoDeDominio.create).toHaveBeenCalledTimes(1);
+    expect(db.eventoDeDominio.updateMany).toHaveBeenCalledTimes(1);
+    expect(consumidor.paraWebhooks).not.toHaveBeenCalled();
+  });
+
   it("entregarEvento sem id (sem tabela) não tenta marcar", async () => {
     await entregarEvento({ id: null, orgId: "o1", tipo: "x", objeto: "deal", objetoId: "d1", dados: {}, ator: { tipo: "sistema" }, criadoEm: new Date() });
     expect(db.eventoDeDominio.updateMany).not.toHaveBeenCalled();

@@ -10,6 +10,9 @@ import type { Definicao, No, Objeto, Regra } from "@/lib/automacoes/tipos";
 import { montarContexto } from "./contexto";
 import { MANIPULADORES, type ManipuladorDeAcao } from "./acoes";
 
+/** Ações que, no Testar, rodam de verdade: só falam com um sistema de fora (o n8n da pessoa) e não mudam nada no CRM. */
+const ENVIA_DE_VERDADE_NO_TESTE = new Set(["n8n.webhook"]);
+
 // ---------------------------------------------------------------------------
 // Executor das automações: pega uma execução (FOR UPDATE SKIP LOCKED com
 // lease de 60 s), anda até 20 passos e grava cada passo com o tempo em ms.
@@ -36,7 +39,13 @@ interface Variaveis {
   __tentativas?: Record<string, number>;
   __janela?: string | null;
   __contagem?: number;
+  /** Teste de verdade (registro de teste criado para isso): passos rodam de verdade. */
+  __testeReal?: { telefone: string; apagado?: boolean } | null;
 }
+
+/** No teste de verdade as esperas encolhem: duração vira 10 s; esperar evento, 1 min (dá tempo de responder). */
+const ESPERA_DO_TESTE_MS = 10_000;
+const ESPERA_DE_EVENTO_DO_TESTE_MS = 60_000;
 
 type Fim = "concluida" | "falhou" | "cancelada" | "objetivo";
 
@@ -127,6 +136,8 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
   const def = exec.versao.definicao as unknown as Definicao;
   const variaveis: Variaveis = { passos: {}, ...((exec.variaveis ?? {}) as Variaveis) };
   let noAtual = exec.noAtual ?? (variaveis.__contagem ? null : def.inicio);
+  // Teste de verdade: roda as ações (num registro de teste) e espera de verdade, só que curto.
+  const testeReal = exec.teste && !!variaveis.__testeReal;
   const objetivo = exec.automacao.objetivo as Regra | null;
 
   const finalizar = async (status: Fim, erro?: string) => {
@@ -188,7 +199,7 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
     }
 
     // Teste: espera não espera (vale como vencida).
-    const espera = variaveis.__espera && exec.teste ? { ...variaveis.__espera, ate: agoraDoPasso.toISOString() } : variaveis.__espera;
+    const espera = variaveis.__espera && exec.teste && !testeReal ? { ...variaveis.__espera, ate: agoraDoPasso.toISOString() } : variaveis.__espera;
     const mov = decidir(def, noAtual, contexto, agoraDoPasso, espera);
     const no = noAtual ? def.nos[noAtual] : undefined;
 
@@ -207,6 +218,13 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
 
     if (mov.tipo === "esperar") {
       const primeiraVez = variaveis.__espera?.noId !== mov.espera.noId;
+      if (testeReal && primeiraVez) {
+        const curto = new Date(agoraDoPasso.getTime() + (mov.registrar ? ESPERA_DE_EVENTO_DO_TESTE_MS : ESPERA_DO_TESTE_MS));
+        if (curto < mov.ate) {
+          mov.ate = curto;
+          mov.espera = { ...mov.espera, ate: curto.toISOString() };
+        }
+      }
       variaveis.__espera = mov.espera;
       if (primeiraVez) {
         await gravarPasso(id, no!, { status: "esperando", inicio: agoraDoPasso, saida: { ate: mov.espera.ate } });
@@ -218,7 +236,7 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
           });
         }
       }
-      if (exec.teste) continue;
+      if (exec.teste && !testeReal) continue;
       return dormir(mov.ate);
     }
 
@@ -251,10 +269,12 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
     let r: Awaited<ReturnType<ManipuladorDeAcao>>;
     if (!manipulador) r = { ok: false, erro: `A ação “${item?.nome ?? noAcao.acao}” ainda não está disponível.` };
     // Teste (modo seguro): nenhuma ação muda nada; o passo mostra o que faria.
-    else if (exec.teste) r = { ok: true, saida: { simulado: true, faria: config } };
+    // Exceção: "Enviar para o n8n" envia de verdade (com "teste": true no corpo),
+    // senão não há como ver o fluxo do n8n receber antes de publicar.
+    else if (exec.teste && !testeReal && !ENVIA_DE_VERDADE_NO_TESTE.has(noAcao.acao)) r = { ok: true, saida: { simulado: true, faria: config } };
     else {
       try {
-        r = await comAtor({ tipo: "automacao", automacaoId: exec.automacaoId, execucaoId: id, profundidade: exec.profundidade + 1 }, () =>
+        r = await comAtor({ tipo: "automacao", automacaoId: exec.automacaoId, execucaoId: id, profundidade: exec.profundidade + 1, ...(exec.teste ? { teste: true } : {}) }, () =>
           manipulador(config, {
             orgId: exec.orgId,
             automacaoId: exec.automacaoId,

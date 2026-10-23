@@ -5,7 +5,7 @@ import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import { useRouter } from "@/lib/contrato/navegacao";
 import { AlertCircle, ArrowLeft, Check, Ellipsis, Pause, Play, Rocket, Settings2, Trash2 } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { PainelDoProximoPasso } from "@/components/automacoes/seletor";
 import { PainelDeConfiguracoes, PainelDoPasso, type ConfigDaAutomacao } from "@/components/automacoes/painel";
 import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/components/automacoes/comum";
 import { FaixaDeExecucoes } from "@/components/automacoes/faixa-de-execucoes";
+import { TesteDeVerdade } from "@/components/automacoes/teste-de-verdade";
 
 // ---------------------------------------------------------------------------
 // Editor da automação. Sempre se edita o rascunho (salvo sozinho); a versão
@@ -108,7 +109,9 @@ function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTermi
       // O resultado também passa pela ilha: o quadro atrás já mostra o caminho aceso.
       avisarNaIlha({
         titulo: ex.status === "falhou" ? "O teste parou num erro" : `Teste concluído em ${duracao(ex.duracaoMs)}`,
-        detalhe: `${ex.passos.length} ${ex.passos.length === 1 ? "passo" : "passos"} · nada foi enviado de verdade`,
+        detalhe: `${ex.passos.length} ${ex.passos.length === 1 ? "passo" : "passos"} · ${
+          (ex.passos as PassoDoTeste[]).some((p) => typeof (p.saida as { status?: unknown } | null)?.status === "number") ? "só o n8n recebeu de verdade" : "nada foi enviado de verdade"
+        }`,
       });
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Não deu para testar.");
@@ -120,7 +123,7 @@ function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTermi
   const nomeDoPasso = (noId: string) => (def.nos[noId] ? resumoDoPasso(def, def.nos[noId], nomes).titulo : noId);
   return (
     <Modal open={aberto} onOpenChange={(v) => !v && fechar()}>
-      <ModalContent size="md" title="Testar com um registro real" description="Roda o rascunho agora num registro de verdade, sem mudar nada: cada passo só mostra o que faria, e as esperas não esperam.">
+      <ModalContent size="md" title="Testar com um registro real" description={'Roda o rascunho agora num registro de verdade, sem mudar nada no CRM: cada passo só mostra o que faria e as esperas não esperam. “Enviar para o n8n” envia de verdade, com "teste": true no corpo, para você ver o n8n receber.'}>
         <div className="flex flex-col gap-3 overflow-y-auto px-5 pb-5">
           {erro && <Notice tone="danger">{erro}</Notice>}
           {resultado ? (
@@ -137,7 +140,11 @@ function ModalDeTeste({ aberto, fechar, automacaoId, def, objeto, nomes, aoTermi
                     <span className="min-w-0 flex-1">
                       <span className="block text-text-primary">{nomeDoPasso(p.noId)}</span>
                       <span className="block text-caption text-text-tertiary">
-                        {p.status === "ok" && (p.saida as { simulado?: boolean } | null)?.simulado ? "simulado (não mudou nada)" : p.status}
+                        {p.status === "ok" && (p.saida as { simulado?: boolean } | null)?.simulado
+                          ? "simulado (não mudou nada)"
+                          : p.status === "ok" && typeof (p.saida as { status?: unknown } | null)?.status === "number"
+                            ? `enviado de verdade · respondeu ${(p.saida as { status: number }).status}`
+                            : p.status}
                         {p.caminho && p.caminho !== "proximo" ? ` · ${p.caminho}` : ""}
                         {p.erro ? ` · ${p.erro}` : ""}
                       </span>
@@ -196,6 +203,8 @@ export default function EditorDaAutomacao() {
   const [publicando, setPublicando] = React.useState(false);
   const [confirmar, setConfirmar] = React.useState(false);
   const [testando, setTestando] = React.useState(false);
+  // Testar de verdade: painel flutuante sobre o quadro (o fluxo fica à vista).
+  const [testeAberto, setTesteAberto] = React.useState(false);
   const [estados, setEstados] = React.useState<Record<string, { estado: EstadoDoNo; ms?: number }> | undefined>();
   const carregado = React.useRef(false);
   // O que está gravado no servidor (rascunho + configurações, serializado).
@@ -464,8 +473,26 @@ export default function EditorDaAutomacao() {
             inserir={abrirInsercao}
             inserindo={inserindo}
             estados={estados}
-            barra={{ testar: () => setTestando(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
+            barra={{ testar: () => setTesteAberto(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
           />
+          {/* No canto de cima: o fluxo fica à vista enquanto o teste anda. */}
+          <div className="pointer-events-none absolute right-4 top-4 z-20">
+            <AnimatePresence>
+              {testeAberto && (
+                <TesteDeVerdade
+                  automacaoId={id}
+                  def={def}
+                  nomeDoPasso={(noId) => (def.nos[noId] ? resumoDoPasso(def, def.nos[noId], nomes).titulo : noId === "gatilho" ? "Gatilho" : noId)}
+                  aoMudarEstados={setEstados}
+                  fechar={() => setTesteAberto(false)}
+                  simular={() => {
+                    setTesteAberto(false);
+                    setTestando(true);
+                  }}
+                />
+              )}
+            </AnimatePresence>
+          </div>
         </div>
         {(inserindo || (painelDoPasso && selecionado)) && (
           <motion.aside

@@ -16,7 +16,8 @@ export async function destinoDoWhatsApp(
   canalPreferido: string | null
 ): Promise<{ channel: string; to: string } | null> {
   const r = ctx.contexto.registro as Record<string, unknown>;
-  if (ctx.objeto === "conversation" && typeof r.channel === "string" && typeof r.channel_contact_id === "string") {
+  // Conversa no próprio WhatsApp: responde nela. Conversa do site/playground cai no telefone do contato.
+  if (ctx.objeto === "conversation" && typeof r.channel === "string" && r.channel.startsWith("whatsapp") && typeof r.channel_contact_id === "string") {
     if (!canalPreferido || canalPreferido === r.channel) return { channel: r.channel, to: r.channel_contact_id };
   }
   const contato = contatoDaAcao(ctx);

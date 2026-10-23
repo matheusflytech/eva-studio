@@ -27,6 +27,8 @@ export interface Ator {
   execucaoId?: string;
   /** Quantas automações encadeadas até aqui (0 = ação de gente, API ou sistema). */
   profundidade?: number;
+  /** Teste de verdade de uma automação: o evento fica gravado mas não vai a ninguém. */
+  teste?: boolean;
 }
 
 export interface EventoNovo {
@@ -111,6 +113,11 @@ function depoisDaResposta(fn: () => Promise<void>) {
 
 /** Entrega a todos os consumidores. Com linha gravada, só quem marcar primeiro entrega. */
 export async function entregarEvento(e: EventoPublicado): Promise<void> {
+  // Registro de teste: não dispara outras automações nem os webhooks de saída do cliente.
+  if (e.ator?.teste) {
+    if (e.id) await prisma.eventoDeDominio.updateMany({ where: { id: e.id, processadoEm: null }, data: { processadoEm: new Date() } }).catch(() => {});
+    return;
+  }
   if (e.id) {
     try {
       const r = await prisma.eventoDeDominio.updateMany({ where: { id: e.id, processadoEm: null }, data: { processadoEm: new Date() } });
