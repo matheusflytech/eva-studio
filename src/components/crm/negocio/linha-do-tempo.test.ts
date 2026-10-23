@@ -48,6 +48,27 @@ describe("descreverItem", () => {
   });
 });
 
+describe("alteração (histórico)", () => {
+  const alteracao = (ator: { tipo: "usuario" | "sistema" | "automacao"; nome: string }, n: number): ItemDaLinhaDoTempo => ({
+    id: "h1",
+    tipo: "alteracao",
+    em: "2026-10-19T12:00:00.000Z",
+    ator: { ...ator, id: null },
+    mudancas: Array.from({ length: n }, (_, i) => ({ campo: `c${i}`, rotulo: i === 0 ? "Valor" : `Campo ${i}`, de: "a", para: "b" })),
+  });
+
+  it("diz quem alterou e o quê", () => {
+    expect(descreverItem(alteracao({ tipo: "usuario", nome: "Ana Souza" }, 2)).titulo).toBe("Ana Souza alterou 2 campos");
+    expect(descreverItem(alteracao({ tipo: "automacao", nome: "Boas-vindas" }, 1)).titulo).toBe("Boas-vindas alterou Valor");
+    expect(descreverItem(alteracao({ tipo: "sistema", nome: "Sistema" }, 1)).titulo).toBe("Valor alterado");
+  });
+
+  it("filtro Alterações", () => {
+    const itens = [alteracao({ tipo: "usuario", nome: "Ana" }, 1), { id: "n1", tipo: "nota" as const, em: "2026-10-19T11:00:00.000Z", texto: "x", autor: null }];
+    expect(filtrarItens(itens, "alteracoes").map((i) => i.id)).toEqual(["h1"]);
+  });
+});
+
 describe("filtrarItens", () => {
   const itens: ItemDaLinhaDoTempo[] = [
     { id: "c", tipo: "criado", em: "2026-10-01T00:00:00.000Z", etapa: null },

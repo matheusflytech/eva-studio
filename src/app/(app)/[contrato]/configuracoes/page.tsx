@@ -6,6 +6,7 @@ import {
   Check,
   Contact,
   Copy,
+  History,
   ImageUp,
   KeyRound,
   Lock,
@@ -30,6 +31,7 @@ import { AbaGrupos } from "@/components/configuracoes/aba-grupos";
 import { AbaEquipes } from "@/components/configuracoes/aba-equipes";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { AbaLixeira } from "@/components/configuracoes/aba-lixeira";
+import { AbaAuditoria } from "@/components/configuracoes/aba-auditoria";
 import { AbaCanais } from "@/components/configuracoes/aba-canais";
 import { EscolhaDeCanvas, EscolhaDeTema } from "@/components/configuracoes/aparencia";
 import { CabecalhoDaSecao, LinhaDeConfig, RodapeDaSecao } from "@/components/configuracoes/secao";
@@ -44,7 +46,7 @@ import { cn } from "@/lib/utils";
 // formulário dentro de cartão.
 // ---------------------------------------------------------------------------
 
-type IdDaAba = "contrato" | "conta" | "canais" | "membros" | "papeis" | "grupos" | "equipes" | "chaves" | "lixeira";
+type IdDaAba = "contrato" | "conta" | "canais" | "membros" | "papeis" | "grupos" | "equipes" | "chaves" | "lixeira" | "auditoria";
 
 const GRUPOS: { rotulo: string; abas: { id: IdDaAba; rotulo: string; icone: React.ReactNode }[] }[] = [
   {
@@ -65,9 +67,14 @@ const GRUPOS: { rotulo: string; abas: { id: IdDaAba; rotulo: string; icone: Reac
     ],
   },
   { rotulo: "Você", abas: [{ id: "conta", rotulo: "Sua conta", icone: <UserRound /> }] },
-  { rotulo: "Dados", abas: [{ id: "lixeira", rotulo: "Lixeira", icone: <Trash2 /> }] },
+  {
+    rotulo: "Dados",
+    abas: [
+      { id: "lixeira", rotulo: "Lixeira", icone: <Trash2 /> },
+      { id: "auditoria", rotulo: "Auditoria", icone: <History /> },
+    ],
+  },
 ];
-const ABAS = GRUPOS.flatMap((g) => g.abas);
 
 function IdDoContrato({ id }: { id: string }) {
   const [copiado, setCopiado] = React.useState(false);
@@ -279,9 +286,12 @@ function Configuracoes() {
   const router = useRouter();
   const pathname = usePathname();
   const pedida = useSearchParams().get("aba");
-  const aba: IdDaAba = ABAS.find((a) => a.id === pedida)?.id ?? "contrato";
   const { session } = useAuth();
   const podeGerenciar = session?.permissoes?.includes("membros:gerenciar") ?? false;
+  // Auditoria (o que todos fizeram) só aparece para quem tem "Ver auditoria".
+  const podeAuditar = session?.permissoes?.includes("auditoria:ver") ?? false;
+  const grupos = GRUPOS.map((g) => ({ ...g, abas: g.abas.filter((a) => a.id !== "auditoria" || podeAuditar) }));
+  const aba: IdDaAba = grupos.flatMap((g) => g.abas).find((a) => a.id === pedida)?.id ?? "contrato";
   // A seção fica na URL: dá para mandar o link "aba de membros" a alguém.
   const irPara = (v: string) => router.replace(`${pathname}?aba=${v}`);
 
@@ -290,7 +300,7 @@ function Configuracoes() {
       {/* Seções agrupadas à esquerda; no celular, um seletor só. */}
       <div className="pb-4 md:hidden">
         <Select aria-label="Seção das configurações" value={aba} onChange={(e) => irPara(e.target.value)}>
-          {GRUPOS.map((g) => (
+          {grupos.map((g) => (
             <optgroup key={g.rotulo} label={g.rotulo}>
               {g.abas.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -302,7 +312,7 @@ function Configuracoes() {
         </Select>
       </div>
       <nav aria-label="Configurações" className="hidden w-[210px] shrink-0 flex-col gap-px border-r border-border-subtle pr-3 md:flex">
-        {GRUPOS.map((g, gi) => (
+        {grupos.map((g, gi) => (
           <div key={g.rotulo} className="flex flex-col gap-px">
             <p className={cn("px-2.5 pb-1.5 font-mono text-caption text-text-tertiary", gi === 0 ? "pt-1" : "pt-3")}>{g.rotulo}</p>
             {g.abas.map((a) => {
@@ -331,7 +341,7 @@ function Configuracoes() {
       </nav>
 
       <div className="min-w-0 flex-1 pb-10 md:pt-1">
-        <div className={cn("w-full", aba === "lixeira" || aba === "papeis" ? "max-w-5xl" : "max-w-3xl")}>
+        <div className={cn("w-full", aba === "lixeira" || aba === "papeis" || aba === "auditoria" ? "max-w-5xl" : "max-w-3xl")}>
           {aba === "contrato" && <AbaContrato />}
           {aba === "conta" && <AbaConta />}
           {aba === "canais" && <AbaCanais />}
@@ -341,6 +351,7 @@ function Configuracoes() {
           {aba === "equipes" && <AbaEquipes podeGerenciar={podeGerenciar} />}
           {aba === "chaves" && <ApiKeysPanel />}
           {aba === "lixeira" && <AbaLixeira />}
+          {aba === "auditoria" && <AbaAuditoria />}
         </div>
       </div>
     </div>

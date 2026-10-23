@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { registrarHistorico } from "@/lib/server/historico";
 
 // Revoga (não apaga a linha — mantém histórico de quando existiu e foi
 // revogada, mesma lógica de qualquer API séria: uma chave revogada some da
@@ -11,9 +12,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
   const { id } = await params;
 
-  const key = await prisma.apiKey.findFirst({ where: { id, orgId: ctx.orgId }, select: { id: true } });
+  const key = await prisma.apiKey.findFirst({ where: { id, orgId: ctx.orgId }, select: { id: true, name: true, keyPrefix: true } });
   if (!key) return NextResponse.json({ error: "Chave não encontrada." }, { status: 404 });
 
   await prisma.apiKey.update({ where: { id }, data: { revokedAt: new Date() }, select: { id: true } });
+  await registrarHistorico({ orgId: ctx.orgId, acao: "chave_api.revogou", objeto: "api_key", objetoId: id, objetoNome: key.name, detalhes: { prefixo: key.keyPrefix } });
   return NextResponse.json({ ok: true });
 }

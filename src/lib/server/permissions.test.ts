@@ -20,12 +20,15 @@ const req = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: async () => ({ data: { user: req.user } }) } }),
 }));
+// Mesmo objeto durante a "requisição", como o Next (a pessoa logada é marcada nele).
+const cabecalhos = { get: (k: string) => req.headers.get(k) ?? null };
 vi.mock("next/headers", () => ({
-  headers: async () => ({ get: (k: string) => req.headers.get(k) ?? null }),
+  headers: async () => cabecalhos,
   cookies: async () => ({ get: (k: string) => (req.cookies.has(k) ? { value: req.cookies.get(k) } : undefined) }),
 }));
 
 import { getSessionContext, requirePermission } from "./permissions";
+import { atorDaRequisicao } from "./eventos/ator-da-requisicao";
 
 type Vinculo = { id: string; orgId: string; userId: string; role: string; roleId: string | null; groupIds: string[]; status: string; customRole: unknown };
 let vinculos: Vinculo[];
@@ -54,6 +57,14 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.EVA_SUPERADMINS;
+});
+
+describe("pessoa da requisição (histórico)", () => {
+  it("depois de requirePermission, o que a requisição mudar sai com a pessoa", async () => {
+    const ctx = await requirePermission("read");
+    expect(ctx).toMatchObject({ userId: "u1" });
+    expect(await atorDaRequisicao()).toEqual({ tipo: "usuario", id: "u1" });
+  });
 });
 
 describe("contrato ativo", () => {

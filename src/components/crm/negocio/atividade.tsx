@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, Plus, StickyNote, UserPlus, XCircle, type LucideIcon,
+  ArrowRight, CalendarDays, CheckCircle2, CirclePlus, ListTodo, Loader2, MessagesSquare, PenLine, Plus, StickyNote, UserPlus, XCircle, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,6 +25,7 @@ import { IconeDoCanal, dataLonga } from "./pecas";
 import { mensagemDeErro, type NegocioDaFicha } from "./use-ficha";
 import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { TIPOS_DE_TAREFA } from "@/lib/tarefas/tipos";
+import { IconeDoAtor, ListaDeMudancas } from "@/components/historico/pecas";
 
 /** Mantido por compatibilidade: a ficha v5 troca as abas pelo filtro da linha do tempo. */
 export type AbaDaAtividade = "atividade" | "notas" | "tarefas";
@@ -35,6 +36,7 @@ const FILTROS: { id: FiltroDaLinhaDoTempo; rotulo: string }[] = [
   { id: "notas", rotulo: "Notas" },
   { id: "etapas", rotulo: "Etapas" },
   { id: "tarefas", rotulo: "Tarefas" },
+  { id: "alteracoes", rotulo: "Alterações" },
 ];
 
 /**
@@ -146,6 +148,8 @@ function iconeDoItem(item: ItemDaLinhaDoTempo): { icone: LucideIcon; tom: string
       return { icone: CheckCircle2, tom: "bg-success-subtle text-success" };
     case "conversa":
       return { icone: MessagesSquare, tom: "bg-raised" };
+    case "alteracao":
+      return { icone: PenLine, tom: "bg-raised text-text-secondary" };
   }
 }
 
@@ -238,9 +242,14 @@ function ItemDaLinha({ item, destacado }: { item: ItemDaLinhaDoTempo; destacado:
 
   return (
     <li className={cn("flex gap-3 rounded-[14px] px-2.5 py-2 transition-colors", destacado ? "bg-inverse text-inverse-fg" : "hover:bg-raised")}>
-      <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", destacado ? "bg-inverse-fg/10 text-inverse-fg" : tom)}>
-        {item.tipo === "conversa" ? <IconeDoCanal canal={item.canal} tamanho={15} /> : <Icone size={15} aria-hidden />}
-      </span>
+      {item.tipo === "alteracao" ? (
+        // Quem alterou: as iniciais da pessoa, ou o ícone do agente/automação/API.
+        <IconeDoAtor tipo={item.ator.tipo} nome={item.ator.nome} />
+      ) : (
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", destacado ? "bg-inverse-fg/10 text-inverse-fg" : tom)}>
+          {item.tipo === "conversa" ? <IconeDoCanal canal={item.canal} tamanho={15} /> : <Icone size={15} aria-hidden />}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <p className={cn("min-w-0 truncate text-small font-semibold", destacado ? "text-inverse-fg" : "text-text-primary")}>
@@ -271,6 +280,7 @@ function ItemDaLinha({ item, destacado }: { item: ItemDaLinhaDoTempo; destacado:
             {detalhe}
           </p>
         )}
+        {item.tipo === "alteracao" && <ListaDeMudancas mudancas={item.mudancas} className="mt-1" />}
         {item.tipo === "tarefa_criada" && item.prazo && (
           <p className="mt-0.5 inline-flex items-center gap-1 text-caption text-text-tertiary">
             <CalendarDays size={11} aria-hidden /> Prazo {dataLonga(item.prazo)}

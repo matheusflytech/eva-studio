@@ -1,4 +1,5 @@
 import "server-only";
+import { registrarHistorico } from "@/lib/server/historico";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { tabelaAusente } from "@/lib/server/layout-do-cartao";
@@ -256,9 +257,11 @@ export async function apagarComLixeira(input: {
   const agora = input.agora ?? new Date();
   const expiresAt = expiraEm(agora);
 
-  return prisma.$transaction(async (tx) => {
+  let nome = "";
+  const r = await prisma.$transaction(async (tx) => {
     const foto = await fotografar(tx, orgId, entidade, id, d);
     if (!foto) throw new ErroDaLixeira("Registro não encontrado.", 404, "nao_encontrado");
+    nome = nomeDaFoto(foto);
 
     let trashId: string | null = null;
     if (d.lixeira) {
@@ -287,6 +290,8 @@ export async function apagarComLixeira(input: {
       ? { lixeira: true as const, trashId, expiresAt, aviso: null }
       : { lixeira: false as const, trashId: null, expiresAt: null, aviso: AVISO_SEM_LIXEIRA };
   });
+  await registrarHistorico({ orgId, acao: "apagou", objeto: entidade, objetoId: id, objetoNome: nome, detalhes: { lixeira: r.lixeira } });
+  return r;
 }
 
 // ── Ler, listar, limpar ────────────────────────────────────────────────────
@@ -617,5 +622,6 @@ export async function restaurarDaLixeira(orgId: string, trashId: string, agora: 
     }
     throw e;
   }
+  await registrarHistorico({ orgId, acao: "restaurou", objeto: entidade, objetoId: item.entityId, objetoNome: item.name });
   return { entidade, entityId: item.entityId, nome: item.name, avisos };
 }

@@ -30,6 +30,9 @@ export const MODULOS = [
   // Restaurar da lixeira segue a permissão de apagar de cada registro; só o
   // "Apagar para sempre" (que não tem volta) é separado.
   { id: "lixeira", nome: "Lixeira", acoes: ["esvaziar"] },
+  // Histórico de tudo o que aconteceu no contrato (Configurações → Auditoria).
+  // A ficha mostra o histórico do registro a quem pode ver o registro.
+  { id: "auditoria", nome: "Auditoria", acoes: ["ver"] },
 ] as const;
 
 export const ACOES_ROTULO: Record<string, string> = {
@@ -79,7 +82,8 @@ export type PermissaoLegada =
 
 export const LEGADO_PARA_GRANULAR: Record<PermissaoLegada, PermissaoGranular[]> = {
   // Exportar o funil sempre foi "read" (a Leitura baixa a planilha): continua.
-  read: [...PERMISSOES.filter((p) => p.endsWith(":ver")), "negocios:exportar"],
+  // A auditoria (tudo o que todos fizeram) fica fora: só dono e administrador.
+  read: [...PERMISSOES.filter((p) => p.endsWith(":ver") && p !== "auditoria:ver"), "negocios:exportar"],
   "contacts:manage": [
     "contatos:criar",
     "contatos:editar",
@@ -117,8 +121,8 @@ export const LEGADO_DO_PAPEL: Record<PapelDeSistema, PermissaoLegada[]> = {
  * um papel personalizado com só ela passar no `requirePermission` antigo).
  */
 const EXTRAS_DO_PAPEL: Partial<Record<PapelDeSistema, PermissaoGranular[]>> = {
-  owner: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar"],
-  admin: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar"],
+  owner: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver"],
+  admin: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver"],
   agent: ["automacoes:ver"],
   viewer: ["automacoes:ver"],
 };

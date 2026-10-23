@@ -2,6 +2,7 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { atorDaRequisicao } from "./ator-da-requisicao";
 
 // ---------------------------------------------------------------------------
 // Barramento de eventos de domínio (plano das automações, parte B).
@@ -64,6 +65,23 @@ export function atorAtual(): Ator {
   return contextoDoAtor.getStore() ?? { tipo: "sistema" };
 }
 
+/**
+ * Quem está agindo: `comAtor` em volta (automação, agente, API) ou a pessoa
+ * logada na requisição (marcada por requirePermission); senão "sistema".
+ */
+export async function atorDaAcao(): Promise<Ator> {
+  return contextoDoAtor.getStore() ?? (await atorDaRequisicao()) ?? { tipo: "sistema" };
+}
+
+// Criar e alterar negócio, contato e empresa também viram linha do histórico.
+const OBJETOS_DO_HISTORICO = new Set(["deal", "contact", "company"]);
+function acaoDoHistorico(e: EventoNovo): "criou" | "alterou" | null {
+  if (!OBJETOS_DO_HISTORICO.has(e.objeto)) return null;
+  if (e.tipo === `${e.objeto}.created`) return "criou";
+  if (e.tipo === `${e.objeto}.updated` && e.diff && Object.keys(e.diff).length > 0) return "alterou";
+  return null;
+}
+
 // Consumidores em lista fixa (import tardio: evita ciclo de import e não carrega
 // o que não é usado).
 type Consumidor = { nome: string; carregar: () => Promise<(e: EventoPublicado) => Promise<void>> };
@@ -77,7 +95,7 @@ function semTabela(error: unknown): boolean {
 }
 
 export async function publicarEvento(e: EventoNovo): Promise<void> {
-  const ator = e.ator ?? atorAtual();
+  const ator = e.ator ?? (await atorDaAcao());
   const publicado: EventoPublicado = { ...e, dados: e.dados ?? {}, ator, id: null, criadoEm: new Date() };
   try {
     if (prisma.eventoDeDominio) {
@@ -98,6 +116,16 @@ export async function publicarEvento(e: EventoNovo): Promise<void> {
     }
   } catch (error) {
     if (!semTabela(error)) console.error("[eventos] falha ao gravar", e.tipo, error);
+  }
+  const acao = acaoDoHistorico(e);
+  if (acao) {
+    depoisDaResposta(async () => {
+      const { registrarHistorico } = await import("@/lib/server/historico");
+      await registrarHistorico(
+        { orgId: e.orgId, acao, objeto: e.objeto as "deal" | "contact" | "company", objetoId: e.objetoId, mudancas: acao === "alterou" ? e.diff : null },
+        ator
+      );
+    });
   }
   depoisDaResposta(() => entregarEvento(publicado));
 }

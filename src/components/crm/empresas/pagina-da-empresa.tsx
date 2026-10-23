@@ -24,6 +24,7 @@ import { useRouter } from "@/lib/contrato/navegacao";
 import { pulsar, avisarNaIlha } from "@/lib/fundo/eventos";
 import { initials } from "@/lib/design-system/format";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { HistoricoDoRegistro } from "@/components/historico/historico-do-registro";
 import { FotoDaPessoa, LogoDaEmpresa, cidadeUf, formatCnpj, money, normalizeUrl, siglaDe } from "./pecas";
 
 interface Company {
@@ -395,6 +396,10 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
                 </ul>
               )}
             </section>
+
+            <div className="md:col-span-2">
+              <HistoricoDoRegistro url={`/api/companies/${companyId}/historico`} versao={data} />
+            </div>
           </div>
         )}
 

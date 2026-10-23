@@ -9,6 +9,7 @@ import { ErroApi, iso } from "./http";
 import { boolOpc, conferirCampos, enumOpc, idOpc, listaDeIdsOpc, objetoOpc } from "./entrada";
 import { whereDeContatos } from "./contatos";
 import { whereDeNegocios } from "./negocios";
+import { registrarHistorico } from "@/lib/server/historico";
 
 // ---------------------------------------------------------------------------
 // Importação e exportação em lote (API-3): criar, consultar, cancelar.
@@ -257,6 +258,14 @@ export async function criarExportacao(orgId: string, keyId: string, corpo: Corpo
       : await prisma.deal.count({ where: where as Prisma.DealWhereInput });
   const job = await prisma.bulkJob.create({
     data: { orgId, apiKeyId: keyId, kind: "export", entity, status: "queued", format, options: { filters: filtros } as Prisma.InputJsonValue, total },
+  });
+  await registrarHistorico({
+    orgId,
+    acao: "exportou",
+    objeto: "export",
+    objetoId: job.id,
+    objetoNome: entity === "contacts" ? "Contatos" : "Negócios",
+    detalhes: { entidade: entity === "contacts" ? "contatos" : "negocios", formato: format, quantidade: total, pela: "api" },
   });
   return serializarJob(job);
 }

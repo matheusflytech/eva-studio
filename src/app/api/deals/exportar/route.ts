@@ -11,6 +11,7 @@ import {
   resumoDaExportacao,
   totaisPorEtapa,
 } from "@/lib/exportar/negocios";
+import { registrarHistorico } from "@/lib/server/historico";
 
 const DIA = 86_400_000;
 
@@ -42,6 +43,14 @@ export async function GET(request: Request) {
     ...(ids.length ? { ids } : {}),
   });
   if (!dados) return NextResponse.json({ error: "Funil não encontrado." }, { status: 404 });
+  await registrarHistorico({
+    orgId: ctx.orgId,
+    acao: "exportou",
+    objeto: "export",
+    objetoId: `negocios-${agora.getTime()}`,
+    objetoNome: `Negócios · ${dados.funil.name}`,
+    detalhes: { entidade: "negocios", funil: dados.funil.name, formato: formato === "csv" ? (url.searchParams.get("itens") === "1" ? "csv por item" : "csv") : "relatório", quantidade: dados.negocios.length, truncado: dados.truncado, selecionados: ids.length || undefined },
+  });
 
   const aviso = dados.truncado
     ? `Atenção: a exportação saiu limitada aos primeiros ${LIMITE_DE_EXPORTACAO.toLocaleString("pt-BR")} negócios do funil.`

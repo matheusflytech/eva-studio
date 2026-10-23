@@ -43,6 +43,8 @@ const db = vi.hoisted(() => {
   return d;
 });
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn() }));
+vi.mock("@/lib/server/historico", () => hist);
 
 import {
   _esquecerSondagens,
@@ -131,6 +133,9 @@ describe("apagar → lixeira", () => {
     expect(db.externalRef.deleteMany).toHaveBeenCalledWith({ where: { orgId: "o1", entity: "deal", entityId: "d1" } });
     expect(db.deal.delete).toHaveBeenCalledWith({ where: { id: "d1" } });
     expect(db.trashItem.create.mock.invocationCallOrder[0]).toBeLessThan(db.deal.delete.mock.invocationCallOrder[0]);
+    // Histórico depois que a transação terminou, com o nome da foto.
+    expect(hist.registrarHistorico).toHaveBeenCalledWith({ orgId: "o1", acao: "apagou", objeto: "deal", objetoId: "d1", objetoNome: "Acme", detalhes: { lixeira: true } });
+    expect(hist.registrarHistorico.mock.invocationCallOrder[0]).toBeGreaterThan(db.deal.delete.mock.invocationCallOrder[0]);
   });
 
   it("contato: canais, etiquetas, negócios, tarefas, notas, inscrições e conversas vão na foto", async () => {
@@ -178,6 +183,7 @@ describe("apagar → lixeira", () => {
     ).rejects.toMatchObject({ status: 404 });
     expect(db.trashItem.create).not.toHaveBeenCalled();
     expect(db.deal.delete).not.toHaveBeenCalled();
+    expect(hist.registrarHistorico).not.toHaveBeenCalled();
   });
 
   it("sem a tabela da lixeira: 'recusar' devolve 409 sem apagar; 'apagar' apaga de vez com aviso", async () => {
@@ -260,6 +266,7 @@ describe("restaurar", () => {
     });
     expect(db.deletedRecord.deleteMany).toHaveBeenCalledWith({ where: { orgId: "o1", entity: "deal", entityId: "d1" } });
     expect(db.trashItem.delete).toHaveBeenCalledWith({ where: { id: "tr1" } });
+    expect(hist.registrarHistorico).toHaveBeenCalledWith({ orgId: "o1", acao: "restaurou", objeto: "deal", objetoId: "d1", objetoNome: "X" });
   });
 
   it("negócio com etapa e empresa apagadas: primeira etapa aberta, sem empresa, evento novo e avisos", async () => {

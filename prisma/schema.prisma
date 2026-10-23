@@ -2102,6 +2102,35 @@ model EventoDeDominio {
   @@map("eva_studio_eventos")
 }
 
+// Histórico de alterações e auditoria (prisma/sql/2026-10-26-historico.sql).
+// Uma linha por ação: criou/alterou/apagou/restaurou um registro ou uma ação
+// da conta (membros, papéis, chaves, exportação). Nomes guardados no momento:
+// o registro ou a pessoa podem sumir depois. Guardado por 2 anos.
+model Historico {
+  id         String   @id @default(uuid())
+  orgId      String
+  // criou | alterou | apagou | restaurou | membro.convidou | chave_api.criou... (src/lib/historico/tipos.ts)
+  acao       String
+  // deal | contact | company | member | role | permission_group | team | api_key | export
+  objeto     String
+  objetoId   String
+  objetoNome String   @default("")
+  // Só em "alterou": { campo: { de, para } }, no formato da API v1.
+  mudancas   Json?
+  detalhes   Json     @default("{}")
+  // usuario | agente | automacao | api | integracao | sistema
+  atorTipo   String   @default("sistema")
+  atorId     String?
+  atorNome   String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, objeto, objetoId, createdAt])
+  @@index([orgId, createdAt])
+  @@index([orgId, atorId, createdAt])
+  @@index([createdAt])
+  @@map("eva_studio_historico")
+}
+
 model AutomacaoExecucao {
   id           String    @id @default(uuid())
   orgId        String

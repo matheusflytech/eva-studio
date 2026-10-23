@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
+import { alteracoesDaFicha } from "@/lib/server/historico-leitura";
 import type { ConversaDoNegocio, ItemDaLinhaDoTempo, LinhaDoTempo } from "@/components/crm/negocio/linha-do-tempo";
 
 // Teto de itens devolvidos. Negócio com mais que isso é exceção, e a ficha
@@ -31,7 +32,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
 
   const contactIds = deal.contacts.map((c) => c.contactId);
 
-  const [eventos, notas, tarefas, conversas] = await Promise.all([
+  const [eventos, notas, tarefas, conversas, alteracoes] = await Promise.all([
     // Histórico de etapas é complemento: se a tabela falhar (migração
     // atrasada, por exemplo), a ficha abre com o resto em vez de dar erro.
     // Select explícito: a coluna `ignorouObrigatorios` só existe depois do SQL
@@ -87,6 +88,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
             agent: { select: { name: true } },
           },
         }),
+    // Histórico de alterações (quem mudou qual campo). Complemento como o de
+    // etapas: falhou, a ficha abre sem ele.
+    alteracoesDaFicha(orgId, "deal", dealId).catch((e: unknown) => {
+      console.error("[linha-do-tempo] histórico de alterações indisponível", e);
+      return [];
+    }),
   ]);
 
   // Nomes das etapas. Sem FK no evento de propósito (etapa apagada não apaga a
@@ -154,6 +161,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
       contato: c.contact?.name || null,
     });
   }
+  itens.push(...alteracoes);
 
   // Desempate pelo id: dois itens no mesmo milissegundo (tarefa criada e
   // concluída por automação) ficam sempre na mesma ordem.

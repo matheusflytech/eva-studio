@@ -5,6 +5,7 @@ import { ctxPode, requirePermission } from "@/lib/server/permissions";
 import { normalizarEscopos, RECURSOS } from "@/lib/server/api-v1/escopos";
 import { escoposAcimaDoQuePode, permissoesDoPapelDeSistema } from "@/lib/permissoes/catalogo";
 import { comFallbackLegado } from "@/lib/server/contratos";
+import { registrarHistorico } from "@/lib/server/historico";
 
 // Chaves de API do contrato ativo. Nunca devolve a chave inteira depois de
 // criada — só prefixo/nome/datas/escopos/responsável. A chave completa só volta
@@ -82,5 +83,7 @@ export async function POST(request: Request) {
     }
   );
 
+  // Nunca a chave nem o hash: só o nome e o começo, para reconhecer qual é.
+  await registrarHistorico({ orgId, acao: "chave_api.criou", objeto: "api_key", objetoId: row.id, objetoNome: row.name, detalhes: { prefixo: row.keyPrefix, escopos: scopes, ...(expiresAt ? { validade: expiresAt.toISOString() } : {}) } });
   return NextResponse.json({ apiKey: { ...row, key, scopes, expiresAt } });
 }

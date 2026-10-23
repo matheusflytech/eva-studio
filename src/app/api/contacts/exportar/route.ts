@@ -8,6 +8,7 @@ import { carregarDefinicoes } from "@/lib/server/custom-fields";
 import { lerOrdenacao } from "@/lib/filtro-crm";
 import { disposicaoDeAnexo, hojeSP, lerIds } from "@/lib/exportar/csv";
 import { LIMITE_DE_EXPORTACAO_DE_CONTATOS, csvDosContatos } from "@/lib/exportar/contatos";
+import { registrarHistorico } from "@/lib/server/historico";
 
 // GET /api/contacts/exportar — planilha (CSV) do que a lista de contatos está
 // mostrando: o MESMO filtro, busca, atalhos, ordem e escopo do papel do
@@ -70,6 +71,14 @@ export async function GET(request: Request) {
       : null,
   });
 
+  await registrarHistorico({
+    orgId: ctx.orgId,
+    acao: "exportou",
+    objeto: "export",
+    objetoId: `contatos-${Date.now()}`,
+    objetoNome: "Contatos",
+    detalhes: { entidade: "contatos", quantidade: Math.min(linhas.length, LIMITE_DE_EXPORTACAO_DE_CONTATOS), truncado: cortado, selecionados: ids.length || undefined, filtro: sp.get("filtro") || ler("q") || undefined },
+  });
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

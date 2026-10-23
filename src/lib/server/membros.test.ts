@@ -4,14 +4,16 @@ const db = vi.hoisted(() => ({
   membership: { findMany: vi.fn(), upsert: vi.fn(async () => ({})), update: vi.fn(async () => ({})), create: vi.fn() },
   profile: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(async () => ({})), create: vi.fn() },
   teamMember: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({})), upsert: vi.fn() },
-  customRole: { findFirst: vi.fn() },
-  permissionGroup: { findMany: vi.fn(async () => []) },
+  customRole: { findFirst: vi.fn(), findMany: vi.fn(async () => []) },
+  permissionGroup: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   team: { findMany: vi.fn(async () => []) },
   $transaction: vi.fn(async (ops: unknown[]) => ops),
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 const admin = vi.hoisted(() => ({ inviteUserByEmail: vi.fn(), deleteUser: vi.fn(async () => ({})) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ auth: { admin } }) }));
+const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn() }));
+vi.mock("@/lib/server/historico", () => hist);
 
 import { alterarMembro, convidarMembro, listarMembros, removerMembro } from "./membros";
 
@@ -76,12 +78,31 @@ describe("membros do contrato", () => {
       data: { role: "viewer" },
     });
     expect(db.profile.updateMany).toHaveBeenCalledWith({ where: { id: "u-ana", orgId: "o1" }, data: { role: "viewer" } });
+    expect(hist.registrarHistorico).toHaveBeenCalledWith({
+      orgId: "o1",
+      acao: "membro.mudou_acesso",
+      objeto: "member",
+      objetoId: "u-ana",
+      objetoNome: "u-ana",
+      mudancas: { papel: { de: "Atendente", para: "Somente leitura" } },
+      detalhes: { email: "u-ana@x.com" },
+    });
+  });
+
+  it("grupos no histórico pelos nomes; sem mudança de fato, nada grava", async () => {
+    db.permissionGroup.findMany.mockResolvedValue([{ id: "g1", name: "Financeiro" }]);
+    await alterarMembro(dono, { userId: "u-ana", groupIds: ["g1"] });
+    expect(hist.registrarHistorico.mock.calls[0][0].mudancas).toEqual({ grupos: { de: [], para: ["Financeiro"] } });
+    hist.registrarHistorico.mockClear();
+    await alterarMembro(dono, { userId: "u-ana", role: "agent" });
+    expect(hist.registrarHistorico).not.toHaveBeenCalled();
   });
 
   it("remover marca 'removido' (não apaga) e tira das equipes do contrato", async () => {
     await removerMembro(dono, "u-ana");
     expect(db.membership.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: { status: "removido" } }));
     expect(db.teamMember.deleteMany).toHaveBeenCalledWith({ where: { userId: "u-ana", team: { orgId: "o1" } } });
+    expect(hist.registrarHistorico).toHaveBeenCalledWith(expect.objectContaining({ acao: "membro.removeu", objetoId: "u-ana" }));
   });
 });
 
@@ -94,6 +115,14 @@ describe("convite", () => {
       expect.objectContaining({ create: expect.objectContaining({ orgId: "o1", userId: "u-bia", status: "convidado" }) })
     );
     expect(admin.inviteUserByEmail).not.toHaveBeenCalled();
+    expect(hist.registrarHistorico).toHaveBeenCalledWith({
+      orgId: "o1",
+      acao: "membro.convidou",
+      objeto: "member",
+      objetoId: "u-bia",
+      objetoNome: "bia",
+      detalhes: { email: "bia@x.com", papel: "Atendente" },
+    });
   });
 
   it("quem já participa não é convidado de novo", async () => {
