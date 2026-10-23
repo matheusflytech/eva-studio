@@ -35,7 +35,7 @@ export interface NegocioDaFicha {
   pipeline: { id: string; name: string; stages: EtapaDaFicha[] };
   company: { id: string; name: string } | null;
   owner: { id: string; name: string } | null;
-  contacts: { contact: { id: string; name: string; email: string; phone: string } }[];
+  contacts: { contact: { id: string; name: string; email: string; phone: string; jobTitle?: string } }[];
   tasks: { id: string; type: string; text: string; dueAt: string | null; doneAt: string | null }[];
   customFields: Record<string, unknown>;
   /** Última atividade (relógio do parado). */

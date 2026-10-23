@@ -19,6 +19,7 @@ import {
   Rows3,
   Search,
   Settings,
+  SlidersHorizontal,
   Sun,
   Upload,
 } from "lucide-react";
@@ -69,6 +70,7 @@ import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from
 import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
 import { QuadroContexto, type AcoesDoQuadro, type FocoDoPainel } from "@/components/crm/negocios/quadro-contexto";
+import { PersonalizarQuadro, type AbaDaPersonalizacao } from "@/components/crm/negocios/personalizar";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
@@ -193,6 +195,7 @@ function NegociosConteudo() {
   }
   const [importando, setImportando] = React.useState(false);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
+  const [personalizando, setPersonalizando] = React.useState<AbaDaPersonalizacao | null>(null);
   const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia; foco?: FocoDoPainel } | null>(null);
   const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string; prazo?: number | null } | null>(null);
   // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
@@ -682,6 +685,9 @@ function NegociosConteudo() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setPersonalizando("card")} disabled={!pipelineId}>
+                <SlidersHorizontal aria-hidden="true" /> Personalizar card (só para você)
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}>
                   <Settings aria-hidden="true" /> Configurar funil, cartão e campos
@@ -906,7 +912,10 @@ function NegociosConteudo() {
       {previaAtual && (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <PreviaDoNegocio
-            key={previaAtual.deal.id}
+            // Chave fixa: clicar em outro cartão troca o conteúdo sem fechar o painel.
+            key="painel-do-negocio"
+            foco={previa?.foco}
+            onPersonalizar={() => setPersonalizando("painel")}
             deal={previaAtual.deal}
             etapa={previaAtual.etapa}
             etapas={etapasDaPrevia}
@@ -919,6 +928,20 @@ function NegociosConteudo() {
             onMover={mudanca.mover}
           />
         </VozDoQuadro.Provider>
+      )}
+
+      {personalizando && pipelineId && (
+        <PersonalizarQuadro
+          pipelineId={pipelineId}
+          aba={personalizando}
+          defs={quadro?.defs ?? []}
+          agora={agora}
+          onFechar={() => setPersonalizando(null)}
+          onSalvo={(layout) => {
+            setQuadro((q) => (q ? { ...q, layout } : q));
+            setVersao((v) => v + 1);
+          }}
+        />
       )}
 
       {novoNaEtapa !== null && (

@@ -79,7 +79,7 @@ function valorDeExemplo(def: DefinicaoDeCampo, agora: Date): unknown {
   }
 }
 
-function negocioDeExemplo(defs: DefinicaoDeCampo[], agora: Date): NegocioKanban {
+export function negocioDeExemplo(defs: DefinicaoDeCampo[], agora: Date): NegocioKanban {
   const t = agora.getTime();
   return {
     id: "exemplo",
@@ -382,7 +382,7 @@ function Faixa({ tom, icone: Icone, children }: { tom: "info" | "aviso"; icone: 
   );
 }
 
-function ListaDeCampos({
+export function ListaDeCampos({
   id,
   titulo,
   descricao,
