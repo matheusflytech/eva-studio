@@ -3,13 +3,19 @@
 ## >>> ROTEIRO DO DONO (23/10/2026): foco agora é FUNCIONALIDADE <<<
 
 O front ficou bonito; agora tudo tem que funcionar. Ordem:
-1. Testar de verdade nas automações: FEITO no PR #9 (registro de teste que
+1. Testar de verdade nas automações: FEITO, PR #9 no ar (registro de teste que
    cumpre gatilho e condições, passos de verdade, esperas de 10 s, quadro
    acendendo, "Apagar dados do teste"; eventos de teste não disparam outras
-   automações nem webhooks). Falta o merge (só com ok do dono).
-2. Revisão geral de TODAS as funções (tudo funcionando antes de seguir).
-3. Testar o WhatsApp por QR Code com o número do dono (47 99970-5773; ele
-   manda outros números para teste).
+   automações nem webhooks).
+2. Revisão geral de TODAS as funções: FEITA em 23/10 (CRM, Caixa de entrada,
+   Automações e réguas, Agentes; leitura e escrita, dados de teste apagados).
+   Não testado: Disparos (precisa de canal). Detalhe menor: GET de agente
+   apagado responde 200 com `{agent:null}`.
+3. WhatsApp por QR com o número do dono: FEITO, PR #10 no ar. Recebe, a IA
+   responde, resposta humana pela Caixa de entrada sai. Worker do Render
+   religado em 23/10 com o código novo; o passo a passo e as armadilhas
+   (certificado do Supabase, URL, ping, deploy automático) estão em
+   `worker/README.md`. Falta: automação mandando WhatsApp por QR e um disparo.
 4. "Aprovação" de modelos (templates) para a API NÃO oficial (QR), ao lado dos
    modelos aprovados pela Meta (API oficial); deixar claro como cada uma dispara.
 5. Ações de canal nas automações: WhatsApp, Instagram, Telegram e outros.
