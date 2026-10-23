@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogoOficial } from "@/components/ui/logo-oficial";
 import { avisarNaIlha } from "@/lib/fundo/eventos";
-import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
+import { CAMPOS_DO_CONTEXTO, NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
 import { passosComProblema, planoDoTeste } from "@/lib/automacoes/teste";
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { cn } from "@/lib/utils";
@@ -85,6 +85,8 @@ export function TesteDeVerdade({
   const pedindo = React.useRef(false);
   const acabou = React.useRef(false);
   const nome = NOMES_DOS_OBJETOS[def.objeto];
+  // "registro.tem_tarefa_aberta" vira "Tem tarefa aberta", como no editor.
+  const rotulos = (campos: string[]) => campos.map((c) => CAMPOS_DO_CONTEXTO[def.objeto]?.find((x) => x.caminho === c)?.rotulo ?? c.split(".").pop()).join(", ");
 
   async function rodar(confirmarContatoExistente = false) {
     setErro(null);
@@ -307,8 +309,12 @@ export function TesteDeVerdade({
 
             {inicio && (inicio.cumpridas.length > 0 || inicio.naoCumpridas.length > 0) && (
               <p className="text-caption leading-snug text-text-tertiary">
-                {inicio.cumpridas.length > 0 && <>Preenchi para passar: {inicio.cumpridas.join(", ")}. </>}
-                {inicio.naoCumpridas.length > 0 && <span className="text-warning">Não deu para cumprir: {inicio.naoCumpridas.join(", ")}.</span>}
+                {inicio.cumpridas.length > 0 && <>Preenchi para passar: {rotulos(inicio.cumpridas)}. </>}
+                {inicio.naoCumpridas.length > 0 && (
+                  <span className="text-warning">
+                    Antes de rodar, não deu para deixar pronto: {rotulos(inicio.naoCumpridas)}. Os passos do fluxo ainda podem cumprir.
+                  </span>
+                )}
               </p>
             )}
 
