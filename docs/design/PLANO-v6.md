@@ -1,5 +1,22 @@
 # Plano v6 do front do EvaApp (para a próxima sessão)
 
+## >>> ROTEIRO DO DONO (23/10/2026): foco agora é FUNCIONALIDADE <<<
+
+O front ficou bonito; agora tudo tem que funcionar. Ordem:
+1. Testar de verdade nas automações: FEITO no PR #9 (registro de teste que
+   cumpre gatilho e condições, passos de verdade, esperas de 10 s, quadro
+   acendendo, "Apagar dados do teste"; eventos de teste não disparam outras
+   automações nem webhooks). Falta o merge (só com ok do dono).
+2. Revisão geral de TODAS as funções (tudo funcionando antes de seguir).
+3. Testar o WhatsApp por QR Code com o número do dono (47 99970-5773; ele
+   manda outros números para teste).
+4. "Aprovação" de modelos (templates) para a API NÃO oficial (QR), ao lado dos
+   modelos aprovados pela Meta (API oficial); deixar claro como cada uma dispara.
+5. Ações de canal nas automações: WhatsApp, Instagram, Telegram e outros.
+6. Depois: rever a tela de login (propostas em
+   docs/design/proposta-v6/login-cesar/v2, branch feat/login-v2-propostas; a
+   foto de referência não tem licença: trocar por foto livre antes de produção).
+
 ## >>> COMECE AQUI: status em 22/10/2026, noite (2ª sessão) <<<
 
 Feito e conferido no navegador (1440×900, claro e escuro), commit local no PR #8:
