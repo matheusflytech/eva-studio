@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/db/prisma";
 import { CABECALHO_CONTRATO, COOKIE_CONTRATO } from "@/lib/contrato/rotas";
 import { resolverContratoAtivo } from "@/lib/server/contratos";
+import { marcarPessoaDaRequisicao } from "@/lib/server/eventos/ator-da-requisicao";
 import {
   PAPEIS_DE_SISTEMA,
   permite,
@@ -109,6 +110,8 @@ export async function getSessionContextDetalhado(
   if (!r.ok) return { ctx: null, falha: r.motivo, userId: user.id };
 
   const a = r.acesso;
+  // O que esta requisição mudar sai no histórico com o nome da pessoa.
+  await marcarPessoaDaRequisicao(user.id);
   return {
     userId: user.id,
     ctx: {

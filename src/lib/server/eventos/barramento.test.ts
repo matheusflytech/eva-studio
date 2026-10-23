@@ -8,6 +8,10 @@ const depois = vi.hoisted(() => ({ fila: [] as (() => Promise<void>)[] }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/webhooks/do-barramento", () => consumidor);
+vi.mock("@/lib/server/automacoes/casamento", () => ({ paraAutomacoes: vi.fn() }));
+const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn(), pessoa: null as { tipo: "usuario"; id: string } | null }));
+vi.mock("@/lib/server/historico", () => ({ registrarHistorico: hist.registrarHistorico }));
+vi.mock("./ator-da-requisicao", () => ({ atorDaRequisicao: async () => hist.pessoa }));
 // `after` guarda o callback; o teste decide quando rodar (como o fim da resposta).
 vi.mock("next/server", () => ({ after: (fn: () => Promise<void>) => depois.fila.push(fn) }));
 
@@ -20,6 +24,7 @@ const rodarDepois = async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   depois.fila = [];
+  hist.pessoa = null;
   db.eventoDeDominio.create.mockResolvedValue({ id: "ev1", createdAt: new Date("2026-10-21T12:00:00Z") });
   db.eventoDeDominio.updateMany.mockResolvedValue({ count: 1 });
 });
@@ -66,6 +71,37 @@ describe("publicarEvento", () => {
       diff: { name: { de: "A", para: "B" } },
     });
     expect(atorAtual()).toEqual({ tipo: "sistema" });
+  });
+});
+
+describe("histórico", () => {
+  it("pessoa logada na requisição vira o ator; comAtor vale mais", async () => {
+    hist.pessoa = { tipo: "usuario", id: "u1" };
+    await publicarEvento({ orgId: "o1", tipo: "deal.won", objeto: "deal", objetoId: "d1" });
+    expect(db.eventoDeDominio.create.mock.calls[0][0].data.ator).toEqual({ tipo: "usuario", id: "u1" });
+    await comAtor({ tipo: "api", id: "k1" }, () => publicarEvento({ orgId: "o1", tipo: "deal.won", objeto: "deal", objetoId: "d1" }));
+    expect(db.eventoDeDominio.create.mock.calls[1][0].data.ator).toEqual({ tipo: "api", id: "k1" });
+  });
+
+  it("criar e alterar registro gravam no histórico, depois da resposta", async () => {
+    hist.pessoa = { tipo: "usuario", id: "u1" };
+    await publicarEvento({ orgId: "o1", tipo: "deal.updated", objeto: "deal", objetoId: "d1", diff: { name: { de: "A", para: "B" } } });
+    await publicarEvento({ orgId: "o1", tipo: "contact.created", objeto: "contact", objetoId: "c1" });
+    expect(hist.registrarHistorico).not.toHaveBeenCalled();
+    await rodarDepois();
+    expect(hist.registrarHistorico).toHaveBeenCalledWith(
+      { orgId: "o1", acao: "alterou", objeto: "deal", objetoId: "d1", mudancas: { name: { de: "A", para: "B" } } },
+      { tipo: "usuario", id: "u1" }
+    );
+    expect(hist.registrarHistorico).toHaveBeenCalledWith({ orgId: "o1", acao: "criou", objeto: "contact", objetoId: "c1", mudancas: null }, { tipo: "usuario", id: "u1" });
+  });
+
+  it("outros eventos e alteração sem diff não gravam", async () => {
+    await publicarEvento({ orgId: "o1", tipo: "deal.stage_changed", objeto: "deal", objetoId: "d1" });
+    await publicarEvento({ orgId: "o1", tipo: "deal.updated", objeto: "deal", objetoId: "d1", diff: {} });
+    await publicarEvento({ orgId: "o1", tipo: "task.created", objeto: "task", objetoId: "t1" });
+    await rodarDepois();
+    expect(hist.registrarHistorico).not.toHaveBeenCalled();
   });
 });
 
