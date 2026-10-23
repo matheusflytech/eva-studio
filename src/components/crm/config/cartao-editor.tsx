@@ -6,14 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { ListaOrdenavel } from "@/components/crm/config/lista-ordenavel";
+import { ListaFixa } from "@/components/crm/config/lista-fixa";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { ConteudoDaPrevia, type EtapaDaPrevia } from "@/components/crm/negocios/previa";
 import { camposDisponiveis, ehPersonalizado, rotulosPersonalizados } from "@/components/crm/negocios/cartao";
 import type { NegocioKanban } from "@/components/crm/negocios/modelo";
 import {
+  ACOES_DO_CARTAO,
   LAYOUT_PADRAO,
   MAX_CAMPOS_NA_PREVIA,
   MAX_CAMPOS_NO_CARTAO,
+  ROTULO_DA_ACAO,
+  ROTULO_DA_SECAO,
+  SECOES_DO_PAINEL,
   rotuloDoCampo,
   type CampoDoCartao,
   type Densidade,
@@ -22,9 +27,10 @@ import {
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { cn } from "@/lib/utils";
 
-// Aba "Cartão do negócio" de /negocios/configurar: por funil, o que aparece no
-// cartão do quadro, o que aparece na prévia ao clicar e a densidade, com um
-// cartão de exemplo mudando ao vivo. Só quem configura funil salva.
+// Aba "Cartão do negócio" de /negocios/configurar: o padrão do funil para o
+// cartão do quadro (campos, ações do rodapé, densidade) e para o painel ao clicar
+// (seções e campos de Detalhes), com um cartão de exemplo mudando ao vivo. Cada
+// pessoa pode personalizar por cima no quadro. Só quem configura funil salva.
 
 interface FunilSimples {
   id: string;
@@ -43,8 +49,9 @@ type Aviso = { tom: "ok" | "erro" | "info"; texto: string };
 
 /** O que cada informação faz no cartão, quando não é óbvio pelo nome. */
 const DICA: Partial<Record<CampoDoCartao, string>> = {
-  empresa: "Vira o título do cartão, que abre a ficha",
-  nome: "Aparece embaixo quando o título é a empresa",
+  contato: "Vai no topo, com foto e nome",
+  empresa: "No topo, embaixo do contato, quando o nome do negócio não está no cartão",
+  nome: "No topo, embaixo do contato",
   whatsapp: "Ícone com ponto quando há mensagem não lida",
   proximoPasso: "Um sinal só: atraso, parado ou a próxima tarefa",
   probabilidade: "Barra e porcentagem, só em etapas abertas",
@@ -220,7 +227,8 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <p className="max-w-[600px] text-small text-text-secondary">
-          Escolha o que cada cartão do quadro mostra e o que aparece na prévia ao clicar nele. Vale para todo mundo que usa este funil.
+          Escolha o que cada cartão do quadro mostra e o que aparece no painel ao clicar nele. É o padrão de todo mundo que usa este funil; cada pessoa
+          pode personalizar o seu no quadro.
         </p>
         {funis.length > 1 && (
           <div className="w-[220px]">
@@ -299,14 +307,33 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
             />
             <ListaDeCampos
               id="na-previa"
-              titulo="Na prévia"
-              descricao="O que aparece ao clicar no cartão."
+              titulo="Detalhes no painel"
+              descricao="O que aparece na seção Detalhes ao clicar no cartão."
               itens={rascunho.previa}
               max={MAX_CAMPOS_NA_PREVIA}
               disponiveis={disponiveis}
               rotulos={rotulos}
               podeEditar={podeEditar}
               onChange={(previa) => mudar({ previa })}
+            />
+            <ListaFixa
+              titulo="Ações no rodapé"
+              descricao="WhatsApp só aparece com conversa e Ligar só com telefone."
+              todas={ACOES_DO_CARTAO}
+              rotulo={(a) => ROTULO_DA_ACAO[a]}
+              escolhidas={rascunho.acoes}
+              podeEditar={podeEditar}
+              onChange={(acoes) => mudar({ acoes })}
+            />
+            <ListaFixa
+              titulo="Seções do painel"
+              descricao="Ligue, desligue e arraste para mudar a ordem."
+              todas={SECOES_DO_PAINEL}
+              rotulo={(s) => ROTULO_DA_SECAO[s]}
+              escolhidas={rascunho.secoes}
+              minimo={1}
+              podeEditar={podeEditar}
+              onChange={(secoes) => mudar({ secoes })}
             />
           </div>
 
@@ -350,12 +377,12 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
         <aside aria-label="Prévia ao vivo" className="flex flex-col gap-4 xl:sticky xl:top-4 xl:self-start">
           <div>
             <p className="mb-2 font-mono text-caption text-text-tertiary">Cartão no quadro</p>
-            <div className="rounded-xl border border-border-subtle bg-panel p-2">
-              <DealCard deal={exemplo} tipoDaEtapa={etapaDeExemplo.type} defs={defs} agora={agora} layout={rascunho} />
+            <div className="rounded-[20px] bg-raised p-4">
+              <DealCard deal={exemplo} tipoDaEtapa={etapaDeExemplo.type} nomeDaEtapa={etapaDeExemplo.name} defs={defs} agora={agora} layout={rascunho} />
             </div>
           </div>
           <div>
-            <p className="mb-2 font-mono text-caption text-text-tertiary">Prévia ao clicar</p>
+            <p className="mb-2 font-mono text-caption text-text-tertiary">Detalhes no painel</p>
             <div className="rounded-2xl border border-border-default bg-panel p-4">
               <ConteudoDaPrevia deal={exemplo} etapa={etapaDeExemplo} layout={rascunho} defs={defs} agora={agora} />
             </div>
