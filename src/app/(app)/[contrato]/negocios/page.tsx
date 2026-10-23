@@ -71,6 +71,9 @@ import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, 
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
 import { QuadroContexto, type AcoesDoQuadro, type FocoDoPainel } from "@/components/crm/negocios/quadro-contexto";
 import { PersonalizarQuadro, type AbaDaPersonalizacao } from "@/components/crm/negocios/personalizar";
+import { useEntradaDoQuadro } from "@/components/crm/negocios/animacao/entrada-do-quadro";
+import { useFlipDoQuadro } from "@/components/crm/negocios/animacao/flip-do-quadro";
+import { useInclinacaoNoArrasto } from "@/components/crm/negocios/animacao/inclinacao-no-arrasto";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
@@ -487,6 +490,13 @@ function NegociosConteudo() {
     naIlha: { elemento: (id) => document.querySelector(`[data-deal-id="${CSS.escape(id)}"]`) },
   });
 
+  // ── Animações (fixas): entrada, inclinação no arrasto e voo entre colunas ──
+  const quadroRef = React.useRef<HTMLDivElement>(null);
+  const overlayRef = React.useRef<HTMLDivElement>(null);
+  useEntradaDoQuadro(quadroRef, stages[0]?.id ?? "");
+  useInclinacaoNoArrasto(overlayRef, !!dragging);
+  const fotografar = useFlipDoQuadro(quadroRef, stages);
+
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
       const deal = s.deals.find((d) => d.id === event.active.id);
@@ -495,14 +505,16 @@ function NegociosConteudo() {
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    // O overlay ainda está na tela: o cartão voa de onde foi solto.
+    const origem = overlayRef.current;
     setDragging(null);
     const alvo = event.over ? String(event.over.id) : "";
     // Ganho e Perdido são colunas (v4): soltar numa coluna é mover para ela.
-    if (alvo) await moverNegocio(String(event.active.id), alvo);
+    if (alvo) await moverNegocio(String(event.active.id), alvo, origem);
   }
 
   /** Arrastar e o "Mover para" do cartão: mesmas regras, mesmo Desfazer. */
-  async function moverNegocio(dealId: string, stageId: string) {
+  async function moverNegocio(dealId: string, stageId: string, origem?: HTMLElement | null) {
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
     const deal = from.deals.find((d) => d.id === dealId)!;
@@ -511,7 +523,10 @@ function NegociosConteudo() {
     const antes = stages;
     // Move na tela antes da resposta: esperar o servidor deixa o quadro lento.
     // Perdido não: o modal do motivo vem antes.
-    if (para.type !== "lost") setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+    if (para.type !== "lost") {
+      fotografar(dealId, origem);
+      setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+    }
     // Regras da etapa no servidor: faltou campo → "Complete para mover";
     // perdido → motivo; negócio fechado → aviso (só sai com Reabrir).
     const r = await mudanca.mover({
@@ -524,16 +539,23 @@ function NegociosConteudo() {
       extra: extraDoArraste(from.type),
       // Perdido só sai da coluna depois do motivo: move no clique de confirmar,
       // sem esperar o servidor (antes o cartão ficava parado e a ilha dizia que moveu).
-      aoConfirmarPerda: () => setStages((ss) => moverCartao(ss, dealId, stageId, new Date())),
+      aoConfirmarPerda: () => {
+        fotografar(dealId);
+        setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+      },
       // Toast com "Desfazer": volta para a coluna de onde saiu.
       de: { id: from.id, name: from.name, type: from.type },
-      aoDesfazer: () => setVersao((v) => v + 1),
+      aoDesfazer: () => {
+        fotografar(dealId);
+        setVersao((v) => v + 1);
+      },
     });
     if (r === "movido") {
       setVersao((v) => v + 1);
       return;
     }
     // Cancelou ou falhou: o cartão volta para onde estava.
+    fotografar(dealId);
     setStages(() => antes);
   }
 
@@ -829,7 +851,7 @@ function NegociosConteudo() {
           <QuadroContexto.Provider value={acoesDoQuadro}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-96 snap-x gap-3 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
+              <div ref={quadroRef} className="flex min-h-96 snap-x gap-3 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
@@ -851,7 +873,10 @@ function NegociosConteudo() {
             </div>
             <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
               {dragging && (
-                <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+                // Wrapper interno: a inclinação mora aqui, não no nó que o dnd-kit posiciona.
+                <div ref={overlayRef} data-flip-id={dragging.deal.id}>
+                  <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+                </div>
               )}
             </DragOverlay>
           </DndContext>
@@ -925,7 +950,18 @@ function NegociosConteudo() {
             onFechar={() => setPrevia(null)}
             onMudou={() => setVersao((v) => v + 1)}
             pipelineId={pipelineId}
-            onMover={mudanca.mover}
+            onMover={async (pedido) => {
+              const r = await mudanca.mover({
+                ...pedido,
+                aoDesfazer: () => {
+                  fotografar(pedido.dealId);
+                  pedido.aoDesfazer?.();
+                },
+              });
+              // O painel recarrega o quadro em seguida: o cartão voa até a coluna nova.
+              if (r === "movido") fotografar(pedido.dealId);
+              return r;
+            }}
           />
         </VozDoQuadro.Provider>
       )}

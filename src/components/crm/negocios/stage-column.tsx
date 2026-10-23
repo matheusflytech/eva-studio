@@ -50,6 +50,7 @@ function CartaoArrastavel({
       {...listeners}
       {...attributes}
       data-deal-id={deal.id}
+      data-flip-id={deal.id}
       aria-label={`${deal.name}. Enter abre a prévia, espaço pega para mover.`}
       onPointerDownCapture={(e) => {
         origem.current = { x: e.clientX, y: e.clientY };
