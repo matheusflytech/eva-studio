@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { formatarMudancas, resumoDaLinha, type CampoDoDicionario, type Dicionario } from "@/lib/historico/formatar";
 import type { ItemDoHistorico, LinhaDoHistorico } from "@/lib/historico/tipos";
+import type { ItemDaLinhaDoTempo } from "@/components/crm/negocio/linha-do-tempo";
+import { listarHistorico } from "@/lib/server/historico";
 
 // Linhas do histórico prontas para a tela: busca de uma vez os nomes que as
 // mudanças citam (responsável, etapa, funil, empresa, contato e rótulo de
@@ -76,4 +78,22 @@ export async function itensDoHistorico(orgId: string, linhas: LinhaDoHistorico[]
     itens.push({ ...l, mudancas, resumo: resumoDaLinha(l, mudancas.length), existe: vivos.has(l.objetoId) });
   }
   return itens;
+}
+
+/** Itens "alteracao" da linha do tempo de uma ficha. Sem a tabela, nenhum. */
+export async function alteracoesDaFicha(
+  orgId: string,
+  objeto: "deal" | "contact" | "company",
+  objetoId: string,
+  limite = 100
+): Promise<ItemDaLinhaDoTempo[]> {
+  const { linhas } = await listarHistorico(orgId, { objeto, objetoId, acoes: ["alterou"], limite });
+  const itens = await itensDoHistorico(orgId, linhas, { semEtapa: objeto === "deal" });
+  return itens.map((h) => ({
+    id: `alteracao-${h.id}`,
+    tipo: "alteracao" as const,
+    em: h.em,
+    ator: { tipo: h.atorTipo, nome: h.atorNome, id: h.atorId },
+    mudancas: h.mudancas,
+  }));
 }

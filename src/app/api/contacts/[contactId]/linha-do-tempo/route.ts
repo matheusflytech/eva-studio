@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { filtroDeEscopo } from "@/lib/server/escopo-dados";
+import { alteracoesDaFicha } from "@/lib/server/historico-leitura";
 import type { ItemDaLinhaDoTempo, LinhaDoTempo } from "@/components/crm/negocio/linha-do-tempo";
 
 // Teto de itens: o mais recente primeiro; o que fica de fora é o mais antigo.
@@ -28,7 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
   });
   if (!contato) return NextResponse.json({ error: "Contato não encontrado." }, { status: 404 });
 
-  const [vinculos, notas, tarefas, conversas] = await Promise.all([
+  const [vinculos, notas, tarefas, conversas, alteracoes] = await Promise.all([
     prisma.dealContact.findMany({
       where: { contactId, deal: { orgId } },
       select: { deal: { select: { id: true, name: true, createdAt: true } } },
@@ -51,6 +52,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
       orderBy: { lastMessageAt: "desc" },
       take: LIMITE_DE_CONVERSAS,
       select: { id: true, channel: true, createdAt: true, lastMessageText: true },
+    }),
+    alteracoesDaFicha(orgId, "contact", contactId).catch((e: unknown) => {
+      console.error("[contato/linha-do-tempo] histórico de alterações indisponível", e);
+      return [];
     }),
   ]);
 
@@ -126,6 +131,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
       ultimaMensagem: c.lastMessageText || undefined,
     });
   }
+
+  itens.push(...alteracoes);
 
   itens.sort((a, b) => b.em.localeCompare(a.em) || a.id.localeCompare(b.id));
   const corpo: LinhaDoTempo = { itens: itens.slice(0, LIMITE), conversas: [] };

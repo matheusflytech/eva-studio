@@ -3,6 +3,8 @@
 // devolvem e as funções puras que viram texto e grupos por dia na tela. Fica fora dos componentes para ser testado
 // sem navegador e para a rota e a tela falarem exatamente o mesmo formato.
 
+import type { MudancaLegivel, TipoDoAtor } from "@/lib/historico/tipos";
+
 export type OrigemDoMovimento = "usuario" | "fluxo" | "api" | "importacao" | "backfill" | string;
 
 interface Base {
@@ -36,6 +38,12 @@ export type ItemDaLinhaDoTempo =
       tipoTarefa: string;
       texto: string;
       prazo: string | null;
+    })
+  | (Base & {
+      /** Campos alterados numa gravação (histórico de alterações). */
+      tipo: "alteracao";
+      ator: { tipo: TipoDoAtor; nome: string; id: string | null };
+      mudancas: MudancaLegivel[];
     })
   | (Base & {
       tipo: "conversa";
@@ -148,6 +156,12 @@ export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
       return { titulo: `Tarefa criada: ${rotuloDoTipoDeTarefa(item.tipoTarefa)}`, detalhe: item.texto };
     case "tarefa_concluida":
       return { titulo: `Tarefa concluída: ${rotuloDoTipoDeTarefa(item.tipoTarefa)}`, detalhe: item.texto };
+    case "alteracao": {
+      const n = item.mudancas.length;
+      const campos = n === 1 ? `alterou ${item.mudancas[0].rotulo}` : `alterou ${n} campos`;
+      if (item.ator.tipo === "sistema") return { titulo: n === 1 ? `${item.mudancas[0].rotulo} alterado` : `${n} campos alterados` };
+      return { titulo: `${item.ator.nome} ${campos}` };
+    }
     case "conversa":
       return {
         titulo: `Nova conversa no ${rotuloDoCanal(item.canal)}`,
@@ -158,7 +172,7 @@ export function descreverItem(item: ItemDaLinhaDoTempo): TextoDoItem {
 
 // ---- filtro ----
 
-export type FiltroDaLinhaDoTempo = "tudo" | "etapas" | "notas" | "tarefas" | "conversas";
+export type FiltroDaLinhaDoTempo = "tudo" | "etapas" | "notas" | "tarefas" | "conversas" | "alteracoes";
 
 const TIPOS_DO_FILTRO: Record<Exclude<FiltroDaLinhaDoTempo, "tudo">, TipoDoItem[]> = {
   // A criação entra junto: é a primeira "etapa" do negócio (e do contato).
@@ -166,6 +180,7 @@ const TIPOS_DO_FILTRO: Record<Exclude<FiltroDaLinhaDoTempo, "tudo">, TipoDoItem[
   notas: ["nota"],
   tarefas: ["tarefa_criada", "tarefa_concluida"],
   conversas: ["conversa"],
+  alteracoes: ["alteracao"],
 };
 
 export function filtrarItens(itens: ItemDaLinhaDoTempo[], filtro: FiltroDaLinhaDoTempo): ItemDaLinhaDoTempo[] {
