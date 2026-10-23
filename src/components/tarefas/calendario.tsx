@@ -2,18 +2,19 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion, type Transition, type Variants } from "framer-motion";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, HandCoins } from "lucide-react";
+import { ChevronLeft, ChevronRight, HandCoins } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import { focusRing } from "@/components/ui/styles";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { cn } from "@/lib/utils";
 import { pulsar } from "@/lib/fundo/eventos";
-import { diaEmSP, mesmoDia, type Dia } from "@/lib/tarefas/calendario";
+import { diaDaSemana, diaEmSP, mesmoDia, somarDias, type Dia } from "@/lib/tarefas/calendario";
 import type { VisaoDeTarefas } from "@/lib/tarefas/escopo";
 import type { TarefaDaTela } from "@/lib/tarefas/tela";
 import {
@@ -21,13 +22,11 @@ import {
   SEMANA_CURTA,
   agruparPorDia,
   chaveDoDia,
-  compararMeses,
   densidade,
   diaDaChave,
   eventosDasTarefas,
   eventosDosNegocios,
   horaDoEvento,
-  intervaloDaGrade,
   partesDoResumo,
   resumirDia,
   semanasDoMes,
@@ -38,27 +37,33 @@ import {
   type Mes,
   type NegocioComPrevisao,
 } from "./calendario-dados";
+import { diasDaSemana, eventoEmDestaque, intervaloDaVisao } from "./calendario-semana";
 import { valorCurto } from "@/components/crm/negocios/modelo";
+import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { buscarTarefas, FiltroDeQuem, type Resposta } from "./lista";
 import { LinhaDeTarefa } from "./linha";
 import { useConcluirTarefa } from "./concluir";
 import { BlocoDeHorario, IconeDoTipo, SemTarefas, TituloDeGrupo, type Moldura } from "./pecas";
+import { MiniMes } from "./mini-mes";
+import { GradeDaSemana } from "./semana";
+import { DetalheDoEvento } from "./detalhe-do-evento";
 
-// Calendário (terceira aba de Tarefas): o mês em grade de cartões, domingo a
-// sábado, no relógio de SP. Cada dia mostra até 3 eventos (ícone do tipo e
-// hora), "+N" e o resumo (tarefas, reuniões, atrasadas); o cartão se tinge
-// com a densidade do dia. Clicar abre o dia no painel lateral com as linhas
-// de tarefa de sempre (concluir, adiar, ligar).
+// Calendário (terceira aba de Tarefas, e bloco do Início). No desenho da
+// agenda de trabalho: em cima, o dia escolhido e a navegação; à esquerda, o
+// mini calendário do mês e o detalhe do item escolhido (quando, a que negócio
+// e contato está ligado, concluir); à direita, a semana em grade de horas
+// (padrão) ou o mês em grade de cartões. Tudo no relógio de SP.
 //
 // Os dados chegam como EventoDoCalendario (calendario-dados.ts). Fontes: as
-// tarefas com prazo na grade do mês e os fechamentos previstos dos negócios
-// abertos; a agenda espelhada (Google/Outlook) entraria como mais uma fonte em
-// `eventos` abaixo, sem mexer na grade nem no painel.
+// tarefas com prazo e os fechamentos previstos dos negócios abertos, no
+// intervalo do mês e da semana escolhidos; a agenda espelhada (Google/Outlook)
+// entraria como mais uma fonte em `eventos` abaixo, sem mexer nas grades nem
+// no detalhe.
 
-/** Eventos listados dentro do cartão do dia antes do "+N". */
+/** Eventos listados dentro do cartão do dia (visão do mês) antes do "+N". */
 const NO_CARTAO = 3;
 
-// Mola curta: o mês desliza para o lado da navegação e esmaece.
+// Mola curta: a semana/o mês desliza para o lado da navegação e esmaece.
 const MOLA: Transition = { type: "spring", stiffness: 420, damping: 38, mass: 0.8 };
 const ESMAECER: Transition = { duration: 0.18, ease: [0.32, 0.72, 0, 1] };
 
@@ -67,9 +72,14 @@ const TINTA = ["", "bg-accent-subtle/40", "bg-accent-subtle/70", "bg-accent-subt
 /** Faixa dos fechamentos previstos (cor de dado, não de estado). */
 const FAIXA_DO_FECHAMENTO = CATEGORY_CLASSES.green.solid;
 
-/** Negócios por página e páginas no máximo por mês (POST /api/deals/busca). */
+/** Negócios por página e páginas no máximo por intervalo (POST /api/deals/busca). */
 const NEGOCIOS_POR_PAGINA = 100;
 const PAGINAS_DE_NEGOCIOS = 5;
+
+const MODOS = ["semana", "mes"] as const;
+type ModoDoCalendario = (typeof MODOS)[number];
+const MESES_CURTOS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"] as const;
+const DIAS_DA_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"] as const;
 
 /**
  * Negócios abertos com previsão de fechamento no intervalo, pela busca da
@@ -113,12 +123,23 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   const [meuId, setMeuId] = React.useState<string | null | undefined>(undefined);
   const [erro, setErro] = React.useState<string | null>(null);
   const [agora, setAgora] = React.useState(() => new Date());
-  const [mes, setMes] = React.useState<Mes>(() => {
+  // Semana ou mês: lembrado no navegador.
+  const [modo, trocarModo] = usePreferencia<ModoDoCalendario>("eva.calendario.modo", "semana", MODOS);
+  // Dia escolhido: a semana dele, o mês dele e o detalhe partem daqui.
+  const [dia, setDia] = React.useState<Dia>(() => diaEmSP(new Date()));
+  const [mesDoMini, setMesDoMini] = React.useState<Mes>(() => {
     const d = diaEmSP(new Date());
     return { ano: d.ano, mes: d.mes };
   });
+  const [selecionadoId, setSelecionadoId] = React.useState<string | null>(null);
   const [direcao, setDirecao] = React.useState(0);
   const [aberto, setAberto] = React.useState<string | null>(null);
+
+  // O "agora" anda sozinho (linha da hora na semana, "em 10 min" no detalhe).
+  React.useEffect(() => {
+    const t = setInterval(() => setAgora(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const aplicar = React.useCallback(
     (r: Resposta) => {
@@ -135,17 +156,17 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     [visao]
   );
 
-  // Só a grade do mês visível (abertas e feitas): a rota filtra pelo prazo.
-  const intervalo = React.useMemo(() => intervaloDaGrade(mes), [mes]);
-  const carregar = React.useCallback(() => buscarTarefas(visao, intervalo).then(aplicar), [visao, intervalo, aplicar]);
+  // A grade do mês do dia escolhido mais a semana dele (abertas e feitas).
+  const { de, ate } = intervaloDaVisao(dia);
+  const carregar = React.useCallback(() => buscarTarefas(visao, { de, ate }).then(aplicar), [visao, de, ate, aplicar]);
 
   React.useEffect(() => {
     let vivo = true;
-    buscarTarefas(visao, intervalo).then((r) => vivo && aplicar(r));
+    buscarTarefas(visao, { de, ate }).then((r) => vivo && aplicar(r));
     return () => {
       vivo = false;
     };
-  }, [visao, intervalo, versao, aplicar]);
+  }, [visao, de, ate, versao, aplicar]);
 
   React.useEffect(() => {
     let vivo = true;
@@ -162,11 +183,11 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   React.useEffect(() => {
     if (meuId === undefined) return;
     let vivo = true;
-    buscarFechamentos(intervalo, visao === "minhas" ? meuId : null).then((lista) => vivo && setNegocios(lista ?? []));
+    buscarFechamentos({ de, ate }, visao === "minhas" ? meuId : null).then((lista) => vivo && setNegocios(lista ?? []));
     return () => {
       vivo = false;
     };
-  }, [intervalo, visao, meuId, versao]);
+  }, [de, ate, visao, meuId, versao]);
 
   const mudou = React.useCallback(() => {
     carregar();
@@ -197,17 +218,36 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     [tarefas, negocios, agora]
   );
   const porDia = React.useMemo(() => agruparPorDia(eventos), [eventos]);
-  const semanas = React.useMemo(() => semanasDoMes(mes), [mes]);
+  const comEventos = React.useMemo(() => new Set(porDia.keys()), [porDia]);
+  const semanas = React.useMemo(() => semanasDoMes({ ano: dia.ano, mes: dia.mes }), [dia.ano, dia.mes]);
+  const semana = React.useMemo(() => diasDaSemana(dia), [dia]);
   const hoje = diaEmSP(agora);
 
-  function irPara(alvo: Mes) {
-    setDirecao(compararMeses(mes, alvo) || 1);
-    setMes(alvo);
-  }
-  const mesDeHoje: Mes = { ano: hoje.ano, mes: hoje.mes };
-  const estaNoMesDeHoje = compararMeses(mes, mesDeHoje) === 0;
+  // Detalhe: o item clicado; sem clique, o próximo do dia escolhido.
+  const doDia = porDia.get(chaveDoDia(dia)) ?? [];
+  const selecionado = (selecionadoId ? eventos.find((e) => e.id === selecionadoId) : null) ?? eventoEmDestaque(doDia, agora);
 
-  // Atalhos: PageUp/PageDown trocam o mês (fora de campo e com o painel fechado).
+  /** Escolhe um dia: a semana/o mês vão para ele, deslizando para o lado certo. */
+  function escolherDia(d: Dia) {
+    const chave = (x: Dia) => (modo === "semana" ? chaveDoDia(diasDaSemana(x)[0]) : chaveDoDia({ ano: x.ano, mes: x.mes, dia: 1 }));
+    const antes = chave(dia);
+    const depois = chave(d);
+    if (antes !== depois) setDirecao(depois > antes ? 1 : -1);
+    setDia(d);
+    setMesDoMini({ ano: d.ano, mes: d.mes });
+    setSelecionadoId(null);
+  }
+  function andar(n: number) {
+    if (modo === "semana") return escolherDia(somarDias(dia, 7 * n));
+    const m = somarMeses({ ano: dia.ano, mes: dia.mes }, n);
+    escolherDia({ ano: m.ano, mes: m.mes, dia: 1 });
+  }
+
+  // Atalhos: PageUp/PageDown andam uma semana/um mês (fora de campo e com o painel fechado).
+  const andarRef = React.useRef(andar);
+  React.useEffect(() => {
+    andarRef.current = andar;
+  });
   React.useEffect(() => {
     function tecla(e: KeyboardEvent) {
       if (aberto || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -215,9 +255,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
       if (alvo && (alvo.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(alvo.tagName))) return;
       if (e.key === "PageDown" || e.key === "PageUp") {
         e.preventDefault();
-        const n = e.key === "PageDown" ? 1 : -1;
-        setDirecao(n);
-        setMes((m) => somarMeses(m, n));
+        andarRef.current(e.key === "PageDown" ? 1 : -1);
       }
     }
     window.addEventListener("keydown", tecla);
@@ -228,10 +266,10 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   const doMes = React.useMemo(() => {
     const lista = eventos.filter((e) => {
       const d = diaEmSP(e.inicio);
-      return d.ano === mes.ano && d.mes === mes.mes;
+      return d.ano === dia.ano && d.mes === dia.mes;
     });
     return resumirDia(lista);
-  }, [eventos, mes]);
+  }, [eventos, dia.ano, dia.mes]);
 
   const contagem =
     tarefas === null ? null : (
@@ -257,7 +295,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     centro: { opacity: 1, x: 0, filter: "blur(0px)" },
     sai: (d: number) => ({ opacity: 0, x: reduzir ? 0 : d * -56, filter: reduzir ? "blur(0px)" : "blur(6px)" }),
   };
-  const chaveDoMes = `${mes.ano}-${mes.mes}`;
+  const chaveDaGrade = modo === "semana" ? `s-${chaveDoDia(semana[0])}` : `m-${dia.ano}-${dia.mes}`;
 
   const diaAberto = aberto ? diaDaChave(aberto) : null;
   const eventosDoDia = aberto ? (porDia.get(aberto) ?? []) : [];
@@ -266,91 +304,127 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
 
   return moldura({
     contagem,
-    lateral: (
-      <FiltroDeQuem
-        visoes={visoes}
-        visao={visao}
-        onEscolher={(v) => {
-          setVisao(v);
-        }}
-      />
-    ),
+    lateral: <FiltroDeQuem visoes={visoes} visao={visao} onEscolher={setVisao} />,
     conteudo: (
-      <div className="flex flex-col gap-4">
-        {/* Navegação: « ‹ Mês Ano › » e Hoje. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h2 className="min-w-[11ch] text-title font-light tracking-tight text-text-primary" aria-live="polite">
-            {NOMES_DOS_MESES[mes.mes - 1]} <span className="text-text-tertiary">{mes.ano}</span>
-          </h2>
-          <div className="flex items-center gap-1">
-            <IconButton aria-label="Ano anterior" tooltip="Ano anterior" size="sm" onClick={() => irPara(somarMeses(mes, -12))}>
-              <ChevronsLeft />
-            </IconButton>
-            <IconButton aria-label="Mês anterior" tooltip="Mês anterior (PageUp)" size="sm" onClick={() => irPara(somarMeses(mes, -1))}>
-              <ChevronLeft />
-            </IconButton>
-            <IconButton aria-label="Próximo mês" tooltip="Próximo mês (PageDown)" size="sm" onClick={() => irPara(somarMeses(mes, 1))}>
-              <ChevronRight />
-            </IconButton>
-            <IconButton aria-label="Próximo ano" tooltip="Próximo ano" size="sm" onClick={() => irPara(somarMeses(mes, 12))}>
-              <ChevronsRight />
-            </IconButton>
+      <div className="overflow-hidden rounded-[22px] border border-border-subtle bg-panel">
+        {/* Cabeçalho: o dia escolhido e a navegação. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border-subtle px-5 py-4">
+          <div aria-hidden="true" className="flex w-12 flex-col overflow-hidden rounded-[10px] border border-border-subtle text-center shadow-[0_1px_2px_rgb(0_0_0/0.05)]">
+            <span className="bg-danger-solid py-0.5 text-[10px] font-semibold tracking-widest text-text-on-accent">{MESES_CURTOS[dia.mes - 1]}</span>
+            <span className="bg-panel py-1 text-title font-semibold leading-none tabular-nums text-text-primary">{dia.dia}</span>
           </div>
-          <Button variant="secondary" size="sm" onClick={() => irPara(mesDeHoje)} disabled={estaNoMesDeHoje}>
-            Hoje
-          </Button>
+          <div className="min-w-0">
+            <h2 className="text-body font-semibold text-text-primary" aria-live="polite">
+              {dia.dia} de {NOMES_DOS_MESES[dia.mes - 1].toLowerCase()} de {dia.ano}
+            </h2>
+            <p className="text-small text-text-tertiary">{DIAS_DA_SEMANA[diaDaSemana(dia)]}</p>
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="inline-flex h-9 items-center rounded-full border border-border-subtle bg-raised p-0.5">
+              <IconButton aria-label={modo === "semana" ? "Semana anterior" : "Mês anterior"} tooltip="PageUp" size="sm" onClick={() => andar(-1)}>
+                <ChevronLeft />
+              </IconButton>
+              <Button variant="ghost" size="sm" className="h-8 rounded-full px-4" onClick={() => escolherDia(hoje)} disabled={mesmoDia(dia, hoje)}>
+                Hoje
+              </Button>
+              <IconButton aria-label={modo === "semana" ? "Próxima semana" : "Próximo mês"} tooltip="PageDown" size="sm" onClick={() => andar(1)}>
+                <ChevronRight />
+              </IconButton>
+            </div>
+            <SegmentedControl
+              label="Visão do calendário"
+              value={modo}
+              onChange={trocarModo}
+              options={[
+                { value: "semana", label: "Semana" },
+                { value: "mes", label: "Mês" },
+              ]}
+            />
+          </div>
         </div>
 
-        {erro && <p role="alert" className="text-small text-danger">{erro}</p>}
-
-        {/* Dias da semana em cápsulas (fixos; só o mês anima). */}
-        <div className="grid grid-cols-7 gap-2" aria-hidden="true">
-          {SEMANA_CURTA.map((d) => (
-            <span key={d} className="grid h-8 place-items-center rounded-full border border-border-subtle bg-raised font-mono text-caption tracking-widest text-text-tertiary">
-              {d}
-            </span>
-          ))}
-        </div>
-
-        {tarefas === null ? (
-          <div className="grid grid-cols-7 gap-2" aria-busy="true">
-            {Array.from({ length: 35 }, (_, i) => (
-              <Skeleton key={i} className="h-[132px] rounded-[18px]" />
-            ))}
-          </div>
-        ) : (
-          <div className="relative">
-            <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
-              <motion.div
-                key={chaveDoMes}
-                role="group"
-                aria-label={`${NOMES_DOS_MESES[mes.mes - 1]} de ${mes.ano}`}
-                custom={direcao}
-                variants={variantes}
-                initial="entra"
-                animate="centro"
-                exit="sai"
-                transition={{ x: MOLA, opacity: ESMAECER, filter: ESMAECER }}
-                className="grid w-full grid-cols-7 gap-2"
-                style={{ gridAutoRows: "minmax(132px, 1fr)" }}
-              >
-                {semanas.flat().map((d) => {
-                  const chave = chaveDoDia(d);
-                  return (
-                    <DiaDoCalendario
-                      key={chave}
-                      dia={d}
-                      eventos={porDia.get(chave) ?? []}
-                      foraDoMes={d.mes !== mes.mes}
-                      ehHoje={mesmoDia(d, hoje)}
-                      onAbrir={() => setAberto(chave)}
-                    />
-                  );
-                })}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+        {erro && (
+          <p role="alert" className="px-5 pt-3 text-small text-danger">
+            {erro}
+          </p>
         )}
+
+        <div className="grid lg:grid-cols-[288px_minmax(0,1fr)]">
+          {/* Esquerda: mini mês e o detalhe do item escolhido. */}
+          <aside aria-label="Mês e detalhe" className="flex flex-col gap-5 border-b border-border-subtle p-5 lg:border-b-0 lg:border-r">
+            <MiniMes mes={mesDoMini} onMes={setMesDoMini} escolhido={dia} hoje={hoje} comEventos={comEventos} onEscolher={escolherDia} />
+            <div className="border-t border-border-subtle pt-5">
+              {tarefas === null ? <Skeleton className="h-40 rounded-2xl" /> : <DetalheDoEvento evento={selecionado} agora={agora} onConcluir={concluir} onReabrir={reabrir} />}
+            </div>
+          </aside>
+
+          {/* Direita: semana (padrão) ou mês. */}
+          <div className="min-w-0">
+            {tarefas === null ? (
+              <div className="grid grid-cols-7 gap-2 p-4" aria-busy="true">
+                {Array.from({ length: 21 }, (_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-[14px]" />
+                ))}
+              </div>
+            ) : (
+              <div className="relative overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
+                  <motion.div
+                    key={chaveDaGrade}
+                    custom={direcao}
+                    variants={variantes}
+                    initial="entra"
+                    animate="centro"
+                    exit="sai"
+                    transition={{ x: MOLA, opacity: ESMAECER, filter: ESMAECER }}
+                  >
+                    {modo === "semana" ? (
+                      <GradeDaSemana
+                        dias={semana}
+                        porDia={porDia}
+                        hoje={hoje}
+                        agora={agora}
+                        escolhido={dia}
+                        selecionadoId={selecionado?.id ?? null}
+                        onEscolherDia={escolherDia}
+                        onEscolherEvento={(e) => {
+                          setDia(diaEmSP(e.inicio));
+                          setSelecionadoId(e.id);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col gap-2 p-4">
+                        <div className="grid grid-cols-7 gap-2" aria-hidden="true">
+                          {SEMANA_CURTA.map((d) => (
+                            <span key={d} className="grid h-8 place-items-center rounded-full border border-border-subtle bg-raised font-mono text-caption tracking-widest text-text-tertiary">
+                              {d}
+                            </span>
+                          ))}
+                        </div>
+                        <div role="group" aria-label={`${NOMES_DOS_MESES[dia.mes - 1]} de ${dia.ano}`} className="grid w-full grid-cols-7 gap-2" style={{ gridAutoRows: "minmax(120px, 1fr)" }}>
+                          {semanas.flat().map((d) => {
+                            const chave = chaveDoDia(d);
+                            return (
+                              <DiaDoCalendario
+                                key={chave}
+                                dia={d}
+                                eventos={porDia.get(chave) ?? []}
+                                foraDoMes={d.mes !== dia.mes}
+                                ehHoje={mesmoDia(d, hoje)}
+                                onAbrir={() => setAberto(chave)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </div>
 
         <Drawer open={!!aberto} onOpenChange={(a) => !a && setAberto(null)}>
           {diaAberto && (
@@ -383,7 +457,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
 
 const primeiraMaiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** Tarefa vira a linha de tarefa de sempre; evento de agenda vira o bloco com faixa de cor e hora. */
+/** Tarefa vira a linha de tarefa de sempre; fechamento leva à ficha; evento de agenda vira o bloco com faixa de cor e hora. */
 function ListaDoDia({
   eventos,
   agora,
