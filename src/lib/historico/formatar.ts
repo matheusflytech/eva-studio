@@ -246,3 +246,40 @@ export function resumoDaLinha(l: Pick<LinhaDoHistorico, "acao" | "objeto" | "obj
   }
   return l.acao;
 }
+
+const ROTULOS_DOS_DETALHES: Record<string, string> = {
+  email: "E-mail",
+  papel: "Papel",
+  prefixo: "Começo da chave",
+  escopos: "Escopos",
+  validade: "Validade",
+  quantidade: "Quantidade",
+  funil: "Funil",
+  formato: "Formato",
+  truncado: "Saiu cortada no limite",
+  selecionados: "Só os selecionados",
+  filtro: "Filtro",
+};
+
+/** Detalhes de uma ação da conta (e-mail do convite, começo da chave...), na ordem acima. */
+export function detalhesLegiveis(detalhes: Record<string, unknown>): { rotulo: string; valor: string }[] {
+  const out: { rotulo: string; valor: string }[] = [];
+  for (const [k, rotulo] of Object.entries(ROTULOS_DOS_DETALHES)) {
+    const v = detalhes?.[k];
+    if (vazio(v) || v === false) continue;
+    const valor =
+      typeof v === "boolean"
+        ? "Sim"
+        : typeof v === "number"
+          ? v.toLocaleString("pt-BR")
+          : Array.isArray(v)
+            ? v.map(String).join(", ")
+            : typeof v === "string" && k === "validade"
+              ? data(v)
+              : typeof v === "string"
+                ? v
+                : JSON.stringify(v);
+    out.push({ rotulo, valor: k === "prefixo" ? `${valor}…` : valor });
+  }
+  return out;
+}

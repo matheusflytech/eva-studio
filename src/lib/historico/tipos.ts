@@ -85,3 +85,22 @@ export const ROTULO_DO_ATOR: Record<TipoDoAtor, string> = {
   integracao: "Integração",
   sistema: "Sistema",
 };
+
+/** Filtro "Ação" da auditoria: o mesmo verbo para registro e para conta. */
+export const ACOES_DO_FILTRO: Record<"criou" | "alterou" | "apagou" | "restaurou" | "exportou", AcaoDoHistorico[]> = {
+  criou: ["criou", "papel.criou", "grupo.criou", "equipe.criou", "chave_api.criou", "membro.convidou"],
+  alterou: ["alterou", "papel.alterou", "grupo.alterou", "equipe.alterou", "membro.mudou_acesso"],
+  apagou: ["apagou", "papel.apagou", "grupo.apagou", "equipe.apagou", "chave_api.revogou", "membro.removeu"],
+  restaurou: ["restaurou"],
+  exportou: ["exportou"],
+};
+
+/** Filtro "Tipo" da auditoria. */
+export const OBJETOS_DO_FILTRO: Record<"deal" | "contact" | "company" | "acesso" | "api_key" | "export", ObjetoDoHistorico[]> = {
+  deal: ["deal"],
+  contact: ["contact"],
+  company: ["company"],
+  acesso: ["member", "role", "permission_group", "team"],
+  api_key: ["api_key"],
+  export: ["export"],
+};

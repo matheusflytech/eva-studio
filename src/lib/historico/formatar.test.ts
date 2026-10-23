@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DICIONARIO_VAZIO, formatarMudancas, resumoDaLinha, type Dicionario } from "./formatar";
+import { DICIONARIO_VAZIO, detalhesLegiveis, formatarMudancas, resumoDaLinha, type Dicionario } from "./formatar";
 
 const d: Dicionario = {
   ...DICIONARIO_VAZIO,
@@ -100,5 +100,18 @@ describe("resumoDaLinha", () => {
     expect(resumoDaLinha({ acao: "membro.convidou", objeto: "member", objetoNome: "Bia", detalhes: { email: "bia@x.com", papel: "Atendente" } }, 0)).toBe("Convidou Bia (bia@x.com) como Atendente");
     expect(resumoDaLinha({ acao: "chave_api.criou", objeto: "api_key", objetoNome: "n8n", detalhes: { prefixo: "evs_live_4f2a" } }, 0)).toBe("Criou a chave de API n8n (evs_live_4f2a…)");
     expect(resumoDaLinha({ acao: "membro.mudou_acesso", objeto: "member", objetoNome: "Bruno", detalhes: {} }, 1)).toBe("Mudou o acesso de Bruno");
+  });
+});
+
+describe("detalhesLegiveis", () => {
+  it("rótulos em português, sem o que é falso ou vazio", () => {
+    expect(detalhesLegiveis({ prefixo: "evs_live_4f2a", escopos: ["deals:read", "contacts:read"], truncado: false, entidade: "x" })).toEqual([
+      { rotulo: "Começo da chave", valor: "evs_live_4f2a…" },
+      { rotulo: "Escopos", valor: "deals:read, contacts:read" },
+    ]);
+    expect(detalhesLegiveis({ quantidade: 1240, truncado: true })).toEqual([
+      { rotulo: "Quantidade", valor: "1.240" },
+      { rotulo: "Saiu cortada no limite", valor: "Sim" },
+    ]);
   });
 });
