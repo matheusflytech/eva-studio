@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   deal: { findMany: vi.fn() },
   customField: { findMany: vi.fn(async () => []) },
   pipelineCardLayout: { findUnique: vi.fn() },
+  userCardLayout: { findUnique: vi.fn(async (): Promise<unknown> => null) },
   dealItem: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -55,6 +56,14 @@ describe("GET /api/deals", () => {
     expect(d.layout).toEqual(LAYOUT_PADRAO);
     expect(d.stages[0].deals[0].contacts).toEqual([{ id: "k1", name: "Marina", phone: "+5511999", email: "m@x.com" }]);
     expect(d.stages[0].deals[0].createdAt).toBe("2026-10-01T00:00:00.000Z");
+  });
+
+  it("devolve o layout da pessoa por cima do funil (quadro v4)", async () => {
+    db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor"], previa: [], densidade: "compacto" } });
+    db.userCardLayout.findUnique.mockResolvedValueOnce({ layout: { campos: ["contato"], previa: [], densidade: "confortavel" } });
+    const d = await (await get()).json();
+    expect(d.layout.campos).toEqual(["contato"]);
+    expect(db.userCardLayout.findUnique).toHaveBeenCalledWith({ where: { userId_pipelineId: { userId: "u", pipelineId: "p1" } }, select: { layout: true } });
   });
 
   it("devolve o layout salvo do funil", async () => {

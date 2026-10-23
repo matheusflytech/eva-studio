@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     const c = await conjunto(stage.pipelineId);
     const pagina = await paginaDaColuna(c.where, stage.id, lerPorEtapa(porEtapaBruto), cursor);
     const fields = await carregarDefinicoes(ctx.orgId, "deal", stage.pipelineId);
-    const { layout } = await lerLayoutDoFunil(stage.pipelineId, fields);
+    const { layout } = await lerLayoutDoFunil(stage.pipelineId, fields, ctx.userId);
     let deals: Cartao[] = await comAtividade(pagina.linhas.map(serializarCartao));
     if (mostraProdutos(layout)) deals = await comProdutos(ctx.orgId, deals);
     return NextResponse.json({ etapa: stage.id, deals, temMais: pagina.temMais, depois: pagina.depois, avisos: c.avisos, truncado: c.truncado });
@@ -98,7 +98,7 @@ export async function GET(request: Request) {
   const fields = await carregarDefinicoes(ctx.orgId, "deal", pipeline.id);
   // Layout do cartão junto, para o quadro não esperar uma segunda chamada.
   // Sem a tabela no banco, vem o padrão (lerLayoutDoFunil nunca lança).
-  const { layout } = await lerLayoutDoFunil(pipeline.id, fields);
+  const { layout } = await lerLayoutDoFunil(pipeline.id, fields, ctx.userId);
   // Regras das etapas (prazo de parado e orientação). Sem a tabela: o padrão.
   const { regras } = await lerRegras(pipeline.stages);
   const etapaBase = (stage: (typeof pipeline.stages)[number]) => ({

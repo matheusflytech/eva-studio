@@ -1048,6 +1048,7 @@ model Pipeline {
   deals        Deal[]
   customFields CustomField[]
   cardLayout   PipelineCardLayout?
+  layoutsDasPessoas UserCardLayout[]
   lostReasons  PipelineLostReason[]
 
   @@index([orgId])
@@ -1069,6 +1070,24 @@ model PipelineCardLayout {
 
   @@index([orgId])
   @@map("eva_studio_pipeline_card_layouts")
+}
+
+// O cartão e o painel como cada pessoa escolheu ver, por funil (quadro v4;
+// prisma/sql/2026-10-27-layout-da-pessoa.sql). Sem registro vale o do funil.
+model UserCardLayout {
+  id         String   @id @default(uuid())
+  orgId      String
+  userId     String
+  pipelineId String
+  // Mesmo formato do PipelineCardLayout: { campos, previa, densidade, acoes, secoes }
+  layout     Json     @default("{}")
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pipelineId])
+  @@index([orgId])
+  @@map("eva_studio_user_card_layouts")
 }
 
 model PipelineStage {
