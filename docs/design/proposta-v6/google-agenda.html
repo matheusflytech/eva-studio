@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta: Google Agenda</title>
+<style>
+  :root { --bg:#0a0a0b; --panel:#141416; --raised:#1b1b1e; --line:rgba(255,255,255,.07); --tx:#f2f2f4; --tx2:#a8a8ad; --tx3:#6f6f76; --acc:#1f6fd6; --accfg:#5d9bf0; --g:#34a853; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family: Inter, system-ui, sans-serif; background:var(--bg); color:var(--tx); padding:40px 48px 80px; }
+  h1 { font-size:28px; font-weight:600; letter-spacing:-.02em; }
+  .lead { color:var(--tx2); margin:8px 0 32px; max-width:860px; line-height:1.5; font-size:15px; }
+  h2 { font-size:15px; font-weight:600; margin:0 0 6px; }
+  .nota { color:var(--tx2); font-size:13px; margin-bottom:14px; line-height:1.5; max-width:900px; }
+  .tela { display:grid; grid-template-columns:1fr 340px; gap:16px; margin-bottom:44px; }
+  .cal { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:18px; }
+  .topo { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .topo b { font-size:20px; letter-spacing:-.02em; font-weight:600; }
+  .topo span { color:var(--tx3); font-size:20px; font-weight:300; }
+  .seg { margin-left:auto; display:flex; gap:2px; background:var(--raised); padding:3px; border-radius:999px; font-size:12px; }
+  .seg i { font-style:normal; padding:5px 11px; border-radius:999px; color:var(--tx2); }
+  .seg i.on { background:var(--tx); color:#111; font-weight:600; }
+  .fontes { display:flex; gap:8px; margin-bottom:12px; }
+  .fonte { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--tx2); padding:5px 10px; border-radius:999px; border:1px solid var(--line); }
+  .ponto { width:8px; height:8px; border-radius:50%; }
+  .grade { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; }
+  .dow { text-align:center; font:600 10px/1 ui-monospace,monospace; color:var(--tx3); padding:8px 0; border-radius:10px; background:rgba(255,255,255,.03); letter-spacing:.08em; }
+  .dia { min-width:0; min-height:104px; border-radius:16px; background:rgba(255,255,255,.035); padding:8px; display:flex; flex-direction:column; gap:3px; }
+  .dia.fora { opacity:.35; }
+  .dia.hoje { outline:1.5px solid var(--acc); background:rgba(31,111,214,.10); }
+  .n { font-size:12px; color:var(--tx2); margin-bottom:2px; }
+  .hoje .n { display:inline-grid; place-items:center; width:20px; height:20px; border-radius:50%; background:var(--acc); color:#fff; font-weight:600; }
+  .ev { font-size:10.5px; line-height:1.25; padding:3px 6px; border-radius:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; gap:4px; align-items:center; }
+  .ev.t { background:rgba(255,255,255,.06); color:var(--tx); }
+  .ev.t::before { content:""; width:3px; height:10px; border-radius:2px; background:var(--accfg); flex:none; }
+  .ev.g { background:rgba(52,168,83,.14); color:#cfe9d6; }
+  .ev.g::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--g); flex:none; }
+  .ev.g2 { background:rgba(171,112,230,.15); color:#e3d3f5; }
+  .ev.g2::before { content:""; width:6px; height:6px; border-radius:50%; background:#ab70e6; flex:none; }
+  .mais { font-size:10px; color:var(--tx3); margin-top:auto; }
+  .lado { display:flex; flex-direction:column; gap:12px; }
+  .bloco { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:18px; }
+  .bloco h3 { font-size:15px; font-weight:600; margin-bottom:2px; }
+  .sub { color:var(--tx3); font:12px ui-monospace,monospace; margin-bottom:14px; }
+  .linha { display:grid; grid-template-columns:46px 1fr; gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:13px; }
+  .linha:first-of-type { border-top:0; }
+  .hora { font:12px ui-monospace,monospace; color:var(--tx3); padding-top:2px; }
+  .titulo { color:var(--tx); }
+  .meta { color:var(--tx3); font-size:12px; margin-top:2px; display:flex; gap:6px; align-items:center; }
+  .agora { position:relative; height:1px; background:var(--acc); margin:2px 0 2px 46px; }
+  .agora::before { content:""; position:absolute; left:-4px; top:-3px; width:7px; height:7px; border-radius:50%; background:var(--acc); }
+  .tag { font-size:10px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,.06); color:var(--tx2); }
+  .btn { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 16px; border-radius:999px; background:var(--tx); color:#111; font-weight:600; font-size:13px; }
+  .btn2 { display:inline-flex; align-items:center; height:34px; padding:0 14px; border-radius:999px; border:1px solid var(--line); color:var(--tx2); font-size:12px; }
+  .gl { width:18px; height:18px; border-radius:5px; background:conic-gradient(#ea4335 0 25%,#fbbc05 0 50%,#34a853 0 75%,#4285f4 0); }
+  .conectar { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:44px; }
+  .conectar .bloco p { color:var(--tx2); font-size:13px; line-height:1.5; margin:6px 0 16px; }
+  .check { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--tx); padding:8px 0; border-top:1px solid var(--line); }
+  .sw { margin-left:auto; width:30px; height:18px; border-radius:999px; background:var(--acc); position:relative; }
+  .sw::after { content:""; position:absolute; right:2px; top:2px; width:14px; height:14px; border-radius:50%; background:#fff; }
+  .sw.off { background:var(--raised); } .sw.off::after { right:auto; left:2px; background:var(--tx3); }
+  table { border-collapse:collapse; font-size:13px; max-width:980px; width:100%; }
+  td, th { text-align:left; padding:10px 12px; border-top:1px solid var(--line); vertical-align:top; color:#d6d6da; }
+  th { color:var(--tx2); font-weight:500; width:220px; }
+  ul { color:#c9c9ce; font-size:14px; line-height:1.7; padding-left:20px; max-width:900px; }
+</style>
+</head>
+<body>
+  <h1>Google Agenda dentro do calendário: proposta</h1>
+  <p class="lead">A agenda da pessoa aparece no mesmo calendário das tarefas, como outra fonte: bolinha com a cor da agenda do Google e o nome dela no filtro. Tarefas do CRM continuam com o traço azul. No lado direito, o dia de hoje vira uma linha do tempo única (reuniões do Google + tarefas), com a linha do "agora".</p>
+
+  <h2>1 · Calendário com as duas fontes</h2>
+  <p class="nota">Mês em grade de cartões (o que já existe em Tarefas › Calendário). O filtro de fontes liga/desliga cada agenda. Clicar num evento do Google abre a prévia com o link da reunião; clicar numa tarefa abre a tarefa como hoje.</p>
+  <div class="tela">
+    <div class="cal">
+      <div class="topo"><b>Outubro</b><span>2026</span>
+        <div class="seg"><i>Dia</i><i>Semana</i><i class="on">Mês</i></div>
+      </div>
+      <div class="fontes">
+        <span class="fonte"><span class="ponto" style="background:var(--accfg)"></span>Tarefas do CRM</span>
+        <span class="fonte"><span class="ponto" style="background:var(--g)"></span>matheus@evaholding.com</span>
+        <span class="fonte"><span class="ponto" style="background:#ab70e6"></span>Comercial (compartilhada)</span>
+      </div>
+      <div class="grade">
+        <div class="dow">DOM</div><div class="dow">SEG</div><div class="dow">TER</div><div class="dow">QUA</div><div class="dow">QUI</div><div class="dow">SEX</div><div class="dow">SÁB</div>
+        <div class="dia fora"><span class="n">11</span></div>
+        <div class="dia"><span class="n">12</span><span class="ev g">09:00 Daily comercial</span></div>
+        <div class="dia"><span class="n">13</span><span class="ev g">10:30 Clínica Aurora</span><span class="ev t">17:44 Agendar demo</span><span class="mais">+1</span></div>
+        <div class="dia"><span class="n">14</span><span class="ev t">16:44 Retornar proposta</span><span class="ev g2">15:00 Revisão de funil</span></div>
+        <div class="dia"><span class="n">15</span><span class="ev t">22:44 Retornar proposta</span></div>
+        <div class="dia"><span class="n">16</span><span class="ev g">11:00 Loja Atlântico</span><span class="ev t">17:44 Confirmar decisor</span><span class="ev t">18:44 Follow-up</span><span class="mais">+5</span></div>
+        <div class="dia fora"><span class="n">17</span><span class="ev t">20:44 Enviar material</span></div>
+        <div class="dia"><span class="n">18</span><span class="ev t">22:44 Confirmar decisor</span></div>
+        <div class="dia"><span class="n">19</span><span class="ev g">09:00 Daily comercial</span><span class="ev t">18:44 Follow-up</span></div>
+        <div class="dia"><span class="n">20</span><span class="ev g2">14:00 Treinamento Eva</span><span class="ev t">08:44 Follow-up</span></div>
+        <div class="dia"><span class="n">21</span><span class="ev t">18:44 Retornar proposta</span><span class="ev g">16:00 Grupo Aurora</span></div>
+        <div class="dia hoje"><span class="n">22</span><span class="ev g">10:00 Reunião Colégio Ipê</span><span class="ev t">19:44 Retornar proposta</span><span class="ev t">21:44 Enviar material</span><span class="mais">+2</span></div>
+        <div class="dia"><span class="n">23</span><span class="ev g">09:30 Rede Monte Verde</span><span class="ev t">17:44 Confirmar</span></div>
+        <div class="dia fora"><span class="n">24</span></div>
+      </div>
+    </div>
+    <div class="lado">
+      <div class="bloco">
+        <h3>Hoje</h3>
+        <div class="sub">qui, 22 de outubro · 3 reuniões · 4 tarefas</div>
+        <div class="linha"><span class="hora">09:00</span><div><div class="titulo">Daily comercial</div><div class="meta"><span class="ponto" style="background:var(--g)"></span>Google Meet · 30 min</div></div></div>
+        <div class="linha"><span class="hora">10:00</span><div><div class="titulo">Reunião Colégio Ipê</div><div class="meta"><span class="ponto" style="background:var(--g)"></span>Negócio: [DEMO] Colégio Ipê <span class="tag">vinculado</span></div></div></div>
+        <div class="agora"></div>
+        <div class="linha"><span class="hora">19:44</span><div><div class="titulo">Retornar sobre a proposta</div><div class="meta"><span class="ponto" style="background:var(--accfg)"></span>Tarefa · Ligação</div></div></div>
+        <div class="linha"><span class="hora">21:44</span><div><div class="titulo">Enviar material</div><div class="meta"><span class="ponto" style="background:var(--accfg)"></span>Tarefa · E-mail</div></div></div>
+      </div>
+      <div class="bloco">
+        <h3>Livre hoje</h3>
+        <div class="sub">o que sobra entre reuniões</div>
+        <div class="linha"><span class="hora">11:00</span><div class="titulo">3 h livres <span class="tag">bom para ligações</span></div></div>
+        <div class="linha"><span class="hora">15:30</span><div class="titulo">2 h livres</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · Conectar (Configurações › Sua conta, e um atalho no calendário)</h2>
+  <p class="nota">Cada pessoa conecta a própria conta. Escolhe quais agendas aparecem. Ninguém vê a agenda de outra pessoa (a não ser que a gente decida o contrário).</p>
+  <div class="conectar">
+    <div class="bloco">
+      <h3>Agenda</h3>
+      <p>Veja suas reuniões do Google junto com as tarefas do CRM. A Eva só lê: nada é criado nem alterado na sua agenda.</p>
+      <span class="btn"><span class="gl"></span>Conectar Google Agenda</span>
+    </div>
+    <div class="bloco">
+      <h3>Google Agenda conectada</h3>
+      <div class="sub">matheus@evaholding.com · atualizado há 2 min</div>
+      <div class="check"><span class="ponto" style="background:var(--g)"></span>matheus@evaholding.com<span class="sw"></span></div>
+      <div class="check"><span class="ponto" style="background:#ab70e6"></span>Comercial (compartilhada)<span class="sw"></span></div>
+      <div class="check"><span class="ponto" style="background:#f2994a"></span>Feriados no Brasil<span class="sw off"></span></div>
+      <div style="margin-top:14px"><span class="btn2">Desconectar</span></div>
+    </div>
+  </div>
+
+  <h2>O que precisa existir por trás (para você decidir)</h2>
+  <table>
+    <tr><th>Login com o Google</th><td>App OAuth no Google Cloud da Eva, escopo <b>calendar.readonly</b> (só leitura). Esse escopo é "sensível": para uso aberto o Google exige verificação do app (tela de consentimento, política de privacidade, alguns dias). Até lá funciona com até 100 usuários de teste.</td></tr>
+    <tr><th>Banco (novo)</th><td>Uma tabela de conexões por usuário (conta Google, token de atualização criptografado, agendas escolhidas). Os eventos não precisam ser guardados: o servidor busca no Google quando o calendário abre (com cache curto). Mexe em banco de produção, por isso só com o seu ok.</td></tr>
+    <tr><th>Outlook</th><td>Mesmo desenho com Microsoft Graph, numa segunda etapa.</td></tr>
+    <tr><th>Vincular ao CRM</th><td>Se o convidado da reunião tem o e-mail de um contato, a reunião aparece ligada ao contato/negócio ("vinculado"). Só leitura, sem gravar nada.</td></tr>
+  </table>
+
+  <h2 style="margin-top:28px">Perguntas</h2>
+  <ul>
+    <li>Só leitura (recomendo para começar) ou também criar evento a partir de uma tarefa/reunião do CRM?</li>
+    <li>Cada pessoa vê só a própria agenda, ou o gestor vê a da equipe?</li>
+    <li>Google primeiro e Outlook depois, ou os dois juntos?</li>
+    <li>Pode criar o app OAuth no Google Cloud da Eva (precisa de quem administra a conta Google da empresa)?</li>
+    <li>Ok criar a tabela de conexões no banco?</li>
+  </ul>
+</body>
+</html>
