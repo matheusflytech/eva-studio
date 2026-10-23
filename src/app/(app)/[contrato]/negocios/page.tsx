@@ -494,7 +494,14 @@ function NegociosConteudo() {
   const quadroRef = React.useRef<HTMLDivElement>(null);
   const overlayRef = React.useRef<HTMLDivElement>(null);
   useEntradaDoQuadro(quadroRef, stages[0]?.id ?? "");
-  useInclinacaoNoArrasto(overlayRef, !!dragging);
+  const inclinar = useInclinacaoNoArrasto();
+  const refDoOverlay = React.useCallback(
+    (el: HTMLDivElement | null) => {
+      overlayRef.current = el;
+      inclinar(el);
+    },
+    [inclinar]
+  );
   const fotografar = useFlipDoQuadro(quadroRef, stages);
 
   function handleDragStart(event: DragStartEvent) {
@@ -871,10 +878,12 @@ function NegociosConteudo() {
                 ))}
               </div>
             </div>
-            <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+            {/* Sem dropAnimation: quem pousa o cartão é o Flip (useFlipDoQuadro). A do dnd-kit
+                deixava opacity 0 presa no cartão que mudou de coluna. */}
+            <DragOverlay dropAnimation={null}>
               {dragging && (
                 // Wrapper interno: a inclinação mora aqui, não no nó que o dnd-kit posiciona.
-                <div ref={overlayRef} data-flip-id={dragging.deal.id}>
+                <div ref={refDoOverlay} data-flip-id={dragging.deal.id}>
                   <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
                 </div>
               )}

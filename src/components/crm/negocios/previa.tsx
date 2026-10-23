@@ -255,9 +255,19 @@ export function PreviaDoNegocio({
     { dependencies: [dealId], scope: painel }
   );
 
+  // Fechou de verdade (não só trocou de negócio): só aí o foco volta ao cartão.
+  const montado = React.useRef(true);
+  React.useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+
   React.useEffect(() => {
     const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    painel.current?.focus({ preventScroll: true });
+    // Aberto pela ação Tarefa/Nota, o campo já pegou o foco (autoFocus): não tira.
+    if (!painel.current?.contains(document.activeElement)) painel.current?.focus({ preventScroll: true });
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
@@ -281,7 +291,7 @@ export function PreviaDoNegocio({
     return () => {
       document.removeEventListener("keydown", aoTeclar);
       document.removeEventListener("pointerdown", aoApontar, true);
-      if (!flag.current) return;
+      if (!flag.current || montado.current) return;
       const cartao = document.querySelector<HTMLElement>(`[data-deal-id="${CSS.escape(dealId)}"]`) ?? anterior;
       cartao?.focus({ preventScroll: true });
     };
@@ -456,6 +466,8 @@ export function PreviaDoNegocio({
 
             {secao === "atividade" && (
               <Atividade
+                // Nova chave por negócio e foco: a ação Nota de outro cartão abre a nota de novo.
+                key={`${deal.id}-${foco ?? ""}`}
                 dealId={deal.id}
                 itens={ficha.linha.itens}
                 falhou={ficha.linhaFalhou}
@@ -472,6 +484,7 @@ export function PreviaDoNegocio({
             {secao === "tarefas" &&
               (ficha.deal ? (
                 <TarefasDoNegocio
+                  key={`${deal.id}-${foco ?? ""}`}
                   deal={ficha.deal}
                   agora={ficha.agora}
                   estreito
@@ -565,9 +578,14 @@ function Atividade({
   onMudou: () => Promise<void>;
 }) {
   const [nota, setNota] = React.useState(abrirNota);
+  const caixa = React.useRef<HTMLDivElement>(null);
+  // Aberto pela ação Nota do cartão: já com o cursor na nota.
+  React.useEffect(() => {
+    if (abrirNota) caixa.current?.querySelector("textarea")?.focus({ preventScroll: true });
+  }, [abrirNota]);
   const recentes = itens.slice(0, 12);
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={caixa} className="flex flex-col gap-3">
       {nota ? (
         <NovaNota vinculo={{ dealId }} onCriada={onMudou} />
       ) : (

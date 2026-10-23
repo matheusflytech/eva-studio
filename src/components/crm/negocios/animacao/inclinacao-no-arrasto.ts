@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { CURVA, gsap, reduzMovimento, useGSAP } from "./gsap";
 
 /** Inclinação máxima, em graus, e quanto o cartão gira por px/ms do ponteiro. */
@@ -13,13 +13,14 @@ const PARADO_MS = 120;
  * Cartão no DragOverlay: escala 1,03 e gira até ±4° na direção do movimento,
  * lendo a velocidade do ponteiro. Vai no wrapper interno do overlay, nunca no
  * nó que o dnd-kit posiciona (nem no cartão original). Com menos movimento,
- * nada gira.
+ * nada gira. Devolve um callback ref: o DragOverlay monta o filho um render
+ * depois do início do arrasto, então o hook espera o elemento aparecer.
  */
-export function useInclinacaoNoArrasto(ref: React.RefObject<HTMLElement | null>, ativo: boolean) {
+export function useInclinacaoNoArrasto(): (el: HTMLElement | null) => void {
+  const [el, setEl] = React.useState<HTMLElement | null>(null);
   useGSAP(
     () => {
-      const el = ref.current;
-      if (!ativo || !el || reduzMovimento()) return;
+      if (!el || reduzMovimento()) return;
       gsap.to(el, { scale: 1.03, duration: 0.18, ease: CURVA.entrada });
       const girar = gsap.quickTo(el, "rotation", { duration: 0.3, ease: CURVA.voo });
       let ultimo: { x: number; t: number } | null = null;
@@ -40,6 +41,7 @@ export function useInclinacaoNoArrasto(ref: React.RefObject<HTMLElement | null>,
         window.clearTimeout(parado);
       };
     },
-    { dependencies: [ativo], scope: ref, revertOnUpdate: true }
+    { dependencies: [el], revertOnUpdate: true }
   );
+  return setEl;
 }
