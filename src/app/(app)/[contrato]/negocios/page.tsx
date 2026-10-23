@@ -68,7 +68,7 @@ import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
 import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
 import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
-import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
+import { QuadroContexto, type AcoesDoQuadro, type FocoDoPainel } from "@/components/crm/negocios/quadro-contexto";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
@@ -193,7 +193,7 @@ function NegociosConteudo() {
   }
   const [importando, setImportando] = React.useState(false);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
-  const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia } | null>(null);
+  const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia; foco?: FocoDoPainel } | null>(null);
   const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string; prazo?: number | null } | null>(null);
   // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
@@ -483,8 +483,6 @@ function NegociosConteudo() {
     onErro: (m) => setErro(m),
     naIlha: { elemento: (id) => document.querySelector(`[data-deal-id="${CSS.escape(id)}"]`) },
   });
-  const etapaGanha = stages.find((s) => s.type === "won");
-  const etapaPerdida = stages.find((s) => s.type === "lost");
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
@@ -495,10 +493,13 @@ function NegociosConteudo() {
 
   async function handleDragEnd(event: DragEndEvent) {
     setDragging(null);
-    const dealId = String(event.active.id);
     const alvo = event.over ? String(event.over.id) : "";
-    const stageId = alvo === ZONA_GANHO ? etapaGanha?.id : alvo === ZONA_PERDIDO ? etapaPerdida?.id : alvo;
-    if (!stageId) return;
+    // Ganho e Perdido são colunas (v4): soltar numa coluna é mover para ela.
+    if (alvo) await moverNegocio(String(event.active.id), alvo);
+  }
+
+  /** Arrastar e o "Mover para" do cartão: mesmas regras, mesmo Desfazer. */
+  async function moverNegocio(dealId: string, stageId: string) {
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
     const deal = from.deals.find((d) => d.id === dealId)!;
@@ -537,10 +538,15 @@ function NegociosConteudo() {
   const etapasDaPrevia: EtapaDaPrevia[] = stages.length
     ? stages
     : (pipeline?.stages ?? []).map((s) => ({ id: s.id, name: s.name, type: s.type, color: "" }));
-  function abrirDoQuadro(deal: NegocioKanban) {
+  function abrirDoQuadro(deal: NegocioKanban, foco?: FocoDoPainel) {
     const etapa = stages.find((s) => s.deals.some((d) => d.id === deal.id));
-    if (etapa) setPrevia({ id: deal.id, deal, etapa });
+    if (etapa) setPrevia({ id: deal.id, deal, etapa, foco });
   }
+  const acoesDoQuadro: AcoesDoQuadro = {
+    etapas: stages.map((s) => ({ id: s.id, name: s.name, type: s.type })),
+    onAbrir: abrirDoQuadro,
+    onMover: (deal, etapaId) => void moverNegocio(deal.id, etapaId),
+  };
   function abrirDaLista(linha: LinhaDeNegocio) {
     const etapa = etapasDaPrevia.find((s) => s.id === linha.stage.id) ?? { ...linha.stage, color: "" };
     setPrevia({ id: linha.id, deal: linha, etapa });
@@ -814,9 +820,10 @@ function NegociosConteudo() {
         </div>
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
+          <QuadroContexto.Provider value={acoesDoQuadro}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
+              <div className="flex min-h-96 snap-x gap-3 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
@@ -835,7 +842,6 @@ function NegociosConteudo() {
                   />
                 ))}
               </div>
-              <ZonasDeFechamento visivel={!!dragging && dragging.tipo === "open"} temGanho={!!etapaGanha} temPerdido={!!etapaPerdida} />
             </div>
             <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
               {dragging && (
@@ -843,6 +849,7 @@ function NegociosConteudo() {
               )}
             </DragOverlay>
           </DndContext>
+          </QuadroContexto.Provider>
         </VozDoQuadro.Provider>
       )}
 
