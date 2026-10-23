@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EventoDoCalendario } from "./calendario-dados";
-import { antecedencia, blocosDoDia, diasDaSemana, eventoEmDestaque, intervaloDaVisao, minutosDeDuracao } from "./calendario-semana";
+import { antecedencia, avisosDoCalendario, blocosDoDia, diasDaSemana, eventoEmDestaque, intervaloDaVisao, minutosDeDuracao, paraAvisarNaIlha } from "./calendario-semana";
 
 function evento(p: Partial<EventoDoCalendario> & { id: string; inicio: Date }): EventoDoCalendario {
   return {
@@ -90,5 +90,48 @@ describe("antecedência e destaque", () => {
   it("duração em minutos (sem fim: null)", () => {
     expect(minutosDeDuracao(evento({ id: "a", inicio: sp("2026-10-23", "13:30"), fim: sp("2026-10-23", "14:30") }))).toBe(60);
     expect(minutosDeDuracao(evento({ id: "a", inicio: sp("2026-10-23", "13:30") }))).toBeNull();
+  });
+});
+
+describe("avisos", () => {
+  const agora = sp("2026-10-23", "16:30");
+  const semana = diasDaSemana({ ano: 2026, mes: 10, dia: 23 });
+
+  it("atrasadas (aponta a mais recente), próximo de hoje e fechamentos da semana", () => {
+    const eventos = [
+      evento({ id: "velha", inicio: sp("2026-10-20", "10:00"), atrasada: true }),
+      evento({ id: "recente", inicio: sp("2026-10-22", "10:00"), atrasada: true }),
+      evento({ id: "feita", inicio: sp("2026-10-23", "16:40"), feita: true }),
+      evento({ id: "prox", titulo: "Confirmar decisor", inicio: sp("2026-10-23", "17:44"), fim: sp("2026-10-23", "17:59") }),
+      evento({
+        id: "neg",
+        inicio: sp("2026-10-24", "09:00"),
+        diaTodo: true,
+        origem: "negocio",
+        tipo: null,
+        negocio: { id: "d", valorCents: 1_250_000, etapa: "Proposta", funil: "Vendas", empresa: null },
+      }),
+    ];
+    expect(avisosDoCalendario(eventos, semana, agora)).toEqual([
+      { id: "atrasadas", tom: "perigo", texto: "2 atrasadas", eventoId: "recente" },
+      { id: "proximo", tom: "normal", texto: "Próximo: Confirmar decisor · em 1 h", eventoId: "prox" },
+      { id: "fechamentos", tom: "sucesso", texto: "1 fechamento previsto na semana · R$ 12,5 mil", eventoId: "neg" },
+    ]);
+  });
+
+  it("sem nada pela frente hoje: dia livre", () => {
+    expect(avisosDoCalendario([], semana, agora)).toEqual([{ id: "livre", tom: "normal", texto: "Nada mais hoje", eventoId: null }]);
+  });
+
+  it("ilha avisa uma vez, nos 10 minutos antes", () => {
+    const avisados = new Set<string>();
+    const eventos = [
+      evento({ id: "ja", inicio: sp("2026-10-23", "16:38") }),
+      evento({ id: "longe", inicio: sp("2026-10-23", "16:45") }),
+      evento({ id: "feita", inicio: sp("2026-10-23", "16:35"), feita: true }),
+    ];
+    expect(paraAvisarNaIlha(eventos, agora, avisados).map((e) => e.id)).toEqual(["ja"]);
+    avisados.add("ja");
+    expect(paraAvisarNaIlha(eventos, agora, avisados)).toEqual([]);
   });
 });

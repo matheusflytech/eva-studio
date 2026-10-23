@@ -1,4 +1,5 @@
-import { diaDaSemana, minutoDoDia, somarDias, type Dia } from "@/lib/tarefas/calendario";
+import { diaDaSemana, diaEmSP, minutoDoDia, somarDias, type Dia } from "@/lib/tarefas/calendario";
+import { valorCurto } from "@/components/crm/negocios/modelo";
 import { chaveDoDia, intervaloDaGrade, type EventoDoCalendario } from "./calendario-dados";
 
 // Visão semanal do calendário, sem React (testável): os dias da semana
@@ -105,4 +106,59 @@ export function eventoEmDestaque(eventos: EventoDoCalendario[], agora: Date): Ev
 
 export function minutosDeDuracao(e: EventoDoCalendario): number | null {
   return e.fim ? Math.round((e.fim.getTime() - e.inicio.getTime()) / 60_000) : null;
+}
+
+export interface AvisoDoCalendario {
+  id: "atrasadas" | "proximo" | "fechamentos" | "livre";
+  tom: "perigo" | "aviso" | "normal" | "sucesso";
+  texto: string;
+  /** Item que o aviso abre no detalhe (null: nada a abrir). */
+  eventoId: string | null;
+}
+
+/**
+ * Avisos de cima do calendário, na ordem de urgência: atrasadas (abre a mais
+ * recente), o próximo compromisso de hoje e os fechamentos previstos da
+ * semana. Sem atrasada nem compromisso pela frente hoje: "Nada mais hoje".
+ */
+export function avisosDoCalendario(eventos: EventoDoCalendario[], semana: Dia[], agora: Date): AvisoDoCalendario[] {
+  const avisos: AvisoDoCalendario[] = [];
+  const atrasadas = eventos.filter((e) => e.atrasada && !e.feita).sort((a, b) => b.inicio.getTime() - a.inicio.getTime());
+  if (atrasadas.length) avisos.push({ id: "atrasadas", tom: "perigo", texto: `${atrasadas.length} ${atrasadas.length === 1 ? "atrasada" : "atrasadas"}`, eventoId: atrasadas[0].id });
+
+  const hoje = chaveDoDia(diaEmSP(agora));
+  const t = agora.getTime();
+  const deHoje = eventos
+    .filter((e) => !e.feita && !e.diaTodo && !e.atrasada && chaveDoDia(diaEmSP(e.inicio)) === hoje && (e.fim ?? e.inicio).getTime() >= t)
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
+  const proximo = deHoje[0];
+  if (proximo) {
+    const quando = antecedencia(proximo, agora);
+    avisos.push({ id: "proximo", tom: quando?.tom === "aviso" ? "aviso" : "normal", texto: `Próximo: ${proximo.titulo}${quando ? ` · ${quando.texto}` : ""}`, eventoId: proximo.id });
+  }
+
+  const dias = new Set(semana.map(chaveDoDia));
+  const fechamentos = eventos.filter((e) => e.origem === "negocio" && dias.has(chaveDoDia(diaEmSP(e.inicio))));
+  if (fechamentos.length) {
+    const soma = fechamentos.reduce((s, e) => s + (e.negocio?.valorCents ?? 0), 0);
+    avisos.push({
+      id: "fechamentos",
+      tom: "sucesso",
+      texto: `${fechamentos.length} ${fechamentos.length === 1 ? "fechamento previsto" : "fechamentos previstos"} na semana · ${valorCurto(soma)}`,
+      eventoId: fechamentos[0].id,
+    });
+  }
+
+  if (!atrasadas.length && !proximo) avisos.push({ id: "livre", tom: "normal", texto: "Nada mais hoje", eventoId: null });
+  return avisos;
+}
+
+/** Compromissos que começam nos próximos 10 minutos e ainda não foram avisados na ilha. */
+export function paraAvisarNaIlha(eventos: EventoDoCalendario[], agora: Date, avisados: Set<string>): EventoDoCalendario[] {
+  const t = agora.getTime();
+  return eventos.filter((e) => {
+    if (e.feita || e.diaTodo || avisados.has(e.id)) return false;
+    const falta = e.inicio.getTime() - t;
+    return falta > 0 && falta <= 10 * 60_000;
+  });
 }
