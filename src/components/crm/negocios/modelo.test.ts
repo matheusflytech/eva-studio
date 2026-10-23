@@ -12,6 +12,7 @@ import {
   serieDeGanhoDoMes,
   juntarCartoes,
   moverCartao,
+  extraDoArraste,
   tempoNaEtapa,
   type EtapaKanban,
   type NegocioKanban,
@@ -250,5 +251,23 @@ describe("quadro paginado", () => {
     // Mesma coluna ou cartão desconhecido: nada muda.
     expect(moverCartao(etapas, "x", "a", agora)).toBe(etapas);
     expect(moverCartao(etapas, "zz", "b", agora)).toBe(etapas);
+  });
+
+  it("mover para ganho ou perdido carimba o fechamento; voltar para aberta tira", () => {
+    const etapas: EtapaKanban[] = [
+      { ...etapa({ id: "a", deals: [neg({ id: "x" })] }), probability: 10 },
+      { ...etapa({ id: "g", deals: [neg({ id: "w", closedAt: dia("18") })] }), type: "won", probability: 100 },
+      { ...etapa({ id: "p", deals: [] }), type: "lost", probability: 0 },
+    ];
+    const fechado = moverCartao(etapas, "x", "p", agora);
+    expect(fechado[2].deals[0]).toMatchObject({ id: "x", closedAt: agora.toISOString() });
+    const reaberto = moverCartao(etapas, "w", "a", agora);
+    expect(reaberto[0].deals[0]).toMatchObject({ id: "w", closedAt: null });
+  });
+
+  it("arrastar negócio fechado para outra etapa reabre junto (arrastar já é a decisão)", () => {
+    expect(extraDoArraste("won")).toEqual({ reabrir: true });
+    expect(extraDoArraste("lost")).toEqual({ reabrir: true });
+    expect(extraDoArraste("open")).toBeUndefined();
   });
 });

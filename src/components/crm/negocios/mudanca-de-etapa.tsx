@@ -57,6 +57,8 @@ export interface PedidoDeMudanca {
   de?: EtapaDoMovimento;
   /** Depois de desfazer (recarregar a tela). */
   aoDesfazer?: () => void;
+  /** A pessoa confirmou o motivo da perda: a tela já pode mostrar o negócio em Perdido (volta se o servidor recusar). */
+  aoConfirmarPerda?: () => void;
 }
 
 export type ResultadoDaTentativa = "movido" | "aguardando" | "erro";
@@ -210,6 +212,7 @@ export function useMudancaDeEtapa({
           const pedido = aberto.pedido;
           const resolver = aberto.resolver;
           setAberto(null);
+          pedido.aoConfirmarPerda?.();
           resolver(await tentar(pedido, { stageId: pedido.para.id, ...pedido.extra, ...perda }));
         }}
       />

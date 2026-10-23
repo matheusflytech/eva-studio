@@ -72,7 +72,7 @@ import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/ne
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
-import { juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
+import { extraDoArraste, juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
 import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { CAMPOS_DE_NEGOCIO } from "@/lib/filtro-crm";
@@ -516,6 +516,11 @@ function NegociosConteudo() {
       pipelineId,
       para,
       defs: quadro.defs,
+      // Cartão fechado (ganho/perdido) arrastado para outra coluna: reabre junto.
+      extra: extraDoArraste(from.type),
+      // Perdido só sai da coluna depois do motivo: move no clique de confirmar,
+      // sem esperar o servidor (antes o cartão ficava parado e a ilha dizia que moveu).
+      aoConfirmarPerda: () => setStages((ss) => moverCartao(ss, dealId, stageId, new Date())),
       // Toast com "Desfazer": volta para a coluna de onde saiu.
       de: { id: from.id, name: from.name, type: from.type },
       aoDesfazer: () => setVersao((v) => v + 1),

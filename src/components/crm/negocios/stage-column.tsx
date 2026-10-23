@@ -4,7 +4,6 @@ import * as React from "react";
 import { ChevronsRightLeft, CircleHelp, Loader2, Plus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/ui/kanban-column";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
@@ -36,14 +35,16 @@ function CartaoArrastavel({
   onAbrir: () => void;
   prazoParado?: number | null;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  // Sem `transform` no cartão original: quem segue o ponteiro é o DragOverlay.
+  // Mover o original junto deixava uma cópia presa na rolagem da coluna (o
+  // cartão "passava por trás" das outras e a coluna ganhava barra lateral).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
   // Onde o ponteiro desceu: soltar depois de arrastar não pode abrir a prévia.
   const origem = React.useRef<{ x: number; y: number } | null>(null);
 
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
       {...listeners}
       {...attributes}
       data-deal-id={deal.id}
