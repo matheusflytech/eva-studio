@@ -19,6 +19,7 @@ import {
   Rows3,
   Search,
   Settings,
+  SlidersHorizontal,
   Sun,
   Upload,
 } from "lucide-react";
@@ -68,11 +69,15 @@ import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
 import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
 import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
-import { ZonasDeFechamento, ZONA_GANHO, ZONA_PERDIDO } from "@/components/crm/negocios/zonas-de-fechamento";
+import { QuadroContexto, type AcoesDoQuadro, type FocoDoPainel } from "@/components/crm/negocios/quadro-contexto";
+import { PersonalizarQuadro, type AbaDaPersonalizacao } from "@/components/crm/negocios/personalizar";
+import { useEntradaDoQuadro } from "@/components/crm/negocios/animacao/entrada-do-quadro";
+import { useFlipDoQuadro } from "@/components/crm/negocios/animacao/flip-do-quadro";
+import { useInclinacaoNoArrasto } from "@/components/crm/negocios/animacao/inclinacao-no-arrasto";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
 import { aplicarVisao, VISOES_DE_NEGOCIO } from "@/components/crm/negocios/visoes";
-import { juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
+import { extraDoArraste, juntarCartoes, moverCartao, type EtapaKanban, type NegocioKanban } from "@/components/crm/negocios/modelo";
 import { LAYOUT_PADRAO, normalizarLayout, type LayoutDoCartao } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { CAMPOS_DE_NEGOCIO } from "@/lib/filtro-crm";
@@ -193,7 +198,8 @@ function NegociosConteudo() {
   }
   const [importando, setImportando] = React.useState(false);
   const [editandoColunas, setEditandoColunas] = React.useState(false);
-  const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia } | null>(null);
+  const [personalizando, setPersonalizando] = React.useState<AbaDaPersonalizacao | null>(null);
+  const [previa, setPrevia] = React.useState<{ id: string; deal: NegocioKanban; etapa: EtapaDaPrevia; foco?: FocoDoPainel } | null>(null);
   const [dragging, setDragging] = React.useState<{ deal: NegocioKanban; tipo: string; prazo?: number | null } | null>(null);
   // Relógio da tela: muda só quando os dados chegam (tempo na etapa, atrasos).
   const [agora, setAgora] = React.useState(() => new Date());
@@ -483,8 +489,20 @@ function NegociosConteudo() {
     onErro: (m) => setErro(m),
     naIlha: { elemento: (id) => document.querySelector(`[data-deal-id="${CSS.escape(id)}"]`) },
   });
-  const etapaGanha = stages.find((s) => s.type === "won");
-  const etapaPerdida = stages.find((s) => s.type === "lost");
+
+  // ── Animações (fixas): entrada, inclinação no arrasto e voo entre colunas ──
+  const quadroRef = React.useRef<HTMLDivElement>(null);
+  const overlayRef = React.useRef<HTMLDivElement>(null);
+  useEntradaDoQuadro(quadroRef, stages[0]?.id ?? "");
+  const inclinar = useInclinacaoNoArrasto();
+  const refDoOverlay = React.useCallback(
+    (el: HTMLDivElement | null) => {
+      overlayRef.current = el;
+      inclinar(el);
+    },
+    [inclinar]
+  );
+  const fotografar = useFlipDoQuadro(quadroRef, stages);
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
@@ -494,11 +512,16 @@ function NegociosConteudo() {
   }
 
   async function handleDragEnd(event: DragEndEvent) {
+    // O overlay ainda está na tela: o cartão voa de onde foi solto.
+    const origem = overlayRef.current;
     setDragging(null);
-    const dealId = String(event.active.id);
     const alvo = event.over ? String(event.over.id) : "";
-    const stageId = alvo === ZONA_GANHO ? etapaGanha?.id : alvo === ZONA_PERDIDO ? etapaPerdida?.id : alvo;
-    if (!stageId) return;
+    // Ganho e Perdido são colunas (v4): soltar numa coluna é mover para ela.
+    if (alvo) await moverNegocio(String(event.active.id), alvo, origem);
+  }
+
+  /** Arrastar e o "Mover para" do cartão: mesmas regras, mesmo Desfazer. */
+  async function moverNegocio(dealId: string, stageId: string, origem?: HTMLElement | null) {
     const from = stages.find((s) => s.deals.some((d) => d.id === dealId));
     if (!from || from.id === stageId) return;
     const deal = from.deals.find((d) => d.id === dealId)!;
@@ -507,7 +530,10 @@ function NegociosConteudo() {
     const antes = stages;
     // Move na tela antes da resposta: esperar o servidor deixa o quadro lento.
     // Perdido não: o modal do motivo vem antes.
-    if (para.type !== "lost") setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+    if (para.type !== "lost") {
+      fotografar(dealId, origem);
+      setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+    }
     // Regras da etapa no servidor: faltou campo → "Complete para mover";
     // perdido → motivo; negócio fechado → aviso (só sai com Reabrir).
     const r = await mudanca.mover({
@@ -516,15 +542,27 @@ function NegociosConteudo() {
       pipelineId,
       para,
       defs: quadro.defs,
+      // Cartão fechado (ganho/perdido) arrastado para outra coluna: reabre junto.
+      extra: extraDoArraste(from.type),
+      // Perdido só sai da coluna depois do motivo: move no clique de confirmar,
+      // sem esperar o servidor (antes o cartão ficava parado e a ilha dizia que moveu).
+      aoConfirmarPerda: () => {
+        fotografar(dealId);
+        setStages((ss) => moverCartao(ss, dealId, stageId, new Date()));
+      },
       // Toast com "Desfazer": volta para a coluna de onde saiu.
       de: { id: from.id, name: from.name, type: from.type },
-      aoDesfazer: () => setVersao((v) => v + 1),
+      aoDesfazer: () => {
+        fotografar(dealId);
+        setVersao((v) => v + 1);
+      },
     });
     if (r === "movido") {
       setVersao((v) => v + 1);
       return;
     }
     // Cancelou ou falhou: o cartão volta para onde estava.
+    fotografar(dealId);
     setStages(() => antes);
   }
 
@@ -532,10 +570,15 @@ function NegociosConteudo() {
   const etapasDaPrevia: EtapaDaPrevia[] = stages.length
     ? stages
     : (pipeline?.stages ?? []).map((s) => ({ id: s.id, name: s.name, type: s.type, color: "" }));
-  function abrirDoQuadro(deal: NegocioKanban) {
+  function abrirDoQuadro(deal: NegocioKanban, foco?: FocoDoPainel) {
     const etapa = stages.find((s) => s.deals.some((d) => d.id === deal.id));
-    if (etapa) setPrevia({ id: deal.id, deal, etapa });
+    if (etapa) setPrevia({ id: deal.id, deal, etapa, foco });
   }
+  const acoesDoQuadro: AcoesDoQuadro = {
+    etapas: stages.map((s) => ({ id: s.id, name: s.name, type: s.type })),
+    onAbrir: abrirDoQuadro,
+    onMover: (deal, etapaId) => void moverNegocio(deal.id, etapaId),
+  };
   function abrirDaLista(linha: LinhaDeNegocio) {
     const etapa = etapasDaPrevia.find((s) => s.id === linha.stage.id) ?? { ...linha.stage, color: "" };
     setPrevia({ id: linha.id, deal: linha, etapa });
@@ -671,6 +714,9 @@ function NegociosConteudo() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setPersonalizando("card")} disabled={!pipelineId}>
+                <SlidersHorizontal aria-hidden="true" /> Personalizar card (só para você)
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}>
                   <Settings aria-hidden="true" /> Configurar funil, cartão e campos
@@ -809,9 +855,10 @@ function NegociosConteudo() {
         </div>
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
+          <QuadroContexto.Provider value={acoesDoQuadro}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div className="flex min-h-96 snap-x gap-2 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
+              <div ref={quadroRef} className="flex min-h-96 snap-x gap-3 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
@@ -830,14 +877,19 @@ function NegociosConteudo() {
                   />
                 ))}
               </div>
-              <ZonasDeFechamento visivel={!!dragging && dragging.tipo === "open"} temGanho={!!etapaGanha} temPerdido={!!etapaPerdida} />
             </div>
-            <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+            {/* Sem dropAnimation: quem pousa o cartão é o Flip (useFlipDoQuadro). A do dnd-kit
+                deixava opacity 0 presa no cartão que mudou de coluna. */}
+            <DragOverlay dropAnimation={null}>
               {dragging && (
-                <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+                // Wrapper interno: a inclinação mora aqui, não no nó que o dnd-kit posiciona.
+                <div ref={refDoOverlay} data-flip-id={dragging.deal.id}>
+                  <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+                </div>
               )}
             </DragOverlay>
           </DndContext>
+          </QuadroContexto.Provider>
         </VozDoQuadro.Provider>
       )}
 
@@ -894,7 +946,10 @@ function NegociosConteudo() {
       {previaAtual && (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <PreviaDoNegocio
-            key={previaAtual.deal.id}
+            // Chave fixa: clicar em outro cartão troca o conteúdo sem fechar o painel.
+            key="painel-do-negocio"
+            foco={previa?.foco}
+            onPersonalizar={() => setPersonalizando("painel")}
             deal={previaAtual.deal}
             etapa={previaAtual.etapa}
             etapas={etapasDaPrevia}
@@ -904,9 +959,34 @@ function NegociosConteudo() {
             onFechar={() => setPrevia(null)}
             onMudou={() => setVersao((v) => v + 1)}
             pipelineId={pipelineId}
-            onMover={mudanca.mover}
+            onMover={async (pedido) => {
+              const r = await mudanca.mover({
+                ...pedido,
+                aoDesfazer: () => {
+                  fotografar(pedido.dealId);
+                  pedido.aoDesfazer?.();
+                },
+              });
+              // O painel recarrega o quadro em seguida: o cartão voa até a coluna nova.
+              if (r === "movido") fotografar(pedido.dealId);
+              return r;
+            }}
           />
         </VozDoQuadro.Provider>
+      )}
+
+      {personalizando && pipelineId && (
+        <PersonalizarQuadro
+          pipelineId={pipelineId}
+          aba={personalizando}
+          defs={quadro?.defs ?? []}
+          agora={agora}
+          onFechar={() => setPersonalizando(null)}
+          onSalvo={(layout) => {
+            setQuadro((q) => (q ? { ...q, layout } : q));
+            setVersao((v) => v + 1);
+          }}
+        />
       )}
 
       {novoNaEtapa !== null && (

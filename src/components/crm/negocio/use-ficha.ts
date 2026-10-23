@@ -35,7 +35,7 @@ export interface NegocioDaFicha {
   pipeline: { id: string; name: string; stages: EtapaDaFicha[] };
   company: { id: string; name: string } | null;
   owner: { id: string; name: string } | null;
-  contacts: { contact: { id: string; name: string; email: string; phone: string } }[];
+  contacts: { contact: { id: string; name: string; email: string; phone: string; jobTitle?: string } }[];
   tasks: { id: string; type: string; text: string; dueAt: string | null; doneAt: string | null }[];
   customFields: Record<string, unknown>;
   /** Última atividade (relógio do parado). */
@@ -97,6 +97,18 @@ export function useFicha(dealId: string) {
   // "Agora" fixado em cada carga: calcular no render deixaria "há N dias"
   // diferente entre servidor e navegador e entre um render e outro.
   const [agora, setAgora] = React.useState(() => new Date(0));
+
+  // Trocou de negócio sem desmontar (o painel do quadro): o que está na tela
+  // é do anterior. Volta a "carregando" já neste render, sem mostrar a linha
+  // do tempo de um negócio no outro.
+  const [doNegocio, setDoNegocio] = React.useState(dealId);
+  if (doNegocio !== dealId) {
+    setDoNegocio(dealId);
+    setEstado("carregando");
+    setDeal(null);
+    setLinha({ itens: [], conversas: [] });
+    setLinhaFalhou(false);
+  }
 
   // A busca não mexe em estado; quem aplica é `aplicar`. Separado assim para
   // a carga inicial poder descartar resposta de outro negócio (trocou de

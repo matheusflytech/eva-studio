@@ -4,18 +4,16 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import {
   CalendarDays,
-  CalendarPlus,
   CheckCircle2,
   Clock,
   Hourglass,
+  ListPlus,
   ListTodo,
   Mail,
   Maximize2,
-  Package,
+  MoreHorizontal,
   Phone,
-  Tag,
-  User,
-  XCircle,
+  StickyNote,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,12 +21,14 @@ import { LogoOficial } from "@/components/ui/logo-oficial";
 import { Avatar as AvatarDS } from "@/components/ui/avatar";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { focusRing } from "@/components/ui/styles";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
-import { LAYOUT_PADRAO, type CampoDoCartao, type LayoutDoCartao } from "@/lib/cartao-layout";
+import { LAYOUT_PADRAO, ROTULO_DA_ACAO, rotuloDoCampo, type AcaoDoCartao, type LayoutDoCartao } from "@/lib/cartao-layout";
 import { VozDoQuadro } from "./eva-topo";
 import { sinalHumano } from "./eva-voz";
-import { dinheiro, estaParado, sinalDoNegocio, tempoNaEtapa, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
-import { blocosDoCartao, ehPersonalizado, textoDoCampo, tituloDoCartao, type ContextoDoCampo } from "./cartao";
+import { sinalDoNegocio, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
+import { acoesDisponiveis, linhasDoCartao, rotulosPersonalizados, textoDoCampo, topoDoCartao, type ContextoDoCampo } from "./cartao";
+import { QuadroContexto } from "./quadro-contexto";
 
 /**
  * Avatar de pessoa no quadro (compatível com a API antiga: nome/tamanho).
@@ -51,17 +51,6 @@ const ICONE: Record<IconeDoSinal, LucideIcon> = {
   mail: Mail,
   task: ListTodo,
   check: CheckCircle2,
-};
-
-/** Ícone das linhas simples do cartão (um por informação). */
-const ICONE_DA_LINHA: Partial<Record<CampoDoCartao, LucideIcon>> = {
-  previsao: CalendarDays,
-  naEtapaHa: Hourglass,
-  criadoEm: CalendarPlus,
-  contato: User,
-  telefone: Phone,
-  email: Mail,
-  produtos: Package,
 };
 
 /** Tom do sinal → variante do Badge (cor só em status). */
@@ -117,23 +106,25 @@ export function SinalDoProximoPasso({
   );
 }
 
-const pararArraste = {
+export const pararArraste = {
   onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
   onClick: (e: React.MouseEvent) => e.stopPropagation(),
-  // Enter no link navega (não abre a prévia) e espaço não pega o cartão.
+  // Enter no link navega (não abre o painel) e espaço não pega o cartão.
   onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
 };
 
-/** Campos que o cartão v5 já mostra do seu jeito (título, valor e chance, sinal, dono, WhatsApp). */
-const FIXOS_DO_CARTAO = new Set<CampoDoCartao>(["empresa", "nome", "valor", "probabilidade", "responsavel", "whatsapp", "proximoPasso"]);
+const ICONE_DA_ACAO: Record<Exclude<AcaoDoCartao, "whatsapp">, LucideIcon> = {
+  ligar: Phone,
+  tarefa: ListPlus,
+  nota: StickyNote,
+};
 
 /**
- * Cartão do negócio (v5): título, valor com a chance e o sinal do próximo
- * passo, com o avatar do dono à direita. Empresa, etiquetas e o resto moram
- * no detalhe; campos além desses que o funil escolheu (previsão, contato,
- * campos personalizados...) continuam aparecendo, na ordem escolhida.
- * Parado ganha a borda esquerda âmbar. O título é o link da ficha (o resto
- * do cartão abre a prévia). Superfície única, sem sombra parada.
+ * Cartão do negócio (quadro v4, exemplo 1 do Matheus): em cima a pessoa (foto
+ * e nome do contato principal, o negócio embaixo) e o "⋯"; no meio os pares
+ * rótulo/valor que a pessoa escolheu (padrão: Valor, Previsão, Responsável);
+ * no rodapé os ícones de ação e o sinal do próximo passo. Sem borda de
+ * atraso: o atraso é o texto do sinal. Clicar no cartão abre o painel.
  */
 export function DealCard({
   deal,
@@ -142,8 +133,8 @@ export function DealCard({
   agora,
   arrastando,
   layout = LAYOUT_PADRAO,
-  comLink = false,
   prazoParado,
+  nomeDaEtapa,
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
@@ -153,132 +144,77 @@ export function DealCard({
   agora: Date;
   arrastando?: boolean;
   layout?: LayoutDoCartao;
-  /** Título vira link para /negocios/<id>. Desligado no cartão que segue o mouse e nas prévias da configuração. */
+  nomeDaEtapa?: string;
+  /** Mantido por compatibilidade (o título não é mais link: o cartão abre o painel). */
   comLink?: boolean;
 }) {
+  const quadro = React.useContext(QuadroContexto);
   const compacto = layout.densidade === "compacto";
-  // Título é o nome do negócio; só vira a empresa quando o funil tirou o nome e deixou a empresa.
-  const titulo =
-    layout.campos.includes("empresa") && !layout.campos.includes("nome") ? tituloDoCartao(deal, layout.campos).titulo : deal.name;
-  const extras = layout.campos.filter((c) => !FIXOS_DO_CARTAO.has(c));
-  const blocos = blocosDoCartao(extras, layout.densidade);
-  const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs, prazoParado };
-  const mostraWhatsapp = layout.campos.includes("whatsapp") && !!deal.whatsapp;
-  const aberto = tipoDaEtapa === "open";
-  const parado = estaParado(deal, tipoDaEtapa, agora, prazoParado);
+  const topo = topoDoCartao(deal, layout.campos);
+  const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs, prazoParado, nomeDaEtapa };
+  // Campo personalizado vazio não ocupa o cartão; os padrões mostram "—".
+  const linhas = linhasDoCartao(layout.campos)
+    .filter((c) => c !== "proximoPasso")
+    .map((campo) => ({ campo, texto: textoDoCampo(campo, deal, ctx) }))
+    .filter((l) => l.texto || !l.campo.startsWith("cf:"));
+  const rotulos = rotulosPersonalizados(defs);
+  const acoes = acoesDisponiveis(deal, layout.acoes);
   const temSinal = !!sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado);
-  const tempo = tempoNaEtapa(deal.stageSince, agora);
-
-  const classeDoTitulo = "min-w-0 truncate text-small font-semibold text-text-primary";
-  const elementoDoTitulo = comLink ? (
-    <Link
-      href={`/negocios/${deal.id}`}
-      {...pararArraste}
-      title="Abrir ficha completa"
-      className={cn(classeDoTitulo, "rounded-sm underline-offset-2 hover:underline", focusRing)}
-    >
-      {titulo}
-    </Link>
-  ) : (
-    <span className={classeDoTitulo}>{titulo}</span>
-  );
 
   return (
     <div
+      data-cartao
       className={cn(
-        "relative flex flex-col rounded-[14px] border border-border-subtle bg-panel transition-colors duration-120",
-        "group-hover/card:border-border-strong",
-        compacto ? "gap-1 px-3 py-2" : "gap-1.5 px-3 py-2.5",
-        parado && "border-l-[3px] border-l-warning",
-        arrastando && "border-border-strong shadow-overlay",
-        tipoDaEtapa === "lost" && "opacity-70"
+        "relative flex flex-col rounded-[16px] border border-border-subtle bg-panel",
+        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-200 ease-[cubic-bezier(.2,0,0,1)]",
+        "group-hover/card:-translate-y-0.5 group-hover/card:border-border-default group-hover/card:shadow-[0_8px_24px_-12px_rgb(0_0_0/0.18)]",
+        compacto ? "gap-2 p-2.5" : "gap-2.5 p-3",
+        arrastando && "border-border-default shadow-overlay",
+        tipoDaEtapa === "lost" && "opacity-75"
       )}
     >
-      <div className="flex items-center gap-2">
-        {elementoDoTitulo}
-        {mostraWhatsapp && deal.whatsapp && (
-          <span
-            className="relative ml-auto inline-flex shrink-0 text-success transition-opacity group-hover/card:opacity-0"
-            title={deal.whatsapp.naoLida ? "Mensagem não lida no WhatsApp" : "Tem conversa no WhatsApp"}
-          >
-            <LogoOficial marca="whatsapp" tamanho={14} />
-            {deal.whatsapp.naoLida && (
-              <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-success ring-2 ring-panel">
-                <span className="sr-only">Mensagem não lida</span>
-              </span>
-            )}
-          </span>
-        )}
-        {tipoDaEtapa === "lost" && <XCircle size={14} aria-label="Perdido" className="ml-auto shrink-0 text-danger" />}
+      {/* Topo: a pessoa (ou o negócio) e o "⋯". */}
+      <div className="flex items-center gap-2.5">
+        <Avatar nome={topo.foto || "?"} tamanho={compacto ? 24 : 32} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-small font-semibold text-text-primary">{topo.titulo}</p>
+          {topo.subtitulo && <p className="truncate text-caption text-text-tertiary">{topo.subtitulo}</p>}
+        </div>
+        <MenuDoCartao deal={deal} />
       </div>
 
-      <div className="flex items-baseline gap-1.5">
-        {deal.amountCents > 0 ? (
-          <span className="text-small font-semibold tabular-nums text-text-primary">{dinheiro(deal.amountCents)}</span>
-        ) : (
-          <span className="text-small text-text-tertiary">Sem valor</span>
-        )}
-        {aberto && (
-          <span className="font-mono text-caption tabular-nums text-text-tertiary" title="Chance de fechar">
-            {deal.probability}%
-          </span>
-        )}
-      </div>
+      {/* Corpo: pares rótulo/valor. */}
+      {linhas.length > 0 && (
+        <dl className={cn("flex flex-col border-t border-border-subtle", compacto ? "gap-1 pt-2" : "gap-2 pt-2.5")}>
+          {linhas.map(({ campo, texto }) => {
+            return (
+              <div key={campo} className={cn(compacto && "flex items-baseline justify-between gap-2")}>
+                <dt className="text-[11px] leading-4 text-text-tertiary">{rotuloDoCampo(campo, rotulos)}</dt>
+                <dd className={cn("truncate text-small leading-5", texto ? "font-medium text-text-primary" : "text-text-tertiary", campo === "valor" && "tabular-nums")}>
+                  {campo === "responsavel" && deal.owner ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Avatar nome={deal.owner.name || "Sem nome"} tamanho={20} />
+                      <span className="truncate">{texto}</span>
+                    </span>
+                  ) : (
+                    texto || "—"
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      )}
 
-      {blocos.map((bloco, i) => {
-        if (bloco.tipo === "metricas") return null;
-        if (bloco.tipo === "etiquetas") {
-          const itens = bloco.campos
-            .map((c) => ({ c, def: defs.find((d) => d.key === c.slice(3)), texto: textoDoCampo(c, deal, ctx) }))
-            .filter((i) => i.def && i.texto && !(i.def.type === "checkbox" && deal.customFields?.[i.def.key] !== true));
-          if (itens.length === 0) return null;
-          return (
-            <div key={i} className="flex flex-wrap gap-1">
-              {itens.map(({ c, def, texto }) => (
-                <Badge key={c} title={def!.label} className="max-w-full truncate">
-                  {def!.type === "checkbox" ? def!.label : ["select", "multiselect", "text"].includes(def!.type) ? texto : `${def!.label}: ${texto}`}
-                </Badge>
-              ))}
-            </div>
-          );
-        }
-        const texto = textoDoCampo(bloco.campo, deal, ctx, "curto");
-        if (!texto) return null;
-        const personalizado = ehPersonalizado(bloco.campo);
-        const def = personalizado ? defs.find((d) => d.key === bloco.campo.slice(3)) : undefined;
-        const Icone = personalizado ? Tag : ICONE_DA_LINHA[bloco.campo] ?? Tag;
-        return (
-          <p key={i} className="flex min-w-0 items-center gap-1.5 text-caption text-text-secondary">
-            <Icone size={12} aria-hidden="true" className="shrink-0 text-text-tertiary" />
-            <span className="truncate">
-              {def && <span className="text-text-tertiary">{def.label}: </span>}
-              {texto}
-            </span>
-          </p>
-        );
-      })}
-
-      {(temSinal || aberto || deal.owner) && (
-        <div className="flex min-h-5 items-center gap-1.5">
-          {temSinal ? (
-            <>
+      {/* Rodapé: ações e o próximo passo. */}
+      {(acoes.length > 0 || temSinal) && (
+        <div className={cn("flex items-center gap-1.5 border-t border-border-subtle", compacto ? "pt-2" : "pt-2.5")}>
+          {acoes.map((a) => (
+            <BotaoDeAcao key={a.acao} acao={a.acao} href={a.href} deal={deal} interativo={!!quadro && !arrastando} />
+          ))}
+          {temSinal && (
+            <span className="ml-auto min-w-0">
               <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} variante="texto" />
-              {deal.openTasks > 1 && (
-                <span className="font-mono text-caption tabular-nums text-text-tertiary" title={`${deal.openTasks} tarefas abertas`}>
-                  +{deal.openTasks - 1}
-                </span>
-              )}
-            </>
-          ) : (
-            aberto && (
-              <span className="font-mono text-caption text-text-tertiary" title="Tempo nesta etapa">
-                {tempo === "agora" ? "entrou agora" : `há ${tempo}`}
-              </span>
-            )
-          )}
-          {deal.owner && (
-            <span className="ml-auto shrink-0">
-              <Avatar nome={deal.owner.name || "Sem nome"} rotulo={`Responsável: ${deal.owner.name || "sem nome"}`} />
             </span>
           )}
         </div>
@@ -287,22 +223,84 @@ export function DealCard({
   );
 }
 
-/** Ações rápidas que aparecem ao passar o mouse (sem ocupar espaço em repouso). */
-export function AcoesRapidas({ deal }: { deal: NegocioKanban }) {
-  const classe = cn(
-    "grid h-6 w-6 place-items-center rounded-full border border-border-subtle bg-panel text-text-secondary hover:bg-hover hover:text-text-primary",
-    focusRing
-  );
-  return (
-    <div className="pointer-events-none absolute right-1.5 top-1.5 z-10 flex gap-1 opacity-0 transition-opacity duration-120 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
-      {deal.whatsapp && (
-        <Link href={`/conversas?c=${deal.whatsapp.conversationId}`} {...pararArraste} aria-label="Abrir conversa no WhatsApp" title="Abrir conversa" className={classe}>
-          <LogoOficial marca="whatsapp" tamanho={13} />
-        </Link>
-      )}
-      <Link href={`/negocios/${deal.id}`} {...pararArraste} aria-label="Abrir ficha completa" title="Abrir ficha completa" className={classe}>
-        <Maximize2 size={12} aria-hidden="true" />
+const CLASSE_DA_ACAO = cn(
+  "grid size-7 shrink-0 place-items-center rounded-full border border-border-subtle text-text-tertiary",
+  "transition-colors duration-150 hover:border-border-default hover:bg-hover hover:text-text-primary group-hover/card:text-text-secondary",
+  focusRing
+);
+
+function BotaoDeAcao({ acao, href, deal, interativo }: { acao: AcaoDoCartao; href?: string; deal: NegocioKanban; interativo: boolean }) {
+  const quadro = React.useContext(QuadroContexto);
+  const rotulo = ROTULO_DA_ACAO[acao];
+  const Icone = acao === "whatsapp" ? null : ICONE_DA_ACAO[acao];
+  const icone = Icone ? <Icone size={13} aria-hidden="true" /> : <LogoOficial marca="whatsapp" tamanho={13} />;
+  if (!interativo) {
+    return (
+      <span className={CLASSE_DA_ACAO} aria-hidden="true">
+        {icone}
+      </span>
+    );
+  }
+  if (href) {
+    const naoLida = acao === "whatsapp" && deal.whatsapp?.naoLida;
+    return href.startsWith("tel:") ? (
+      <a href={href} {...pararArraste} aria-label={`${rotulo}: ${deal.contacts[0]?.name ?? deal.name}`} title={rotulo} className={CLASSE_DA_ACAO}>
+        {icone}
+      </a>
+    ) : (
+      <Link href={href} {...pararArraste} aria-label={naoLida ? `${rotulo} (mensagem não lida)` : rotulo} title={rotulo} className={cn(CLASSE_DA_ACAO, "relative")}>
+        {icone}
+        {naoLida && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-success ring-2 ring-panel" />}
       </Link>
-    </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      {...pararArraste}
+      onClick={(e) => {
+        e.stopPropagation();
+        quadro?.onAbrir(deal, acao === "tarefa" ? "tarefa" : "nota");
+      }}
+      aria-label={rotulo}
+      title={rotulo}
+      className={CLASSE_DA_ACAO}
+    >
+      {icone}
+    </button>
+  );
+}
+
+/** "⋯" do cartão: abrir a ficha e mover de etapa sem arrastar. */
+function MenuDoCartao({ deal }: { deal: NegocioKanban }) {
+  const quadro = React.useContext(QuadroContexto);
+  if (!quadro) return <MoreHorizontal size={15} aria-hidden="true" className="shrink-0 text-text-tertiary" />;
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          {...pararArraste}
+          aria-label={`Ações de ${deal.name}`}
+          className={cn("grid size-7 shrink-0 place-items-center rounded-full text-text-tertiary hover:bg-hover hover:text-text-primary", focusRing)}
+        >
+          <MoreHorizontal size={15} aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem asChild>
+          <Link href={`/negocios/${deal.id}`}>
+            <Maximize2 size={14} aria-hidden="true" /> Abrir ficha completa
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Mover para</DropdownMenuLabel>
+        {quadro.etapas.map((e) => (
+          <DropdownMenuItem key={e.id} onSelect={() => quadro.onMover(deal, e.id)}>
+            {e.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

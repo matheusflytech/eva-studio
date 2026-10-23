@@ -395,7 +395,21 @@ export function NovaNota({
 
 const TIPOS = TIPOS_DE_TAREFA;
 
-function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; agora: Date; recarregar: () => Promise<void> }) {
+export function TarefasDoNegocio({
+  deal,
+  agora,
+  recarregar,
+  estreito = false,
+  focar = false,
+}: {
+  deal: NegocioDaFicha;
+  agora: Date;
+  recarregar: () => Promise<void>;
+  /** Painel lateral (pouca largura): o formulário quebra em duas linhas. */
+  estreito?: boolean;
+  /** Abre com o cursor na descrição (ação "Nova tarefa" do cartão). */
+  focar?: boolean;
+}) {
   const [texto, setTexto] = React.useState("");
   const [tipo, setTipo] = React.useState<(typeof TIPOS)[number]>("ligar");
   const [prazo, setPrazo] = React.useState("");
@@ -462,12 +476,13 @@ function TarefasDoNegocio({ deal, agora, recarregar }: { deal: NegocioDaFicha; a
 
   return (
     <div>
-      <form onSubmit={criar} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_130px_150px_auto]">
+      <form onSubmit={criar} className={cn("grid gap-2", estreito ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] [&>input:first-of-type]:col-span-3" : "sm:grid-cols-[minmax(0,1fr)_130px_150px_auto]")}>
         <label htmlFor="ficha-tarefa" className="sr-only">
           Descrição da tarefa
         </label>
         <Input
           id="ficha-tarefa"
+          autoFocus={focar}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Nova tarefa..."

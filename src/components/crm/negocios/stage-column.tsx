@@ -4,20 +4,19 @@ import * as React from "react";
 import { ChevronsRightLeft, CircleHelp, Loader2, Plus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/components/ui/kanban-column";
-import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import type { CategoryColor } from "@/lib/design-system/tokens";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { focusRing } from "@/components/ui/styles";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import type { LayoutDoCartao } from "@/lib/cartao-layout";
-import { AcoesRapidas, DealCard } from "./deal-card";
+import { DealCard } from "./deal-card";
 import type { EtapaKanban, NegocioKanban } from "./modelo";
 import { VozDoQuadro } from "./eva-topo";
 import { vazioDaEtapa } from "./eva-voz";
+import { NumeroAnimado } from "./animacao/numero-animado";
 
 function CartaoArrastavel({
   deal,
@@ -27,26 +26,31 @@ function CartaoArrastavel({
   agora,
   onAbrir,
   prazoParado,
+  nomeDaEtapa,
 }: {
   deal: NegocioKanban;
   tipoDaEtapa: string;
+  nomeDaEtapa: string;
   defs: DefinicaoDeCampo[];
   layout: LayoutDoCartao;
   agora: Date;
   onAbrir: () => void;
   prazoParado?: number | null;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: deal.id });
+  // Sem `transform` no cartão original: quem segue o ponteiro é o DragOverlay.
+  // Mover o original junto deixava uma cópia presa na rolagem da coluna (o
+  // cartão "passava por trás" das outras e a coluna ganhava barra lateral).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
   // Onde o ponteiro desceu: soltar depois de arrastar não pode abrir a prévia.
   const origem = React.useRef<{ x: number; y: number } | null>(null);
 
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Translate.toString(transform) }}
       {...listeners}
       {...attributes}
       data-deal-id={deal.id}
+      data-flip-id={deal.id}
       aria-label={`${deal.name}. Enter abre a prévia, espaço pega para mover.`}
       onPointerDownCapture={(e) => {
         origem.current = { x: e.clientX, y: e.clientY };
@@ -64,10 +68,9 @@ function CartaoArrastavel({
         }
         listeners?.onKeyDown?.(e);
       }}
-      className={cn("group/card relative cursor-grab rounded-[14px] active:cursor-grabbing", focusRing, isDragging && "opacity-30")}
+      className={cn("group/card relative cursor-grab rounded-[16px] active:cursor-grabbing", focusRing, isDragging && "opacity-30")}
     >
-      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} defs={defs} agora={agora} layout={layout} prazoParado={prazoParado} comLink />
-      <AcoesRapidas deal={deal} />
+      <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} nomeDaEtapa={nomeDaEtapa} defs={defs} agora={agora} layout={layout} prazoParado={prazoParado} />
     </div>
   );
 }
@@ -113,8 +116,10 @@ export function corDeDadoDaEtapa(cor: string, tipo: string): CategoryColor {
 }
 
 /**
- * Coluna do quadro (v5): sem fundo pintado, cabeçalho com o ponto da cor da
- * etapa, nome, contagem, "+" e recolher; embaixo a chance e a soma. Alvo de
+ * Coluna do quadro (v4, exemplo 1): fundo sutil, cabeçalho com o nome, a
+ * contagem em selo e o total em R$; logo abaixo "+ Adicionar negócio". Sem o
+ * ponto colorido e sem a porcentagem (a chance mora no painel). Ganho e
+ * Perdido são colunas como as outras: fechar é arrastar até elas. Alvo de
  * soltar do dnd-kit, "Carregar mais" automático ao rolar até o fim (com
  * botão, para teclado). Recolhida vira uma faixa estreita com o nome na
  * vertical.
@@ -152,7 +157,6 @@ export function StageColumn({
   const aberta = etapa.type === "open";
   const total = etapa.count ?? etapa.deals.length;
   const corpoId = React.useId();
-  const ponto = CATEGORY_CLASSES[corDeDadoDaEtapa(etapa.color, etapa.type)].solid;
   const fim = React.useRef<HTMLDivElement>(null);
   const carregarMais = React.useRef(onCarregarMais);
   React.useEffect(() => {
@@ -171,8 +175,8 @@ export function StageColumn({
   }, [etapa.temMais, recolhida, etapa.deals.length]);
 
   const vazio = vazioDaEtapa(etapa.type, etapa.name, etapaAnterior);
-  // Soltar aqui: só um contorno de destaque, sem pintar a coluna.
-  const destaque = isOver ? "bg-accent-subtle ring-1 ring-accent-solid" : "bg-raised/50";
+  // Soltar aqui: realce suave (fundo e anel), a coluna continua a mesma.
+  const destaque = isOver ? "bg-accent-subtle/70 ring-1 ring-accent-solid/60" : "bg-raised";
 
   if (recolhida) {
     return (
@@ -188,7 +192,6 @@ export function StageColumn({
           onClick={() => onRecolher(false)}
           className={cn("flex flex-1 flex-col items-center gap-2 rounded-full px-1 py-1 text-text-secondary hover:text-text-primary", focusRing)}
         >
-          <span aria-hidden="true" className={cn("size-2 rounded-full", ponto)} />
           <span className="text-small font-medium [writing-mode:vertical-rl]">{etapa.name}</span>
           <span className="font-mono text-caption tabular-nums text-text-tertiary">{total.toLocaleString("pt-BR")}</span>
         </button>
@@ -201,20 +204,24 @@ export function StageColumn({
       ref={setNodeRef}
       data-etapa={etapa.name}
       aria-label={`${etapa.name}, ${total} itens`}
-      className={cn("flex max-h-full w-64 shrink-0 snap-start flex-col rounded-[18px] transition-colors duration-120", destaque)}
+      className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200", destaque)}
     >
-      <header className="group/cab flex flex-col gap-0.5 px-3 pb-2 pt-2.5">
+      <header className="group/cab flex flex-col gap-2 px-3 pb-2.5 pt-3">
         <div className="flex h-7 items-center gap-2">
-          <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", ponto)} />
-          <h3 className="min-w-0 truncate text-small font-semibold text-text-primary">{etapa.name}</h3>
-          <span className="font-mono text-caption tabular-nums text-text-tertiary">{total.toLocaleString("pt-BR")}</span>
-          <span className="ml-auto flex items-center">
-            {etapa.guidance && <OrientacaoDaEtapa etapa={etapa.name} texto={etapa.guidance} />}
-            {aberta && (
-              <IconButton aria-label={`Novo negócio em ${etapa.name}`} tooltip size="sm" onClick={() => onNovo(etapa.id)}>
-                <Plus />
-              </IconButton>
+          <h3 className="min-w-0 truncate text-body font-semibold text-text-primary">{etapa.name}</h3>
+          <span
+            className={cn(
+              "rounded-full px-1.5 py-px text-caption font-medium tabular-nums",
+              etapa.type === "won" ? "bg-success-subtle text-success" : etapa.type === "lost" ? "bg-danger-subtle text-danger" : "bg-panel text-text-secondary"
             )}
+          >
+            <NumeroAnimado valor={total} />
+          </span>
+          <span className="ml-auto flex items-center gap-0.5">
+            <span className="mr-1 text-caption tabular-nums text-text-tertiary" title={aberta ? `Ponderado: ${formatMoney(etapa.weightedCents / 100)}` : undefined}>
+              <NumeroAnimado valor={etapa.totalCents / 100} formatar={formatMoney} />
+            </span>
+            {etapa.guidance && <OrientacaoDaEtapa etapa={etapa.name} texto={etapa.guidance} />}
             <IconButton
               aria-label={`Recolher ${etapa.name}`}
               aria-expanded={true}
@@ -227,21 +234,28 @@ export function StageColumn({
             </IconButton>
           </span>
         </div>
-        <div
-          className="flex items-center justify-between pl-4 font-mono text-caption tabular-nums text-text-tertiary"
-          title={aberta ? `Ponderado: ${formatMoney(etapa.weightedCents / 100)}` : undefined}
-        >
-          <span>{aberta ? `${etapa.probability}%` : etapa.type === "won" ? "ganho" : "perdido"}</span>
-          <span className="text-text-secondary">{formatMoney(etapa.totalCents / 100)}</span>
-        </div>
+        {aberta && (
+          <button
+            type="button"
+            onClick={() => onNovo(etapa.id)}
+            className={cn(
+              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] border border-accent-solid/35 bg-accent-subtle/40 text-small font-medium text-accent-fg",
+              "transition-colors duration-150 hover:border-accent-solid/60 hover:bg-accent-subtle",
+              focusRing
+            )}
+          >
+            <Plus size={14} aria-hidden="true" /> Adicionar negócio
+          </button>
+        )}
       </header>
 
-      <div id={corpoId} className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto px-1.5 pb-1.5">
+      <div id={corpoId} data-coluna-corpo className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
         {etapa.deals.map((deal) => (
           <CartaoArrastavel
             key={deal.id}
             deal={deal}
             tipoDaEtapa={etapa.type}
+            nomeDaEtapa={etapa.name}
             prazoParado={etapa.rottingDays}
             defs={defs}
             layout={layout}

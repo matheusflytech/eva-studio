@@ -347,13 +347,25 @@ export function juntarCartoes(atuais: NegocioKanban[], novos: NegocioKanban[]): 
  * total e ponderado das duas (o ponderado usa a chance da etapa de destino,
  * que é o que o servidor grava ao mover).
  */
+/**
+ * Corpo extra do PATCH quando o cartão é arrastado. Negócio fechado (ganho ou
+ * perdido) só muda de etapa com "Reabrir"; no quadro, soltar em outra coluna
+ * já é essa decisão (e o Desfazer volta), então o reabrir vai junto em vez de
+ * o servidor recusar depois de pedir o motivo.
+ */
+export function extraDoArraste(tipoDeOrigem: string): { reabrir: true } | undefined {
+  return tipoDeOrigem === "won" || tipoDeOrigem === "lost" ? { reabrir: true } : undefined;
+}
+
 export function moverCartao(etapas: EtapaKanban[], dealId: string, paraEtapaId: string, agora: Date): EtapaKanban[] {
   const origem = etapas.find((e) => e.deals.some((d) => d.id === dealId));
   const destino = etapas.find((e) => e.id === paraEtapaId);
   if (!origem || !destino || origem.id === destino.id) return etapas;
   const deal = origem.deals.find((d) => d.id === dealId)!;
   const pesoAntes = Math.round((deal.amountCents * deal.probability) / 100);
-  const movido: NegocioKanban = { ...deal, probability: destino.probability, stageSince: agora.toISOString() };
+  const fecha = destino.type === "won" || destino.type === "lost";
+  // Como o servidor faz: ganho/perdido carimba o fechamento, etapa aberta tira.
+  const movido: NegocioKanban = { ...deal, probability: destino.probability, stageSince: agora.toISOString(), closedAt: fecha ? agora.toISOString() : null };
   const pesoDepois = Math.round((movido.amountCents * movido.probability) / 100);
   return etapas.map((e) => {
     if (e.id === origem.id) {

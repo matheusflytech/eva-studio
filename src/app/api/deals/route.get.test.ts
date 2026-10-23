@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   deal: { findMany: vi.fn() },
   customField: { findMany: vi.fn(async () => []) },
   pipelineCardLayout: { findUnique: vi.fn() },
+  userCardLayout: { findUnique: vi.fn(async (): Promise<unknown> => null) },
   dealItem: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -57,10 +58,19 @@ describe("GET /api/deals", () => {
     expect(d.stages[0].deals[0].createdAt).toBe("2026-10-01T00:00:00.000Z");
   });
 
+  it("devolve o layout da pessoa por cima do funil (quadro v4)", async () => {
+    db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor"], previa: [], densidade: "compacto" } });
+    db.userCardLayout.findUnique.mockResolvedValueOnce({ layout: { campos: ["contato"], previa: [], densidade: "confortavel" } });
+    const d = await (await get()).json();
+    expect(d.layout.campos).toEqual(["contato"]);
+    expect(db.userCardLayout.findUnique).toHaveBeenCalledWith({ where: { userId_pipelineId: { userId: "u", pipelineId: "p1" } }, select: { layout: true } });
+  });
+
   it("devolve o layout salvo do funil", async () => {
     db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor"], previa: [], densidade: "compacto" } });
     const d = await (await get()).json();
-    expect(d.layout).toEqual({ campos: ["valor"], previa: [], densidade: "compacto" });
+    // Layout salvo antes do v4: ações e seções vêm do padrão.
+    expect(d.layout).toEqual({ campos: ["valor"], previa: [], densidade: "compacto", acoes: ["whatsapp", "ligar", "tarefa", "nota"], secoes: ["detalhes", "contato", "atividade"] });
     expect(db.pipelineCardLayout.findUnique).toHaveBeenCalledWith({ where: { pipelineId: "p1" }, select: { layout: true } });
   });
 
