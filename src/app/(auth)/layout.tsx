@@ -21,8 +21,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       <div data-theme="dark" className="cartao-de-entrada relative z-10 grid w-full max-w-[1040px] lg:min-h-[min(600px,calc(100vh-160px))] lg:grid-cols-[420px_1fr]">
         <div className="relative z-10 flex flex-col justify-center px-8 py-10 sm:px-14">
-          <span className="mb-7 grid h-11 w-11 place-items-center rounded-[13px] bg-[#f2f2f4]">
-            <MarcaEva size={22} className="text-[#0c0c0e]" />
+          <span className="mb-7 grid h-12 w-12 place-items-center rounded-[14px] bg-[#f2f2f4]">
+            <MarcaEva size={26} title="Eva" className="text-[#0c0c0e]" />
           </span>
           {children}
         </div>

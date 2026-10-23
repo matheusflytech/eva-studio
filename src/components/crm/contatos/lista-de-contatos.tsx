@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Columns3, Download, List, ListFilter, Table2, Upload } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Columns3, Download, List, ListFilter, Table2, Upload } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -128,6 +129,8 @@ export function ListaDeContatos({
   onVista,
   abertoId,
   painel,
+  atividadesAbertas,
+  onAtividades,
 }: {
   opcoes: OpcoesDoCrm;
   /** Muda quando algo foi criado/alterado fora (recarrega lista e contagens). */
@@ -141,9 +144,13 @@ export function ListaDeContatos({
   onVista: (v: VistaDaLista) => void;
   /** Contato com a ficha aberta (destacado na Lista). */
   abertoId: string | null;
-  /** Painel à direita da Lista (próximas atividades ou a ficha). */
-  painel: React.ReactNode;
+  /** Painel à direita da Lista (próximas atividades ou a ficha); null = fechado, a lista ocupa a largura. */
+  painel: React.ReactNode | null;
+  /** Botão "Atividades" da Lista: abre/fecha as próximas atividades no painel. */
+  atividadesAbertas: boolean;
+  onAtividades: () => void;
 }) {
+  const calmo = useReducedMotion();
   const contrato = useContrato();
   const visoes = useVisoesDaLista("contatos", VISOES, PADRAO);
   const padrao = React.useMemo(() => ({ ...PADRAO, visao: visoes.padrao }), [visoes.padrao]);
@@ -510,6 +517,12 @@ export function ListaDeContatos({
                 <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-accent-solid px-1 text-caption tabular-nums text-text-on-accent">{nFiltros}</span>
               )}
             </Button>
+            {vista === "lista" && (
+              <Button variant="secondary" aria-pressed={atividadesAbertas} onClick={onAtividades} className={cn(atividadesAbertas && "bg-raised ring-1 ring-border-strong")}>
+                <CalendarClock size={14} aria-hidden="true" />
+                Atividades
+              </Button>
+            )}
             <SeletorDeVista value={vista} onChange={onVista} />
           </div>
         </div>
@@ -542,7 +555,9 @@ export function ListaDeContatos({
 
       {vista === "lista" ? (
         <div className="flex min-h-96 flex-1 gap-4">
-          <div className="flex min-h-0 w-full flex-col lg:w-[360px] lg:shrink-0">
+          {/* Sem nada aberto a lista ocupa a largura (linhas com celular, e-mail,
+              etiquetas…); a ficha ou as atividades só abrem quando pedidas. */}
+          <div className={cn("flex min-h-0 w-full flex-col", painel && "lg:w-[360px] lg:shrink-0")}>
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
               {carregandoAgora && !dados ? (
                 <div role="status" aria-label="Carregando contatos" className="flex flex-col">
@@ -556,12 +571,21 @@ export function ListaDeContatos({
               ) : linhas.length === 0 ? (
                 vazioDaLista
               ) : (
-                <ListaDePessoas contatos={linhas} porLetra={ordem?.key === "nome"} abertoId={abertoId} onAbrir={onAbrir} />
+                <ListaDePessoas contatos={linhas} porLetra={ordem?.key === "nome"} abertoId={abertoId} onAbrir={onAbrir} larga={!painel} />
               )}
             </div>
             <PaginacaoCompacta pagina={estado.pagina} tamanho={estado.tamanho} total={total} onPagina={(p) => setEstado({ ...estado, pagina: p })} />
           </div>
-          <div className="hidden min-w-0 flex-1 lg:block">{painel}</div>
+          {painel && (
+            <motion.div
+              className="hidden min-w-0 flex-1 lg:block"
+              initial={calmo ? { opacity: 0 } : { opacity: 0, x: 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.8 }}
+            >
+              {painel}
+            </motion.div>
+          )}
         </div>
       ) : (
         <>
@@ -624,12 +648,15 @@ function ListaDePessoas({
   porLetra,
   abertoId,
   onAbrir,
+  larga,
 }: {
   contatos: Contact[];
   /** Seções por letra só fazem sentido em ordem de nome. */
   porLetra: boolean;
   abertoId: string | null;
   onAbrir: (c: Contact) => void;
+  /** Painel fechado: a linha mostra também celular, e-mail, etiquetas, responsável e data. */
+  larga: boolean;
 }) {
   const secoes: { letra: string | null; itens: Contact[] }[] = [];
   for (const c of contatos) {
@@ -640,6 +667,17 @@ function ListaDePessoas({
   }
   return (
     <div className="flex flex-col">
+      {larga && (
+        <div aria-hidden="true" className={cn(GRADE_LARGA, "sticky top-0 z-[1] hidden h-8 bg-page px-2 font-mono text-caption uppercase tracking-wider text-text-tertiary lg:grid")}>
+          <span />
+          <span>Nome</span>
+          <span>Celular</span>
+          <span>E-mail</span>
+          <span>Etiquetas</span>
+          <span>Responsável</span>
+          <span className="text-right">Criado</span>
+        </div>
+      )}
       {secoes.map((s, i) => (
         <section key={`${s.letra ?? "_"}-${i}`} aria-label={s.letra ? `Contatos com ${s.letra}` : "Contatos"}>
           {s.letra && <h3 className="px-2 pb-1 pt-2.5 font-mono text-caption uppercase tracking-wider text-text-tertiary">{s.letra}</h3>}
@@ -655,7 +693,8 @@ function ListaDePessoas({
                     onClick={() => onAbrir(c)}
                     aria-current={ativo || undefined}
                     className={cn(
-                      "grid h-14.5 w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-3 rounded-xl px-2 text-left transition-colors duration-120",
+                      "grid h-14.5 w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-3 rounded-xl px-2 text-left transition-[background-color,transform] duration-120 active:scale-[0.995]",
+                      larga && GRADE_LARGA_LG,
                       ativo ? "bg-raised ring-1 ring-border-subtle" : "hover:bg-hover",
                       focusRing
                     )}
@@ -663,8 +702,39 @@ function ListaDePessoas({
                     <FotoDoContato nome={nome} semente={c.id} />
                     <span className="min-w-0">
                       <span className="block truncate text-body font-semibold text-text-primary">{nome}</span>
-                      <span className="block truncate text-caption text-text-tertiary">{linha2 || c.phone || c.email || "Sem etiqueta"}</span>
+                      <span className="block truncate text-caption text-text-tertiary">
+                        {larga ? linha2 || origemCurta(c) : linha2 || c.phone || c.email || origemCurta(c)}
+                      </span>
                     </span>
+                    {larga && (
+                      <>
+                        <span className="hidden min-w-0 truncate text-small text-text-secondary lg:block">{c.phone ? <PhoneNumber value={c.phone} whatsapp /> : <span className="text-text-disabled">—</span>}</span>
+                        <span className="hidden min-w-0 truncate text-small text-text-secondary lg:block">{c.email || <span className="text-text-disabled">—</span>}</span>
+                        <span className="hidden min-w-0 items-center gap-1 overflow-hidden lg:flex">
+                          {c.tags.length ? (
+                            <>
+                              {c.tags.slice(0, 2).map((t) => (
+                                <Badge key={t.id} variant="neutral" className="max-w-[110px] truncate">{t.name}</Badge>
+                              ))}
+                              {c.tags.length > 2 && <span className="font-mono text-caption text-text-tertiary">+{c.tags.length - 2}</span>}
+                            </>
+                          ) : (
+                            <span className="text-small text-text-disabled">—</span>
+                          )}
+                        </span>
+                        <span className="hidden min-w-0 items-center gap-2 text-small text-text-secondary lg:flex">
+                          {c.owner ? (
+                            <>
+                              <Avatar name={c.owner.name || "Sem nome"} size="sm" />
+                              <span className="truncate">{c.owner.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-text-disabled">Sem responsável</span>
+                          )}
+                        </span>
+                        <span className="hidden text-right font-mono text-caption tabular-nums text-text-tertiary lg:block">{dataCurta(c.createdAt)}</span>
+                      </>
+                    )}
                   </button>
                 </li>
               );
@@ -674,6 +744,16 @@ function ListaDePessoas({
       ))}
     </div>
   );
+}
+
+// Colunas da Lista larga (painel fechado): foto, nome, celular, e-mail, etiquetas, responsável, criado.
+const GRADE_LARGA = "grid-cols-[38px_minmax(180px,1.4fr)_minmax(130px,0.9fr)_minmax(160px,1.1fr)_minmax(140px,1fr)_minmax(130px,0.8fr)_84px] items-center gap-3";
+const GRADE_LARGA_LG = "lg:grid-cols-[38px_minmax(180px,1.4fr)_minmax(130px,0.9fr)_minmax(160px,1.1fr)_minmax(140px,1fr)_minmax(130px,0.8fr)_84px]";
+
+/** Sem etiqueta nem empresa: de onde o contato veio, em vez de "Sem etiqueta". */
+function origemCurta(c: Contact): string {
+  const origem = (SOURCE_LABEL as Record<string, string>)[c.source];
+  return origem ? `Veio de ${origem.toLowerCase()}` : "Sem etiqueta";
 }
 
 /** Paginação curta da coluna da Lista (a numerada fica na Tabela). */

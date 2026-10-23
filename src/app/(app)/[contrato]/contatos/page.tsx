@@ -53,6 +53,9 @@ function ContatosConteudo() {
   const [tags, setTags] = React.useState<TagRow[]>([]);
   const [segments, setSegments] = React.useState<SegmentRow[]>([]);
   const [selected, setSelected] = React.useState<Contact | null>(null);
+  // Próximas atividades: só quando a pessoa pede (botão "Atividades"); a lista
+  // começa ocupando a largura toda.
+  const [verAtividades, setVerAtividades] = React.useState(false);
   const [versao, setVersao] = React.useState(0);
   const [criando, setCriando] = React.useState(false);
   const [aba, setAba] = React.useState<AbaDeContatos>("contatos");
@@ -172,10 +175,17 @@ function ContatosConteudo() {
           vista={vista}
           onVista={(v) => gravarVista([v])}
           abertoId={selected?.id ?? null}
+          atividadesAbertas={verAtividades && !selected}
+          onAtividades={() => {
+            setSelected(null);
+            setVerAtividades((v) => !(v && !selected));
+          }}
           painel={
-            <PainelDeContatos chave={selected?.id ?? "agenda"}>
-              {selected ? ficha("painel") : <ProximasAtividades versao={versao} onAbrirContato={abrirPorId} />}
-            </PainelDeContatos>
+            selected || verAtividades ? (
+              <PainelDeContatos chave={selected?.id ?? "agenda"}>
+                {selected ? ficha("painel") : <ProximasAtividades versao={versao} onAbrirContato={abrirPorId} />}
+              </PainelDeContatos>
+            ) : null
           }
         />
       )}
