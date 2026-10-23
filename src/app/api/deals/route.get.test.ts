@@ -60,7 +60,8 @@ describe("GET /api/deals", () => {
   it("devolve o layout salvo do funil", async () => {
     db.pipelineCardLayout.findUnique.mockResolvedValue({ layout: { campos: ["valor"], previa: [], densidade: "compacto" } });
     const d = await (await get()).json();
-    expect(d.layout).toEqual({ campos: ["valor"], previa: [], densidade: "compacto" });
+    // Layout salvo antes do v4: ações e seções vêm do padrão.
+    expect(d.layout).toEqual({ campos: ["valor"], previa: [], densidade: "compacto", acoes: ["whatsapp", "ligar", "tarefa", "nota"], secoes: ["detalhes", "contato", "atividade"] });
     expect(db.pipelineCardLayout.findUnique).toHaveBeenCalledWith({ where: { pipelineId: "p1" }, select: { layout: true } });
   });
 

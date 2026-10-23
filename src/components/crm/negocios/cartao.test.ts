@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LAYOUT_PADRAO } from "@/lib/cartao-layout";
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
-import { blocosDoCartao, camposDisponiveis, textoDoCampo, tituloDoCartao } from "./cartao";
+import { acoesDisponiveis, blocosDoCartao, camposDisponiveis, linhasDoCartao, textoDoCampo, tituloDoCartao, topoDoCartao } from "./cartao";
 import type { NegocioKanban } from "./modelo";
 
 const agora = new Date("2026-10-19T15:00:00Z");
@@ -78,8 +78,8 @@ describe("blocosDoCartao", () => {
       { tipo: "linha", campo: "cf:consumo" },
     ]);
   });
-  it("layout padrão gera o cartão de sempre: métricas e próximo passo", () => {
-    expect(blocosDoCartao(LAYOUT_PADRAO.campos, "confortavel")).toEqual([
+  it("layout de antes do v4 gera o cartão de sempre: métricas e próximo passo", () => {
+    expect(blocosDoCartao(["empresa", "nome", "valor", "probabilidade", "responsavel", "whatsapp", "proximoPasso"], "confortavel")).toEqual([
       { tipo: "metricas", campos: ["valor", "probabilidade", "responsavel"] },
       { tipo: "linha", campo: "proximoPasso" },
     ]);
@@ -126,5 +126,37 @@ describe("camposDisponiveis", () => {
     const c = camposDisponiveis(defs);
     expect(c[0]).toBe("empresa");
     expect(c.slice(-2)).toEqual(["cf:segmento", "cf:consumo"]);
+  });
+});
+
+describe("cartão v4", () => {
+  it("topo: contato com foto e o negócio embaixo", () => {
+    expect(topoDoCartao(negocio(), LAYOUT_PADRAO.campos)).toEqual({ foto: "Marina Costa", titulo: "Marina Costa", subtitulo: "Implantação anual", ehContato: true });
+  });
+  it("topo sem contato (ou sem 'contato' no layout): o negócio em cima e a empresa embaixo", () => {
+    expect(topoDoCartao(negocio({ contacts: [] }), LAYOUT_PADRAO.campos)).toEqual({ foto: "Padaria Bom Pão", titulo: "Implantação anual", subtitulo: "Padaria Bom Pão", ehContato: false });
+    expect(topoDoCartao(negocio(), ["valor"]).titulo).toBe("Implantação anual");
+    expect(topoDoCartao(negocio({ contacts: [], company: null }), ["valor"])).toMatchObject({ foto: "Implantação anual", subtitulo: "" });
+  });
+  it("corpo: pares de rótulo e valor, sem o que já está no topo", () => {
+    expect(linhasDoCartao(["contato", "nome", "empresa", "valor", "previsao", "responsavel"])).toEqual(["valor", "previsao", "responsavel"]);
+  });
+  it("ações: WhatsApp só com conversa, ligar só com telefone; tarefa e nota sempre", () => {
+    const todas = ["whatsapp", "ligar", "tarefa", "nota"] as const;
+    expect(acoesDisponiveis(negocio(), [...todas])).toEqual([
+      { acao: "whatsapp", href: "/conversas?c=cv1" },
+      { acao: "ligar", href: "tel:+5511987654321" },
+      { acao: "tarefa" },
+      { acao: "nota" },
+    ]);
+    expect(acoesDisponiveis(negocio({ whatsapp: null, contacts: [] }), [...todas]).map((a) => a.acao)).toEqual(["tarefa", "nota"]);
+    expect(acoesDisponiveis(negocio(), ["nota"]).map((a) => a.acao)).toEqual(["nota"]);
+  });
+  it("etapa e última interação", () => {
+    expect(textoDoCampo("etapa", negocio(), { ...ctx, nomeDaEtapa: "Proposta" })).toBe("Proposta");
+    expect(textoDoCampo("ultimaInteracao", negocio({ lastActivityAt: "2026-10-19T14:00:00Z" }), ctx)).toBe("Hoje");
+    expect(textoDoCampo("ultimaInteracao", negocio({ lastActivityAt: "2026-10-18T14:00:00Z" }), ctx)).toBe("Ontem");
+    expect(textoDoCampo("ultimaInteracao", negocio({ lastActivityAt: "2026-10-12T14:00:00Z" }), ctx)).toBe("Há 7 dias");
+    expect(textoDoCampo("ultimaInteracao", negocio({ lastActivityAt: null }), ctx)).toBe("");
   });
 });

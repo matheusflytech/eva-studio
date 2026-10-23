@@ -72,7 +72,7 @@ describe("GET /api/pipelines/[id]/cartao", () => {
     const d = await (await get()).json();
     expect(d.salvo).toBe(true);
     expect(d.disponivel).toBe(true);
-    expect(d.layout).toEqual({ campos: ["valor", "cf:segmento"], previa: ["email"], densidade: "compacto" });
+    expect(d.layout).toEqual({ campos: ["valor", "cf:segmento"], previa: ["email"], densidade: "compacto", acoes: ["whatsapp", "ligar", "tarefa", "nota"], secoes: ["detalhes", "contato", "atividade"] });
     expect(db.pipeline.findFirst).toHaveBeenCalledWith({ where: { id: "p1", orgId: "org" }, select: { id: true } });
   });
 
@@ -83,7 +83,7 @@ describe("GET /api/pipelines/[id]/cartao", () => {
 });
 
 describe("PUT /api/pipelines/[id]/cartao", () => {
-  const valido = { campos: ["empresa", "valor", "cf:segmento"], previa: ["telefone", "valor"], densidade: "compacto" };
+  const valido = { campos: ["empresa", "valor", "cf:segmento"], previa: ["telefone", "valor"], densidade: "compacto", acoes: ["ligar"], secoes: ["detalhes", "atividade"] };
 
   it("salva por funil e devolve o layout", async () => {
     const res = await put(valido);

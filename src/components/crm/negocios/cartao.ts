@@ -2,7 +2,7 @@
 // escolhidos se agrupam no cartão e o texto de cada campo (cartão e prévia).
 // Sem React: a ordem e a formatação ficam testadas à parte.
 
-import { CAMPOS_PADRAO, type CampoDoCartao, type CampoPadrao, type Densidade } from "@/lib/cartao-layout";
+import { CAMPOS_PADRAO, type AcaoDoCartao, type CampoDoCartao, type CampoPadrao, type Densidade } from "@/lib/cartao-layout";
 import { formatarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 import { resumoDosProdutos } from "@/lib/produtos";
 import { dataCurta, dataCurtaDoDia, diaDaPrevisao, dinheiro, sinalDoNegocio, tempoNaEtapa, type NegocioKanban } from "./modelo";
@@ -31,6 +31,68 @@ export function tituloDoCartao(deal: NegocioKanban, campos: CampoDoCartao[]): { 
   const titulo = campos.includes("empresa") ? deal.company?.name || contato || deal.name : deal.name;
   const subtitulo = campos.includes("nome") && titulo !== deal.name ? deal.name : "";
   return { titulo, subtitulo };
+}
+
+// ---- cartão v4 (exemplo 1): topo com o contato, pares rótulo/valor, ações ----
+
+export interface TopoDoCartao {
+  /** Nome para a foto/iniciais. */
+  foto: string;
+  titulo: string;
+  subtitulo: string;
+  /** O topo é a pessoa (contato principal), não o negócio. */
+  ehContato: boolean;
+}
+
+/**
+ * Topo do cartão. Com "contato" no layout e um contato no negócio: a pessoa em
+ * cima e o negócio embaixo (a empresa, quando o layout tem empresa e não tem o
+ * nome). Sem isso: o negócio em cima e a empresa embaixo.
+ */
+export function topoDoCartao(deal: NegocioKanban, campos: CampoDoCartao[]): TopoDoCartao {
+  const contato = deal.contacts[0]?.name?.trim();
+  const empresa = deal.company?.name?.trim() || "";
+  if (contato && campos.includes("contato")) {
+    const soEmpresa = campos.includes("empresa") && !campos.includes("nome") && !!empresa;
+    return { foto: contato, titulo: contato, subtitulo: soEmpresa ? empresa : deal.name, ehContato: true };
+  }
+  return { foto: empresa || deal.name, titulo: deal.name, subtitulo: empresa, ehContato: false };
+}
+
+/** O que mora no topo do cartão v4 não se repete nas linhas. */
+const DO_TOPO = new Set<CampoDoCartao>(["contato", "nome", "empresa"]);
+
+/** Campos do corpo do cartão v4 (pares rótulo/valor), na ordem do layout. */
+export function linhasDoCartao(campos: CampoDoCartao[]): CampoDoCartao[] {
+  return campos.filter((c) => !DO_TOPO.has(c));
+}
+
+export interface AcaoDisponivel {
+  acao: AcaoDoCartao;
+  href?: string;
+}
+
+/** Ações do rodapé que fazem sentido para este negócio (sem conversa não há WhatsApp; sem telefone não há ligar). */
+export function acoesDisponiveis(deal: NegocioKanban, acoes: AcaoDoCartao[]): AcaoDisponivel[] {
+  const out: AcaoDisponivel[] = [];
+  const telefone = deal.contacts.find((c) => c.phone)?.phone?.replace(/[^\d+]/g, "");
+  for (const acao of acoes) {
+    if (acao === "whatsapp") {
+      if (deal.whatsapp) out.push({ acao, href: `/conversas?c=${deal.whatsapp.conversationId}` });
+    } else if (acao === "ligar") {
+      if (telefone) out.push({ acao, href: `tel:${telefone}` });
+    } else out.push({ acao });
+  }
+  return out;
+}
+
+/** "Hoje", "Ontem", "Há 7 dias" no calendário de São Paulo. */
+function diasAtras(iso: string, agora: Date): string {
+  const dia = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: FUSO });
+  const n = Math.round((Date.parse(dia(agora)) - Date.parse(dia(new Date(iso)))) / 86_400_000);
+  if (n <= 0) return "Hoje";
+  if (n === 1) return "Ontem";
+  return `Há ${n} dias`;
 }
 
 /** Campos que moram no cabeçalho do cartão (título, subtítulo e ícone do WhatsApp). */
@@ -72,6 +134,8 @@ export interface ContextoDoCampo {
   prazoParado?: number | null;
   agora: Date;
   defs: DefinicaoDeCampo[];
+  /** Nome da etapa do negócio (campo "etapa" do painel). */
+  nomeDaEtapa?: string;
 }
 
 function dataCompleta(iso: string): string {
@@ -134,6 +198,10 @@ export function textoDoCampo(
       return contato?.email || "";
     case "produtos":
       return resumoDosProdutos(deal.produtos ?? []);
+    case "etapa":
+      return ctx.nomeDaEtapa ?? "";
+    case "ultimaInteracao":
+      return deal.lastActivityAt ? diasAtras(deal.lastActivityAt, ctx.agora) : "";
     default:
       return "";
   }
