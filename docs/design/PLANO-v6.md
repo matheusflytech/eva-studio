@@ -25,7 +25,23 @@ Feito e conferido no navegador (1440×900, claro e escuro), commit local no PR #
   neste Windows).
 - Dashboard: o "Ver mais N cartões" foi mantido (decisão da v5).
 
-Próximo: propostas do fundo "gelo" e do Google Agenda (mostrar antes),
+**Atualização (22/10, mais tarde):**
+- Login escolhido: proposta 2 "Constelação" (César em nuvem de pontos), num
+  cartão escuro sobre o fundo "gelo" (cordilheira em linhas finas). Feito em
+  `src/app/(auth)/layout.tsx`, `components/entrada/fundo-gelo.tsx` e
+  `components/entrada/busto-constelacao.tsx` (foto em `public/entrada/`).
+- Regra nova do dono: sempre o LOGO OFICIAL de marcas (WhatsApp, Instagram,
+  Google, Google Agenda…), nunca ícone genérico (ex.: balão verde no lugar do
+  WhatsApp). Usar `src/components/ui/logo-oficial.tsx` (`<LogoOficial
+  marca="whatsapp" />`, SVGs da coleção Iconify "logos", CC0).
+- Login novo com Júlio César: 5 propostas animadas em
+  `docs/design/proposta-v6/login-cesar/` (abrir `index.html` por HTTP:
+  preview "propostas-v6" na porta 8110). Base: foto do busto de Túsculo,
+  domínio público. A 2 foi a escolhida.
+- Google Agenda: proposta com logos oficiais; integração ainda depende das
+  respostas (só leitura?, quem vê, app OAuth, tabela nova).
+
+Próximo: respostas do Google Agenda,
 depois aplicar o mesmo método (medir vídeo, gravar, comparar) nas
 transições de painel/gaveta/modal (ref. Cadra: fundo desfocado atrás).
 

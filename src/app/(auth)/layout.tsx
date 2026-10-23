@@ -1,32 +1,42 @@
 "use client";
 
 import * as React from "react";
-import { FundoVivo } from "@/components/layout/fundo-vivo";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { FundoGelo } from "@/components/entrada/fundo-gelo";
+import { BustoConstelacao } from "@/components/entrada/busto-constelacao";
 
 // ---------------------------------------------------------------------------
-// Entrar e criar conta: sempre no escuro. Preto quase puro, um feixe de luz
-// diagonal, as curvas do fundo vivo bem de leve e o formulário num cartão de
-// vidro fosco que sobe do desfoque ao abrir.
+// Entrar e criar conta (v6): o cartão escuro flutua sobre o fundo "gelo"
+// (cordilheira em linhas finas). À esquerda o formulário; à direita Júlio
+// César em nuvem de pontos, que gira devagar seguindo o mouse e acende perto
+// da mão (proposta 2, "Constelação"). O cartão sobe do desfoque ao abrir.
 // ---------------------------------------------------------------------------
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-theme="dark" className="tela-de-entrada relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
-      <FundoVivo escuro forca={2.4} className="pointer-events-none absolute inset-0 h-full w-full" />
-      <span className="feixe-de-luz" aria-hidden="true" />
-      <span className="feixe-de-luz feixe-fino" aria-hidden="true" />
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef2f6] px-6 py-16">
+      <FundoGelo className="pointer-events-none absolute inset-0 h-full w-full" />
 
-      <span className="absolute left-8 top-7 z-10 text-small font-semibold text-text-secondary">Eva Holding</span>
+      <span className="absolute left-8 top-7 z-10 text-small font-semibold text-[#121214]">Eva Holding</span>
 
-      <div className="cartao-vidro relative z-10 w-full max-w-[380px]">
-        <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[13px] bg-page ring-1 ring-white/10">
-          <MarcaEva size={22} className="text-[#f2f2f4]" />
-        </span>
-        {children}
+      <div data-theme="dark" className="cartao-de-entrada relative z-10 grid w-full max-w-[1040px] lg:min-h-[min(600px,calc(100vh-160px))] lg:grid-cols-[420px_1fr]">
+        <div className="relative z-10 flex flex-col justify-center px-8 py-10 sm:px-14">
+          <span className="mb-7 grid h-11 w-11 place-items-center rounded-[13px] bg-[#f2f2f4]">
+            <MarcaEva size={22} className="text-[#0c0c0e]" />
+          </span>
+          {children}
+        </div>
+        <div className="palco-do-busto relative hidden lg:block">
+          <BustoConstelacao className="absolute inset-0" />
+          <p className="pointer-events-none absolute bottom-7 left-8 font-mono text-[11px] leading-[1.7] tracking-[0.2em] text-[#4c4c54]">
+            GAIVS · IVLIVS · CAESAR
+            <br />
+            EVA HOLDING · MMXXVI
+          </p>
+        </div>
       </div>
 
-      <span className="absolute bottom-6 z-10 font-mono text-caption text-text-disabled">evapp.vercel.app</span>
+      <span className="absolute bottom-6 z-10 font-mono text-caption text-[#8a93a3]">evapp.vercel.app</span>
     </div>
   );
 }

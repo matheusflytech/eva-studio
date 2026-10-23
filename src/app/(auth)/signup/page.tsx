@@ -31,7 +31,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex flex-col text-center">
+    <div className="flex flex-col text-left">
       <h1 className="text-title font-semibold tracking-tight text-text-primary">Criar conta</h1>
       <p className="mt-1 text-small text-text-secondary">Comece a criar agentes em minutos.</p>
 
@@ -89,7 +89,7 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-small text-text-tertiary">
+      <p className="mt-5 text-small text-text-tertiary">
         Já tem conta?{" "}
         <Link href="/login" className="font-medium text-text-primary hover:underline">
           Entrar

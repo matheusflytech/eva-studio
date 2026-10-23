@@ -31,9 +31,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col text-center">
+    <div className="flex flex-col text-left">
       <h1 className="text-title font-semibold tracking-tight text-text-primary">Entrar</h1>
-      <p className="mt-1 text-small text-text-secondary">Acesse seu painel de agentes.</p>
+      <p className="mt-1 text-small text-text-secondary">Acesse o painel da Eva Holding.</p>
 
       {/* O fundo reage quando a pessoa entra num campo. */}
       <form onSubmit={handleSubmit} onFocus={(e) => pulsar(e.target, 0.9)} className="mt-6 flex flex-col gap-3 text-left">
@@ -69,7 +69,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-5 text-center text-small text-text-tertiary">
+      <p className="mt-5 text-small text-text-tertiary">
         Ainda não tem conta?{" "}
         <Link href="/signup" className="font-medium text-text-primary hover:underline">
           Criar conta

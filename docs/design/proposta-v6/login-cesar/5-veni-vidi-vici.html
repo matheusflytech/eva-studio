@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5 · Veni, vidi, vici</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: #070708; color: #f2f2f4; }
+  .etiqueta { background: rgba(255,255,255,.08); color: #d6d6da; }
+  .nota { color: #6f6f76; }
+  .cartao { background: #0b0b0d; box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 40px 120px -40px rgba(0,0,0,.9); }
+  .marca { background: #f2f2f4; color: #0b0b0d; }
+  .form .sub, .form .rodape { color: #8a8a90; }
+  .form label { color: #c9c9ce; }
+  .form .campo { border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: #f2f2f4; }
+  .form .campo:focus { border-color: #5d9bf0; box-shadow: 0 0 0 4px rgba(31,111,214,.18); }
+  .form .botao { background: #f2f2f4; color: #0b0b0d; }
+  .palco { background: #0b0b0d; }
+  .faixa { position: absolute; left: 0; white-space: nowrap; font: 400 150px/1 "Times New Roman", Georgia, serif; letter-spacing: .04em; color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,.07); animation: corre 60s linear infinite; z-index: 0; }
+  .faixa.b { animation-direction: reverse; animation-duration: 80s; }
+  @keyframes corre { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .faixa { animation-duration: 180s; } }
+</style>
+</head>
+<body>
+  <a class="etiqueta" href="index.html">← Proposta 5 · Veni, vidi, vici</a>
+  <div class="cartao">
+    <form class="form" onsubmit="return false">
+      <div class="marca">Λ</div>
+      <h1>Entrar</h1>
+      <p class="sub">Acesse o painel da Eva Holding.</p>
+      <div><label>E-mail</label><input class="campo" placeholder="voce@empresa.com"></div>
+      <div><label>Senha</label><input class="campo" type="password" placeholder="••••••••"></div>
+      <button class="botao">Entrar</button>
+      <p class="rodape">Ainda não tem conta? <b style="color:#f2f2f4">Criar conta</b></p>
+    </form>
+    <div class="palco" id="palco">
+      <div class="faixa" style="top:40px">VENI · VIDI · VICI · VENI · VIDI · VICI · </div>
+      <div class="faixa b" style="top:240px">EVA · HOLDING · EVA · HOLDING · </div>
+      <div class="faixa" style="top:440px">VENI · VIDI · VICI · VENI · VIDI · VICI · </div>
+      <canvas id="c"></canvas>
+    </div>
+  </div>
+  <p class="nota">César escrito com algarismos romanos (I V X L C D M: quanto mais claro o mármore, mais "pesada" a letra), sobre faixas enormes de "VENI · VIDI · VICI" passando devagar. Ao abrir, as letras se embaralham e assentam no rosto. Passe o mouse: elas se embaralham perto da mão, como um código sendo decifrado.</p>
+
+<script src="cesar.js"></script>
+<script src="base.js"></script>
+<script>
+(async () => {
+  const canvas = document.getElementById("c"), palco = document.getElementById("palco");
+  const busto = await carregarBusto(CESAR_34, 240);
+  const mao = new Ponteiro(palco);
+  const ESCALA_LETRAS = " ·:IVXLCDM"; // do vazio ao mais denso
+  const TODAS = "IVXLCDM·:";
+  const rand = semente(5);
+  let W = 0, H = 0, cels = [], CEL = 9;
+  const g = prepararCanvas(canvas, (w, h) => {
+    W = w; H = h; cels = [];
+    const escala = (h * 0.98) / busto.h, ox = w - busto.w * escala - 10, oy = h - busto.h * escala;
+    for (let y = 0; y < h; y += CEL * 1.25)
+      for (let x = 0; x < w; x += CEL) {
+        const v = busto.em((x - ox) / escala, (y - oy) / escala);
+        if (x < ox || v < 0.1) continue;
+        const letra = ESCALA_LETRAS[Math.min(ESCALA_LETRAS.length - 1, Math.round(Math.pow(v, 0.9) * (ESCALA_LETRAS.length - 1)))];
+        if (letra === " ") continue;
+        cels.push({ x, y, v, letra, mostra: TODAS[(rand() * TODAS.length) | 0], ate: 0.3 + rand() * 1.2 + (y / h) * 0.6 });
+      }
+  });
+  const t0 = performance.now();
+  function quadro(t) {
+    mao.passo(0.3);
+    const tempo = (t - t0) / 1000 * (CALMO ? 0.5 : 1);
+    g.clearRect(0, 0, W, H);
+    g.font = `500 ${CEL * 1.2}px ui-monospace, "JetBrains Mono", monospace`; g.textBaseline = "top";
+    for (const c of cels) {
+      const perto = mao.forca > 0.05 ? Math.max(0, 1 - Math.hypot(c.x - mao.x, c.y - mao.y) / 90) : 0;
+      const embaralha = tempo < c.ate || rand() < perto * 0.5;
+      if (embaralha && rand() < 0.35) c.mostra = TODAS[(rand() * TODAS.length) | 0];
+      const letra = embaralha ? c.mostra : c.letra;
+      const a = (0.25 + c.v * 0.75) * Math.min(1, tempo * 1.5);
+      g.fillStyle = perto > 0.05 ? `rgba(120,170,245,${Math.min(1, a + perto * 0.5)})` : `rgba(236,236,240,${a})`;
+      g.fillText(letra, c.x, c.y);
+    }
+    requestAnimationFrame(quadro);
+  }
+  requestAnimationFrame(quadro);
+})();
+</script>
+</body>
+</html>
