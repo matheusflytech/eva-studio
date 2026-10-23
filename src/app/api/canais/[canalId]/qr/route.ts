@@ -13,9 +13,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ can
   if (!canal) return NextResponse.json({ error: "Canal não encontrado." }, { status: 404 });
   const s = await prisma.canalWhatsAppQr.findUnique({
     where: { canalId },
-    select: { status: true, qrDataUrl: true, phoneNumber: true, lastError: true },
+    select: { status: true, qrDataUrl: true, phoneNumber: true, lastError: true, updatedAt: true },
   });
-  return NextResponse.json({ connection: s ?? { status: "disconnected", qrDataUrl: null, phoneNumber: null, lastError: null } });
+  // updatedAt: quando o worker mexeu na sessão pela última vez. Esperando QR há
+  // minutos sem mudança = worker parado (a tela avisa em vez de mostrar QR velho).
+  return NextResponse.json({
+    connection: s
+      ? { status: s.status, qrDataUrl: s.qrDataUrl, phoneNumber: s.phoneNumber, lastError: s.lastError, atualizadoEm: s.updatedAt.toISOString() }
+      : { status: "disconnected", qrDataUrl: null, phoneNumber: null, lastError: null, atualizadoEm: null },
+  });
 }
 
 // Pede de novo a sessão (QR expirou ou caiu).

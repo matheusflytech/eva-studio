@@ -279,12 +279,21 @@ interface EstadoDoQr {
   qrDataUrl: string | null;
   phoneNumber: string | null;
   lastError: string | null;
+  /** Quando o worker mexeu na sessão pela última vez. */
+  atualizadoEm?: string | null;
+  /** Calculado na leitura: esperando QR sem mudança há tempo demais. */
+  parado?: boolean;
 }
+
+// Um worker vivo troca o QR a cada ~20 s e reabre a sessão a cada ~2 min.
+// Sem mudança há mais que isso, o QR na tela já não vale: o worker parou.
+const WORKER_PARADO_MS = 3 * 60_000;
 
 // QR: cria o canal, o worker abre a sessão e devolve o QR; a tela lê a cada
 // 3 s até conectar.
-function ConectarWhatsAppQr({ aoConectar }: { aoConectar: AoConectar }) {
-  const [canalId, setCanalId] = React.useState<string | null>(null);
+export function ConectarWhatsAppQr({ aoConectar, canalInicial = null }: { aoConectar: AoConectar; canalInicial?: string | null }) {
+  // canalInicial: canal de QR que ficou pendente (a pessoa volta para ler o QR).
+  const [canalId, setCanalId] = React.useState<string | null>(canalInicial);
   const [estado, setEstado] = React.useState<EstadoDoQr | null>(null);
   const { enviando, erro, enviar } = useEnvio();
 
@@ -295,7 +304,10 @@ function ConectarWhatsAppQr({ aoConectar }: { aoConectar: AoConectar }) {
       fetch(`/api/canais/${canalId}/qr`)
         .then((r) => r.json())
         .then((d) => {
-          if (vivo && d?.connection) setEstado(d.connection);
+          if (!vivo || !d?.connection) return;
+          const c = d.connection as EstadoDoQr;
+          const esperando = c.status === "requesting" || c.status === "qr_pending";
+          setEstado({ ...c, parado: esperando && !!c.atualizadoEm && Date.now() - Date.parse(c.atualizadoEm) > WORKER_PARADO_MS });
         })
         .catch(() => {});
     void ler();
@@ -325,6 +337,20 @@ function ConectarWhatsAppQr({ aoConectar }: { aoConectar: AoConectar }) {
             <QrCode size={15} /> {enviando ? "Preparando..." : "Gerar QR code"}
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (estado?.parado) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <Notice tone="warning">
+          O worker do WhatsApp não responde desde {new Date(estado!.atualizadoEm!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}. O QR que ele
+          deixou já não vale (o celular diria “não é possível conectar”). Ligue o worker e gere outro QR.
+        </Notice>
+        <Button type="button" variant="secondary" size="sm" onClick={() => void fetch(`/api/canais/${canalId}/qr`, { method: "POST" })}>
+          <RefreshCw size={14} /> Gerar outro QR
+        </Button>
       </div>
     );
   }

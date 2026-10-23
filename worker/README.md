@@ -31,6 +31,17 @@ para Railway.
 3. Start command já vem do `package.json` (`npm start` → `node index.js`)
 4. Sem porta fixa necessária — o worker escuta na porta que o provedor injetar (Render e Railway fazem isso)
 
+## Cuidados (aprendidos em 23/10/2026)
+
+- **Um worker só no ar.** Dois workers no mesmo banco abrem duas sessões para o mesmo canal, gravam QRs
+  diferentes e um sobrescreve as credenciais do outro no pareamento (o celular diz "não é possível conectar").
+  Antes de subir em outro lugar (Railway, local), desligue o que está rodando.
+- **Worker parado não dá erro na tela de antes.** Em 21/10 o worker do Render parou e o QR que ficou no banco
+  continuou na tela por dois dias; escanear dava "não é possível conectar". Agora Configurações → Canais avisa
+  quando a sessão espera QR sem mudança há mais de 3 minutos.
+- **Códigos de desconexão.** 408 (QR expirou) e 515 (reinício pedido logo depois de parear) são normais e não
+  viram aviso. Qualquer outro fica em `lastError` como "Conexão caiu (código N)".
+
 ## O que o worker faz
 
 - **Sessão do Baileys** por canal do contrato (ou por agente, sem o SQL de canais), com QR e reconexão (polling de 4s)
