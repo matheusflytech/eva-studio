@@ -26,6 +26,9 @@ import { PALETTE_GROUPS } from "./palette-groups";
 import { validateNode } from "./block-validation";
 import { cn } from "@/lib/utils";
 
+// Acima disso a IA começa a esquecer partes do prompt (plano v7, A6).
+const LIMITE_DO_PROMPT = 3000;
+
 /** Como o bloco se chama e o que ele faz, na linguagem da paleta. */
 const DICIONARIO = new Map(
   PALETTE_GROUPS.flatMap((g) => g.items.map((i) => [i.key, { label: i.label, hint: i.hint }]))
@@ -205,6 +208,12 @@ export function NodeInspector({
             value={node.data.detail ?? ""}
             onChange={(e) => onChange({ detail: e.target.value })}
           />
+          {iconKey === "ai-agent" && (node.data.detail ?? "").length > LIMITE_DO_PROMPT && (
+            <p className="mt-1 text-caption text-warning">
+              {(node.data.detail ?? "").length.toLocaleString("pt-BR")} caracteres. Acima de uns 3 mil a IA começa a
+              esquecer partes do texto: corte o que se repete ou leve para a aba Agente.
+            </p>
+          )}
         </div>
 
         {iconKey === "message" && (
@@ -522,9 +531,13 @@ export function NodeInspector({
               <span>
                 <span className="block text-small font-medium text-text-primary">Usar o cadastro do agente</span>
                 <span className="block text-caption text-text-tertiary">
-                  {node.data.aiUsarAgente === false
-                    ? "Só o texto deste bloco vai para a IA."
-                    : "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."}
+                  {node.data.aiUsarAgente === false ? (
+                    <span className="text-warning">
+                      Só o texto deste bloco vai para a IA: instruções, tom e &quot;Nunca faça&quot; do agente não valem aqui.
+                    </span>
+                  ) : (
+                    "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."
+                  )}
                 </span>
               </span>
               <Switch
@@ -548,6 +561,22 @@ export function NodeInspector({
                 aria-label="Balões no WhatsApp"
               />
             </label>
+            <div>
+              <Label htmlFor="node-ai-temperatura">Criatividade (temperatura)</Label>
+              <Input
+                id="node-ai-temperatura"
+                type="number"
+                min={0}
+                max={1}
+                step={0.1}
+                placeholder="0,4"
+                value={node.data.aiTemperature ?? ""}
+                onChange={(e) => onChange({ aiTemperature: e.target.value ? Math.min(1, Math.max(0, Number(e.target.value))) : undefined })}
+              />
+              <p className="mt-1 text-caption text-text-tertiary">
+                0 responde sempre igual; 1 varia mais. Vazio = 0,4. Não vale para OpenAI e Anthropic.
+              </p>
+            </div>
             <div>
               <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
               <Input

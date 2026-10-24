@@ -49,6 +49,8 @@ export interface CallLlmOptions {
   maxTokens?: number;
   /** Tempo máximo de cada pedido ao provedor; estourar vira erro (e a reserva entra). Vazio = sem limite. */
   timeoutMs?: number;
+  /** Ignorada na Anthropic e na OpenAI: os modelos novos delas recusam o campo com 400. */
+  temperature?: number;
 }
 
 export interface LlmUsage {
@@ -78,6 +80,16 @@ export function somarUso(total: LlmUsage, data: unknown): void {
 }
 
 const DEFAULT_MAX_TOKENS = 2048;
+
+/**
+ * Texto que o modelo escreve junto da chamada de ferramenta ("Perfeito, anotei!"
+ * + seguir_fluxo) vinha descartado quando a rodada final voltava vazia. Agora vai
+ * antes da resposta final, ou no lugar dela.
+ */
+export function comRascunho(rascunho: string[], final: string | null | undefined): string | null {
+  const partes = [...rascunho, final ?? ""].map((t) => t.trim()).filter(Boolean);
+  return partes.length ? [...new Set(partes)].join("\n\n") : null;
+}
 
 const sinalDeTempo = (opts: CallLlmOptions) => (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
 
@@ -130,6 +142,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
     type: "function" as const,
     function: { name: t.name, description: t.description, parameters: jsonSchemaFor(t, true) },
   }));
+  const rascunho: string[] = [];
 
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -140,6 +153,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
         model: opts.model,
         messages,
         max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
+        ...(opts.temperature !== undefined && opts.provider !== "openai" ? { temperature: opts.temperature } : {}),
         ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
       }),
     });
@@ -151,6 +165,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
     if (!choice) return { usage, text: null, error: "Resposta sem conteúdo." };
 
     if (choice.tool_calls?.length) {
+      if (typeof choice.content === "string") rascunho.push(choice.content);
       messages.push({ role: "assistant", content: choice.content ?? null, tool_calls: choice.tool_calls });
       for (const call of choice.tool_calls as { id: string; function: { name: string; arguments: string } }[]) {
         const result = await opts.executeTool({
@@ -163,7 +178,7 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
       continue;
     }
 
-    return { usage, text: typeof choice.content === "string" ? choice.content : null };
+    return { usage, text: comRascunho(rascunho, typeof choice.content === "string" ? choice.content : null) };
   }
 
   return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
@@ -195,6 +210,7 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
     description: t.description,
     input_schema: jsonSchemaFor(t),
   }));
+  const rascunho: string[] = [];
 
   for (let i = 0; i < (opts.maxIterations ?? 4); i += 1) {
     const res = await fetch(`${baseUrl}/messages`, {
@@ -234,7 +250,13 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
     const blocks: AnthropicBlock[] = Array.isArray(data?.content) ? data.content : [];
     const toolUses = blocks.filter((b) => b.type === "tool_use");
 
+    const textoDosBlocos = blocks
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("");
+
     if (toolUses.length > 0) {
+      rascunho.push(textoDosBlocos);
       messages.push({ role: "assistant", content: blocks as unknown as AnthropicContent });
       const results = [];
       for (const use of toolUses) {
@@ -251,12 +273,7 @@ async function callAnthropic(opts: CallLlmOptions, baseUrl: string): Promise<Llm
       continue;
     }
 
-    const text = blocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.text ?? "")
-      .join("")
-      .trim();
-    return { usage, text: text || null };
+    return { usage, text: comRascunho(rascunho, textoDosBlocos) };
   }
 
   return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };
@@ -283,6 +300,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
     { role: "user", parts: [{ text: opts.userMessage }] },
   ];
 
+  const rascunhoGemini: string[] = [];
   const functionDeclarations = opts.tools.map((t) => ({
     name: t.name,
     description: t.description,
@@ -297,7 +315,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
       body: JSON.stringify({
         contents,
         systemInstruction: { parts: [{ text: opts.systemPrompt || "Você é um assistente útil." }] },
-        generationConfig: { maxOutputTokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS },
+        generationConfig: { maxOutputTokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS, ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}) },
         ...(functionDeclarations.length > 0 ? { tools: [{ functionDeclarations }] } : {}),
       }),
     });
@@ -309,6 +327,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
     const calls = parts.filter((p) => p.functionCall);
 
     if (calls.length > 0) {
+      rascunhoGemini.push(parts.map((p) => p.text ?? "").join(""));
       contents.push({ role: "model", parts });
       const responseParts: GeminiPart[] = [];
       for (const part of calls) {
@@ -320,8 +339,7 @@ async function callGoogle(opts: CallLlmOptions, baseUrl: string): Promise<LlmRes
       continue;
     }
 
-    const text = parts.map((p) => p.text ?? "").join("").trim();
-    return { usage, text: text || null };
+    return { usage, text: comRascunho(rascunhoGemini, parts.map((p) => p.text ?? "").join("")) };
   }
 
   return { usage, text: null, error: "Excedeu o limite de rodadas de ferramenta sem resposta final." };

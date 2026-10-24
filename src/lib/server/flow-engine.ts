@@ -7,7 +7,7 @@ import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
-import { montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
+import { contextoDaConversa, montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
 import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
@@ -111,6 +111,14 @@ const UNSAFE_VAR_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 function setVar(variables: Variables, name: string | undefined, value: unknown): void {
   if (!name || UNSAFE_VAR_KEYS.has(name)) return;
   variables[name] = value;
+}
+
+/** Como o interpolate, mas mantém {chave} sem valor: o prompt da IA pode ter chaves de exemplo. */
+export function preencherConhecidas(template: string, variables: Variables): string {
+  return template.replace(/\{(\w+)\}/g, (todo, key) => {
+    const value = Object.hasOwn(variables, key) ? variables[key] : undefined;
+    return value === undefined || value === null ? todo : String(value);
+  });
 }
 
 function interpolate(template: string, variables: Variables): string {
@@ -291,6 +299,8 @@ async function loadConversationHistory(
 
 const SAVE_SLOTS_TOOL = "salvar_dados_coletados";
 const SEGUIR_TOOL = "seguir_fluxo";
+// Sem nada no bloco ficava a do provedor (~1,0): respostas soltas demais para atendimento.
+const TEMPERATURA_PADRAO = 0.4;
 
 // ---------------------------------------------------------------------------
 // Saída dos blocos "Responder com IA" (ai-agent) e "Enviar para meu fluxo"
@@ -647,7 +657,9 @@ async function runAiAgent(
   // Contexto de CRM: quem é a pessoa e em que org. Só é usado quando há um
   // bloco "Ferramenta: CRM" ligado neste agente.
   crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> },
-  historicoAntesDe?: Date
+  historicoAntesDe?: Date,
+  /** Hora, canal e contato (contextoDaConversa): vai no fim do prompt. */
+  contexto?: string
 ): Promise<{ text: string | null; error?: string; seguir: boolean }> {
   // De onde vem a IA: a conexão do contrato (lista com reserva automática)
   // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
@@ -865,7 +877,7 @@ async function runAiAgent(
     });
   }
 
-  let systemPrompt = montarPromptDoAgente(agente, node.data.detail, { usarAgente: node.data.aiUsarAgente });
+  let systemPrompt = montarPromptDoAgente(agente, preencherConhecidas(node.data.detail ?? "", variables), { usarAgente: node.data.aiUsarAgente });
   if (collectVars.length > 0) {
     const lines = ["", "## Dados que você precisa coletar nesta conversa"];
     if (collectedVars.length) lines.push(`Já coletados: ${collectedVars.map((v) => `${v.key}=${variables[v.key]}`).join(", ")}.`);
@@ -879,12 +891,14 @@ async function runAiAgent(
     }
     systemPrompt += lines.join("\n");
   }
+  if (contexto) systemPrompt += `\n\n${contexto}`;
 
   const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20, historicoAntesDe);
 
   try {
     const chamar = () => chamarComReserva(passos, {
       effort: node.data.aiEffort,
+      temperature: node.data.aiTemperature ?? TEMPERATURA_PADRAO,
       timeoutMs,
       systemPrompt,
       userMessage,
@@ -1341,6 +1355,24 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return pergunta;
   }
 
+  async function contextoDaIa(): Promise<string> {
+    const grupo = input.contactId.endsWith("@g.us");
+    let nome: string | undefined;
+    // O nome é um extra: falhar aqui nunca impede a IA de responder.
+    try {
+      if (!grupo) {
+        const vinculo = await prisma.contactChannel.findUnique({
+          where: { agentId_channel_externalId: { agentId: input.agentId, channel: input.channel, externalId: input.contactId } },
+          select: { contact: { select: { name: true } } },
+        });
+        nome = vinculo?.contact.name;
+      }
+    } catch {
+      nome = undefined;
+    }
+    return contextoDaConversa({ canal: input.channel, grupo, nome });
+  }
+
   const variables: Variables = { ...(conversation.variables as Variables) };
   const messages: OutboundMessage[] = [];
   let currentId = conversation.currentNodeId;
@@ -1549,7 +1581,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     const reply = await runAiAgent(parkedNode, agent, await perguntaParaIA(), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
-    }, juntadas?.desde);
+    }, juntadas?.desde, await contextoDaIa());
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
     if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
     else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
@@ -1823,7 +1855,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       const reply = await runAiAgent(node, agent, await perguntaParaIA(), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
-    }, juntadas?.desde);
+    }, juntadas?.desde, await contextoDaIa());
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
       if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, node));
       else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });

@@ -36,7 +36,7 @@ vi.mock("@/lib/server/ia/conexao", () => ({ passosDaConexao: vi.fn() }));
 vi.mock("@/lib/server/ia/uso", () => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
 vi.mock("@/lib/server/crm", () => crm);
 
-import { advanceConversation } from "./flow-engine";
+import { advanceConversation, preencherConhecidas } from "./flow-engine";
 
 const base = { agentId: "a1", channel: "instagram", contactId: "IG1" };
 const parado = (no: string | null, vars: Record<string, unknown> = {}) => ({
@@ -104,5 +104,13 @@ describe("motor de fluxo", () => {
     expect(rede.safeFetch.mock.calls[0][0]).toBe("https://api.loja/pedidos?cpf=111");
     expect(credenciais.getCredentialSecret).toHaveBeenCalledWith("o1", "cred");
     expect(db.mcpServer.findFirst).toHaveBeenCalledWith({ where: { id: "srv", orgId: "o1" } });
+  });
+});
+
+describe("preencherConhecidas (texto do bloco de IA)", () => {
+  it("troca a variável conhecida e mantém a chave sem valor", () => {
+    expect(preencherConhecidas("Oi {nome}, use o formato {exemplo}. {constructor}", { nome: "Ana" })).toBe(
+      "Oi Ana, use o formato {exemplo}. {constructor}"
+    );
   });
 });

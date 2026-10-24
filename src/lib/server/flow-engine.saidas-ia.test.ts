@@ -91,7 +91,9 @@ describe("Responder com IA (ai-agent)", () => {
 
     db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiUsarAgente: false }), false));
     await advanceConversation({ ...base, text: "olá" });
-    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt).toBe("Atenda.");
+    const soOBloco = llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt;
+    expect(soOBloco).toMatch(/^Atenda\.\n\n## Contexto desta conversa/);
+    expect(soOBloco).not.toContain("Venda sofás.");
   });
 
   it("sem ligação: responde e a conversa continua com a IA (e ela nem recebe a ferramenta de seguir)", async () => {

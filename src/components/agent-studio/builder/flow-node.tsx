@@ -81,6 +81,8 @@ export interface FlowNodeData {
   aiModel?: string;
   // Só a Anthropic expõe controle de esforço; os outros provedores ignoram.
   aiEffort?: "low" | "medium" | "high";
+  // Temperatura do modelo (0 a 1). Vazio = 0,4. Não vale para OpenAI e Anthropic.
+  aiTemperature?: number;
   // Quantas mensagens anteriores da conversa entram no contexto (janela
   // deslizante, sem sumarização — ver runAiAgent em flow-engine.ts).
   aiMemoryWindow?: number;
