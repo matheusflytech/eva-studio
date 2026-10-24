@@ -213,7 +213,7 @@ export function DealCard({
             <BotaoDeAcao key={a.acao} acao={a.acao} href={a.href} deal={deal} interativo={!!quadro && !arrastando} />
           ))}
           {temSinal && (
-            <span className="ml-auto min-w-0">
+            <span className="ml-auto flex min-w-0">
               <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} variante="texto" />
             </span>
           )}

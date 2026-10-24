@@ -21,10 +21,15 @@ export function formatDelta(delta: number): string {
 
 /** "Ana Maria Souza" → "AS"; "ana" → "A"; "" → "?". */
 export function initials(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  // Etiquetas como "[DEMO]" e pontuação não viram inicial.
+  const semEtiqueta = nome.replace(/\[[^\]]*\]/g, " ");
+  const partes = (semEtiqueta.trim() ? semEtiqueta : nome)
+    .split(/\s+/)
+    .map((p) => p.match(/[\p{L}\p{N}]/u)?.[0] ?? "")
+    .filter(Boolean);
   if (partes.length === 0) return "?";
-  const primeira = partes[0][0] ?? "";
-  const ultima = partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "";
+  const primeira = partes[0];
+  const ultima = partes.length > 1 ? partes[partes.length - 1] : "";
   return (primeira + ultima).toUpperCase();
 }
 
