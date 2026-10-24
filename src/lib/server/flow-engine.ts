@@ -270,14 +270,17 @@ function extractToolParams(data: FlowNodeData, variables: Variables): string[] {
 // cronológica no formato que a Groq espera.
 async function loadConversationHistory(
   conversationId: string,
-  windowSize: number
+  windowSize: number,
+  // Mensagens juntadas (ver juntarMensagensSeguidas) já estão gravadas e vão
+  // como a pergunta da vez: o histórico para antes delas.
+  antesDe?: Date
 ): Promise<{ role: "user" | "assistant"; content: string }[]> {
   if (windowSize <= 0) return [];
   const rows = await prisma.message.findMany({
     // Nota interna é recado da equipe. Se entrasse aqui, a IA leria "esse
     // cliente é chato, não dê desconto" como se fosse algo que ela mesma
     // disse, e podia repetir ao cliente.
-    where: { conversationId, role: { in: ["contact", "bot", "human"] } },
+    where: { conversationId, role: { in: ["contact", "bot", "human"] }, ...(antesDe ? { createdAt: { lt: antesDe } } : {}) },
     orderBy: { createdAt: "desc" },
     take: windowSize,
   });
@@ -640,7 +643,8 @@ async function runAiAgent(
   conversationId: string,
   // Contexto de CRM: quem é a pessoa e em que org. Só é usado quando há um
   // bloco "Ferramenta: CRM" ligado neste agente.
-  crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> }
+  crmContext?: { orgId: string; resolveContactId: () => Promise<string | null> },
+  historicoAntesDe?: Date
 ): Promise<{ text: string | null; error?: string; seguir: boolean }> {
   // De onde vem a IA: a conexão do contrato (lista com reserva automática)
   // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
@@ -873,7 +877,7 @@ async function runAiAgent(
     systemPrompt += lines.join("\n");
   }
 
-  const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20);
+  const history = await loadConversationHistory(conversationId, node.data.aiMemoryWindow ?? 20, historicoAntesDe);
 
   try {
     const chamar = () => chamarComReserva(passos, {
@@ -1100,6 +1104,63 @@ async function logMessages(
   await registrarMensagens(conversationId, rows);
 }
 
+/** Quanto esperar por mais mensagens antes de a IA responder (WhatsApp). */
+export const JANELA_DE_JUNTAR_MS = 4000;
+
+/** WhatsApp 1:1, texto do contato, conversa parada num bloco de IA. */
+function deveJuntar(input: AdvanceInput, nodes: Node<FlowNodeData>[], currentNodeId: string | null): boolean {
+  if (input.channel !== "whatsapp_meta" && input.channel !== "whatsapp_qr") return false;
+  if (input.text === undefined || input.optionId !== undefined) return false;
+  if (input.contactId.endsWith("@g.us")) return false; // grupo: a IA só responde a quem marcou
+  return nodes.find((n) => n.id === currentNodeId)?.data.iconKey === "ai-agent";
+}
+
+/**
+ * Grava a mensagem, espera JANELA_DE_JUNTAR_MS e devolve null se o contato
+ * escreveu de novo (a rodada da mensagem nova responde). Senão, devolve o
+ * texto de tudo o que ele mandou desde a última resposta (até 10 mensagens) e
+ * de quando é a primeira delas.
+ */
+async function juntarMensagensSeguidas(conversationId: string, input: AdvanceInput): Promise<{ texto: string; desde: Date } | null> {
+  const [minha] = await registrarMensagens(conversationId, [
+    {
+      role: "contact",
+      text: input.text ?? "",
+      mediaPath: input.media?.path,
+      mediaType: input.media?.type,
+      mediaMime: input.media?.mime,
+      mediaName: input.media?.name,
+      mediaSize: input.media?.size,
+      externalId: input.externalId,
+    },
+  ]);
+  await new Promise((r) => setTimeout(r, JANELA_DE_JUNTAR_MS));
+
+  const depois = await prisma.message.findFirst({
+    where: { conversationId, role: "contact", createdAt: { gt: minha.createdAt } },
+    select: { id: true },
+  });
+  if (depois) return null;
+
+  const ultimaResposta = await prisma.message.findFirst({
+    where: { conversationId, role: { in: ["bot", "human"] }, createdAt: { lt: minha.createdAt } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  const pendentes = (
+    await prisma.message.findMany({
+      where: { conversationId, role: "contact", createdAt: { gt: ultimaResposta?.createdAt ?? new Date(0), lte: minha.createdAt } },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { text: true, createdAt: true },
+    })
+  ).reverse();
+  return {
+    texto: pendentes.map((m) => m.text).filter(Boolean).join("\n"),
+    desde: pendentes[0]?.createdAt ?? minha.createdAt,
+  };
+}
+
 async function acharGatilho(input: AdvanceInput, kind: InboundKind) {
   const triggers = await prisma.agentTrigger.findMany({ where: { agentId: input.agentId, active: true } });
   if (triggers.length === 0) return null;
@@ -1237,6 +1298,15 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
   }
 
+  // Mensagens quebradas ("E", "S", "A"… em segundos): só a última responde,
+  // com tudo junto. As anteriores ficam gravadas e saem sem resposta.
+  let juntadas: { texto: string; desde: Date } | null = null;
+  if (deveJuntar(input, nodes, conversation.currentNodeId)) {
+    juntadas = await juntarMensagensSeguidas(conversation.id, input);
+    if (!juntadas) return { messages: [], status: conversation.status as AdvanceResult["status"] };
+    input = { ...input, text: juntadas.texto };
+  }
+
   const variables: Variables = { ...(conversation.variables as Variables) };
   const messages: OutboundMessage[] = [];
   let currentId = conversation.currentNodeId;
@@ -1308,7 +1378,8 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         lastContactMessageAt: isGenuineInbound ? new Date() : conversation.lastContactMessageAt,
       },
     });
-    await logMessages(conversation.id, inboundText, messages, input);
+    // Juntadas: as mensagens do contato já foram gravadas uma a uma.
+    await logMessages(conversation.id, juntadas ? undefined : inboundText, messages, juntadas ? undefined : input);
     const contatoId = await syncContact(conversation.id, variables, isGenuineInbound);
     if (passouParaEquipe) {
       await publicarEvento({
@@ -1435,7 +1506,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     const reply = await runAiAgent(parkedNode, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
-    });
+    }, juntadas?.desde);
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
     if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
     else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
@@ -1709,7 +1780,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       const reply = await runAiAgent(node, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
-    });
+    }, juntadas?.desde);
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
       if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, node));
       else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
