@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
 import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
@@ -32,6 +32,7 @@ import {
   preencherCamposDoContato,
 } from "@/lib/server/crm";
 import { carregarDefinicoes } from "@/lib/server/custom-fields";
+import { reaisParaCentavos } from "@/lib/server/api-validacao";
 import { safeFetch } from "@/lib/server/ssrf";
 import { comAtor, publicarEvento } from "@/lib/server/eventos/barramento";
 import { registrarMensagens, agentePausado, type NovaMensagem } from "@/lib/server/inbox";
@@ -654,7 +655,7 @@ async function runAiAgent(
   let timeoutMs: number | undefined;
   if (fonteDaIa(node.data) === "bloco") {
     const provider = getProvider(node.data.aiProvider);
-    const apiKey = node.data.aiCredentialId ? await getCredentialSecret(node.data.aiCredentialId) : null;
+    const apiKey = node.data.aiCredentialId ? await getCredentialSecret(agente.orgId, node.data.aiCredentialId) : null;
     if (!apiKey) return { text: null, error: `Credencial ${provider.label} não configurada nesse bloco.`, seguir: false };
     // Modelos reserva do bloco: mesma chave, outro modelo (o limite por minuto
     // do provedor vale por modelo).
@@ -705,7 +706,7 @@ async function runAiAgent(
     if (tn.data.iconKey === "tool-mcp") {
       const serverId = tn.data.mcpServerId;
       if (!serverId) continue;
-      const server = await prisma.mcpServer.findUnique({ where: { id: serverId } });
+      const server = await prisma.mcpServer.findFirst({ where: { id: serverId, orgId: agente.orgId } });
       if (!server || !server.active) continue;
 
       let discovered: McpToolDef[] = [];
@@ -933,7 +934,8 @@ async function runAiAgent(
           const chunks = await searchKnowledgeBase(agente.id, query, 4);
           return chunks.join("\n\n") || "Nenhum trecho relevante encontrado na base de conhecimento.";
         }
-        const result = await performHttpRequest(toolNode.data, { ...variables, ...call.arguments });
+        // O que já foi capturado na conversa vale mais que o que a IA mandar.
+        const result = await performHttpRequest(toolNode.data, { ...call.arguments, ...variables });
         return result.error ? `Erro: ${result.error}` : JSON.stringify(result.value ?? null);
       },
     }, undefined, (passo, r, ok) => {
@@ -1371,15 +1373,10 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return resolvedContactId;
   }
 
-  // Valor em texto ("R$ 1.500,00", "{orcamento}") vira centavos. Aceita o
-  // formato brasileiro (vírgula decimal, ponto de milhar), que é o que o
-  // cliente digita numa conversa.
+  // Valor em texto ("R$ 1.500,00", "{orcamento}") vira centavos, com a mesma
+  // regra da API. Valor inválido vira 0.
   function toCents(expression: string | undefined): number {
-    const raw = interpolate(expression ?? "", variables).replace(/[^\d,.-]/g, "").trim();
-    if (!raw) return 0;
-    const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
-    const value = Number(normalized);
-    return Number.isFinite(value) ? Math.round(value * 100) : 0;
+    return reaisParaCentavos(interpolate(expression ?? "", variables)) ?? 0;
   }
 
   // Passo a passo da execução (aba "Execuções") — um registro leve por bloco
@@ -1400,16 +1397,30 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
   async function finish(): Promise<AdvanceResult> {
     const passouParaEquipe = status === "waiting_human" && conversation.status !== "waiting_human";
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        currentNodeId: currentId,
-        variables: variables as Prisma.InputJsonValue,
-        status,
-        updatedAt: new Date(),
-        lastContactMessageAt: isGenuineInbound ? new Date() : conversation.lastContactMessageAt,
-      },
-    });
+    try {
+      // Só grava se ninguém mexeu no estado desde que esta rodada o leu: outra
+      // mensagem do mesmo contato (ou a equipe assumindo) chegou antes.
+      await prisma.conversation.update({
+        where: {
+          id: conversation.id,
+          currentNodeId: conversation.currentNodeId,
+          status: conversation.status,
+          variables: { equals: conversation.variables as Prisma.InputJsonValue },
+        },
+        data: {
+          currentNodeId: currentId,
+          variables: variables as Prisma.InputJsonValue,
+          status,
+          updatedAt: new Date(),
+          lastContactMessageAt: isGenuineInbound ? new Date() : conversation.lastContactMessageAt,
+        },
+      });
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025")) throw e;
+      // Perdeu a corrida: não sobrescreve o estado nem responde de novo, só grava a mensagem.
+      if (juntadas) return { messages: [], status: conversation.status as AdvanceResult["status"] };
+      return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
+    }
     // Juntadas: as mensagens do contato já foram gravadas uma a uma.
     await logMessages(conversation.id, juntadas ? undefined : inboundText, messages, juntadas ? undefined : input);
     const contatoId = await syncContact(conversation.id, variables, isGenuineInbound);
@@ -1549,7 +1560,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
-      return { messages: [], status: "active" }; // ainda não é hora, ignora essa mensagem (não regista transcrição)
+      return registrarSemResponder(conversation.id, "active"); // ainda não é hora: grava a mensagem e não anda
     }
     delete variables.__wait_until;
     currentId = nextNodeId(edges, parkedNode.id);
@@ -1788,7 +1799,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
     if (kind === "email") {
       const startedAt = Date.now();
-      const apiKey = node.data.emailCredentialId ? await getCredentialSecret(node.data.emailCredentialId) : null;
+      const apiKey = node.data.emailCredentialId ? await getCredentialSecret(agent.orgId, node.data.emailCredentialId) : null;
       let stepError: string | undefined;
       if (!apiKey) {
         stepError = "Credencial Resend não configurada nesse bloco.";
