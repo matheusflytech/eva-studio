@@ -11,6 +11,7 @@ import { registrarMensagens } from "@/lib/server/inbox";
 import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
 import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
 import { contarReciboNoDisparo } from "@/lib/server/recibos";
+import { corpoDoMenu } from "@/lib/server/meta-menu";
 import {
   baixarEGuardar,
   guardarMidiaWhatsApp,
@@ -168,18 +169,7 @@ async function sendMetaMessage(
         },
       }
     : message.options && message.options.length > 0
-      ? {
-          messaging_product: "whatsapp",
-          to,
-          type: "interactive",
-          interactive: {
-            type: "button",
-            body: { text: message.text },
-            action: {
-              buttons: message.options.slice(0, 3).map((o) => ({ type: "reply", reply: { id: o.id, title: o.label.slice(0, 20) } })),
-            },
-          },
-        }
+      ? corpoDoMenu(to, message.text, message.options)
       : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text } };
 
   try {
