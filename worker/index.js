@@ -466,7 +466,8 @@ setInterval(tickScheduler, 60000);
 http
   .createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("eva-studio whatsapp worker ok\n");
+    // Commit em execução (o Render preenche RENDER_GIT_COMMIT): confere se o deploy pegou.
+    res.end(`eva-studio whatsapp worker ok ${(process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7)}\n`);
   })
   .listen(process.env.PORT || 3010, () => {
     logger.info(`Health check ouvindo na porta ${process.env.PORT || 3010}`);
