@@ -127,7 +127,7 @@ const ICONE_DA_ACAO: Record<Exclude<AcaoDoCartao, "whatsapp">, LucideIcon> = {
  * no rodapé os ícones de ação e o sinal do próximo passo. Sem borda de
  * atraso: o atraso é o texto do sinal. Clicar no cartão abre o painel.
  */
-export function DealCard({
+function DealCardBase({
   deal,
   tipoDaEtapa,
   defs,
@@ -305,3 +305,6 @@ function MenuDoCartao({ deal }: { deal: NegocioKanban }) {
     </DropdownMenu>
   );
 }
+
+// Memorizado: num quadro com centenas de cartões, pegar ou soltar um não redesenha os outros.
+export const DealCard = React.memo(DealCardBase);
