@@ -86,6 +86,9 @@ export interface FlowNodeData {
   // Junta ao prompt o cadastro do agente (instruções, tom, idioma, "nunca
   // fazer"). Vazio = ligado; false = só o texto do bloco, como era antes.
   aiUsarAgente?: boolean;
+  // No WhatsApp, a resposta longa sai em até 3 balões com "digitando…" entre
+  // eles. Vazio = ligado; false = uma mensagem só.
+  aiBaloes?: boolean;
   // De onde vem a IA: "conexao" = Central de IA do contrato (ordem + reserva);
   // "bloco" = provedor/credencial/modelo deste bloco. Vazio = ver fonte-da-ia.ts.
   aiFonte?: "conexao" | "bloco";

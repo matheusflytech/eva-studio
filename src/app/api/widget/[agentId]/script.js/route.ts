@@ -53,7 +53,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     '.header{background:#4f46e5;color:#fff;padding:14px 16px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between;}' +
     '.close{background:none;border:none;color:#fff;cursor:pointer;font-size:18px;line-height:1;opacity:.85;}' +
     '.messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f7f7f9;}' +
-    '.msg{max-width:82%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;}' +
+    '.msg{max-width:82%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;}' +
     '.msg.bot{align-self:flex-start;background:#fff;border:1px solid #e5e5ea;color:#111;}' +
     '.msg.user{align-self:flex-end;background:#4f46e5;color:#fff;}' +
     '.options{display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:90%;}' +

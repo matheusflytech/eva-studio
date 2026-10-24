@@ -187,6 +187,11 @@ async function setConnectionState(chave, patch) {
 // texto já vem numerado também, como plano B (ver flow-engine.ts, que aceita
 // resposta por número ou por rótulo, não só pelo toque no botão).
 async function sendReply(sock, jid, message) {
+  // Balões seguintes de uma resposta da IA: "digitando…" antes (ver respostaDaIa no motor).
+  if (message.digitando) {
+    await sock.sendPresenceUpdate("composing", jid).catch(() => {});
+    await new Promise((r) => setTimeout(r, message.digitando));
+  }
   if (!message.options || message.options.length === 0) {
     await sock.sendMessage(jid, { text: message.text });
     return;

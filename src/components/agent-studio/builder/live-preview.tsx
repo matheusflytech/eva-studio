@@ -101,7 +101,7 @@ export function LivePreview({ agentId, agentName }: { agentId: string; agentName
             <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
               <div
                 className={cn(
-                  "max-w-[85%] rounded-[18px] px-3 py-2 text-small",
+                  "max-w-[85%] whitespace-pre-wrap break-words rounded-[18px] px-3 py-2 text-small",
                   m.role === "user" ? "rounded-br-md bg-accent-solid text-text-on-accent" : "rounded-bl-md border border-border-subtle bg-raised text-text-primary"
                 )}
               >
