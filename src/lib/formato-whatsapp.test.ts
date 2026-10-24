@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { emBaloes, paraWhatsApp, pausaDeDigitacao } from "./formato-whatsapp";
+import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "./formato-whatsapp";
+
+describe("paraTextoSimples", () => {
+  it("tira as marcas sem perder o texto (resposta real da prévia de 24/10)", () => {
+    expect(
+      paraTextoSimples("Quatro frentes: **Web e Produto**, *leve* e ~~velho~~.\n\n- **Agentes de IA**: atendem 24 h.\n### Fim")
+    ).toBe("Quatro frentes: Web e Produto, leve e velho.\n\n• Agentes de IA: atendem 24 h.\nFim");
+  });
+
+  it("tabela vira lista sem asterisco", () => {
+    expect(paraTextoSimples("| A | B |\n|---|---|\n| **x** | y |")).toBe("• x: y");
+  });
+});
 
 describe("paraWhatsApp", () => {
   it("negrito, itálico, riscado", () => {

@@ -48,7 +48,7 @@ import {
   type CaptureField,
 } from "@/lib/capture-validation";
 import { marcarComoLead } from "@/lib/server/leads";
-import { emBaloes, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
+import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
 
 export interface OutboundMessage {
   text: string;
@@ -619,9 +619,12 @@ ${input.anexoContexto}`.trim() : texto;
 const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
 const CANAIS_DE_TESTE_DA_IA = ["playground", "builder_preview"];
 
-/** Resposta da IA no jeito do canal: no WhatsApp, sem markdown e em até 3 balões. */
+/**
+ * Resposta da IA no jeito do canal. Nenhum canal mostra markdown: no WhatsApp
+ * vira o negrito de lá e sai em até 3 balões; nos outros, texto simples.
+ */
 function respostaDaIa(texto: string, canal: string, node: Node<FlowNodeData>): OutboundMessage[] {
-  if (canal !== "whatsapp_meta" && canal !== "whatsapp_qr") return [{ text: texto }];
+  if (canal !== "whatsapp_meta" && canal !== "whatsapp_qr") return [{ text: paraTextoSimples(texto) }];
   const t = paraWhatsApp(texto);
   if (node.data.aiBaloes === false) return [{ text: t }];
   return emBaloes(t).map((b, i) => (i === 0 ? { text: b } : { text: b, digitando: pausaDeDigitacao(b) }));

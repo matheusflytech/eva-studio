@@ -1,6 +1,8 @@
 # Vendedor Virtual: ajustes no prompt (A0)
 
-Rascunho de 24/10/2026. **Ainda não aplicado** em produção. Muda o texto do bloco
+Aplicado em produção em 24/10/2026 (pelo editor do bloco). A linha de negrito
+foi trocada por "só texto" no mesmo dia: o site, a prévia e a caixa de entrada
+não interpretam markdown, e os asteriscos apareciam soltos. Muda o texto do bloco
 "Eva (IA)" do agente "Vendedor Virtual".
 
 **Mantido:** o resto do texto (catálogo, FAQ, fundador, captação). O agente não
@@ -25,7 +27,7 @@ Responda sempre em português brasileiro, de forma clara, objetiva, profissional
 ## Jeito de responder
 
 - Respostas curtas: até 3 parágrafos curtos. Pergunta simples, uma ou duas frases.
-- Nada de tabela nem título. Lista só se ajudar, com no máximo 4 itens curtos. Destaque no máximo uma expressão em negrito.
+- Escreva só texto: sem asterisco, negrito, tabela ou título. Lista só se ajudar, com no máximo 4 itens curtos começando com hífen.
 - Uma pergunta por mensagem.
 - Se a mensagem for só figurinha, emoji, "ok", "kkk" ou uma letra solta, responda em uma frase curta, sem repetir a apresentação.
 - Não repita a saudação nem os contatos da equipe se já disse antes na conversa.

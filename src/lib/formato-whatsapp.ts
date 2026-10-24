@@ -1,8 +1,12 @@
-// Texto da IA (markdown) no jeito do WhatsApp: *negrito*, _itálico_, ~riscado~,
-// sem títulos, tabelas nem [links](url), que lá chegam como símbolos soltos.
-// E a resposta longa em até 3 balões, como uma pessoa digitando.
+// Texto da IA (markdown) no jeito de cada canal. Nenhum canal mostra markdown:
+// no WhatsApp vira *negrito*, _itálico_ e ~riscado~; nos outros (site, prévia,
+// Instagram…), texto simples. Títulos, tabelas e [links](url) somem nos dois.
+// E a resposta longa no WhatsApp sai em até 3 balões, como uma pessoa digitando.
 
-const NEGRITO = "\u0001"; // marcador provisório: o "*" de itálico do markdown não pode virar negrito
+// Marcadores provisórios: o "*" de itálico do markdown não pode virar negrito.
+const NEGRITO = "\u0001";
+const ITALICO = "\u0002";
+const RISCADO = "\u0003";
 
 const semNegrito = (s: string) => s.replace(/\*\*(.+?)\*\*|__(.+?)__/g, "$1$2");
 
@@ -31,11 +35,11 @@ function marcasDaLinha(l: string): string {
     .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, "$2")
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t: string, url: string) => (t === url ? url : `${t}: ${url}`))
     .replace(/\*\*(.+?)\*\*|__(.+?)__/g, `${NEGRITO}$1$2${NEGRITO}`)
-    .replace(/(^|[^\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![\w*])/g, "$1_$2_")
-    .replace(/~~(.+?)~~/g, "~$1~");
+    .replace(/(^|[^\w*])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![\w*])/g, `$1${ITALICO}$2${ITALICO}`)
+    .replace(/~~(.+?)~~/g, `${RISCADO}$1${RISCADO}`);
 }
 
-export function paraWhatsApp(md: string): string {
+function converter(md: string, marcas: { negrito: string; italico: string; riscado: string }): string {
   const linhas = md.replace(/\r\n?/g, "\n").split("\n");
   const saida: string[] = [];
   let emCodigo = false;
@@ -44,7 +48,7 @@ export function paraWhatsApp(md: string): string {
     const linha = linhas[i];
     if (/^\s*```/.test(linha)) emCodigo = !emCodigo;
     if (emCodigo || /^\s*```/.test(linha)) {
-      saida.push(linha); // bloco de código o WhatsApp mostra igual
+      saida.push(linha); // bloco de código fica igual
       continue;
     }
     if (ehLinhaDeTabela(linha) && ehSeparadorDeTabela(linhas[i + 1] ?? "")) {
@@ -65,10 +69,17 @@ export function paraWhatsApp(md: string): string {
 
   return saida
     .join("\n")
-    .replaceAll(NEGRITO, "*")
+    .replaceAll(NEGRITO, marcas.negrito)
+    .replaceAll(ITALICO, marcas.italico)
+    .replaceAll(RISCADO, marcas.riscado)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+export const paraWhatsApp = (md: string) => converter(md, { negrito: "*", italico: "_", riscado: "~" });
+
+/** Para canais que mostram o texto como veio (widget do site, prévia, Instagram). */
+export const paraTextoSimples = (md: string) => converter(md, { negrito: "", italico: "", riscado: "" });
 
 /** Abaixo disto a resposta vai num balão só. */
 const CURTA = 120;

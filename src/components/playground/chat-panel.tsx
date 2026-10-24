@@ -125,7 +125,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
                   )}
                 >
                   {m.isError && <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />}
-                  <span>{m.text}</span>
+                  <span className="whitespace-pre-wrap break-words">{m.text}</span>
                 </div>
                 {m.options && m.options.length > 0 && (
                   <div className={cn("mt-2 flex max-w-[85%] flex-wrap gap-1.5 sm:max-w-[66%] xl:max-w-[min(66%,560px)]", i < ultimaDoAgente && "opacity-50")}>
