@@ -27,6 +27,7 @@ import {
 } from "./fonte.js";
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 import { decidirReconexao } from "./desconexao.js";
+import { contatoDaMensagem } from "./contato.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -262,6 +263,9 @@ async function startSession(chave) {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe || !msg.message) continue;
+      // Grupo, status, transmissão e canal não são contato (e o agente não responde lá).
+      const contato = contatoDaMensagem(msg.key);
+      if (!contato) continue;
       const optionId = extractOptionId(msg);
       let text = extractText(msg);
       const midia = extractMedia(msg);
@@ -283,8 +287,9 @@ async function startSession(chave) {
         if (!anexo) text = `${text} (não foi possível baixar o arquivo)`;
       }
 
+      // A resposta vai para onde a mensagem veio (o lid, se veio por lid); a ficha fica com o número.
       const remoteJid = msg.key.remoteJid;
-      const replies = await advanceViaEngine(agentId, remoteJid, {
+      const replies = await advanceViaEngine(agentId, contato, {
         text,
         optionId,
         media: anexo,

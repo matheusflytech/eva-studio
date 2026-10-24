@@ -293,11 +293,10 @@ function BotaoDeFiltros({
 }
 
 function LinhaDeConversa({
-  c, ativa, mostrarAgente, onSelecionar,
+  c, ativa, onSelecionar,
 }: {
   c: Conversa;
   ativa: boolean;
-  mostrarAgente: boolean;
   onSelecionar: (id: string) => void;
 }) {
   const naoLida = c.naoLidas > 0;
@@ -322,12 +321,6 @@ function LinhaDeConversa({
           <AvatarDoContato chave={c.contactId} nome={c.nome} />
           {/* Canal da conversa: logo oficial no canto de baixo à direita. */}
           <SeloDoCanal canal={c.channel} className="absolute -bottom-0.5 -right-0.5" />
-          {/* Em "Todas as caixas", de qual agente é a conversa: só a cor, o nome fica no title. */}
-          {mostrarAgente && (
-            <span className="absolute -bottom-0.5 -left-0.5 rounded-[5px] ring-2 ring-page" title={c.agentName}>
-              <QuadradoDoAgente id={c.agentId} nome={c.agentName} tamanho="xs" />
-            </span>
-          )}
         </span>
 
         <span className="flex min-w-0 flex-1 flex-col gap-px">
@@ -466,7 +459,6 @@ export function ListaDeConversas({
                 key={c.id}
                 c={c}
                 ativa={c.id === selecionada}
-                mostrarAgente={!agente && agentes.length > 1}
                 onSelecionar={onSelecionar}
               />
             ))}
