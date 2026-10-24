@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { sendTikTokText } from "@/lib/server/tiktok";
 import { tokenDoWebhookTikTokConfere } from "@/lib/server/tiktok-token";
+import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Webhook do TikTok Business Messaging.
@@ -55,11 +57,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     const text = event.message?.text ?? event.message?.content ?? event.text;
     if (!conversationId || !text) continue;
 
+    // Mesma idempotência do webhook da Meta; o evento não traz id de mensagem conhecido.
+    // shortcut: a chave é o hash do evento (como no ingress), então evento idêntico byte a byte conta como reentrega; trocar pelo id da mensagem quando o formato do TikTok for confirmado.
+    const idDoEvento = `tiktok:${agentId}:${createHash("sha256").update(JSON.stringify(event)).digest("hex")}`;
+    if (!(await isFirstDelivery(idDoEvento))) continue;
+
     const result = await advanceConversation({
       agentId,
       channel: "tiktok",
       contactId: conversationId,
       text,
+    }).catch(async (e) => {
+      await esquecerEntrega(idDoEvento);
+      throw e;
     });
 
     for (const message of result.messages) {

@@ -7,15 +7,17 @@ const db = vi.hoisted(() => ({
   instagramConnection: { findUnique: vi.fn() },
   commentAutomation: { findMany: vi.fn(), update: vi.fn() },
   conversation: { upsert: vi.fn(), findUnique: vi.fn() },
+  metaConnection: { findUnique: vi.fn() },
 }));
 const engine = vi.hoisted(() => ({ advanceConversation: vi.fn() }));
 const media = vi.hoisted(() => ({ baixarEGuardar: vi.fn() }));
 const inbox = vi.hoisted(() => ({ registrarMensagens: vi.fn() }));
+const entrega = vi.hoisted(() => ({ isFirstDelivery: vi.fn(async () => true), esquecerEntrega: vi.fn(async () => {}) }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/flow-engine", () => engine);
 vi.mock("@/lib/server/crypto", () => ({ decryptSecret: (v: string) => v }));
-vi.mock("@/lib/server/rate-limit", () => ({ checkRateLimit: vi.fn(async () => ({ count: 1 })) }));
+vi.mock("@/lib/server/rate-limit", () => entrega);
 vi.mock("@/lib/server/inbox", () => inbox);
 vi.mock("@/lib/server/outbound", () => ({ sendInstagramText: vi.fn(), sendMessengerText: vi.fn() }));
 vi.mock("@/lib/server/media-inbound", async (importOriginal) => {
@@ -117,5 +119,29 @@ describe("webhook Meta — automação de comentário", () => {
       where: { id: "ca1" },
       data: { triggerCount: { increment: 1 } },
     });
+  });
+});
+
+describe("webhook Meta — processamento falhou", () => {
+  const whatsapp = (id: string) => ({
+    object: "whatsapp_business_account",
+    entry: [{ changes: [{ value: { metadata: { phone_number_id: "pn1" }, messages: [{ id, from: "5511", type: "text", text: { body: "oi" } }] } }] }],
+  });
+
+  beforeEach(() => {
+    db.metaConnection.findUnique.mockResolvedValue({ agentId: "a1", accessToken: "tok" });
+  });
+
+  it("esquece a mensagem e responde 500 para a Meta reentregar", async () => {
+    engine.advanceConversation.mockRejectedValueOnce(new Error("pool timeout"));
+    const res = await POST(assinado(whatsapp("wamid.1")));
+    expect(res.status).toBe(500);
+    expect(entrega.esquecerEntrega).toHaveBeenCalledWith("wamid.1");
+  });
+
+  it("deu certo: 200 e a mensagem continua marcada como vista", async () => {
+    const res = await POST(assinado(whatsapp("wamid.2")));
+    expect(res.status).toBe(200);
+    expect(entrega.esquecerEntrega).not.toHaveBeenCalled();
   });
 });

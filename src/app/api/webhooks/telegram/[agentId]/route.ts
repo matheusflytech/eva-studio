@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { decryptSecret } from "@/lib/server/crypto";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
+import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 import { guardarMidiaTelegram, orgDoAgente, textoDeAnexo, type MidiaGuardada } from "@/lib/server/media-inbound";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,7 @@ interface TelegramArquivo {
 }
 
 interface TelegramUpdate {
+  update_id?: number;
   message?: {
     message_id?: number;
     chat?: { id?: number | string; first_name?: string; username?: string };
@@ -125,6 +127,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
 
   if (text === undefined && optionId === undefined && !media) return NextResponse.json({ ok: true });
 
+  // O Telegram repete o update que não recebeu 2xx: mesma idempotência do
+  // webhook da Meta, e falhar libera o id para a repetição ser processada.
+  const idDoEvento = typeof update.update_id === "number" ? `telegram:${agentId}:${update.update_id}` : undefined;
+  if (!(await isFirstDelivery(idDoEvento))) return NextResponse.json({ ok: true });
+
   const result = await advanceConversation({
     agentId,
     channel: "telegram",
@@ -133,6 +140,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     optionId,
     media,
     externalId: update.message?.message_id ? String(update.message.message_id) : undefined,
+  }).catch(async (e) => {
+    await esquecerEntrega(idDoEvento);
+    throw e;
   });
 
   const token = decryptSecret(conn.botToken);
