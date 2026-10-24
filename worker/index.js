@@ -279,14 +279,18 @@ async function startSession(chave) {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-      // Regras em desconexao.js: logout limpa; sessão aberta em outro lugar ou
-      // número recusado param; o resto reconecta, esperando mais a cada queda.
+      // Regras em desconexao.js: logout limpa; sessão assumida por outro worker
+      // só sai da memória; número recusado para; o resto reconecta, esperando
+      // mais a cada queda.
       const tentativas = quedas.get(chave) ?? 0;
       const decisao = loggedOut ? { acao: "logout" } : decidirReconexao(statusCode, { pareado: !!state.creds?.registered, tentativas });
       if (decisao.acao === "logout") {
         quedas.delete(chave);
         await limparSessao(pool, MODO, chave);
         logger.info({ chave }, "WhatsApp desconectado (logout)");
+      } else if (decisao.acao === "largar") {
+        quedas.delete(chave);
+        logger.warn({ chave, statusCode }, "Sessão assumida por outro worker; largando sem mexer no estado");
       } else if (decisao.acao === "parar") {
         quedas.delete(chave);
         logger.warn({ chave, statusCode }, "Sessão parada");
