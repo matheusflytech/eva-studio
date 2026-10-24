@@ -264,7 +264,7 @@ export function PreviaDoNegocio({
           transformOrigin: "top left",
           autoAlpha: 0.4,
           duration: 0.42,
-          ease: CURVA.voo,
+          ease: CURVA.entrada,
           clearProps: "transform,opacity,visibility",
         });
       } else {
