@@ -127,7 +127,7 @@ const ICONE_DA_ACAO: Record<Exclude<AcaoDoCartao, "whatsapp">, LucideIcon> = {
  * no rodapé os ícones de ação e o sinal do próximo passo. Sem borda de
  * atraso: o atraso é o texto do sinal. Clicar no cartão abre o painel.
  */
-export function DealCard({
+function DealCardBase({
   deal,
   tipoDaEtapa,
   defs,
@@ -167,7 +167,7 @@ export function DealCard({
       data-cartao
       className={cn(
         "relative flex flex-col rounded-[16px] border border-border-subtle bg-panel",
-        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-200 ease-[cubic-bezier(.2,0,0,1)]",
+        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] ease-out",
         "group-hover/card:-translate-y-0.5 group-hover/card:border-border-default group-hover/card:shadow-[0_8px_24px_-12px_rgb(0_0_0/0.18)]",
         compacto ? "gap-2 p-2.5" : "gap-2.5 p-3",
         arrastando && "border-border-default shadow-overlay",
@@ -305,3 +305,6 @@ function MenuDoCartao({ deal }: { deal: NegocioKanban }) {
     </DropdownMenu>
   );
 }
+
+// Memorizado: num quadro com centenas de cartões, pegar ou soltar um não redesenha os outros.
+export const DealCard = React.memo(DealCardBase);

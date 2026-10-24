@@ -338,7 +338,7 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
           </div>
 
           {podeEditar && (
-            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-panel/95 px-4 py-3 backdrop-blur">
+            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-panel px-4 py-3">
               <div aria-live="polite" className="min-w-0 flex-1 text-small">
                 {aviso ? (
                   <span

@@ -265,6 +265,11 @@ function NegociosConteudo() {
 
   // ── Quadro: N primeiros cartões de cada coluna + totais agregados ──
   const ultimaCarga = React.useRef(0);
+  // Recarga silenciosa (outras pessoas mexendo no mesmo funil): ver o efeito
+  // de atualização abaixo. Refs porque o efeito de carga não deve depender deles.
+  const deFundo = React.useRef(false);
+  const arrastandoAgora = React.useRef(false);
+  const fotografarAgora = React.useRef<(() => void) | null>(null);
   React.useEffect(() => {
     if (!pronto) return;
     const { pipelineId: funil, filtro: f } = JSON.parse(chaveAtrasada) as { pipelineId: string; filtro: unknown };
@@ -278,6 +283,13 @@ function NegociosConteudo() {
         const dadosDoFunil = funilRes?.ok ? await funilRes.json().catch(() => null) : null;
         if (!vivo || carga !== ultimaCarga.current) return;
         const campos: DefinicaoDeCampo[] = data.fields ?? [];
+        if (deFundo.current) {
+          deFundo.current = false;
+          // Recarga silenciosa no meio de um arrasto: descarta (a próxima pega).
+          if (arrastandoAgora.current) return;
+          // Quem outra pessoa mudou de coluna desliza até o lugar novo.
+          fotografarAgora.current?.();
+        }
         setQuadro({
           stages: data.stages ?? [],
           defs: campos,
@@ -503,6 +515,29 @@ function NegociosConteudo() {
     [inclinar]
   );
   const fotografar = useFlipDoQuadro(quadroRef, stages);
+  React.useEffect(() => {
+    fotografarAgora.current = () => fotografar();
+    arrastandoAgora.current = !!dragging;
+  });
+
+  // Outras pessoas mexem no mesmo funil: com a aba à vista, o quadro recarrega
+  // em silêncio a cada 30 s e ao voltar para a aba. Não recarrega quem pediu
+  // "mais cartões" numa coluna (a recarga traria só os primeiros de volta).
+  const carregouMais = stages.some((s) => s.deals.length > POR_ETAPA);
+  React.useEffect(() => {
+    if (carregouMais) return;
+    const atualizar = () => {
+      if (document.visibilityState !== "visible") return;
+      deFundo.current = true;
+      setVersao((v) => v + 1);
+    };
+    const intervalo = window.setInterval(atualizar, 30_000);
+    document.addEventListener("visibilitychange", atualizar);
+    return () => {
+      window.clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", atualizar);
+    };
+  }, [carregouMais]);
 
   function handleDragStart(event: DragStartEvent) {
     for (const s of stages) {
@@ -574,11 +609,22 @@ function NegociosConteudo() {
     const etapa = stages.find((s) => s.deals.some((d) => d.id === deal.id));
     if (etapa) setPrevia({ id: deal.id, deal, etapa, foco });
   }
-  const acoesDoQuadro: AcoesDoQuadro = {
-    etapas: stages.map((s) => ({ id: s.id, name: s.name, type: s.type })),
-    onAbrir: abrirDoQuadro,
-    onMover: (deal, etapaId) => void moverNegocio(deal.id, etapaId),
-  };
+  // Contexto estável: todo cartão lê dele, e um valor novo a cada render (ex.:
+  // ao pegar um cartão) redesenhava os 300 cartões do quadro de uma vez.
+  const acoesAtuais = React.useRef({ abrirDoQuadro, moverNegocio });
+  React.useEffect(() => {
+    acoesAtuais.current = { abrirDoQuadro, moverNegocio };
+  });
+  // Só muda quando as etapas mudam (não a cada cartão que anda).
+  const chaveDasEtapas = JSON.stringify(stages.map((s) => ({ id: s.id, name: s.name, type: s.type })));
+  const acoesDoQuadro: AcoesDoQuadro = React.useMemo(
+    () => ({
+      etapas: JSON.parse(chaveDasEtapas) as AcoesDoQuadro["etapas"],
+      onAbrir: (deal, foco) => acoesAtuais.current.abrirDoQuadro(deal, foco),
+      onMover: (deal, etapaId) => void acoesAtuais.current.moverNegocio(deal.id, etapaId),
+    }),
+    [chaveDasEtapas]
+  );
   function abrirDaLista(linha: LinhaDeNegocio) {
     const etapa = etapasDaPrevia.find((s) => s.id === linha.stage.id) ?? { ...linha.stage, color: "" };
     setPrevia({ id: linha.id, deal: linha, etapa });

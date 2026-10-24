@@ -185,11 +185,11 @@ export default function InicioPage() {
         </div>
 
         <div className="relative mt-auto grid gap-3 md:grid-cols-2">
-          <div className={cn("flex flex-col gap-1.5 rounded-[22px] px-5 py-4 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06] backdrop-blur-xl" : "bg-[#121214]")}>
+          <div className={cn("flex flex-col gap-1.5 rounded-[22px] px-5 py-4 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06]" : "bg-[#121214]")}>
             <span className="text-small text-[#a8a8ad]">Conversas nos últimos 7 dias</span>
             <b className="self-end text-[34px] font-medium leading-none tracking-[-0.035em] tabular-nums">{dados ? dados.resumo.conversas7d : "—"}</b>
           </div>
-          <div className={cn("flex items-center gap-1.5 rounded-[22px] py-2.5 pl-1 pr-5 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06] backdrop-blur-xl" : "bg-[#121214]/90")}>
+          <div className={cn("flex items-center gap-1.5 rounded-[22px] py-2.5 pl-1 pr-5 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06]" : "bg-[#121214]")}>
             <OrbeEva falando={falando} className="-my-4 -mr-2 h-[116px] w-[116px] shrink-0 cursor-pointer" />
             <span className="flex min-w-0 flex-col gap-1">
               <span className="font-mono text-caption text-[#8a8a90]">Eva · resumo do dia</span>
@@ -288,7 +288,7 @@ export default function InicioPage() {
 
       {/* Folha de "Personalizar": os blocos que estão fora do Início. */}
       {editando && (
-        <div className="sticky bottom-4 z-20 mx-6 rounded-[26px] border border-border-subtle bg-overlay/90 p-4 shadow-overlay backdrop-blur-xl motion-safe:animate-[ds-pop-in_300ms_var(--ease-standard)]">
+        <div className="sticky bottom-4 z-20 mx-6 rounded-[26px] border border-border-subtle bg-overlay p-4 shadow-overlay motion-safe:animate-[ds-pop-in_300ms_var(--ease-standard)]">
           <div className="mb-3 flex items-center">
             <p className="text-body font-semibold text-text-primary">Adicionar ao Início</p>
             <button type="button" onClick={() => setEditando(false)} className="ml-auto text-small font-medium text-accent-fg">

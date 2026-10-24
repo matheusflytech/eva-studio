@@ -62,6 +62,7 @@ import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
 import { getFlow, saveFlow } from "@/lib/data/flows";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
+import { MOLA } from "@/lib/design-system/movimento";
 
 type SaveState = "idle" | "pending" | "saved" | "error";
 type BuilderTab = "editor" | "conversa" | "executions";
@@ -103,7 +104,7 @@ function BarraFlutuante({ onOrganizar }: { onOrganizar: () => void }) {
       <motion.div
         initial={calmo ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.8, delay: 0.15 }}
+        transition={{ ...MOLA, delay: 0.15 }}
         role="toolbar"
         aria-label="Ferramentas do fluxo"
         className="flex items-center gap-0.5 rounded-full border border-border-default bg-overlay p-1 shadow-[var(--elevation-overlay)]"

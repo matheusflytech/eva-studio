@@ -93,7 +93,7 @@ function ToastView({ toast, onClose }: { toast: ToastItem; onClose: () => void }
       onBlur={() => setPausado(false)}
       className={cn(
         "pointer-events-auto flex items-start gap-2.5 rounded-[18px] border border-border-subtle bg-overlay px-3.5 py-3 shadow-overlay",
-        "origin-bottom animate-[ds-menu-in_320ms_cubic-bezier(.32,.72,0,1)]"
+        "origin-bottom animate-[ds-menu-in_var(--dur-slow)_var(--ease-out)]"
       )}
     >
       {icones[tone] && <span className="mt-0.5">{icones[tone]}</span>}

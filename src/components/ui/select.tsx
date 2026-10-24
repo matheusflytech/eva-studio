@@ -127,7 +127,7 @@ export const Select = React.forwardRef<HTMLSelectElement, Props>(
               <ChevronDown
                 size={14}
                 aria-hidden="true"
-                className="shrink-0 text-text-tertiary transition-transform duration-200 ease-[cubic-bezier(.32,.72,0,1)] group-data-[state=open]:rotate-180"
+                className="shrink-0 text-text-tertiary transition-transform duration-[var(--dur-base)] ease-out group-data-[state=open]:rotate-180"
               />
             </button>
           </Menu.Trigger>
@@ -138,8 +138,7 @@ export const Select = React.forwardRef<HTMLSelectElement, Props>(
               collisionPadding={12}
               className={cn(
                 overlayBox,
-                "max-h-[min(320px,var(--radix-dropdown-menu-content-available-height))] min-w-[max(var(--radix-dropdown-menu-trigger-width),180px)] overflow-y-auto outline-none",
-                "backdrop-blur-xl [background:color-mix(in_srgb,var(--color-overlay)_86%,transparent)]"
+                "max-h-[min(320px,var(--radix-dropdown-menu-content-available-height))] min-w-[max(var(--radix-dropdown-menu-trigger-width),180px)] overflow-y-auto overscroll-contain outline-none"
               )}
             >
               <Menu.RadioGroup value={atual} onValueChange={escolher}>

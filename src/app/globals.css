@@ -359,7 +359,16 @@
   --radius-2xl: 0.5rem;
   --radius-3xl: 0.75rem;
 
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* Movimento (plano v7, B1): uma curva de entrada, uma de saída, quatro tempos.
+     Entra/move com --ease-out; sai com --ease-in, mais curto que a entrada.
+     --ease-standard fica como apelido (era outra curva; agora é a mesma). */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: var(--ease-out);
+  --dur-instant: 100ms; /* hover de linha, cor */
+  --dur-fast: 150ms; /* apertar, abas, saída */
+  --dur-base: 220ms; /* menus, popovers */
+  --dur-slow: 300ms; /* gaveta, modal, entrada de tela */
 }
 
 @theme inline {
@@ -792,41 +801,54 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Movimento v5. Mola curta (cubic-bezier(.32,.72,0,1)), só opacity/transform/
-   filter. A tela nova entra em cascata: cada bloco de primeiro nível sobe um
-   pouco depois do anterior. "Reduzir movimento" desliga tudo (regra global).
+   Movimento v7 (tokens no :root). Só opacity e transform: sem desfoque nas
+   entradas do dia a dia (trocar de tela, abrir menu ou modal acontecem o tempo
+   todo, e desfoque repetido cansa). A tela nova entra em cascata: cada bloco
+   de primeiro nível sobe um pouco depois do anterior. "Reduzir movimento" vira
+   só esmaecer (regra abaixo).
    --------------------------------------------------------------------------- */
 @keyframes eva-entra {
-  from { opacity: 0; transform: translateY(10px); filter: blur(3px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
-.entrada-de-tela { animation: eva-entra 0.42s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.entrada-de-tela { animation: eva-entra var(--dur-slow) var(--ease-out) both; }
 /* :where() zera a especificidade: um bloco com animação própria (o topo
    iridescente, o tremor de "Personalizar", esqueletos) mantém a dele. */
-:where(.entrada-de-tela > * > *) { animation: eva-entra 0.55s cubic-bezier(0.32, 0.72, 0, 1) both; }
+:where(.entrada-de-tela > * > *) { animation: eva-entra var(--dur-slow) var(--ease-out) both; }
 :where(.entrada-de-tela > * > *:nth-child(2)) { animation-delay: 0.05s; }
 :where(.entrada-de-tela > * > *:nth-child(3)) { animation-delay: 0.1s; }
 :where(.entrada-de-tela > * > *:nth-child(4)) { animation-delay: 0.15s; }
 :where(.entrada-de-tela > * > *:nth-child(5)) { animation-delay: 0.2s; }
 :where(.entrada-de-tela > * > *:nth-child(n + 6)) { animation-delay: 0.25s; }
 .entrada-de-tela .heroi-iridescente {
-  animation: eva-entra 0.55s cubic-bezier(0.32, 0.72, 0, 1) both, eva-iridescencia 18s ease-in-out infinite alternate;
+  animation: eva-entra var(--dur-slow) var(--ease-out) both, eva-iridescencia 18s ease-in-out infinite alternate;
 }
+/* Menu e popover crescem do botão que os abriu (transform-origin no Radix). */
 @keyframes ds-menu-in {
-  from { opacity: 0; transform: scale(0.94) translateY(-4px); filter: blur(4px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes ds-menu-out {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: scale(0.97); }
+  to { opacity: 0; transform: scale(0.98); }
 }
 @keyframes ds-modal-in {
   /* Tailwind v4 centraliza com a propriedade translate; aqui só transform. */
-  from { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(6px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+/* Saídas: o mesmo caminho da entrada, mais curto e menor (--dur-fast, --ease-in). */
+@keyframes ds-fade-out {
+  to { opacity: 0; }
+}
+@keyframes ds-modal-out {
+  to { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes ds-slide-out-right {
+  to { opacity: 0; transform: translateX(16px); }
 }
 
-/* Reduzir movimento: entradas só com esmaecer, sem deslocamento nem escala. */
+/* Reduzir movimento: entradas e saídas só com esmaecer, sem deslocamento nem escala. */
 @keyframes eva-aparece {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -838,6 +860,8 @@ body {
   [data-state="open"][class*="ds-menu-in"],
   [data-state="open"][class*="ds-modal-in"],
   [data-state="open"][class*="ds-slide-in-right"] { animation: eva-aparece 0.2s ease both !important; }
+  [data-state="closed"][class*="ds-modal-out"],
+  [data-state="closed"][class*="ds-slide-out-right"] { animation: ds-fade-out 0.15s ease both !important; }
 }
 
 /* Troca de tela (View Transitions): só o conteúdo anima; o resto da página
@@ -850,21 +874,21 @@ body {
 .trocando-tema *::before,
 .trocando-tema *::after { transition: none !important; }
 ::view-transition-old(.eva-tela-sai) {
-  animation: eva-tela-sai 0.16s cubic-bezier(0.4, 0, 1, 1) both;
+  animation: eva-tela-sai var(--dur-fast) var(--ease-in) both;
 }
 @keyframes eva-tela-sai {
-  to { opacity: 0; transform: translateY(-6px) scale(0.99); filter: blur(4px); }
+  to { opacity: 0; transform: translateY(-6px); }
 }
 
-/* Toque: tudo que é botão afunda um pouco com mola ao clicar e volta solto.
-   :where() deixa as classes de cada componente vencerem. */
+/* Toque: tudo que é botão afunda um pouco ao clicar e volta, sem quique (o
+   quique em cada clique cansa). :where() deixa as classes de cada componente vencerem. */
 :where(button, [role="button"], [role="tab"], [role="menuitemcheckbox"], [role="menuitemradio"], summary):not(:disabled):active {
   transform: scale(0.97);
 }
 :where(button, [role="button"], [role="tab"], summary) {
   transition-property: transform, background-color, color, border-color, opacity, box-shadow;
-  transition-duration: 0.22s;
-  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   :where(button, [role="button"], [role="tab"], summary):not(:disabled):active { transform: scale(0.99); }

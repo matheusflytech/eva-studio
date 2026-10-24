@@ -28,6 +28,7 @@ import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/compo
 import { FaixaDeExecucoes } from "@/components/automacoes/faixa-de-execucoes";
 import { TesteDeVerdade } from "@/components/automacoes/teste-de-verdade";
 import { motivoDoPasso, passosComProblema } from "@/lib/automacoes/teste";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Editor da automação. Sempre se edita o rascunho (salvo sozinho); a versão
@@ -501,7 +502,7 @@ export default function EditorDaAutomacao() {
             key={inserindo ? `inserir:${inserindo.de}:${inserindo.saida}` : selecionado}
             initial={calmo ? { opacity: 0 } : { opacity: 0, x: 18 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.8 }}
+            transition={MOLA}
             className="absolute inset-y-0 right-0 z-10 w-full max-w-[400px] border-l border-border-subtle bg-panel lg:static lg:w-[380px] lg:max-w-none lg:shrink-0"
           >
             {inserindo ? (

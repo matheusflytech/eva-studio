@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion, type Transition, type Variants } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AlarmClock, CalendarCheck, ChevronLeft, ChevronRight, HandCoins, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -37,6 +37,7 @@ import { faixaDeHorario, GradeDaSemana } from "./semana";
 import { GradeDoMes } from "./mes";
 import { AgendaDoDia } from "./agenda-do-dia";
 import { DetalheDoEvento } from "./detalhe-do-evento";
+import { ESMAECER, MOLA } from "@/lib/design-system/movimento";
 
 // Calendário (terceira aba de Tarefas, e bloco do Início). No desenho da
 // agenda de trabalho: em cima, o dia escolhido, a navegação e os avisos
@@ -52,8 +53,6 @@ import { DetalheDoEvento } from "./detalhe-do-evento";
 // no detalhe.
 
 // Mola curta: a semana/o mês desliza para o lado da navegação e esmaece.
-const MOLA: Transition = { type: "spring", stiffness: 420, damping: 38, mass: 0.8 };
-const ESMAECER: Transition = { duration: 0.18, ease: [0.32, 0.72, 0, 1] };
 
 /** Negócios por página e páginas no máximo por intervalo (POST /api/deals/busca). */
 const NEGOCIOS_POR_PAGINA = 100;

@@ -5,6 +5,7 @@ import Link from "@/components/contrato/link";
 import { usePathname } from "@/lib/contrato/navegacao";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { MOLA } from "@/lib/design-system/movimento";
 
 export function SidebarNavItem({
   href,
@@ -38,7 +39,7 @@ export function SidebarNavItem({
         <motion.span
           layoutId="menu-item-ativo"
           className="absolute inset-0 -z-10 rounded-[10px] bg-hover"
-          transition={{ type: "spring", stiffness: 520, damping: 40, mass: 0.8 }}
+          transition={MOLA}
         />
       )}
       <Icon

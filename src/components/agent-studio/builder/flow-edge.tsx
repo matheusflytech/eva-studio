@@ -97,7 +97,7 @@ export function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositio
               setOpen((o) => !o);
             }}
             className={cn(
-              "flex size-5 items-center justify-center rounded-full border transition-[opacity,background-color,border-color,color,transform] duration-150 hover:scale-110 active:scale-95 motion-reduce:hover:scale-100 group-hover:opacity-100",
+              "flex size-5 items-center justify-center rounded-full border transition-[opacity,background-color,border-color,color,transform] duration-150 hover:scale-110 active:scale-[0.96] motion-reduce:hover:scale-100 group-hover:opacity-100",
               open
                 ? "border-accent-solid bg-accent-solid text-text-on-accent opacity-100"
                 : "border-border-default bg-panel text-text-tertiary opacity-0 hover:border-accent-solid hover:bg-accent-solid hover:text-text-on-accent"

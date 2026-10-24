@@ -7,6 +7,7 @@ import Link from "@/components/contrato/link";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import { EVENTO_ILHA, pulsar, type AvisoDaIlha } from "@/lib/fundo/eventos";
 import { cn } from "@/lib/utils";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Notificações (antes "ilha"): como as do iPhone. Não há nada fixo no topo;
@@ -187,4 +188,3 @@ function CartaoDeNotificacao({ notificacao: n, onFechar }: { notificacao: Notifi
   );
 }
 
-const MOLA = { type: "spring", stiffness: 380, damping: 30, mass: 0.9 } as const;

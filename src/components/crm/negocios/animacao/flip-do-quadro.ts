@@ -46,9 +46,10 @@ export function useFlipDoQuadro(ref: React.RefObject<HTMLElement | null>, coluna
         if (cartao) gsap.from(cartao, { autoAlpha: 0, duration: 0.15, clearProps: "opacity,visibility" });
         return;
       }
+      // Pouso firme, sem quique (curva --ease-out); os vizinhos se reacomodam junto.
       Flip.from(f.estado, {
         targets: gsap.utils.toArray<HTMLElement>("[data-deal-id]", raiz),
-        duration: 0.45,
+        duration: 0.4,
         ease: CURVA.voo,
         prune: true,
       });

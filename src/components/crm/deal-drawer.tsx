@@ -250,6 +250,15 @@ export function DealDrawer({
   const [montado, setMontado] = React.useState(false);
   React.useEffect(() => { setMontado(true); }, []);
 
+  // Foco: entra no painel ao abrir e volta para quem abriu ao fechar.
+  const painel = React.useRef<HTMLElement>(null);
+  React.useEffect(() => {
+    if (!montado) return;
+    const quemAbriu = document.activeElement as HTMLElement | null;
+    painel.current?.focus({ preventScroll: true });
+    return () => quemAbriu?.focus?.({ preventScroll: true });
+  }, [montado]);
+
   // Esc fecha, como todo painel por cima da tela.
   React.useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
@@ -264,9 +273,13 @@ export function DealDrawer({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Detalhes do negócio">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm animate-[ds-fade-in_var(--dur-fast)_var(--ease-out)]" onClick={onClose} />
       {/* glass-card-solid: sem ele o kanban aparece por baixo do painel. */}
-      <aside className="glass-card glass-card-solid relative z-10 flex h-full w-full max-w-[520px] flex-col overflow-y-auto rounded-l-3xl">
+      <aside
+        ref={painel}
+        tabIndex={-1}
+        className="glass-card glass-card-solid relative z-10 flex h-full w-full max-w-[520px] flex-col overflow-y-auto overscroll-contain rounded-l-3xl outline-none motion-safe:animate-[ds-slide-in-right_var(--dur-slow)_var(--ease-out)] motion-reduce:animate-[ds-fade-in_var(--dur-fast)_var(--ease-out)]"
+      >
         {!deal ? (
           <p className="p-8 text-[13px] text-text-tertiary">Carregando...</p>
         ) : (

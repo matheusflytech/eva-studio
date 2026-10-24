@@ -20,7 +20,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { motion, useReducedMotion, type Transition } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, Check, FlaskConical, Maximize, Minus, Plus, Redo2, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
@@ -33,6 +33,7 @@ import { EVENTOS_DE_ESPERA } from "@/lib/automacoes/catalogo";
 import type { Definicao, No, Ponta } from "@/lib/automacoes/tipos";
 import type { Pendencia } from "@/lib/automacoes/validar";
 import { IconeDoPasso, visualDoPasso } from "./comum";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Canvas da automação: layout automático da esquerda para a direita (puro, em
@@ -84,7 +85,6 @@ export interface BarraDoCanvas {
 }
 
 // Mola curta e firme (mesma família do resto do app). Só transform/opacity.
-const MOLA: Transition = { type: "spring", stiffness: 420, damping: 30, mass: 0.8 };
 
 // Borda e brilho do quadrado por estado da execução. O brilho é estático
 // (box-shadow em repouso não anima); o "rodando" pulsa por opacidade numa camada à parte.
@@ -278,7 +278,7 @@ function Ligacao({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
                 data.inserir(data.ponta);
               }}
               className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full border transition-[background-color,border-color,color,opacity,transform] duration-150 hover:scale-110 active:scale-95 motion-reduce:hover:scale-100",
+                "flex h-5 w-5 items-center justify-center rounded-full border transition-[background-color,border-color,color,opacity,transform] duration-150 hover:scale-110 active:scale-[0.96] motion-reduce:hover:scale-100",
                 data.inserindoAqui
                   ? "border-accent-solid bg-accent-solid text-text-on-accent opacity-100"
                   : "border-border-default bg-panel text-text-tertiary opacity-70 hover:border-accent-solid hover:bg-accent-solid hover:text-text-on-accent hover:opacity-100"
