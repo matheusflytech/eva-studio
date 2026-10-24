@@ -130,27 +130,29 @@ Confira: tamanho, sem markdown, uma pergunta por vez, não inventou.
 
 ---
 
-## 3. Particularidades do WhatsApp: o que a plataforma faz hoje
+## 3. Particularidades do WhatsApp: o que a plataforma faz
+
+Atualizado com A1–A3 do plano v7 (branches `feat/agente-whatsapp-*`; valem depois do merge).
 
 | Entrada | Meta (API oficial) | QR (Baileys) | Site (widget) |
 |---|---|---|---|
 | Texto | sim | sim | sim |
-| Áudio | guarda o arquivo; IA vê só `[Áudio]` | igual | **transcreve** (Groq Whisper) |
-| Imagem | guarda; IA vê só a legenda | igual | **IA vê a imagem** |
-| Documento / PDF | guarda; IA vê legenda ou `[Documento]` | igual | **lê o texto** (PDF/DOCX) |
+| Áudio | **transcreve** até 5 min; o texto fica na conversa | igual | **transcreve** (Groq Whisper) |
+| Imagem | **IA vê a imagem** (até 3 por resposta) | igual | **IA vê a imagem** |
+| Documento / PDF | **lê o texto** (PDF/DOCX/TXT/CSV, até 10 MB) | igual | **lê o texto** (PDF/DOCX) |
 | Vídeo | legenda ou `[Vídeo]` | igual | — |
 | Figurinha | `[Figurinha]` (IA responde) | igual | — |
 | Localização / contato | vira texto | **some** | — |
 | Resposta citando outra mensagem | perde a citação | perde a citação | — |
 | Mensagem temporária / visualização única | — | **some** | — |
 | Reação, editada, apagada | ignora | ignora | — |
-| Várias mensagens seguidas | uma resposta por mensagem | igual | igual |
+| Várias mensagens seguidas | **espera 4 s e responde tudo junto** (1:1 com IA) | igual | uma resposta por mensagem |
 
 | Saída | Hoje |
 |---|---|
-| Markdown | vai literal (`**`, `#`, tabelas) |
-| Quebrar em balões | não; uma mensagem só |
-| "Digitando…" e pausa | não |
+| Markdown | vira o formato do WhatsApp (`*negrito*`); tabela vira lista |
+| Quebrar em balões | até 3, por parágrafo (interruptor no bloco) |
+| "Digitando…" e pausa | sim, 0,8 a 2,5 s antes de cada balão seguinte |
 | Botões | Meta: até 3, título até 20 caracteres; QR: lista numerada |
 
 A transcrição e a leitura de imagem/PDF já existem (`src/lib/server/transcribe.ts`,

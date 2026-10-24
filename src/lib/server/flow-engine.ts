@@ -49,6 +49,7 @@ import {
 } from "@/lib/capture-validation";
 import { marcarComoLead } from "@/lib/server/leads";
 import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
+import { entenderAnexosDoWhatsApp, transcreverAudioDoWhatsApp, type AnexoGuardado } from "@/lib/server/anexos-whatsapp";
 
 export interface OutboundMessage {
   text: string;
@@ -621,13 +622,14 @@ ${input.anexoContexto}`.trim() : texto;
 // (no Playground e na prévia o erro aparece no log, então não manda nada).
 const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
 const CANAIS_DE_TESTE_DA_IA = ["playground", "builder_preview"];
+const ehWhatsApp = (canal: string) => canal === "whatsapp_meta" || canal === "whatsapp_qr";
 
 /**
  * Resposta da IA no jeito do canal. Nenhum canal mostra markdown: no WhatsApp
  * vira o negrito de lá e sai em até 3 balões; nos outros, texto simples.
  */
 function respostaDaIa(texto: string, canal: string, node: Node<FlowNodeData>): OutboundMessage[] {
-  if (canal !== "whatsapp_meta" && canal !== "whatsapp_qr") return [{ text: paraTextoSimples(texto) }];
+  if (!ehWhatsApp(canal)) return [{ text: paraTextoSimples(texto) }];
   const t = paraWhatsApp(texto);
   if (node.data.aiBaloes === false) return [{ text: t }];
   return emBaloes(t).map((b, i) => (i === 0 ? { text: b } : { text: b, digitando: pausaDeDigitacao(b) }));
@@ -1109,7 +1111,7 @@ export const JANELA_DE_JUNTAR_MS = 4000;
 
 /** WhatsApp 1:1, texto do contato, conversa parada num bloco de IA. */
 function deveJuntar(input: AdvanceInput, nodes: Node<FlowNodeData>[], currentNodeId: string | null): boolean {
-  if (input.channel !== "whatsapp_meta" && input.channel !== "whatsapp_qr") return false;
+  if (!ehWhatsApp(input.channel)) return false;
   if (input.text === undefined || input.optionId !== undefined) return false;
   if (input.contactId.endsWith("@g.us")) return false; // grupo: a IA só responde a quem marcou
   return nodes.find((n) => n.id === currentNodeId)?.data.iconKey === "ai-agent";
@@ -1121,7 +1123,7 @@ function deveJuntar(input: AdvanceInput, nodes: Node<FlowNodeData>[], currentNod
  * texto de tudo o que ele mandou desde a última resposta (até 10 mensagens) e
  * de quando é a primeira delas.
  */
-async function juntarMensagensSeguidas(conversationId: string, input: AdvanceInput): Promise<{ texto: string; desde: Date } | null> {
+async function juntarMensagensSeguidas(conversationId: string, input: AdvanceInput): Promise<Juntadas | null> {
   const [minha] = await registrarMensagens(conversationId, [
     {
       role: "contact",
@@ -1152,13 +1154,23 @@ async function juntarMensagensSeguidas(conversationId: string, input: AdvanceInp
       where: { conversationId, role: "contact", createdAt: { gt: ultimaResposta?.createdAt ?? new Date(0), lte: minha.createdAt } },
       orderBy: { createdAt: "desc" },
       take: 10,
-      select: { text: true, createdAt: true },
+      select: { text: true, createdAt: true, mediaPath: true, mediaType: true, mediaMime: true, mediaName: true },
     })
   ).reverse();
   return {
     texto: pendentes.map((m) => m.text).filter(Boolean).join("\n"),
     desde: pendentes[0]?.createdAt ?? minha.createdAt,
+    anexos: pendentes.flatMap((m) =>
+      m.mediaPath && m.mediaType && m.mediaMime ? [{ path: m.mediaPath, type: m.mediaType, mime: m.mediaMime, name: m.mediaName }] : []
+    ),
   };
+}
+
+interface Juntadas {
+  texto: string;
+  desde: Date;
+  /** Fotos e documentos das mensagens juntadas, para a IA ler. */
+  anexos: AnexoGuardado[];
 }
 
 async function acharGatilho(input: AdvanceInput, kind: InboundKind) {
@@ -1192,6 +1204,13 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
+
+  // Áudio do WhatsApp (1:1) vira texto antes de tudo: a equipe lê a transcrição
+  // em Conversas e a IA responde como se a pessoa tivesse digitado.
+  if (ehWhatsApp(input.channel) && input.media?.type === "audio" && input.text === "[Áudio]") {
+    const transcricao = await transcreverAudioDoWhatsApp(agent.orgId, input.media);
+    if (transcricao) input = { ...input, text: transcricao };
+  }
 
   // Espelha a conversa no CRM de contatos (Contact) e, quando o contato
   // falou de verdade, tira ele de qualquer sequencia com stopOnReply. Roda
@@ -1300,11 +1319,24 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
   // Mensagens quebradas ("E", "S", "A"… em segundos): só a última responde,
   // com tudo junto. As anteriores ficam gravadas e saem sem resposta.
-  let juntadas: { texto: string; desde: Date } | null = null;
+  let juntadas: Juntadas | null = null;
   if (deveJuntar(input, nodes, conversation.currentNodeId)) {
     juntadas = await juntarMensagensSeguidas(conversation.id, input);
     if (!juntadas) return { messages: [], status: conversation.status as AdvanceResult["status"] };
     input = { ...input, text: juntadas.texto };
+  }
+
+  // O que vai para a IA. No WhatsApp, foto e documento só são lidos aqui, na
+  // hora de a IA responder (e uma vez só, mesmo que dois blocos de IA rodem).
+  let pergunta: string | null = null;
+  async function perguntaParaIA(): Promise<string> {
+    if (pergunta === null) {
+      const anexos = juntadas?.anexos ?? (input.media ? [input.media] : []);
+      const anexoContexto =
+        input.anexoContexto ?? (ehWhatsApp(input.channel) ? await entenderAnexosDoWhatsApp(agent!.orgId, anexos) : undefined);
+      pergunta = textoParaIA({ text: input.text, anexoContexto });
+    }
+    return pergunta;
   }
 
   const variables: Variables = { ...(conversation.variables as Variables) };
@@ -1503,7 +1535,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     if (!(reply && done && temSaidaPrincipal(edges, parkedNode.id))) return finish();
     currentId = nextNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "ai-agent") {
-    const reply = await runAiAgent(parkedNode, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
+    const reply = await runAiAgent(parkedNode, agent, await perguntaParaIA(), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     }, juntadas?.desde);
@@ -1777,7 +1809,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
     if (kind === "ai-agent") {
       const startedAt = Date.now();
-      const reply = await runAiAgent(node, agent, textoParaIA(input), variables, nodes, edges, conversation.id, {
+      const reply = await runAiAgent(node, agent, await perguntaParaIA(), variables, nodes, edges, conversation.id, {
       orgId: agent.orgId,
       resolveContactId: ensureContactId,
     }, juntadas?.desde);
