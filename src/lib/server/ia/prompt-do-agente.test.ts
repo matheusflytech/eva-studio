@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { montarPromptDoAgente } from "./prompt-do-agente";
+import { contextoDaConversa, montarPromptDoAgente } from "./prompt-do-agente";
 
 const agente = {
   name: "Eva",
@@ -50,5 +50,23 @@ describe("montarPromptDoAgente", () => {
     expect(p).not.toContain("## Tom de voz");
     expect(p).not.toContain("## Nunca faça");
     expect(p).not.toContain("## Nesta etapa");
+  });
+});
+
+describe("contextoDaConversa", () => {
+  const agora = new Date("2026-10-24T21:40:00.000Z"); // 18:40 em São Paulo
+
+  it("leva hora de Brasília, canal, nome e o formato de WhatsApp", () => {
+    const c = contextoDaConversa({ canal: "whatsapp_qr", nome: "Rafael", agora });
+    expect(c).toContain("18:40");
+    expect(c).toContain("Canal: WhatsApp.");
+    expect(c).toContain("Nome do contato: Rafael.");
+    expect(c).toContain("Uma pergunta por vez.");
+  });
+
+  it("grupo, nome que é só número e canal fora do WhatsApp", () => {
+    expect(contextoDaConversa({ canal: "whatsapp_qr", grupo: true, agora })).toContain("Canal: grupo de WhatsApp.");
+    expect(contextoDaConversa({ canal: "website", nome: "5547999990001", agora })).not.toContain("Nome do contato");
+    expect(contextoDaConversa({ canal: "website", agora })).toContain("nada de markdown");
   });
 });
