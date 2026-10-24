@@ -81,6 +81,11 @@ export interface AdvanceInput {
   // Que tipo de evento é (só o Instagram distingue hoje): DM comum, resposta
   // ou reação a story, menção em story. Sem isso, é DM.
   event?: { kind: InboundKind; storyId?: string; isReaction?: boolean };
+  // Só registra, sem o agente responder (grupo do WhatsApp em que ninguém
+  // marcou o número). Só o worker manda isto.
+  semResposta?: boolean;
+  // Nome que o canal informa (assunto do grupo), para a ficha não ficar sem nome.
+  nomeDoContato?: string;
   // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
   // da pergunta para o modelo, mas não é gravado na conversa.
   anexoContexto?: string;
@@ -1129,6 +1134,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         conversationId,
         variables,
         isInbound,
+        nome: input.nomeDoContato,
       });
       if (contactId && isInbound) {
         await stopEnrollmentsOnReply(contactId);
@@ -1178,7 +1184,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       create: { agentId: input.agentId, channel: input.channel, contactId: input.contactId, variables: {} },
       update: { updatedAt: new Date() },
     });
-    if (agentePausado(conversation.status)) {
+    if (agentePausado(conversation.status) || input.semResposta) {
       return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
     }
     // Menção em story não é pergunta: registra e não acorda o webhook do agente.
@@ -1212,7 +1218,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   // um atendente cuidava da conversa, tudo que o cliente escrevia sumia: não
   // aparecia na caixa de entrada, não renovava a janela de 24h da Meta e não
   // atualizava a ficha. O atendente respondia no escuro.
-  if (agentePausado(conversation.status)) {
+  if (agentePausado(conversation.status) || input.semResposta) {
     return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
   }
 
@@ -1243,6 +1249,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       conversationId: conversation.id,
       variables,
       isInbound: false,
+      nome: input.nomeDoContato,
     });
     return resolvedContactId;
   }

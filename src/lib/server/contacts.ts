@@ -116,6 +116,8 @@ export interface SyncContactInput {
   conversationId: string;
   variables: Record<string, unknown>;
   isInbound: boolean;
+  /** Nome que o canal informa (assunto do grupo do WhatsApp), quando a conversa não capturou um. */
+  nome?: string;
 }
 
 /**
@@ -132,7 +134,7 @@ export interface SyncContactInput {
  * uma captura que a pessoa pulou.
  */
 export async function syncContactFromConversation(input: SyncContactInput): Promise<string | null> {
-  const { agentId, channel, externalId, conversationId, variables, isInbound } = input;
+  const { agentId, channel, externalId, conversationId, variables, isInbound, nome } = input;
   if (!externalId) return null;
 
   const agent = await prisma.agent.findUnique({ where: { id: agentId }, select: { orgId: true } });
@@ -153,7 +155,10 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
     else custom[key] = value;
   }
 
-  if (!fields.phone && PHONE_CHANNELS.has(channel)) {
+  if (!fields.name && nome?.trim()) fields.name = nome.trim().slice(0, 200);
+
+  // Grupo (@g.us) e "@lid" não são telefone: os dígitos do id não levam a ninguém.
+  if (!fields.phone && PHONE_CHANNELS.has(channel) && !/@(g\.us|lid)$/.test(externalId)) {
     const digits = externalId.replace(/\D/g, "");
     if (digits.length >= 10) fields.phone = digits;
   }

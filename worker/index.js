@@ -27,7 +27,7 @@ import {
 } from "./fonte.js";
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 import { decidirReconexao } from "./desconexao.js";
-import { contatoDaMensagem } from "./contato.js";
+import { analisarMensagem } from "./contato.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -143,14 +143,14 @@ function extractOptionId(msg) {
 
 // Fala com o motor de fluxo no app principal (Next.js/Vercel) — o worker não
 // decide mais nada sozinho sobre o que responder, só repassa mensagens.
-async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId }) {
+async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId, semResposta, nomeDoContato }) {
   try {
     const res = await fetch(`${EVA_STUDIO_URL}/api/conversations/message`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
       // canalId vai junto no modo canal: canal sem agente ainda é registrado
       // no app (Conversas), só não responde.
-      body: JSON.stringify({ agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId }),
+      body: JSON.stringify({ agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId, semResposta, nomeDoContato }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -158,6 +158,22 @@ async function advanceViaEngine(agentId, contactId, { text, optionId, media, ext
   } catch (err) {
     logger.error({ err, agentId }, "Falha ao chamar o motor de fluxo");
     return [];
+  }
+}
+
+// Nome do grupo (assunto), com cache de 1 h: buscar a cada mensagem pesaria
+// no WhatsApp. Falha não derruba nada: o grupo fica sem nome por enquanto.
+const nomesDeGrupo = new Map();
+async function nomeDoGrupo(sock, jid) {
+  const guardado = nomesDeGrupo.get(jid);
+  if (guardado && Date.now() - guardado.em < 3600_000) return guardado.nome;
+  try {
+    const nome = (await sock.groupMetadata(jid))?.subject || undefined;
+    nomesDeGrupo.set(jid, { nome, em: Date.now() });
+    return nome;
+  } catch (err) {
+    logger.warn({ err, jid }, "Não foi possível ler o nome do grupo");
+    return guardado?.nome;
   }
 }
 
@@ -263,9 +279,11 @@ async function startSession(chave) {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe || !msg.message) continue;
-      // Grupo, status, transmissão e canal não são contato (e o agente não responde lá).
-      const contato = contatoDaMensagem(msg.key);
-      if (!contato) continue;
+      // Status, transmissão e canal ficam de fora; grupo entra, e o agente só
+      // responde nele quando marcam o número ou respondem a uma mensagem dele.
+      const analise = analisarMensagem(msg, sock.user);
+      if (!analise) continue;
+      const { contato, grupo, responder } = analise;
       const optionId = extractOptionId(msg);
       let text = extractText(msg);
       const midia = extractMedia(msg);
@@ -290,7 +308,10 @@ async function startSession(chave) {
       // A resposta vai para onde a mensagem veio (o lid, se veio por lid); a ficha fica com o número.
       const remoteJid = msg.key.remoteJid;
       const replies = await advanceViaEngine(agentId, contato, {
-        text,
+        // No grupo, cada mensagem diz quem mandou (a conversa é do grupo todo).
+        text: grupo && msg.pushName ? `${msg.pushName}: ${text ?? ""}` : text,
+        semResposta: !responder,
+        nomeDoContato: grupo ? await nomeDoGrupo(sock, contato) : undefined,
         optionId,
         media: anexo,
         externalId: msg.key.id,
