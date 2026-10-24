@@ -266,6 +266,7 @@ export function AbaMembros() {
                       <span className="truncate">{m.name}</span>
                       {m.isMe && <Badge>você</Badge>}
                       {m.status === "convidado" && <Badge variant="info">convidado</Badge>}
+                      {m.status === "pendente" && <Badge variant="warning">aguardando aceite</Badge>}
                     </span>
                   }
                   detalhe={m.email}

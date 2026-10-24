@@ -14,6 +14,8 @@ const admin = vi.hoisted(() => ({ inviteUserByEmail: vi.fn(), deleteUser: vi.fn(
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ auth: { admin } }) }));
 const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn() }));
 vi.mock("@/lib/server/historico", () => hist);
+const convite = vi.hoisted(() => ({ enviarLinkDoConvite: vi.fn(async () => null as string | null) }));
+vi.mock("@/lib/server/convite", () => convite);
 
 import { alterarMembro, convidarMembro, listarMembros, removerMembro } from "./membros";
 
@@ -107,13 +109,14 @@ describe("membros do contrato", () => {
 });
 
 describe("convite", () => {
-  it("conta existente ganha o vínculo como convidado", async () => {
+  it("conta existente fica pendente e recebe o link de aceite", async () => {
     db.profile.findFirst.mockResolvedValue({ id: "u-bia", orgId: "o2" });
     const r = await convidarMembro(dono, { email: "Bia@X.com", role: "agent" }, "https://app");
     expect(r).toEqual({ userId: "u-bia", email: "bia@x.com", novo: false });
     expect(db.membership.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ create: expect.objectContaining({ orgId: "o1", userId: "u-bia", status: "convidado" }) })
+      expect.objectContaining({ create: expect.objectContaining({ orgId: "o1", userId: "u-bia", status: "pendente" }) })
     );
+    expect(convite.enviarLinkDoConvite).toHaveBeenCalledWith("bia@x.com", "o1", "u-bia", "https://app");
     expect(admin.inviteUserByEmail).not.toHaveBeenCalled();
     expect(hist.registrarHistorico).toHaveBeenCalledWith({
       orgId: "o1",
