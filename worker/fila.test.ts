@@ -72,6 +72,14 @@ describe("marcarEnviado / marcarFalha", () => {
     expect(sqls()[1]).toMatch(/"sentCount" = "sentCount" \+ 1/);
   });
 
+  it("com o id do WhatsApp: item e mensagem de Conversas passam a apontar para ele", async () => {
+    query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    await marcarEnviado(pool, { id: "q1", broadcastId: null, variantId: null }, "WA1");
+    expect(sqls()[1]).toMatch(/update eva_studio_outbound_queue set "externalId" = \$2 where id = \$1/);
+    expect(sqls()[2]).toMatch(/update eva_studio_messages set "externalId" = \$2, "deliveryStatus" = 'sent' where "externalId" = \$1/);
+    expect(query.mock.calls[2][1]).toEqual(["q1", "WA1"]);
+  });
+
   it("se o item já não estava em 'sending' (expirou), não soma de novo", async () => {
     query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     await marcarEnviado(pool, { id: "q1", broadcastId: "b1", variantId: null });

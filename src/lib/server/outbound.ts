@@ -405,6 +405,7 @@ export async function deliverToContact(input: DeliverInput): Promise<DeliverResu
         enrollmentId: input.enrollmentId ?? null,
         status: "sent",
         sentAt: new Date(),
+        externalId: result.id ?? null, // recibo de entregue/lida acha o item por ele
       },
     });
   }

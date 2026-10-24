@@ -10,6 +10,7 @@ import { checkRateLimit } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
 import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
 import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
+import { contarReciboNoDisparo } from "@/lib/server/recibos";
 import {
   baixarEGuardar,
   guardarMidiaWhatsApp,
@@ -259,6 +260,11 @@ async function aplicarStatusDeEntrega(statuses: MetaStatus[]) {
             : { deliveryStatus: st.status },
       })
       .catch(() => {});
+    if (st.status === "delivered" || st.status === "read") {
+      await contarReciboNoDisparo(st.id, st.status).catch((e) =>
+        console.error("[webhook/meta] falha ao contar recibo no disparo", e instanceof Error ? e.message : e)
+      );
+    }
   }
 }
 

@@ -28,6 +28,7 @@ import {
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 import { decidirReconexao } from "./desconexao.js";
 import { analisarMensagem } from "./contato.js";
+import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -186,6 +187,7 @@ async function setConnectionState(chave, patch) {
 // de botão nativo varia por versão do WhatsApp do destinatário; por isso o
 // texto já vem numerado também, como plano B (ver flow-engine.ts, que aceita
 // resposta por número ou por rótulo, não só pelo toque no botão).
+// Devolve o id que o WhatsApp deu à mensagem (para os tiques, ver entrega.js).
 async function sendReply(sock, jid, message) {
   // Balões seguintes de uma resposta da IA: "digitando…" antes (ver respostaDaIa no motor).
   if (message.digitando) {
@@ -193,19 +195,29 @@ async function sendReply(sock, jid, message) {
     await new Promise((r) => setTimeout(r, message.digitando));
   }
   if (!message.options || message.options.length === 0) {
-    await sock.sendMessage(jid, { text: message.text });
-    return;
+    return (await sock.sendMessage(jid, { text: message.text }))?.key?.id ?? null;
   }
   const numbered = message.options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   try {
-    await sock.sendMessage(jid, {
+    const enviada = await sock.sendMessage(jid, {
       text: `${message.text}\n\n${numbered}`,
       footer: "Toque numa opção ou digite o número",
       buttons: message.options.slice(0, 3).map((o) => ({ buttonId: o.id, buttonText: { displayText: o.label }, type: 1 })),
       headerType: 1,
     });
+    return enviada?.key?.id ?? null;
   } catch {
-    await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` });
+    return (await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` }))?.key?.id ?? null;
+  }
+}
+
+/** Envia a resposta do agente e anota o id dela; anotar falhar não derruba o envio. */
+async function enviarResposta(sock, jid, reply, agentId, contactId) {
+  const id = await sendReply(sock, jid, reply);
+  if (id && agentId) {
+    await anotarIdDaResposta(pool, { agentId, contactId, texto: reply.text, id }).catch((err) =>
+      logger.warn({ err }, "Falha ao anotar id da resposta")
+    );
   }
 }
 
@@ -237,6 +249,15 @@ async function startSession(chave) {
   sessions.set(chave, { sock });
 
   sock.ev.on("creds.update", saveCreds);
+
+  // Recibos das mensagens que mandamos: entregue, lida (tiques e placar dos disparos).
+  sock.ev.on("messages.update", async (updates) => {
+    for (const { key, update } of updates) {
+      const status = key?.fromMe ? statusDoRecibo(update?.status) : null;
+      if (!status || !key.id) continue;
+      await aplicarRecibo(pool, key.id, status).catch((err) => logger.warn({ err }, "Falha ao gravar recibo"));
+    }
+  });
 
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -323,7 +344,7 @@ async function startSession(chave) {
         canalId,
       });
       for (const reply of replies) {
-        await sendReply(sock, remoteJid, reply);
+        await enviarResposta(sock, remoteJid, reply, agentId, contato);
       }
     }
   });
@@ -376,7 +397,7 @@ async function resumeDueWaits() {
       if (!session?.sock) continue;
       const replies = await advanceViaEngine(row.agentId, row.contactId, {});
       for (const reply of replies) {
-        await sendReply(session.sock, row.contactId, reply);
+        await enviarResposta(session.sock, row.contactId, reply, row.agentId, row.contactId);
       }
     }
   } catch (err) {
@@ -409,6 +430,7 @@ async function drainOutboundQueue() {
         await marcarFalha(pool, row, "WhatsApp não conectado");
         continue;
       }
+      let idNoWhatsApp = null;
       try {
         if (row.mediaPath) {
           // O arquivo vive no storage do app; ele devolve um link temporário.
@@ -427,15 +449,15 @@ async function drainOutboundQueue() {
           else if (row.mediaType === "sticker") conteudo = { sticker: { url } };
           else conteudo = { document: { url }, mimetype: row.mediaMime || "application/octet-stream", fileName: row.mediaName || "arquivo", caption: legenda };
 
-          await session.sock.sendMessage(row.contactId, conteudo);
+          idNoWhatsApp = (await session.sock.sendMessage(row.contactId, conteudo))?.key?.id ?? null;
           // Áudio e figurinha não levam legenda: o texto vai em mensagem à parte.
           if (legenda && (row.mediaType === "audio" || row.mediaType === "sticker")) {
             await session.sock.sendMessage(row.contactId, { text: legenda });
           }
         } else {
-          await session.sock.sendMessage(row.contactId, { text: row.text });
+          idNoWhatsApp = (await session.sock.sendMessage(row.contactId, { text: row.text }))?.key?.id ?? null;
         }
-        await marcarEnviado(pool, row);
+        await marcarEnviado(pool, row, idNoWhatsApp);
       } catch (err) {
         await marcarFalha(pool, row, String(err?.message ?? err));
       }

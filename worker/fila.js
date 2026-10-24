@@ -63,13 +63,31 @@ export async function somarNoDisparo(pool, broadcastId, variantId, campo) {
 /**
  * @param {{ query: Function }} pool
  * @param {{ id: string, broadcastId?: string | null, variantId?: string | null }} item
+ * @param {string | null} [idNoWhatsApp] id que o WhatsApp deu à mensagem (para os recibos, ver entrega.js)
  */
-export async function marcarEnviado(pool, item) {
+export async function marcarEnviado(pool, item, idNoWhatsApp = null) {
   const r = await pool.query(
     `update eva_studio_outbound_queue set status = 'sent', "sentAt" = now() where id = $1 and status = 'sending'`,
     [item.id]
   );
+  if (r.rowCount > 0 && idNoWhatsApp) await anotarIdDoItem(pool, item.id, idNoWhatsApp);
   if (r.rowCount > 0 && item.broadcastId) await somarNoDisparo(pool, item.broadcastId, item.variantId, "sentCount");
+}
+
+/**
+ * A mensagem em Conversas apontava para o item da fila ("queued"); passa a
+ * apontar para o id do WhatsApp, já como enviada, e o item guarda o mesmo id.
+ * @param {{ query: Function }} pool
+ * @param {string} itemId
+ * @param {string} idNoWhatsApp
+ */
+async function anotarIdDoItem(pool, itemId, idNoWhatsApp) {
+  await pool.query(`update eva_studio_outbound_queue set "externalId" = $2 where id = $1`, [itemId, idNoWhatsApp]);
+  await pool.query(
+    `update eva_studio_messages set "externalId" = $2, "deliveryStatus" = 'sent'
+      where "externalId" = $1 and "deliveryStatus" in ('queued', 'sending')`,
+    [itemId, idNoWhatsApp]
+  );
 }
 
 /**
