@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { encryptSecret } from "@/lib/server/crypto";
+import { tokenDoWebhookTikTok } from "@/lib/server/tiktok-token";
 
 // Conexão do TikTok Business Messaging.
 //
@@ -12,10 +13,9 @@ function webhookUrl(agentId: string): string {
   const base =
     process.env.NEXT_PUBLIC_APP_URL ??
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "");
-  const secret = process.env.INTERNAL_API_SECRET;
-  // O TikTok não assina o corpo, então a URL carrega um segredo como única
-  // prova possível de origem.
-  return `${base}/api/webhooks/tiktok/${agentId}${secret ? `?token=${secret}` : ""}`;
+  // O TikTok não assina o corpo: a URL carrega um token deste agente (nunca o segredo interno).
+  const token = tokenDoWebhookTikTok(`agente:${agentId}`);
+  return `${base}/api/webhooks/tiktok/${agentId}${token ? `?token=${token}` : ""}`;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {

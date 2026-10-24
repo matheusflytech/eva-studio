@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { processDueEnrollments, enrollBySegments, enrollByDealStage } from "@/lib/server/sequences";
-import { runDueBroadcasts } from "@/lib/server/broadcast-runner";
+import { runDueBroadcasts, type RunResult } from "@/lib/server/broadcast-runner";
 import { registrarBatida, tentarTravarRelogio } from "@/lib/server/heartbeat";
 import { processarJobs } from "@/lib/server/api-v1/processar-jobs";
 import { limparLixeiraVencida } from "@/lib/server/lixeira";
 import { entregarPendentes } from "@/lib/server/webhooks/entrega";
 import { entregarEventosPendentes } from "@/lib/server/eventos/barramento";
 import { rodarAutomacoes } from "@/lib/server/automacoes/varreduras";
+import { retomarEsperasVencidas } from "@/lib/server/esperas";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -58,9 +59,22 @@ export async function POST(request: Request) {
   // Primeiro inscreve quem passou a bater com um segmento, depois entrega os
   // passos vencidos — nessa ordem, quem acabou de entrar já começa a contar o
   // relógio a partir de agora em vez de esperar a próxima varredura.
-  const [porSegmento, porEtapa] = await Promise.all([enrollBySegments(), enrollByDealStage()]);
+  // Cada job com o seu catch: um erro numa régua não pode derrubar a rodada
+  // inteira (os jobs de baixo nem rodariam e a rota voltaria 500).
+  const falhou = <T>(nome: string, vazio: T) => (e: unknown) => {
+    console.error(`[scheduler] ${nome} falhou`, e instanceof Error ? e.message : e);
+    return vazio;
+  };
+  const [porSegmento, porEtapa] = await Promise.all([
+    enrollBySegments().catch(falhou("inscrição por segmento", 0)),
+    enrollByDealStage().catch(falhou("inscrição por etapa", 0)),
+  ]);
   const newlyEnrolled = porSegmento + porEtapa;
-  const [sequences, broadcasts] = await Promise.all([processDueEnrollments(50), runDueBroadcasts(10)]);
+  const [sequences, broadcasts, esperas] = await Promise.all([
+    processDueEnrollments(50).catch(falhou("sequências", { processed: 0, delivered: 0, stopped: 0, errors: [] as string[] })),
+    runDueBroadcasts(10).catch(falhou("disparos", { ran: 0, results: [] as RunResult[] })),
+    retomarEsperasVencidas().catch(falhou("esperas", 0)),
+  ]);
 
   // Importação/exportação em lote da API v1, no tempo que sobrar da rodada
   // (a trava do relógio é de 45 s). Nunca derruba a rodada: antes do SQL da
@@ -105,6 +119,7 @@ export async function POST(request: Request) {
     webhooks,
     eventos,
     automacoes,
+    esperas,
     lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {

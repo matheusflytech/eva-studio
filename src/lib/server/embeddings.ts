@@ -105,12 +105,12 @@ export async function embedTexts(
 
   const agent = await prisma.agent.findUnique({
     where: { id: agentId },
-    select: { embeddingModel: true, embeddingCredentialId: true },
+    select: { orgId: true, embeddingModel: true, embeddingCredentialId: true },
   });
   const model = getEmbeddingModel(agent?.embeddingModel);
   if (!model || !agent?.embeddingCredentialId) return null;
 
-  const apiKey = await getCredentialSecret(agent.embeddingCredentialId);
+  const apiKey = await getCredentialSecret(agent.orgId, agent.embeddingCredentialId);
   if (!apiKey) return null;
 
   const vectors =

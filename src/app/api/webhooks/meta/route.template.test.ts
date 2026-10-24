@@ -8,7 +8,7 @@ vi.mock("@/lib/server/comment-automation", () => ({ matchCommentAutomation: vi.f
 vi.mock("@/lib/server/instagram-events", () => ({ classifyInstagramMessage: vi.fn() }));
 vi.mock("@/lib/server/meta-signature", () => ({ verifyMetaSignature: () => true }));
 vi.mock("@/lib/server/crypto", () => ({ decryptSecret: (s: string) => s }));
-vi.mock("@/lib/server/rate-limit", () => ({ checkRateLimit: vi.fn(async () => ({ count: 1 })) }));
+vi.mock("@/lib/server/rate-limit", () => ({ isFirstDelivery: vi.fn(async () => true), esquecerEntrega: vi.fn() }));
 vi.mock("@/lib/server/inbox", () => ({ registrarMensagens: vi.fn() }));
 vi.mock("@/lib/server/outbound", () => ({ sendInstagramText: vi.fn(), sendMessengerText: vi.fn() }));
 vi.mock("@/lib/server/media-inbound", () => ({

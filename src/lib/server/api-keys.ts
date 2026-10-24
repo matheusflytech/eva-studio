@@ -18,22 +18,6 @@ export function generateApiKey(): { key: string; keyPrefix: string; keyHash: str
   return { key, keyPrefix: key.slice(0, PREFIX.length + 8), keyHash: hashKey(key) };
 }
 
-// Usado pelas rotas públicas /api/v1/* — devolve o orgId dono da chave, ou
-// null se a chave for inválida/revogada. Atualiza lastUsedAt em segundo
-// plano (não espera, não deve atrasar a resposta por causa disso).
-export async function requireApiKeyOrgId(request: Request): Promise<string | null> {
-  const key = chaveDoHeader(request);
-  if (!key) return null;
-
-  // Select explícito: a coluna `scopes` é nova, e o /v1/leads não pode
-  // depender dela (continua funcionando antes do SQL da v1 ser aplicado).
-  const row = await buscarChaveValida(hashKey(key), { id: true, orgId: true });
-  if (!row) return null;
-
-  marcarUso(row.id);
-  return row.orgId;
-}
-
 /**
  * Chave não revogada e não vencida. `expiresAt` é coluna do SQL de contratos:
  * antes dele, a busca cai no select antigo (nenhuma chave vence).
@@ -68,7 +52,10 @@ export interface ChaveAutenticada {
   scopes: string[];
 }
 
-/** Como requireApiKeyOrgId, mas devolve também o id e os escopos da chave (API v1). */
+/**
+ * Rotas públicas /api/v1/*: org, id e escopos da chave, ou null se inválida,
+ * revogada ou vencida. lastUsedAt é gravado em segundo plano.
+ */
 export async function autenticarChave(request: Request): Promise<ChaveAutenticada | null> {
   const key = chaveDoHeader(request);
   if (!key) return null;

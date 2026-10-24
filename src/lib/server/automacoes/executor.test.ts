@@ -17,11 +17,19 @@ const db = vi.hoisted(() => ({
     const livre = ["pendente", "esperando"].includes(e.status as string) && (!e.proximaEm || (e.proximaEm as Date) <= new Date(Date.now() + 1e12));
     if (!livre) return [];
     e.status = "rodando";
+    e.travadaAte = new Date(Date.now() + 60_000);
     return [{ id: e.id }];
   }),
   automacaoExecucao: {
     findUnique: vi.fn(async () => ({ ...estado.exec, automacao: estado.automacao })),
     update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => Object.assign(estado.exec!, data)),
+    // Gravação condicional: só pega se status e lease ainda são os esperados.
+    updateMany: vi.fn(async ({ where, data }: { where: { status: string; travadaAte: Date | null }; data: Record<string, unknown> }) => {
+      const e = estado.exec!;
+      if (e.status !== where.status || (e.travadaAte as Date | null)?.getTime() !== where.travadaAte?.getTime()) return { count: 0 };
+      Object.assign(e, data);
+      return { count: 1 };
+    }),
   },
   automacaoPasso: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => estado.passos.push(data)) },
   automacaoEspera: {
@@ -94,6 +102,20 @@ beforeEach(() => {
 });
 
 describe("executor", () => {
+  it("lease vencido no meio (outra batida assumiu): para sem repetir passos nem gravar o fim", async () => {
+    novaExecucao(semEspera());
+    const lenta: ManipuladorDeAcao = async (config) => {
+      // O relógio devolveu à fila e outra batida pegou: o lease agora é dela.
+      estado.exec!.travadaAte = new Date(Date.now() + 120_000);
+      return { ok: true, saida: { feito: config } };
+    };
+    const r = await executarExecucao("x1", { manipuladores: manip({ "whatsapp.send": lenta }), agora: () => QUARTA_10H });
+    expect(r).toBeNull();
+    expect(status()).toEqual(["cond:ok:sim", "zap:ok"]);
+    expect(estado.exec!.status).toBe("rodando");
+    expect(estado.exec!.terminadaEm).toBeUndefined();
+  });
+
   it("anda pelos passos, grava cada um com ms e termina concluída", async () => {
     novaExecucao(semEspera());
     const r = await executarExecucao("x1", { manipuladores: manip(), agora: () => QUARTA_10H });

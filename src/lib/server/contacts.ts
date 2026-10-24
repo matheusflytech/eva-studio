@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { normalizarCapturados } from "@/lib/server/custom-fields";
 import { normalizarTelefoneBR } from "@/lib/capture-validation";
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { publicarEvento } from "@/lib/server/eventos/barramento";
 
 // ---------------------------------------------------------------------------
@@ -193,13 +193,13 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
     });
   } else {
     // 2) Mesma pessoa, canal novo: procura por e-mail ou telefone na org.
-    const phoneKey = normalizePhone(fields.phone ?? "");
+    const porTelefone = filtroDeTelefone(fields.phone ?? "");
     const dedupe = await prisma.contact.findFirst({
       where: {
         orgId,
         OR: [
           ...(fields.email ? [{ email: { equals: fields.email, mode: "insensitive" as const } }] : []),
-          ...(phoneKey.length >= 10 ? [{ phone: { contains: phoneKey } }] : []),
+          ...(porTelefone ? [porTelefone] : []),
         ],
       },
     });
@@ -219,24 +219,37 @@ export async function syncContactFromConversation(input: SyncContactInput): Prom
           lastSeenAt: isInbound ? now : dedupe.lastSeenAt,
         },
       });
+      await prisma.contactChannel.create({ data: { contactId, agentId, channel, externalId } });
     } else {
-      // 3) Pessoa nova.
-      const created = await prisma.contact.create({
-        data: {
-          orgId,
-          name: fields.name ?? "",
-          email: fields.email ?? "",
-          phone: fields.phone ?? "",
-          customFields: custom as Prisma.InputJsonValue,
-          source: "conversa",
-          lastSeenAt: now,
-        },
-      });
-      contactId = created.id;
-      await publicarEvento({ orgId, tipo: "contact.created", objeto: "contact", objetoId: created.id, dados: { source: "conversa" } });
+      // 3) Pessoa nova, junto com o canal. Duas mensagens seguidas de um número
+      // novo correm aqui ao mesmo tempo: a segunda bate no canal único, desfaz
+      // a ficha dela e usa a da primeira.
+      try {
+        contactId = await prisma.$transaction(async (tx) => {
+          const created = await tx.contact.create({
+            data: {
+              orgId,
+              name: fields.name ?? "",
+              email: fields.email ?? "",
+              phone: fields.phone ?? "",
+              customFields: custom as Prisma.InputJsonValue,
+              source: "conversa",
+              lastSeenAt: now,
+            },
+          });
+          await tx.contactChannel.create({ data: { contactId: created.id, agentId, channel, externalId } });
+          return created.id;
+        });
+        await publicarEvento({ orgId, tipo: "contact.created", objeto: "contact", objetoId: contactId, dados: { source: "conversa" } });
+      } catch (e) {
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
+        const canal = await prisma.contactChannel.findUniqueOrThrow({
+          where: { agentId_channel_externalId: { agentId, channel, externalId } },
+          select: { contactId: true },
+        });
+        contactId = canal.contactId;
+      }
     }
-
-    await prisma.contactChannel.create({ data: { contactId, agentId, channel, externalId } });
   }
 
   await prisma.conversation.update({

@@ -4,6 +4,7 @@ import { decryptSecret, encryptSecret } from "@/lib/server/crypto";
 import { assinarEventosInstagram } from "@/lib/server/instagram-subscribe";
 import type { TipoDeCanal } from "@/lib/canais";
 import { cifrarSegredos, decifrarSegredos, desativarCanal, gravarAtivacao, apagarAtivacao, type DadosDaAtivacao } from "./ativacao";
+import { tokenDoWebhookTikTok } from "@/lib/server/tiktok-token";
 
 // ---------------------------------------------------------------------------
 // Conectar e desconectar canais no CONTRATO (Configurações → Canais).
@@ -34,9 +35,9 @@ function baseDoApp(): string {
 export const webhookDoTelegramPorCanal = (canalId: string) => `${baseDoApp()}/api/webhooks/telegram/canal/${canalId}`;
 
 export function webhookDoTikTokPorCanal(canalId: string): string {
-  const secret = process.env.INTERNAL_API_SECRET;
-  // O TikTok não assina o corpo: o segredo na URL é a única prova de origem.
-  return `${baseDoApp()}/api/webhooks/tiktok/canal/${canalId}${secret ? `?token=${secret}` : ""}`;
+  // O TikTok não assina o corpo: a URL carrega um token deste canal (nunca o segredo interno).
+  const token = tokenDoWebhookTikTok(`canal:${canalId}`);
+  return `${baseDoApp()}/api/webhooks/tiktok/canal/${canalId}${token ? `?token=${token}` : ""}`;
 }
 
 /**

@@ -8,8 +8,11 @@ describe("o que fazer quando a conexão fecha", () => {
     expect(decidirReconexao(CODIGOS.loggedOut, s(true))).toEqual({ acao: "logout" });
   });
 
-  it("sessão aberta em outro lugar ou número recusado: para, sem reconectar", () => {
-    expect(decidirReconexao(CODIGOS.connectionReplaced, s(true))).toMatchObject({ acao: "parar", erro: expect.stringMatching(/outro lugar/) });
+  it("sessão assumida por outro worker (deploy): larga sem gravar estado nem reconectar", () => {
+    expect(decidirReconexao(CODIGOS.connectionReplaced, s(true))).toEqual({ acao: "largar" });
+  });
+
+  it("número recusado: para, sem reconectar", () => {
     expect(decidirReconexao(CODIGOS.forbidden, s(true))).toMatchObject({ acao: "parar", erro: expect.stringMatching(/403/) });
   });
 

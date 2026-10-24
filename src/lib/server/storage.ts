@@ -139,8 +139,9 @@ export async function urlsAssinadas(caminhos: string[], segundos = 3600): Promis
 }
 
 /** Só quem tem o prefixo da própria organização pode tocar no arquivo. */
+// Só os caracteres que novoCaminho gera: "%2e%2e" e afins virariam ".." na URL do storage.
 export function caminhoDaOrg(caminho: string, orgId: string): boolean {
-  return caminho.startsWith(`${orgId}/`) && !caminho.includes("..");
+  return caminho.startsWith(`${orgId}/`) && !caminho.includes("..") && /^[A-Za-z0-9/_.-]+$/.test(caminho);
 }
 
 /**

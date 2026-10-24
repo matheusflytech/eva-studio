@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
-  sequenceEnrollment: { findMany: vi.fn(), update: vi.fn() },
+  sequenceEnrollment: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) },
   conversation: { findFirst: vi.fn() },
   contactChannel: { findFirst: vi.fn() },
   messageTemplate: { findFirst: vi.fn() },

@@ -48,6 +48,22 @@ export async function checkRateLimit(key: string, limit: number, windowSec: numb
   }
 }
 
+// Idempotência: o canal pode reentregar o mesmo evento. Guarda o id do evento
+// por 24h (reusa a tabela de rate limit como store de "já visto") e ignora
+// reentregas — evita DM/resposta duplicada. Retorna true se é NOVO.
+export async function isFirstDelivery(eventId: string | undefined): Promise<boolean> {
+  if (!eventId) return true; // sem id não dá pra deduplicar; processa
+  const { count } = await checkRateLimit(`evt:${eventId}`, 1, 86_400);
+  return count <= 1;
+}
+
+// O processamento do evento falhou: esquece o id para a reentrega do canal
+// ser processada, em vez de ignorada como repetida (a mensagem sumiria).
+export async function esquecerEntrega(eventId: string | undefined): Promise<void> {
+  if (!eventId) return;
+  await prisma.rateLimit.deleteMany({ where: { key: `evt:${eventId}` } }).catch(() => {});
+}
+
 // Extrai um identificador de cliente (IP) dos headers de proxy da Vercel.
 export function getClientIp(request: Request): string {
   const xff = request.headers.get("x-forwarded-for");
