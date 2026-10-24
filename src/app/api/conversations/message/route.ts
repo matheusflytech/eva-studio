@@ -32,7 +32,7 @@ async function authorize(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { agentId, canalId, channel, contactId, text, optionId, media, externalId, semResposta, nomeDoContato } = body ?? {};
+  const { agentId, canalId, channel, contactId, text, optionId, media, externalId, semResposta, nomeDoContato, autor } = body ?? {};
 
   // Worker no modo canal: mensagem num canal do contrato sem agente. Só o
   // worker (segredo interno) chega aqui; registra o aviso e não responde.
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
     // Só o worker (segredo interno) decide calar o agente ou dar nome ao contato.
     semResposta: auth.interno && semResposta === true,
     nomeDoContato: auth.interno && typeof nomeDoContato === "string" ? nomeDoContato.slice(0, 200) : undefined,
+    autorNoGrupo: auth.interno && typeof autor === "string" ? autor.slice(0, 100) : undefined,
   }).catch(async (e) => {
     await esquecerEntrega(idDoEvento);
     throw e;

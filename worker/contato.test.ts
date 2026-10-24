@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analisarMensagem, usuarioDoJid } from "./contato.js";
+import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 
 const eu = { id: "5511999990001:12@s.whatsapp.net", lid: "987654321098765:12@lid" };
 const grupo = (message: object) => ({ key: { remoteJid: "120363408777803125@g.us" }, message });
@@ -37,5 +37,13 @@ describe("usuarioDoJid", () => {
   it("tira aparelho e servidor", () => {
     expect(usuarioDoJid("5511999990001:12@s.whatsapp.net")).toBe("5511999990001");
     expect(usuarioDoJid(undefined)).toBe("");
+  });
+});
+
+describe("semMencaoAoAgente", () => {
+  it("tira a marcação do agente (número ou lid) e mantém a de outras pessoas", () => {
+    const eu = { id: "554799990000:3@s.whatsapp.net", lid: "100579644821683:3@lid" };
+    expect(semMencaoAoAgente("@100579644821683 oi", eu)).toBe("oi");
+    expect(semMencaoAoAgente("@554799990000 fala com o @5511988887777", eu)).toBe("fala com o @5511988887777");
   });
 });

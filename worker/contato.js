@@ -17,6 +17,16 @@ export function usuarioDoJid(jid) {
   return (jid ?? "").split("@")[0].split(":")[0];
 }
 
+/**
+ * Tira "@<número do agente>" do texto: no grupo a marcação só serve para
+ * chamar o agente, e o número (ou lid) solto confunde a IA.
+ */
+export function semMencaoAoAgente(texto, eu) {
+  if (!texto) return texto;
+  const meus = new Set([usuarioDoJid(eu?.id), usuarioDoJid(eu?.lid)].filter(Boolean));
+  return texto.replace(/@(\d+)\s*/g, (todo, numero) => (meus.has(numero) ? "" : todo)).trim();
+}
+
 /** contextInfo de qualquer tipo de mensagem (texto, imagem, áudio...). */
 function contextoDa(mensagem) {
   for (const valor of Object.values(mensagem ?? {})) {

@@ -27,7 +27,7 @@ import {
 } from "./fonte.js";
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 import { decidirReconexao } from "./desconexao.js";
-import { analisarMensagem } from "./contato.js";
+import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
 import { chamarMotor, reivindicarEspera } from "./motor.js";
@@ -134,12 +134,12 @@ function extractOptionId(msg) {
 
 // Fala com o motor de fluxo no app principal (Next.js/Vercel) — o worker não
 // decide mais nada sozinho sobre o que responder, só repassa mensagens.
-async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId, semResposta, nomeDoContato }) {
+async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId, semResposta, nomeDoContato, autor }) {
   try {
     // canalId vai junto no modo canal: canal sem agente ainda é registrado
     // no app (Conversas), só não responde. Falha do app tenta de novo (motor.js).
     return await chamarMotor(`${EVA_STUDIO_URL}/api/conversations/message`, INTERNAL_API_SECRET, {
-      agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId, semResposta, nomeDoContato,
+      agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId, semResposta, nomeDoContato, autor,
     });
   } catch (err) {
     logger.error({ err, agentId }, "Falha ao chamar o motor de fluxo");
@@ -173,14 +173,16 @@ async function setConnectionState(chave, patch) {
 // texto já vem numerado também, como plano B (ver flow-engine.ts, que aceita
 // resposta por número ou por rótulo, não só pelo toque no botão).
 // Devolve o id que o WhatsApp deu à mensagem (para os tiques, ver entrega.js).
-async function sendReply(sock, jid, message) {
+// `citar`: no grupo, o primeiro balão sai como resposta (reply) à mensagem de quem chamou.
+async function sendReply(sock, jid, message, citar) {
+  const opcoes = citar ? { quoted: citar } : undefined;
   // Balões seguintes de uma resposta da IA: "digitando…" antes (ver respostaDaIa no motor).
   if (message.digitando) {
     await sock.sendPresenceUpdate("composing", jid).catch(() => {});
     await new Promise((r) => setTimeout(r, message.digitando));
   }
   if (!message.options || message.options.length === 0) {
-    return (await sock.sendMessage(jid, { text: message.text }))?.key?.id ?? null;
+    return (await sock.sendMessage(jid, { text: message.text }, opcoes))?.key?.id ?? null;
   }
   const numbered = message.options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   try {
@@ -189,16 +191,16 @@ async function sendReply(sock, jid, message) {
       footer: "Toque numa opção ou digite o número",
       buttons: message.options.slice(0, 3).map((o) => ({ buttonId: o.id, buttonText: { displayText: o.label }, type: 1 })),
       headerType: 1,
-    });
+    }, opcoes);
     return enviada?.key?.id ?? null;
   } catch {
-    return (await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` }))?.key?.id ?? null;
+    return (await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` }, opcoes))?.key?.id ?? null;
   }
 }
 
 /** Envia a resposta do agente e anota o id dela; anotar falhar não derruba o envio. */
-async function enviarResposta(sock, jid, reply, agentId, contactId) {
-  const id = await sendReply(sock, jid, reply);
+async function enviarResposta(sock, jid, reply, agentId, contactId, citar) {
+  const id = await sendReply(sock, jid, reply, citar);
   if (id && agentId) {
     await anotarIdDaResposta(pool, { agentId, contactId, texto: reply.text, id }).catch((err) =>
       logger.warn({ err }, "Falha ao anotar id da resposta")
@@ -325,9 +327,13 @@ async function startSession(chave) {
 
       // A resposta vai para onde a mensagem veio (o lid, se veio por lid); a ficha fica com o número.
       const remoteJid = msg.key.remoteJid;
+      if (grupo) text = semMencaoAoAgente(text, sock.user);
+      // No grupo, quem chamou o agente agora (a IA responde a essa pessoa).
+      const autor = grupo ? msg.pushName || usuarioDoJid(msg.key.participant) : undefined;
       const replies = await advanceViaEngine(agentId, contato, {
         // No grupo, cada mensagem diz quem mandou (a conversa é do grupo todo).
-        text: grupo && msg.pushName ? `${msg.pushName}: ${text ?? ""}` : text,
+        text: grupo && autor ? `${autor}: ${text ?? ""}` : text,
+        autor: grupo && responder ? autor : undefined,
         semResposta: !responder,
         nomeDoContato: grupo ? await nomeDoGrupo(sock, contato) : undefined,
         optionId,
@@ -335,8 +341,8 @@ async function startSession(chave) {
         externalId: msg.key.id,
         canalId,
       });
-      for (const reply of replies) {
-        await enviarResposta(sock, remoteJid, reply, agentId, contato);
+      for (const [i, reply] of replies.entries()) {
+        await enviarResposta(sock, remoteJid, reply, agentId, contato, grupo && i === 0 ? bruta : undefined);
       }
     }
   });
