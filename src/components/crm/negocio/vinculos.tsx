@@ -111,7 +111,7 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
             const nome = c.name || c.phone || c.email || "Sem nome";
             return (
               <li key={c.id} className="group flex items-start gap-2.5 rounded-[14px] px-2 py-2 hover:bg-hover">
-                <Avatar nome={nome} tamanho={28} rotulo="" />
+                <Avatar nome={nome} tamanho={28} rotulo="" foto={c.avatarPath} />
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/contatos?abrir=${c.id}`}

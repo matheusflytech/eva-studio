@@ -34,8 +34,8 @@ export interface NegocioDaFicha {
   stage: EtapaDaFicha;
   pipeline: { id: string; name: string; stages: EtapaDaFicha[] };
   company: { id: string; name: string } | null;
-  owner: { id: string; name: string } | null;
-  contacts: { contact: { id: string; name: string; email: string; phone: string; jobTitle?: string } }[];
+  owner: { id: string; name: string; avatarPath?: string | null } | null;
+  contacts: { contact: { id: string; name: string; email: string; phone: string; jobTitle?: string; avatarPath?: string | null } }[];
   tasks: { id: string; type: string; text: string; dueAt: string | null; doneAt: string | null }[];
   customFields: Record<string, unknown>;
   /** Última atividade (relógio do parado). */
@@ -48,6 +48,7 @@ export interface Membro {
   id: string;
   name: string;
   email: string;
+  avatarPath?: string | null;
 }
 
 export type EstadoDaFicha = "carregando" | "ok" | "nao_encontrado" | "erro";

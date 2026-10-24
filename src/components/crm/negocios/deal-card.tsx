@@ -29,16 +29,17 @@ import { sinalHumano } from "./eva-voz";
 import { sinalDoNegocio, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
 import { acoesDisponiveis, linhasDoCartao, rotulosPersonalizados, textoDoCampo, topoDoCartao, type ContextoDoCampo } from "./cartao";
 import { QuadroContexto } from "./quadro-contexto";
+import { urlDoAvatar } from "@/lib/avatar";
 
 /**
  * Avatar de pessoa no quadro (compatível com a API antiga: nome/tamanho).
  * Iniciais em cinza do design system, nunca cor por pessoa.
  */
-export function Avatar({ nome, tamanho = 24, rotulo }: { nome: string; tamanho?: number; rotulo?: string }) {
+export function Avatar({ nome, tamanho = 24, rotulo, foto }: { nome: string; tamanho?: number; rotulo?: string; foto?: string | null }) {
   const size = tamanho <= 24 ? "sm" : tamanho <= 32 ? "md" : "lg";
   return (
     <span title={rotulo ?? nome} className="inline-flex">
-      <AvatarDS name={nome} size={size} />
+      <AvatarDS name={nome} size={size} src={urlDoAvatar(foto)} />
     </span>
   );
 }
@@ -175,7 +176,7 @@ export function DealCard({
     >
       {/* Topo: a pessoa (ou o negócio) e o "⋯". */}
       <div className="flex items-center gap-2.5">
-        <Avatar nome={topo.foto || "?"} tamanho={compacto ? 24 : 32} />
+        <Avatar nome={topo.foto || "?"} tamanho={compacto ? 24 : 32} foto={topo.ehContato ? deal.contacts[0]?.avatarPath : null} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-small font-semibold text-text-primary">{topo.titulo}</p>
           {topo.subtitulo && <p className="truncate text-caption text-text-tertiary">{topo.subtitulo}</p>}
@@ -193,7 +194,7 @@ export function DealCard({
                 <dd className={cn("truncate text-small leading-5", texto ? "font-medium text-text-primary" : "text-text-tertiary", campo === "valor" && "tabular-nums")}>
                   {campo === "responsavel" && deal.owner ? (
                     <span className="inline-flex items-center gap-1.5">
-                      <Avatar nome={deal.owner.name || "Sem nome"} tamanho={20} />
+                      <Avatar nome={deal.owner.name || "Sem nome"} tamanho={20} foto={deal.owner.avatarPath} />
                       <span className="truncate">{texto}</span>
                     </span>
                   ) : (

@@ -49,6 +49,7 @@ import type { ItemDoNegocio } from "@/lib/produtos";
 import type { FocoDoPainel } from "./quadro-contexto";
 import { CURVA, gsap, reduzMovimento, useGSAP } from "./animacao/gsap";
 import { editoresDoPainel } from "./detalhes-editaveis";
+import { TrocarFoto } from "@/components/crm/trocar-foto";
 
 export interface EtapaDaPrevia {
   id: string;
@@ -128,7 +129,7 @@ export function ConteudoDaPrevia({
               <span className="tabular-nums">{deal.amountCents > 0 ? dinheiro(deal.amountCents) : "—"}</span>
             ) : campo === "responsavel" && deal.owner ? (
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <Avatar nome={deal.owner.name || "Sem nome"} tamanho={20} />
+                <Avatar nome={deal.owner.name || "Sem nome"} tamanho={20} foto={deal.owner.avatarPath} />
                 <span className="truncate">{deal.owner.name}</span>
               </span>
             ) : (
@@ -475,7 +476,16 @@ export function PreviaDoNegocio({
               </>
             )}
 
-            {secao === "contato" && <ContatoPrincipal deal={deal} ficha={ficha.deal} />}
+            {secao === "contato" && (
+              <ContatoPrincipal
+                deal={deal}
+                ficha={ficha.deal}
+                onMudouFoto={async () => {
+                  await ficha.carregar();
+                  onMudou();
+                }}
+              />
+            )}
 
             {secao === "atividade" && (
               <Atividade
@@ -542,16 +552,23 @@ function Carregando() {
 }
 
 /** Contato principal: foto, nome, cargo e os atalhos de e-mail e WhatsApp. */
-function ContatoPrincipal({ deal, ficha }: { deal: NegocioKanban; ficha: ReturnType<typeof useFicha>["deal"] }) {
+function ContatoPrincipal({ deal, ficha, onMudouFoto }: { deal: NegocioKanban; ficha: ReturnType<typeof useFicha>["deal"]; onMudouFoto: () => void }) {
   const doQuadro = deal.contacts[0];
   const completo = ficha?.contacts[0]?.contact;
   if (!doQuadro && !completo) return <p className="text-small text-text-tertiary">Nenhum contato ligado a este negócio.</p>;
   const nome = completo?.name || doQuadro?.name || "Contato sem nome";
   const email = completo?.email || doQuadro?.email;
   const id = completo?.id || doQuadro?.id;
+  const foto = completo ? completo.avatarPath : doQuadro?.avatarPath;
   return (
     <div className="flex items-center gap-3 rounded-[14px] border border-border-subtle bg-panel px-3 py-2.5">
-      <Avatar nome={nome} tamanho={40} />
+      {id ? (
+        <TrocarFoto endpoint={`/api/contacts/${id}/foto`} temFoto={!!foto} rotulo={nome} onMudou={onMudouFoto}>
+          <Avatar nome={nome} tamanho={40} foto={foto} />
+        </TrocarFoto>
+      ) : (
+        <Avatar nome={nome} tamanho={40} />
+      )}
       <Link href={`/contatos/${id}`} className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus">
         <span className="block truncate text-small font-semibold text-text-primary hover:underline">{nome}</span>
         <span className="block truncate text-caption text-text-tertiary">{completo?.jobTitle || email || "—"}</span>

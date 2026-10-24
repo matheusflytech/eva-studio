@@ -9,9 +9,9 @@ export interface NegocioKanban {
   amountCents: number;
   probability: number;
   company: { id: string; name: string } | null;
-  owner: { id: string; name: string } | null;
+  owner: { id: string; name: string; avatarPath?: string | null } | null;
   /** Contatos do negócio; o primeiro é o principal. phone/email vêm do GET /api/deals. */
-  contacts: { id: string; name: string; phone?: string; email?: string }[];
+  contacts: { id: string; name: string; avatarPath?: string | null; phone?: string; email?: string }[];
   openTasks: number;
   expectedClosingAt: string | null;
   closedAt: string | null;

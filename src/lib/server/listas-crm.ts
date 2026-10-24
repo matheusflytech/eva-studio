@@ -47,7 +47,7 @@ const INCLUDE_CONTATO = {
   tags: { include: { tag: true } },
   channels: true,
   company: { select: { id: true, name: true } },
-  owner: { select: { id: true, name: true } },
+  owner: { select: { id: true, name: true, avatarPath: true } },
 } satisfies Prisma.ContactInclude;
 
 /** Junta a busca da caixa (?q=) ao filtro (objeto ou JSON em texto). */

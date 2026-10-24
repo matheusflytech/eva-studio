@@ -151,11 +151,12 @@ export function caminhoDaOrg(caminho: string, orgId: string): boolean {
  * AUTORIZAR e o navegador (ou o worker) mandar o arquivo direto pro storage,
  * por uma URL assinada de uso único.
  */
-export async function urlDeUpload(caminho: string): Promise<{ url: string; token: string } | null> {
+export async function urlDeUpload(caminho: string, bucket = BUCKET): Promise<{ url: string; token: string } | null> {
   try {
-    await garantirBucket();
+    // Só o bucket de anexos se cria sozinho; o de fotos é criado à mão (público).
+    if (bucket === BUCKET) await garantirBucket();
     const { url, key } = config();
-    const res = await fetch(`${url}/storage/v1/object/upload/sign/${BUCKET}/${caminho}`, {
+    const res = await fetch(`${url}/storage/v1/object/upload/sign/${bucket}/${caminho}`, {
       method: "POST",
       // Sem Content-Type: com JSON declarado e corpo vazio o Supabase recusa.
       headers: cabecalho(key),
@@ -189,14 +190,29 @@ export async function baixarTexto(caminho: string): Promise<string | null> {
 }
 
 /** O arquivo existe de fato? Confere depois do upload, antes de aceitar o caminho. */
-export async function midiaExiste(caminho: string): Promise<{ existe: boolean; tamanho: number }> {
+export async function midiaExiste(caminho: string, bucket = BUCKET): Promise<{ existe: boolean; tamanho: number }> {
   try {
     const { url, key } = config();
-    const res = await fetch(`${url}/storage/v1/object/info/${BUCKET}/${caminho}`, { headers: cabecalho(key) });
+    const res = await fetch(`${url}/storage/v1/object/info/${bucket}/${caminho}`, { headers: cabecalho(key) });
     if (!res.ok) return { existe: false, tamanho: 0 };
     const info = (await res.json()) as { size?: number; metadata?: { size?: number } };
     return { existe: true, tamanho: Number(info.size ?? info.metadata?.size ?? 0) };
   } catch {
     return { existe: false, tamanho: 0 };
+  }
+}
+
+/** Apaga arquivos (troca ou remoção de foto). Falha não derruba quem chamou: sobra um arquivo órfão. */
+export async function apagarArquivos(caminhos: string[], bucket = BUCKET): Promise<void> {
+  if (caminhos.length === 0) return;
+  try {
+    const { url, key } = config();
+    await fetch(`${url}/storage/v1/object/${bucket}`, {
+      method: "DELETE",
+      headers: cabecalho(key, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: caminhos }),
+    });
+  } catch (e) {
+    console.error("[storage] falha ao apagar", e instanceof Error ? e.message : e);
   }
 }

@@ -16,6 +16,7 @@ export function serializeContact(c: ContactRow) {
   return {
     id: c.id,
     name: c.name,
+    avatarPath: c.avatarPath,
     jobTitle: c.jobTitle,
     email: c.email,
     phone: c.phone,

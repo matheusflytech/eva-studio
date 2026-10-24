@@ -12,13 +12,14 @@ import { ultimaAtividadePorNegocio } from "@/lib/server/atividade-do-negocio";
 
 export const INCLUDE_CARTAO = {
   company: { select: { id: true, name: true } },
-  owner: { select: { id: true, name: true } },
+  owner: { select: { id: true, name: true, avatarPath: true } },
   contacts: {
     include: {
       contact: {
         select: {
           id: true,
           name: true,
+          avatarPath: true,
           // Telefone e e-mail: campos que o cartão e a prévia podem mostrar.
           phone: true,
           email: true,
@@ -51,7 +52,7 @@ export function serializarCartao(d: LinhaDoCartao) {
     probability: d.probability,
     company: d.company,
     owner: d.owner,
-    contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name, phone: c.contact.phone, email: c.contact.email })),
+    contacts: d.contacts.map((c) => ({ id: c.contact.id, name: c.contact.name, avatarPath: c.contact.avatarPath, phone: c.contact.phone, email: c.contact.email })),
     whatsapp: (() => {
       const conversa = d.contacts.map((c) => c.contact.conversations[0]).find(Boolean);
       if (!conversa) return null;
