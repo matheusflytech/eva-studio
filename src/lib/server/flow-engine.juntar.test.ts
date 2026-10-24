@@ -28,6 +28,11 @@ vi.mock("@/lib/server/ssrf", () => ({ safeFetch: vi.fn() }));
 vi.mock("@/lib/server/knowledge-search", () => ({ searchKnowledgeBase: vi.fn(async () => []) }));
 vi.mock("@/lib/server/ia/conexao", () => ({ passosDaConexao: vi.fn() }));
 vi.mock("@/lib/server/ia/uso", () => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
+const anexos = vi.hoisted(() => ({
+  transcreverAudioDoWhatsApp: vi.fn(async () => "manda o preço"),
+  entenderAnexosDoWhatsApp: vi.fn(async (_o: string, lista: { path: string }[]) => (lista.length ? `[leu ${lista.map((a) => a.path).join(",")}]` : undefined)),
+}));
+vi.mock("@/lib/server/anexos-whatsapp", () => anexos);
 
 import { advanceConversation, JANELA_DE_JUNTAR_MS } from "./flow-engine";
 
@@ -91,6 +96,29 @@ describe("juntar mensagens seguidas (WhatsApp)", () => {
     // As do contato já estavam gravadas: no fim só entra a resposta.
     const fim = inbox.registrarMensagens.mock.calls.at(-1)?.[1] as { role: string }[];
     expect(fim.map((m) => m.role)).toEqual(["bot"]);
+  });
+
+  it("áudio vira texto antes de gravar; foto das mensagens juntadas vai para a IA", async () => {
+    db.message.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    db.message.findMany.mockImplementation(async (args: { where: { role: unknown } }) =>
+      args.where.role === "contact"
+        ? [
+            { text: "manda o preço", createdAt: T(3), mediaPath: "o1/a.ogg", mediaType: "audio", mediaMime: "audio/ogg", mediaName: null },
+            { text: "[Foto]", createdAt: T(1), mediaPath: "o1/f.jpg", mediaType: "image", mediaMime: "image/jpeg", mediaName: null },
+          ]
+        : []
+    );
+    await rodar({ ...base, text: "[Áudio]", media: { path: "o1/a.ogg", type: "audio", mime: "audio/ogg" } });
+
+    expect((inbox.registrarMensagens.mock.calls[0][1] as { text: string }[])[0].text).toBe("manda o preço");
+    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0].userMessage).toBe("[Foto]\nmanda o preço\n\n[leu o1/f.jpg,o1/a.ogg]");
+  });
+
+  it("fora do WhatsApp: nada é transcrito nem lido aqui", async () => {
+    db.message.findMany.mockResolvedValue([]);
+    await advanceConversation({ ...base, channel: "instagram", text: "[Áudio]", media: { path: "x", type: "audio", mime: "audio/ogg" } });
+    expect(anexos.transcreverAudioDoWhatsApp).not.toHaveBeenCalled();
+    expect(anexos.entenderAnexosDoWhatsApp).not.toHaveBeenCalled();
   });
 
   it("grupo, Instagram e conversa fora da IA respondem na hora, sem esperar", async () => {
