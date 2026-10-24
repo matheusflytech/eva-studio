@@ -28,6 +28,7 @@ import {
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
 import { decidirReconexao } from "./desconexao.js";
 import { analisarMensagem } from "./contato.js";
+import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
 import { chamarMotor, reivindicarEspera } from "./motor.js";
 
@@ -63,18 +64,6 @@ const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 const sessions = new Map(); // chave da sessão (canalId ou agentId) -> { sock }
 // "canal" ou "agente": decidido na subida pela existência da tabela nova.
 let MODO = "agente";
-
-function extractText(msg) {
-  const m = msg.message;
-  if (!m) return null;
-  return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    null
-  );
-}
 
 // Anexo que o cliente mandou. O WhatsApp entrega cada tipo numa chave
 // diferente da mensagem; aqui vira um formato só.
@@ -303,15 +292,17 @@ async function startSession(chave) {
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
-    for (const msg of messages) {
-      if (msg.key.fromMe || !msg.message) continue;
+    for (const bruta of messages) {
+      if (bruta.key.fromMe || !bruta.message) continue;
+      // Temporária e visualização única chegam embrulhadas (ver tipos.js).
+      const msg = { ...bruta, message: desembrulhar(bruta.message) };
       // Status, transmissão e canal ficam de fora; grupo entra, e o agente só
       // responde nele quando marcam o número ou respondem a uma mensagem dele.
       const analise = analisarMensagem(msg, sock.user);
       if (!analise) continue;
       const { contato, grupo, responder } = analise;
       const optionId = extractOptionId(msg);
-      let text = extractText(msg);
+      let text = textoDaMensagem(msg.message);
       const midia = extractMedia(msg);
       if (!optionId && !text && !midia) continue;
 
@@ -330,6 +321,7 @@ async function startSession(chave) {
         text = text || `[${rotulo}]`;
         if (!anexo) text = `${text} (não foi possível baixar o arquivo)`;
       }
+      if (!optionId) text = comCitacao(trechoCitado(msg.message), text);
 
       // A resposta vai para onde a mensagem veio (o lid, se veio por lid); a ficha fica com o número.
       const remoteJid = msg.key.remoteJid;
