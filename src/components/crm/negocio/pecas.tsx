@@ -165,7 +165,15 @@ export function CampoInline({
     setRascunho(valor);
   }
 
+  // Esc desfaz e tira o foco; o blur que vem junto ainda enxerga o rascunho
+  // antigo e salvaria o que a pessoa acabou de desistir.
+  const desistiu = React.useRef(false);
+
   async function salvar(v = rascunho) {
+    if (desistiu.current) {
+      desistiu.current = false;
+      return;
+    }
     if (v === valor) {
       setErro(null);
       return;
@@ -189,6 +197,10 @@ export function CampoInline({
 
   const teclas = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (e.key === "Escape") {
+      // Desfaz a edição sem fechar o painel ou a gaveta em volta.
+      e.preventDefault();
+      // Data não salva no blur: marcar aqui engoliria a próxima escolha.
+      desistiu.current = tipo !== "data";
       setRascunho(valor);
       setErro(null);
       e.currentTarget.blur();
