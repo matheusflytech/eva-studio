@@ -148,4 +148,22 @@ describe("advanceConversation com gatilhos", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  it("semResposta (grupo sem menção): registra a mensagem com o nome do grupo e não responde", async () => {
+    const { registrarMensagens } = await import("@/lib/server/inbox");
+    const { syncContactFromConversation } = await import("@/lib/server/contacts");
+    const r = await advanceConversation({ ...base, text: "Ana: bom dia", semResposta: true, nomeDoContato: "Equipe Vendas" });
+    expect(r.messages).toEqual([]);
+    expect(registrarMensagens).toHaveBeenCalledWith(expect.any(String), [expect.objectContaining({ role: "contact", text: "Ana: bom dia" })]);
+    expect(syncContactFromConversation).toHaveBeenCalledWith(expect.objectContaining({ nome: "Equipe Vendas", isInbound: true }));
+  });
+
+  it("agente sem fluxo salvo também fica calado com semResposta", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(null);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await advanceConversation({ ...base, text: "oi", semResposta: true });
+    expect(r.messages).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
 });
