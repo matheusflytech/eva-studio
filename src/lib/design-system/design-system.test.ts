@@ -299,6 +299,9 @@ describe("formatação", () => {
     expect(initials("Ana Maria Souza")).toBe("AS");
     expect(initials("  joão ")).toBe("J");
     expect(initials("")).toBe("?");
+    expect(initials("[DEMO] Marcelo Duarte")).toBe("MD");
+    expect(initials("[DEMO]")).toBe("D");
+    expect(initials("(Ana) - Lima")).toBe("AL");
   });
 
   it("filtra opções sem acento e sem caixa", () => {
