@@ -29,6 +29,7 @@ import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindic
 import { decidirReconexao } from "./desconexao.js";
 import { analisarMensagem } from "./contato.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
+import { chamarMotor, reivindicarEspera } from "./motor.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -146,16 +147,11 @@ function extractOptionId(msg) {
 // decide mais nada sozinho sobre o que responder, só repassa mensagens.
 async function advanceViaEngine(agentId, contactId, { text, optionId, media, externalId, canalId, semResposta, nomeDoContato }) {
   try {
-    const res = await fetch(`${EVA_STUDIO_URL}/api/conversations/message`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Internal-Secret": INTERNAL_API_SECRET },
-      // canalId vai junto no modo canal: canal sem agente ainda é registrado
-      // no app (Conversas), só não responde.
-      body: JSON.stringify({ agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId, semResposta, nomeDoContato }),
+    // canalId vai junto no modo canal: canal sem agente ainda é registrado
+    // no app (Conversas), só não responde. Falha do app tenta de novo (motor.js).
+    return await chamarMotor(`${EVA_STUDIO_URL}/api/conversations/message`, INTERNAL_API_SECRET, {
+      agentId, canalId, channel: "whatsapp_qr", contactId, text, optionId, media, externalId, semResposta, nomeDoContato,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.messages ?? [];
   } catch (err) {
     logger.error({ err, agentId }, "Falha ao chamar o motor de fluxo");
     return [];
@@ -279,14 +275,18 @@ async function startSession(chave) {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-      // Regras em desconexao.js: logout limpa; sessão aberta em outro lugar ou
-      // número recusado param; o resto reconecta, esperando mais a cada queda.
+      // Regras em desconexao.js: logout limpa; sessão assumida por outro worker
+      // só sai da memória; número recusado para; o resto reconecta, esperando
+      // mais a cada queda.
       const tentativas = quedas.get(chave) ?? 0;
       const decisao = loggedOut ? { acao: "logout" } : decidirReconexao(statusCode, { pareado: !!state.creds?.registered, tentativas });
       if (decisao.acao === "logout") {
         quedas.delete(chave);
         await limparSessao(pool, MODO, chave);
         logger.info({ chave }, "WhatsApp desconectado (logout)");
+      } else if (decisao.acao === "largar") {
+        quedas.delete(chave);
+        logger.warn({ chave, statusCode }, "Sessão assumida por outro worker; largando sem mexer no estado");
       } else if (decisao.acao === "parar") {
         quedas.delete(chave);
         logger.warn({ chave, statusCode }, "Sessão parada");
@@ -383,10 +383,15 @@ async function pollForWork() {
 // reage a eventos). Como esse worker fica ligado 24/7, aproveita o mesmo
 // polling pra cutucar as conversas cujo prazo já venceu, sem precisar de
 // mensagem nova do contato.
+let resumindo = false;
 async function resumeDueWaits() {
+  // Mesma trava do drenando: uma rodada lenta (IA com 429) não pode se
+  // sobrepor à seguinte e mandar o follow-up duas vezes.
+  if (resumindo) return;
+  resumindo = true;
   try {
     const { rows } = await pool.query(
-      `select "agentId", "contactId" from eva_studio_conversations
+      `select id, "agentId", "contactId", variables->>'__wait_until' as prazo from eva_studio_conversations
        where channel = 'whatsapp_qr' and status = 'active'
          and variables ? '__wait_until'
          and (variables->>'__wait_until')::timestamptz <= now()`
@@ -395,6 +400,7 @@ async function resumeDueWaits() {
       const chave = await sessaoDoAgente(pool, MODO, row.agentId);
       const session = chave ? sessions.get(chave) : null;
       if (!session?.sock) continue;
+      if (!(await reivindicarEspera(pool, row.id, row.prazo))) continue; // outro worker já retomou
       const replies = await advanceViaEngine(row.agentId, row.contactId, {});
       for (const reply of replies) {
         await enviarResposta(session.sock, row.contactId, reply, row.agentId, row.contactId);
@@ -402,6 +408,8 @@ async function resumeDueWaits() {
     }
   } catch (err) {
     logger.error({ err }, "Erro ao retomar esperas vencidas");
+  } finally {
+    resumindo = false;
   }
 }
 

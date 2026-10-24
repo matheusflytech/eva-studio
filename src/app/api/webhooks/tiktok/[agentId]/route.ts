@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
 import { sendTikTokText } from "@/lib/server/tiktok";
-import { timingSafeEqualStr } from "@/lib/server/secure-compare";
+import { tokenDoWebhookTikTokConfere } from "@/lib/server/tiktok-token";
+import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Webhook do TikTok Business Messaging.
@@ -36,14 +38,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   // repetição do outro lado sem nunca ter chance de dar certo.
   if (!conn) return NextResponse.json({ ok: true });
 
-  // O TikTok não assina o corpo como a Meta. A checagem possível é um segredo
-  // compartilhado na querystring, configurado junto com o callback no portal.
-  const expected = process.env.INTERNAL_API_SECRET;
-  if (expected) {
-    const token = new URL(request.url).searchParams.get("token");
-    if (!timingSafeEqualStr(token, expected)) {
-      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-    }
+  // O TikTok não assina o corpo como a Meta. A checagem possível é o token
+  // deste agente na querystring, configurado junto com o callback no portal.
+  if (!tokenDoWebhookTikTokConfere(`agente:${agentId}`, new URL(request.url).searchParams.get("token"))) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   const body = (await request.json().catch(() => null)) as TikTokWebhookBody | null;
@@ -59,11 +57,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     const text = event.message?.text ?? event.message?.content ?? event.text;
     if (!conversationId || !text) continue;
 
+    // Mesma idempotência do webhook da Meta; o evento não traz id de mensagem conhecido.
+    // shortcut: a chave é o hash do evento (como no ingress), então evento idêntico byte a byte conta como reentrega; trocar pelo id da mensagem quando o formato do TikTok for confirmado.
+    const idDoEvento = `tiktok:${agentId}:${createHash("sha256").update(JSON.stringify(event)).digest("hex")}`;
+    if (!(await isFirstDelivery(idDoEvento))) continue;
+
     const result = await advanceConversation({
       agentId,
       channel: "tiktok",
       contactId: conversationId,
       text,
+    }).catch(async (e) => {
+      await esquecerEntrega(idDoEvento);
+      throw e;
     });
 
     for (const message of result.messages) {

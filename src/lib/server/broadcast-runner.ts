@@ -4,6 +4,7 @@ import { deliverToContact } from "@/lib/server/outbound";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { decidirEnvio } from "@/lib/whatsapp/janela";
 import { rodarDisparoDeEmail } from "@/lib/server/email/disparo";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Execução de um disparo.
@@ -29,6 +30,9 @@ export interface RunResult {
   queuedCount: number;
   errors: string[];
 }
+
+/** Tempo de envio por chamada; o resto do público sai nas próximas batidas do relógio. */
+const ORCAMENTO_MS = 20_000;
 
 interface Recipient {
   externalId: string;
@@ -65,7 +69,8 @@ async function resolveRecipients(broadcast: {
   manualRecipients: unknown;
 }): Promise<Recipient[]> {
   if (broadcast.audience === "manual") {
-    const ids = Array.isArray(broadcast.manualRecipients) ? (broadcast.manualRecipients as string[]) : [];
+    // Sem repetidos: o registro de envio é por número, e o total tem de bater com ele para o disparo fechar.
+    const ids = Array.isArray(broadcast.manualRecipients) ? [...new Set(broadcast.manualRecipients as string[])] : [];
     // Mesmo na lista manual vale a pena puxar a ficha, quando ela existe: é o
     // que permite personalizar {nome} em vez de mandar texto igual pra todos.
     const known = await prisma.contactChannel.findMany({
@@ -105,7 +110,7 @@ async function resolveRecipients(broadcast: {
     include: {
       channels: { where: { agentId: broadcast.agentId, channel: broadcast.channel }, take: 1 },
     },
-    take: 5000,
+    take: 20_000,
   });
 
   return contacts.map((c) => ({
@@ -143,7 +148,7 @@ function contactValues(contact: {
  * pra fila do WhatsApp QR é somado pelo worker quando ele manda de verdade —
  * antes os dois somavam e o placar chegava ao dobro (e fechava "done" cedo).
  */
-export async function runBroadcast(broadcastId: string): Promise<RunResult> {
+export async function runBroadcast(broadcastId: string, ate = Date.now() + ORCAMENTO_MS): Promise<RunResult> {
   const broadcast = await prisma.broadcast.findUnique({
     where: { id: broadcastId },
     include: { variants: true, agent: { select: { orgId: true } } },
@@ -160,6 +165,10 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
   } else if (broadcast.status !== "sending") {
     return result; // done | canceled
   }
+
+  // Uma rodada por vez por disparo: o envio imediato e o relógio podem chegar
+  // juntos e mandariam para as mesmas pessoas. Janela maior que o orçamento.
+  if (!(await checkRateLimit(`disparo:${broadcastId}`, 1, 50)).allowed) return result;
 
   // E-mail sai em lotes (ver email/disparo.ts): cada chamada manda uma parte
   // e o relógio continua enquanto o disparo estiver "sending".
@@ -183,6 +192,14 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
   const recipients = await resolveRecipients({ ...broadcast, orgId: broadcast.agent.orgId });
   result.totalCount = recipients.length;
 
+  // Sai em partes, como o e-mail: quem já tem registro deste disparo (na fila,
+  // enviado ou falhou) já foi, e a próxima batida continua de onde parou.
+  const feitos = new Set(
+    (await prisma.outboundQueueItem.findMany({ where: { broadcastId }, select: { contactId: true } })).map((i) => i.contactId)
+  );
+  const pendentes = recipients.filter((r) => !feitos.has(r.externalId));
+  let faltam = pendentes.length;
+
   // Modelos aprovados usados pelas variantes/pelo disparo, carregados de uma
   // vez pra não bater no banco por destinatário.
   const templateIds = [broadcast.templateId, ...broadcast.variants.map((v) => v.templateId)].filter(
@@ -193,7 +210,9 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
     : [];
   const templateById = new Map(templates.map((t) => [t.id, t]));
 
-  for (const recipient of recipients) {
+  for (const recipient of pendentes) {
+    if (Date.now() > ate) break;
+    faltam -= 1;
     const variant = pickVariant(broadcast.variants);
     const rawText = variant?.text ?? broadcast.text;
     const templateId = variant?.templateId ?? broadcast.templateId;
@@ -210,6 +229,18 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
             ),
           }
         : undefined;
+
+    const falhar = async (erro: string | undefined) => {
+      result.failedCount += 1;
+      if (erro && result.errors.length < 5) result.errors.push(erro);
+      // Registro da falha: é a marca de "já foi" para a próxima batida.
+      await prisma.outboundQueueItem.create({
+        data: { agentId: broadcast.agentId, contactId: recipient.externalId, text, broadcastId: broadcast.id, variantId: variant?.id ?? null, status: "failed", error: erro?.slice(0, 300) ?? null },
+      });
+      if (variant) {
+        await prisma.broadcastVariant.update({ where: { id: variant.id }, data: { failedCount: { increment: 1 } } });
+      }
+    };
 
     // WhatsApp oficial sem modelo (ou mensagem avulsa): texto livre só com a
     // janela de 24h aberta AGORA. Avulsa com modelo sai sempre como modelo.
@@ -233,11 +264,7 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
         temModelo: !!templatePayload,
       });
       if (!decisao.ok) {
-        result.failedCount += 1;
-        if (result.errors.length < 5) result.errors.push(decisao.erro);
-        if (variant) {
-          await prisma.broadcastVariant.update({ where: { id: variant.id }, data: { failedCount: { increment: 1 } } });
-        }
+        await falhar(decisao.erro);
         continue;
       }
       usarModelo = decisao.usarModelo;
@@ -265,21 +292,14 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
         });
       }
     } else {
-      result.failedCount += 1;
-      if (result.errors.length < 5 && delivery.error) result.errors.push(delivery.error);
-      if (variant) {
-        await prisma.broadcastVariant.update({
-          where: { id: variant.id },
-          data: { failedCount: { increment: 1 } },
-        });
-      }
+      await falhar(delivery.error);
     }
   }
 
-  // Uma instrução só: soma o que saiu aqui e decide o status com os números
-  // já somados (os do worker inclusive). Se ainda há itens na fila, fica
-  // "sending" e o worker fecha quando o último sair; se o worker já mandou
-  // tudo antes desta linha, ela mesma fecha.
+  // Uma instrução só, a cada parte: soma o que saiu aqui e decide o status com
+  // os números já somados (os do worker inclusive). Se ainda falta gente ou há
+  // itens na fila, fica "sending" (o worker fecha quando o último sair); se o
+  // worker já mandou tudo antes desta linha, ela mesma fecha.
   const lastError = result.errors[0] ?? null;
   await prisma.$executeRaw`
     UPDATE "eva_studio_broadcasts" SET
@@ -289,7 +309,7 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
       "lastError" = COALESCE(${lastError}::text, "lastError"),
       "status" = CASE
         WHEN "status" = 'canceled' THEN 'canceled'
-        WHEN "sentCount" + ${result.sentCount} + "failedCount" + ${result.failedCount} >= ${result.totalCount} THEN 'done'
+        WHEN ${faltam} = 0 AND "sentCount" + ${result.sentCount} + "failedCount" + ${result.failedCount} >= ${result.totalCount} THEN 'done'
         ELSE 'sending'
       END
     WHERE "id" = ${broadcastId}`;
@@ -300,12 +320,12 @@ export async function runBroadcast(broadcastId: string): Promise<RunResult> {
 /** Disparos agendados cuja hora chegou. Chamado pelo scheduler. */
 export async function runDueBroadcasts(limit = 10): Promise<{ ran: number; results: RunResult[] }> {
   const due = await prisma.broadcast.findMany({
-    // Disparo de e-mail em andamento também entra: ele sai em lotes, uma
-    // parte por batida do relógio.
+    // Disparo em andamento também entra (qualquer canal): ele sai em partes,
+    // uma por batida do relógio.
     where: {
       OR: [
         { status: "scheduled", scheduledAt: { lte: new Date() } },
-        { status: "sending", channel: "email" },
+        { status: "sending" },
       ],
     },
     select: { id: true },
@@ -313,9 +333,11 @@ export async function runDueBroadcasts(limit = 10): Promise<{ ran: number; resul
     take: limit,
   });
 
+  const ate = Date.now() + ORCAMENTO_MS;
   const results: RunResult[] = [];
   for (const b of due) {
-    results.push(await runBroadcast(b.id));
+    if (Date.now() > ate) break;
+    results.push(await runBroadcast(b.id, ate));
   }
-  return { ran: due.length, results };
+  return { ran: results.length, results };
 }

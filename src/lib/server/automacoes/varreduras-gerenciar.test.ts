@@ -14,7 +14,10 @@ const db = vi.hoisted(() => ({
   conversation: { findMany: vi.fn() },
   $queryRawUnsafe: vi.fn(),
 }));
-const insc = vi.hoisted(() => ({ inscrever: vi.fn(async (..._args: unknown[]) => ({ inscrita: true, execucaoId: "x" })) }));
+const insc = vi.hoisted(() => ({
+  inscrever: vi.fn(async (..._args: unknown[]) => ({ inscrita: true, execucaoId: "x" })),
+  chaveDaInscricao: (a: string, o: string, origem: string) => `${a}:${o}:${origem}`,
+}));
 const executor = vi.hoisted(() => ({ executarExecucao: vi.fn(async () => ({ status: "concluida" })) }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -55,6 +58,24 @@ describe("varreduras", () => {
     expect(insc.inscrever.mock.calls[0][2]).toMatchObject({ origem: "parado:s1:2026-10-01T12:00:00.000Z" });
     const limite = db.deal.findMany.mock.calls[0][0].where.stageSince.lte as Date;
     expect(AGORA.getTime() - limite.getTime()).toBe(7 * 86_400_000);
+  });
+
+  it("mais de 200: quem já entrou no período sai antes e a varredura segue para a próxima página", async () => {
+    db.automacao.findMany.mockResolvedValue([ativa({ tipo: "deal.schedule", config: { frequencia: "diaria", hora: "10:00" } })]);
+    const id = (n: number) => `d${String(n).padStart(3, "0")}`;
+    const primeira = Array.from({ length: 200 }, (_, i) => ({ id: id(i + 1) }));
+    db.deal.findMany.mockResolvedValueOnce(primeira).mockResolvedValueOnce([{ id: id(201) }]);
+    // Os 200 primeiros já têm execução com a chave de hoje.
+    db.automacaoExecucao.findMany.mockImplementation(async ({ where }: { where: { chave?: { in: string[] } } }) =>
+      (where.chave?.in ?? []).filter((c) => !c.includes(id(201))).map((chave) => ({ chave }))
+    );
+
+    const r = await rodarAutomacoes({ agora: AGORA });
+
+    expect(db.deal.findMany.mock.calls[1][0].where.id).toEqual({ gt: id(200) });
+    expect(insc.inscrever).toHaveBeenCalledTimes(1);
+    expect(insc.inscrever.mock.calls[0][1]).toBe(id(201));
+    expect(r.inscritas).toBe(1);
   });
 
   it("agendado: antes da hora não inscreve; depois, chave do dia", async () => {

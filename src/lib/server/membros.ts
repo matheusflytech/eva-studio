@@ -5,6 +5,7 @@ import { STATUS_COM_ACESSO, comFallbackLegado, ehPapelDeSistema } from "@/lib/se
 import type { SessionContext } from "@/lib/server/permissions";
 import { PAPEIS_DE_SISTEMA, type PapelDeSistema } from "@/lib/permissoes/catalogo";
 import { registrarHistorico } from "@/lib/server/historico";
+import { enviarLinkDoConvite } from "@/lib/server/convite";
 import type { Mudancas } from "@/lib/historico/tipos";
 
 // ---------------------------------------------------------------------------
@@ -75,13 +76,13 @@ function papel(v: string): PapelDeSistema {
   return ehPapelDeSistema(v) ? v : "owner";
 }
 
-/** Membros com acesso (ativos e convidados) + legado sem vínculo. */
+/** Membros com acesso (ativos e convidados), convites pendentes + legado sem vínculo. */
 export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> {
   return comFallbackLegado(
     async () => {
       const [vinculos, legado, equipes] = await Promise.all([
         prisma.membership.findMany({
-          where: { orgId, status: { in: STATUS_COM_ACESSO } },
+          where: { orgId, status: { in: [...STATUS_COM_ACESSO, "pendente"] } },
           include: { user: { select: { id: true, name: true, email: true, avatarPath: true } } },
           orderBy: { createdAt: "asc" },
         }),
@@ -140,7 +141,7 @@ export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> 
 
 async function donosDoContrato(orgId: string): Promise<number> {
   const membros = await listarMembros(orgId);
-  return membros.filter((m) => m.role === "owner").length;
+  return membros.filter((m) => m.role === "owner" && m.status !== "pendente").length;
 }
 
 function ehDono(ctx: SessionContext) {
@@ -298,8 +299,8 @@ export interface Convite {
 }
 
 /**
- * Convida por e-mail. Já tem conta no Eva: ganha o vínculo na hora (aparece no
- * seletor de contratos). Não tem: o Supabase manda o convite (a pessoa define a
+ * Convida por e-mail. Já tem conta no Eva: o vínculo fica "pendente" até a
+ * pessoa aceitar pelo link do e-mail (ver convite.ts). Não tem: o Supabase manda o convite (a pessoa define a
  * senha pelo link) e o perfil nasce com este contrato como padrão.
  */
 export async function convidarMembro(ctx: SessionContext, input: Convite, origem: string) {
@@ -323,12 +324,15 @@ export async function convidarMembro(ctx: SessionContext, input: Convite, origem
 
   if (existente) {
     const membros = await listarMembros(ctx.orgId);
-    if (membros.some((m) => m.id === existente.id)) throw new ErroDeMembro("Essa pessoa já participa do contrato.", 409);
+    // Pendente pode ser convidado de novo: reenvia o link.
+    if (membros.some((m) => m.id === existente.id && m.status !== "pendente")) throw new ErroDeMembro("Essa pessoa já participa do contrato.", 409);
     await prisma.membership.upsert({
       where: { orgId_userId: { orgId: ctx.orgId, userId: existente.id } },
-      create: { orgId: ctx.orgId, userId: existente.id, role, roleId, status: "convidado", invitedById: ctx.userId },
-      update: { role, roleId, status: "convidado", invitedById: ctx.userId, groupIds: [] },
+      create: { orgId: ctx.orgId, userId: existente.id, role, roleId, status: "pendente", invitedById: ctx.userId },
+      update: { role, roleId, status: "pendente", invitedById: ctx.userId, groupIds: [] },
     });
+    const erroDoEnvio = await enviarLinkDoConvite(email, ctx.orgId, existente.id, origem);
+    if (erroDoEnvio) throw new ErroDeMembro(`Convite salvo, mas o e-mail não saiu: ${erroDoEnvio}. Tente convidar de novo.`, 502);
     await registrarHistorico({ orgId: ctx.orgId, acao: "membro.convidou", objeto: "member", objetoId: existente.id, objetoNome: nome, detalhes: { email, papel: nomeDoPapel(role) } });
     return { userId: existente.id, email, novo: false };
   }

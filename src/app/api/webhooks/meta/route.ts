@@ -6,11 +6,12 @@ import { matchCommentAutomation } from "@/lib/server/comment-automation";
 import { classifyInstagramMessage } from "@/lib/server/instagram-events";
 import { verifyMetaSignature } from "@/lib/server/meta-signature";
 import { decryptSecret } from "@/lib/server/crypto";
-import { checkRateLimit } from "@/lib/server/rate-limit";
+import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
 import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
 import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
 import { contarReciboNoDisparo } from "@/lib/server/recibos";
+import { corpoDoMenu } from "@/lib/server/meta-menu";
 import {
   baixarEGuardar,
   guardarMidiaWhatsApp,
@@ -19,15 +20,6 @@ import {
   tipoDoAnexoSocial,
   type MidiaGuardada,
 } from "@/lib/server/media-inbound";
-
-// Idempotência: a Meta pode reentregar o mesmo evento. Guarda o id do evento
-// por 24h (reusa a tabela de rate limit como store de "já visto") e ignora
-// reentregas — evita DM/resposta duplicada. Retorna true se é NOVO.
-async function isFirstDelivery(eventId: string | undefined): Promise<boolean> {
-  if (!eventId) return true; // sem id não dá pra deduplicar; processa
-  const { count } = await checkRateLimit(`evt:${eventId}`, 1, 86_400);
-  return count <= 1;
-}
 
 // Handshake de verificação exigido pela Meta ao configurar o webhook no
 // painel do app (Settings > Webhooks). Só funciona depois que
@@ -168,18 +160,7 @@ async function sendMetaMessage(
         },
       }
     : message.options && message.options.length > 0
-      ? {
-          messaging_product: "whatsapp",
-          to,
-          type: "interactive",
-          interactive: {
-            type: "button",
-            body: { text: message.text },
-            action: {
-              buttons: message.options.slice(0, 3).map((o) => ({ type: "reply", reply: { id: o.id, title: o.label.slice(0, 20) } })),
-            },
-          },
-        }
+      ? corpoDoMenu(to, message.text, message.options)
       : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text } };
 
   try {
@@ -349,7 +330,10 @@ async function lerEntradaWhatsApp(
   return { text: `[Mensagem não suportada: ${m.type}]` };
 }
 
-async function handleWhatsAppEntries(entries: unknown[]) {
+// Os handlers devolvem quantas mensagens falharam: cada uma volta a ser
+// "não vista" e o POST responde 500 para a Meta reentregar.
+async function handleWhatsAppEntries(entries: unknown[]): Promise<number> {
+  let falhas = 0;
   for (const entry of entries as { id?: string; changes?: { field?: string; value?: MetaValue }[] }[]) {
     for (const change of entry.changes ?? []) {
       // Status/categoria de template: não tem phone_number_id, vem pelo WABA
@@ -410,10 +394,13 @@ async function handleWhatsAppEntries(entries: unknown[]) {
           // Falha isolada por mensagem não deve derrubar o resto do batch —
           // mas fica no log, porque engolir em silêncio é como se perde cliente.
           console.error("[webhook/meta] falha ao processar mensagem", e instanceof Error ? e.message : e);
+          await esquecerEntrega(message.id);
+          falhas += 1;
         }
       }
     }
   }
+  return falhas;
 }
 
 // Comentário bateu com uma automação — manda a resposta pública (se tiver),
@@ -530,7 +517,8 @@ async function registrarAnexosExtras(
 // Entradas do Messenger (body.object === "page"). A entry.id é o id da
 // Página, que é como a conexão do agente é descoberta — mesmo papel que o
 // phone_number_id tem no WhatsApp e o igBusinessId no Instagram.
-async function handleMessengerEntries(entries: unknown[]) {
+async function handleMessengerEntries(entries: unknown[]): Promise<number> {
+  let falhas = 0;
   for (const entry of entries as { id?: string; messaging?: MessengerEvent[] }[]) {
     const pageId = entry.id;
     if (!pageId) continue;
@@ -574,12 +562,16 @@ async function handleMessengerEntries(entries: unknown[]) {
         }
       } catch (e) {
         console.error("[webhook/meta] falha no Messenger", e instanceof Error ? e.message : e);
+        await esquecerEntrega(event.message?.mid);
+        falhas += 1;
       }
     }
   }
+  return falhas;
 }
 
-async function handleInstagramEntries(entries: unknown[]) {
+async function handleInstagramEntries(entries: unknown[]): Promise<number> {
+  let falhas = 0;
   for (const entry of entries as {
     id?: string;
     messaging?: InstagramMessagingEvent[];
@@ -623,6 +615,8 @@ async function handleInstagramEntries(entries: unknown[]) {
         }
       } catch (e) {
         console.error("[webhook/meta] falha no Instagram", e instanceof Error ? e.message : e);
+        await esquecerEntrega(event.message?.mid);
+        falhas += 1;
       }
     }
 
@@ -657,6 +651,7 @@ async function handleInstagramEntries(entries: unknown[]) {
       }
     }
   }
+  return falhas;
 }
 
 export async function POST(request: Request) {
@@ -688,13 +683,15 @@ export async function POST(request: Request) {
   // Um webhook, três produtos: WhatsApp manda object "whatsapp_business_account",
   // Instagram manda "instagram" e Messenger manda "page" — mesma Graph API,
   // payloads e formas de envio diferentes (§9 e §21 do CHATBOT_ENGINE.md).
-  if (body?.object === "instagram") {
-    await handleInstagramEntries(entries);
-  } else if (body?.object === "page") {
-    await handleMessengerEntries(entries);
-  } else {
-    await handleWhatsAppEntries(entries);
-  }
+  const falhas =
+    body?.object === "instagram"
+      ? await handleInstagramEntries(entries)
+      : body?.object === "page"
+        ? await handleMessengerEntries(entries)
+        : await handleWhatsAppEntries(entries);
 
+  // 500 faz a Meta (ou a fila da Cloudflare) reentregar; as mensagens que deram
+  // certo continuam marcadas como vistas e não rodam de novo.
+  if (falhas > 0) return NextResponse.json({ received: true, falhas }, { status: 500 });
   return NextResponse.json({ received: true });
 }

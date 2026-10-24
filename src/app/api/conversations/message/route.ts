@@ -5,6 +5,7 @@ import { advanceConversation } from "@/lib/server/flow-engine";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { caminhoDaOrg, classificarMime } from "@/lib/server/storage";
 import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
+import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 
 // Dois jeitos de chamar essa rota:
 // 1) O worker do WhatsApp / webhook da Meta (processos externos, sem sessão
@@ -51,6 +52,12 @@ export async function POST(request: Request) {
   const auth = await authorize(request, agentId);
   if (!auth.ok) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
+  // Do navegador só os canais de teste (Playground e prévia do Builder):
+  // outro canal gravaria mensagem falsa na conversa de um cliente de verdade.
+  if (!auth.interno && channel !== "playground" && channel !== "builder_preview") {
+    return NextResponse.json({ error: "Canal não permitido por este caminho." }, { status: 403 });
+  }
+
   // Anexo só vem do worker. De um navegador, aceitar um caminho de storage
   // arbitrário deixaria qualquer usuário anexar arquivo que não é dele.
   let anexo: { path: string; type: string; mime: string; name?: string; size?: number } | undefined;
@@ -75,6 +82,11 @@ export async function POST(request: Request) {
     };
   }
 
+  // O Baileys reemite mensagem ao reconectar e o worker tenta de novo quando o
+  // app falha: mesma idempotência do webhook da Meta, e falhar libera o id.
+  const idDoEvento = auth.interno && typeof externalId === "string" ? `${channel}:${contactId}:${externalId}` : undefined;
+  if (!(await isFirstDelivery(idDoEvento))) return NextResponse.json({ messages: [] });
+
   const result = await advanceConversation({
     agentId,
     channel,
@@ -86,6 +98,9 @@ export async function POST(request: Request) {
     // Só o worker (segredo interno) decide calar o agente ou dar nome ao contato.
     semResposta: auth.interno && semResposta === true,
     nomeDoContato: auth.interno && typeof nomeDoContato === "string" ? nomeDoContato.slice(0, 200) : undefined,
+  }).catch(async (e) => {
+    await esquecerEntrega(idDoEvento);
+    throw e;
   });
   return NextResponse.json(result);
 }

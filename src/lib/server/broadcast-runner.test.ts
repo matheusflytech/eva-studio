@@ -8,9 +8,12 @@ const db = vi.hoisted(() => ({
   segment: { findUnique: vi.fn() },
   messageTemplate: { findMany: vi.fn(async () => []) },
   conversation: { findUnique: vi.fn() },
+  outboundQueueItem: { findMany: vi.fn(async () => [] as { contactId: string }[]), create: vi.fn() },
   $executeRaw: vi.fn(async () => 1),
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+const vez = vi.hoisted(() => vi.fn(async () => ({ allowed: true })));
+vi.mock("@/lib/server/rate-limit", () => ({ checkRateLimit: vez }));
 
 const deliver = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/server/outbound", () => ({ deliverToContact: deliver }));
@@ -47,6 +50,8 @@ function fechamento() {
 beforeEach(() => {
   vi.clearAllMocks();
   db.broadcast.updateMany.mockResolvedValue({ count: 1 });
+  db.outboundQueueItem.findMany.mockResolvedValue([]);
+  vez.mockResolvedValue({ allowed: true });
 });
 
 describe("contagem do disparo", () => {
@@ -126,13 +131,13 @@ describe("agendado", () => {
     expect(deliver).not.toHaveBeenCalled();
   });
 
-  it("runDueBroadcasts busca os agendados vencidos e os de e-mail em andamento (saem em lotes), do mais antigo pro mais novo", async () => {
+  it("runDueBroadcasts busca os agendados vencidos e os em andamento de qualquer canal (saem em partes), do mais antigo pro mais novo", async () => {
     db.broadcast.findMany.mockResolvedValue([]);
     await runDueBroadcasts(5);
     const arg = db.broadcast.findMany.mock.calls[0][0];
     expect(arg.where.OR[0].status).toBe("scheduled");
     expect(arg.where.OR[0].scheduledAt.lte).toBeInstanceOf(Date);
-    expect(arg.where.OR[1]).toEqual({ status: "sending", channel: "email" });
+    expect(arg.where.OR[1]).toEqual({ status: "sending" });
     expect(arg.orderBy).toEqual({ scheduledAt: "asc" });
     expect(arg.take).toBe(5);
   });
@@ -179,5 +184,55 @@ describe("mensagem avulsa no WhatsApp oficial (janela de 24h)", () => {
     await runBroadcast("b1");
 
     expect(deliver.mock.calls[0][0].template).toEqual({ name: "lembrete", languageCode: "pt_BR", parameters: [] });
+  });
+});
+
+describe("disparo grande sai em partes", () => {
+  /** Último parâmetro do CASE: quantos ainda faltam nesta parte. */
+  const faltam = () => (db.$executeRaw.mock.calls.at(-1) as unknown as unknown[])[5];
+
+  it("continua de onde parou: quem já tem registro do disparo não recebe de novo", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo({ channel: "whatsapp_meta", templateId: "t1" }));
+    db.outboundQueueItem.findMany.mockResolvedValue([{ contactId: "5511999990001" }]);
+    deliver.mockResolvedValue({ ok: true, id: "w" });
+
+    const r = await runBroadcast("b1");
+
+    expect(deliver.mock.calls.map((c) => c[0].to)).toEqual(["5511999990002", "5511999990003"]);
+    expect(r).toMatchObject({ totalCount: 3, sentCount: 2 });
+    expect(faltam()).toBe(0);
+  });
+
+  it("tempo da parte acabou: grava o que saiu e fica 'sending' para a próxima batida", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo({ channel: "whatsapp_meta", templateId: "t1" }));
+
+    await runBroadcast("b1", Date.now() - 1);
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(faltam()).toBe(3);
+  });
+
+  it("falha deixa registro, para não ser tentada a cada batida", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo({ channel: "whatsapp_meta", templateId: "t1", manualRecipients: ["5511999990001"] }));
+    deliver.mockResolvedValue({ ok: false, error: "Número inválido" });
+
+    await runBroadcast("b1");
+
+    expect(db.outboundQueueItem.create.mock.calls[0][0].data).toMatchObject({
+      broadcastId: "b1",
+      contactId: "5511999990001",
+      status: "failed",
+      error: "Número inválido",
+    });
+  });
+
+  it("outra rodada do mesmo disparo em andamento: não envia nada", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo());
+    vez.mockResolvedValue({ allowed: false });
+
+    await runBroadcast("b1");
+
+    expect(deliver).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
   });
 });

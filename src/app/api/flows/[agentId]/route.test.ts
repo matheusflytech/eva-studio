@@ -11,8 +11,12 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/auth/require-org", () => ({ requireOrgId: vi.fn(async () => "o1") }));
+vi.mock("@/lib/server/permissions", () => ({
+  requirePermission: vi.fn(async () => ({ userId: "u1", orgId: "o1", role: "admin" })),
+}));
 
 import { PUT } from "./route";
+import { requirePermission } from "@/lib/server/permissions";
 
 const params = Promise.resolve({ agentId: "a1" });
 const put = (body: unknown) => PUT(new Request("https://eva.test/api", { method: "PUT", body: JSON.stringify(body) }), { params });
@@ -29,6 +33,13 @@ beforeEach(() => {
 });
 
 describe("salvamento interno do Builder", () => {
+  it("salvar exige agents:manage (Leitura não altera o fluxo)", async () => {
+    vi.mocked(requirePermission).mockResolvedValueOnce({ error: "Seu perfil não tem permissão para essa ação.", status: 403 });
+    expect((await put({ nodes: [no("a", "start")], edges: [] })).status).toBe(403);
+    expect(requirePermission).toHaveBeenCalledWith("agents:manage");
+    expect(db.agentFlow.upsert).not.toHaveBeenCalled();
+  });
+
   it("bloco pela metade salva e devolve os avisos (o canvas salva enquanto a pessoa monta)", async () => {
     const res = await put({ nodes: [no("a", "start"), no("b", "message", { detail: "" })], edges: [{ id: "e", source: "a", target: "b" }] });
     expect(res.status).toBe(200);

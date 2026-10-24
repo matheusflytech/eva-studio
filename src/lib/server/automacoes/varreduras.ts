@@ -5,7 +5,7 @@ import { diaEmSP, somarDias, diaDaSemana } from "@/lib/tarefas/calendario";
 import { gatilhoDoTipo } from "@/lib/automacoes/catalogo";
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
-import { inscrever, type AutomacaoParaInscrever } from "./inscricao";
+import { chaveDaInscricao, inscrever, type AutomacaoParaInscrever } from "./inscricao";
 import { executarExecucao } from "./executor";
 import { limparHistoricoVencido } from "@/lib/server/historico";
 
@@ -46,7 +46,7 @@ const COLUNAS_DE_DATA: Record<string, Record<string, string>> = {
 const TABELAS: Record<string, string> = { deal: "eva_studio_deals", contact: "eva_studio_contacts", company: "eva_studio_companies" };
 
 /** Ids dos registros cuja data (+dias) cai hoje em SP. Campo personalizado guarda "AAAA-MM-DD". */
-async function registrosDaData(a: Ativa, c: Record<string, unknown>, agora: Date): Promise<string[]> {
+async function registrosDaData(a: Ativa, c: Record<string, unknown>, agora: Date, depois?: string): Promise<string[]> {
   const tabela = TABELAS[a.objeto];
   if (!tabela) return [];
   const campo = String(c.campo ?? "").replace(/^registro\./, "");
@@ -60,22 +60,30 @@ async function registrosDaData(a: Ativa, c: Record<string, unknown>, agora: Date
   // Nome de tabela/coluna vem de lista fixa acima; valores vão como parâmetro.
   const expr = coluna ? `("${coluna}" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date` : `NULLIF(substring("customFields"->>$3 from '^\\d{4}-\\d{2}-\\d{2}'), '')::date`;
   const filtro = todoAno ? `to_char(${expr}, 'MM-DD') = $2` : `${expr} = $2::date`;
-  const sql = `SELECT "id" FROM "${tabela}" WHERE "orgId" = $1 AND ${filtro} LIMIT ${POR_AUTOMACAO}`;
-  const linhas = await prisma.$queryRawUnsafe<{ id: string }[]>(sql, a.orgId, todoAno ? md : dia(alvo), ...(personalizado ? [personalizado] : []));
+  const params: unknown[] = [a.orgId, todoAno ? md : dia(alvo), ...(personalizado ? [personalizado] : [])];
+  const cursor = depois ? ` AND "id" > $${params.push(depois)}` : "";
+  const sql = `SELECT "id" FROM "${tabela}" WHERE "orgId" = $1 AND ${filtro}${cursor} ORDER BY "id" LIMIT ${POR_AUTOMACAO}`;
+  const linhas = await prisma.$queryRawUnsafe<{ id: string }[]>(sql, ...params);
   return linhas.map((l) => l.id);
 }
 
-/** Quem atende o gatilho de varredura agora, com a "origem" que dá a chave do período. */
-async function candidatos(a: Ativa, agora: Date): Promise<{ id: string; origem: string; gatilho: Record<string, unknown> }[]> {
+/**
+ * Quem atende o gatilho de varredura agora, com a "origem" que dá a chave do
+ * período. Uma página por vez, em ordem de id, a partir de `depois`.
+ */
+async function candidatos(a: Ativa, agora: Date, depois?: string): Promise<{ id: string; origem: string; gatilho: Record<string, unknown> }[]> {
   const g = a.definicao.gatilho;
   if (!g) return [];
   const c = g.config ?? {};
   const hoje = dia(diaEmSP(agora));
+  const apos = depois ? { id: { gt: depois } } : {};
+  const pagina = { orderBy: { id: "asc" as const }, take: POR_AUTOMACAO };
   switch (g.tipo) {
     case "deal.stale": {
       const limite = new Date(agora.getTime() - (Number(c.dias) || 7) * 86_400_000);
       const deals = await prisma.deal.findMany({
         where: {
+          ...apos,
           orgId: a.orgId,
           closedAt: null,
           archivedAt: null,
@@ -84,20 +92,20 @@ async function candidatos(a: Ativa, agora: Date): Promise<{ id: string; origem: 
           OR: [{ activity: { is: null } }, { activity: { lastActivityAt: { lte: limite } } }],
         },
         select: { id: true, stageSince: true, stageId: true },
-        take: POR_AUTOMACAO,
+        ...pagina,
       });
       return deals.map((d) => ({ id: d.id, origem: `parado:${d.stageId}:${d.stageSince.toISOString()}`, gatilho: { tipo: g.tipo, stage_id: d.stageId } }));
     }
     case "task.overdue": {
       const limite = new Date(agora.getTime() - (Number(c.horas) || 0) * 3_600_000);
-      const tarefas = await prisma.task.findMany({ where: { orgId: a.orgId, doneAt: null, dueAt: { lte: limite } }, select: { id: true, dueAt: true }, take: POR_AUTOMACAO });
+      const tarefas = await prisma.task.findMany({ where: { ...apos, orgId: a.orgId, doneAt: null, dueAt: { lte: limite } }, select: { id: true, dueAt: true }, ...pagina });
       return tarefas.map((t) => ({ id: t.id, origem: `atrasada:${t.dueAt?.toISOString()}`, gatilho: { tipo: g.tipo, due_at: t.dueAt?.toISOString() } }));
     }
     case "deal.date_relative":
     case "contact.date_relative":
     case "company.date_relative": {
       if (!passouDaHora(agora, c.hora)) return [];
-      const ids = await registrosDaData(a, c, agora);
+      const ids = await registrosDaData(a, c, agora, depois);
       return ids.map((id) => ({ id, origem: `data:${hoje}`, gatilho: { tipo: g.tipo, dia: hoje } }));
     }
     case "deal.schedule":
@@ -107,37 +115,38 @@ async function candidatos(a: Ativa, agora: Date): Promise<{ id: string; origem: 
       const origem = `agendado:${hoje}`;
       if (g.tipo === "deal.schedule") {
         const deals = await prisma.deal.findMany({
-          where: { orgId: a.orgId, closedAt: null, archivedAt: null, ...(c.funil ? { pipelineId: String(c.funil) } : {}), ...(c.etapa ? { stageId: String(c.etapa) } : {}) },
+          where: { ...apos, orgId: a.orgId, closedAt: null, archivedAt: null, ...(c.funil ? { pipelineId: String(c.funil) } : {}), ...(c.etapa ? { stageId: String(c.etapa) } : {}) },
           select: { id: true },
-          take: POR_AUTOMACAO,
+          ...pagina,
         });
         return deals.map((d) => ({ id: d.id, origem, gatilho: { tipo: g.tipo, dia: hoje } }));
       }
       const seg = await prisma.segment.findFirst({ where: { id: String(c.segmento ?? ""), orgId: a.orgId } });
       if (!seg) return [];
-      const contatos = await prisma.contact.findMany({ where: buildSegmentWhere(a.orgId, seg.match, parseRules(seg.rules)), select: { id: true }, take: POR_AUTOMACAO });
+      const contatos = await prisma.contact.findMany({ where: { AND: [buildSegmentWhere(a.orgId, seg.match, parseRules(seg.rules)), apos] }, select: { id: true }, ...pagina });
       return contatos.map((x) => ({ id: x.id, origem, gatilho: { tipo: g.tipo, dia: hoje } }));
     }
     case "conversation.no_reply": {
       const limite = new Date(agora.getTime() - (Number(c.horas) || 24) * 3_600_000);
       const conversas = await prisma.conversation.findMany({
         where: {
+          ...apos,
           agent: { orgId: a.orgId },
           lastMessageRole: { in: ["bot", "human"] },
           lastMessageAt: { lte: limite },
           channel: c.canal ? String(c.canal) : { notIn: ["playground", "builder_preview"] },
         },
         select: { id: true, lastMessageAt: true },
-        take: POR_AUTOMACAO,
+        ...pagina,
       });
       return conversas.map((x) => ({ id: x.id, origem: `sem_resposta:${x.lastMessageAt.toISOString()}`, gatilho: { tipo: g.tipo, last_message_at: x.lastMessageAt.toISOString() } }));
     }
     case "conversation.waiting_human": {
       const limite = new Date(agora.getTime() - (Number(c.minutos) || 5) * 60_000);
       const conversas = await prisma.conversation.findMany({
-        where: { agent: { orgId: a.orgId }, status: "waiting_human", updatedAt: { lte: limite } },
+        where: { ...apos, agent: { orgId: a.orgId }, status: "waiting_human", updatedAt: { lte: limite } },
         select: { id: true, updatedAt: true },
-        take: POR_AUTOMACAO,
+        ...pagina,
       });
       return conversas.map((x) => ({ id: x.id, origem: `fila:${x.updatedAt.toISOString()}`, gatilho: { tipo: g.tipo } }));
     }
@@ -166,11 +175,21 @@ export async function rodarAutomacoes(opcoes: { orcamentoMs?: number; agora?: Da
       const item = definicao?.gatilho ? gatilhoDoTipo(definicao.gatilho.tipo) : undefined;
       if (item?.modo !== "varredura") continue;
       try {
-        for (const cand of await candidatos({ ...a, definicao }, agora)) {
-          if (Date.now() > fim) break;
-          const x = await inscrever(a, cand.id, { origem: cand.origem, gatilho: cand.gatilho });
-          if (x.inscrita) r.inscritas++;
-        }
+        // Página por página: os já inscritos do começo não seguram os de depois.
+        let depois: string | undefined;
+        do {
+          const lista = await candidatos({ ...a, definicao }, agora, depois);
+          // Quem já entrou neste período (mesma chave) sai com uma consulta por página.
+          const novos = new Map(lista.map((cand) => [chaveDaInscricao(a.id, cand.id, cand.origem), cand]));
+          const ja = await prisma.automacaoExecucao.findMany({ where: { chave: { in: [...novos.keys()] } }, select: { chave: true } });
+          for (const x of ja) novos.delete(x.chave);
+          for (const cand of novos.values()) {
+            if (Date.now() > fim) break;
+            const x = await inscrever(a, cand.id, { origem: cand.origem, gatilho: cand.gatilho });
+            if (x.inscrita) r.inscritas++;
+          }
+          depois = lista.length === POR_AUTOMACAO ? lista[lista.length - 1].id : undefined;
+        } while (depois && Date.now() <= fim);
       } catch (e) {
         console.error("[automacoes] varredura falhou", a.id, e instanceof Error ? e.message : e);
       }
