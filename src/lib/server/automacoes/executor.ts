@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { comAtor } from "@/lib/server/eventos/barramento";
 import { acaoDoTipo } from "@/lib/automacoes/catalogo";
 import { dentroDaJanela, proximaJanela } from "@/lib/automacoes/calendario";
@@ -140,21 +141,26 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
   const testeReal = exec.teste && !!variaveis.__testeReal;
   const objetivo = exec.automacao.objetivo as Regra | null;
 
+  // Lease desta rodada. Toda gravação confere que ele ainda é nosso: se o
+  // relógio devolveu a execução à fila (lease vencido) e outra batida pegou,
+  // esta rodada para sem gravar, em vez de repetir passos e brigar pelo status.
+  let lease = exec.travadaAte;
+  const gravar = async (data: Prisma.AutomacaoExecucaoUpdateManyMutationInput) =>
+    (await prisma.automacaoExecucao.updateMany({ where: { id, status: "rodando", travadaAte: lease }, data })).count > 0;
+
   const finalizar = async (status: Fim, erro?: string) => {
     const fim = agora();
-    await prisma.automacaoExecucao.update({
-      where: { id },
-      data: {
-        status,
-        erro: erro ?? null,
-        noAtual,
-        variaveis: variaveis as object,
-        terminadaEm: fim,
-        duracaoMs: fim.getTime() - (exec.iniciadaEm ?? exec.createdAt).getTime(),
-        proximaEm: null,
-        travadaAte: null,
-      },
+    const nossa = await gravar({
+      status,
+      erro: erro ?? null,
+      noAtual,
+      variaveis: variaveis as object,
+      terminadaEm: fim,
+      duracaoMs: fim.getTime() - (exec.iniciadaEm ?? exec.createdAt).getTime(),
+      proximaEm: null,
+      travadaAte: null,
     });
+    if (!nossa) return null;
     await prisma.automacaoEspera.deleteMany({ where: { execucaoId: id } });
     if (exec.teste) return { status };
     if (status === "falhou") {
@@ -172,11 +178,8 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
   };
 
   const dormir = async (ate: Date) => {
-    await prisma.automacaoExecucao.update({
-      where: { id },
-      data: { status: "esperando", noAtual, variaveis: variaveis as object, proximaEm: ate, travadaAte: null },
-    });
-    return { status: "esperando" };
+    const nossa = await gravar({ status: "esperando", noAtual, variaveis: variaveis as object, proximaEm: ate, travadaAte: null });
+    return nossa ? { status: "esperando" } : null;
   };
 
   // Automação pausada (ou desligada) depois de inscrever: a execução espera, não some.
@@ -186,6 +189,11 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
   }
 
   for (let rodada = 0; rodada < PASSOS_POR_RODADA; rodada++) {
+    // Antes de cada passo: grava onde está e renova o lease.
+    const renovado = new Date(Date.now() + LEASE_SEG * 1000);
+    if (!(await gravar({ noAtual, variaveis: variaveis as object, travadaAte: renovado }))) return null;
+    lease = renovado;
+
     variaveis.__contagem = (variaveis.__contagem ?? 0) + 1;
     if (variaveis.__contagem > MAX_PASSOS) return finalizar("falhou", `Mais de ${MAX_PASSOS} passos numa execução (loop?).`);
 
@@ -318,9 +326,6 @@ export async function executarExecucao(id: string, opcoes: OpcoesDoExecutor = {}
   }
 
   // Rodada cheia: volta para a fila e a próxima batida continua.
-  await prisma.automacaoExecucao.update({
-    where: { id },
-    data: { status: "pendente", noAtual, variaveis: variaveis as object, proximaEm: agora(), travadaAte: null },
-  });
-  return { status: "pendente" };
+  const nossa = await gravar({ status: "pendente", noAtual, variaveis: variaveis as object, proximaEm: agora(), travadaAte: null });
+  return nossa ? { status: "pendente" } : null;
 }
