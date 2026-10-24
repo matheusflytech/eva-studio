@@ -54,6 +54,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ag
     if (!credentialId) {
       return NextResponse.json({ error: "Escolha a credencial do provedor de embedding." }, { status: 400 });
     }
+    if (!(await prisma.credential.findFirst({ where: { id: credentialId, orgId: ctx.orgId }, select: { id: true } }))) {
+      return NextResponse.json({ error: "Credencial não encontrada." }, { status: 400 });
+    }
     await prisma.agent.update({
       where: { id: agentId },
       data: { embeddingModel: modelId, embeddingCredentialId: credentialId, embeddingProvider: model.provider },
