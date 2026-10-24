@@ -43,7 +43,7 @@ export function ModalContent({
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col",
           "rounded-[22px] border border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none",
-          "data-[state=open]:animate-[ds-modal-in_320ms_cubic-bezier(.32,.72,0,1)]",
+          "data-[state=open]:animate-[ds-modal-in_var(--dur-slow)_var(--ease-out)]",
           larguras[size],
           className
         )}

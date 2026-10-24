@@ -127,7 +127,7 @@ export const Select = React.forwardRef<HTMLSelectElement, Props>(
               <ChevronDown
                 size={14}
                 aria-hidden="true"
-                className="shrink-0 text-text-tertiary transition-transform duration-200 ease-[cubic-bezier(.32,.72,0,1)] group-data-[state=open]:rotate-180"
+                className="shrink-0 text-text-tertiary transition-transform duration-[var(--dur-base)] ease-out group-data-[state=open]:rotate-180"
               />
             </button>
           </Menu.Trigger>

@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion, type Transition } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Database, GitBranch, MessageCircle, Search, Users, Webhook, X, type LucideIcon } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { acoesDoObjeto, configPadrao, EVENTOS_DE_ESPERA, type GrupoDeAcao } from "@/lib/automacoes/catalogo";
 import { novoId, saidaPrincipal, saidasDe, type No, type Objeto } from "@/lib/automacoes/tipos";
 import { IconeDoPasso, visualDoPasso, type VisualDoPasso } from "./comum";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // O "+" do canvas abre o painel "O que vem depois?" à direita: busca no topo
@@ -81,7 +82,6 @@ interface Opcao {
 // Busca sem acento e sem caixa: "acao" acha "Ação".
 const normal = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-const MOLA: Transition = { type: "spring", stiffness: 420, damping: 32, mass: 0.8 };
 
 function Linha({
   icone: Icone,

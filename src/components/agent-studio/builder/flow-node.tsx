@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Handle, Position, useNodeConnections, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
-import { motion, useReducedMotion, type Transition } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
@@ -13,6 +13,7 @@ import { validateNode } from "./block-validation";
 import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
 import { fonteDaIa } from "./fonte-da-ia";
 import { ESTILO_DA_SAIDA } from "./saida-estilo";
+import { MOLA } from "@/lib/design-system/movimento";
 
 export interface MenuOption {
   id: string;
@@ -171,7 +172,6 @@ export function alturaDoQuadrado(saidas: number): number {
 }
 
 // Mola curta e firme (mesma do canvas de automações). Só transform/opacity.
-const MOLA: Transition = { type: "spring", stiffness: 420, damping: 30, mass: 0.8 };
 
 // Luz fraca vinda de cima: o quadrado parece elevado sem sombra em repouso.
 const LUZ_DE_CIMA = "linear-gradient(180deg, color-mix(in srgb, var(--text-primary) 6%, transparent), transparent 62%)";

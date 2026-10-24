@@ -36,6 +36,7 @@ import { cn, formatRelativeDate } from "@/lib/utils";
 import { CHANNEL_LABEL, SOURCE_LABEL, nomeDoContato, type Contact } from "./tipos";
 import { CabecalhoDeContatos, type AbaDeContatos } from "./cabecalho";
 import { FotoDoContato } from "./foto-do-contato";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Lista de contatos: visões salvas em cápsula com contagem, busca + "Filtros"
@@ -582,7 +583,7 @@ export function ListaDeContatos({
               className="hidden min-w-0 flex-1 lg:block"
               initial={calmo ? { opacity: 0 } : { opacity: 0, x: 32 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.8 }}
+              transition={MOLA}
             >
               {painel}
             </motion.div>

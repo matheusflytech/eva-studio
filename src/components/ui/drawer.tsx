@@ -38,7 +38,7 @@ export function DrawerContent({
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn(
           "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden border-l border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none sm:inset-y-3 sm:right-3 sm:rounded-[22px] sm:border",
-          "data-[state=open]:animate-[ds-slide-in-right_380ms_cubic-bezier(.32,.72,0,1)]",
+          "data-[state=open]:animate-[ds-slide-in-right_var(--dur-slow)_var(--ease-out)]",
           larguras[size],
           className
         )}

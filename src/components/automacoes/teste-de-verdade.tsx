@@ -13,6 +13,7 @@ import { passosComProblema, planoDoTeste } from "@/lib/automacoes/teste";
 import type { Definicao } from "@/lib/automacoes/tipos";
 import { cn } from "@/lib/utils";
 import type { EstadoDoNo } from "./canvas";
+import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Testar de verdade, sem janela por cima do quadro: uma confirmação curta
@@ -30,7 +31,6 @@ interface Inicio { execucaoId: string; objeto: Definicao["objeto"]; objetoId: st
 const CHAVE_DO_TELEFONE = "eva:teste:whatsapp";
 const CHAVE_DO_EMAIL = "eva:teste:email";
 const FIM = new Set(["concluida", "falhou", "cancelada", "objetivo"]);
-const MOLA = { type: "spring", stiffness: 420, damping: 34, mass: 0.8 } as const;
 
 function lerGuardado(chave: string): string {
   try {

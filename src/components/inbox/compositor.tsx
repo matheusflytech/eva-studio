@@ -345,7 +345,7 @@ export function Compositor({
             <p className="truncate text-small text-text-primary">{anexo?.name ?? subindo?.nome}</p>
             {subindo ? (
               <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-hover">
-                <div className="h-1 rounded-full bg-accent-solid transition-all" style={{ width: `${subindo.pct}%` }} />
+                <div className="h-1 rounded-full bg-accent-solid transition-[width] duration-[var(--dur-base)] ease-out" style={{ width: `${subindo.pct}%` }} />
               </div>
             ) : (
               <p className="text-caption text-text-tertiary">{tamanhoLegivel(anexo?.size ?? 0)}</p>

@@ -167,7 +167,7 @@ export function DealCard({
       data-cartao
       className={cn(
         "relative flex flex-col rounded-[16px] border border-border-subtle bg-panel",
-        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-200 ease-[cubic-bezier(.2,0,0,1)]",
+        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] ease-out",
         "group-hover/card:-translate-y-0.5 group-hover/card:border-border-default group-hover/card:shadow-[0_8px_24px_-12px_rgb(0_0_0/0.18)]",
         compacto ? "gap-2 p-2.5" : "gap-2.5 p-3",
         arrastando && "border-border-default shadow-overlay",
