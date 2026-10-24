@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import NextLink from "next/link";
 import { usePathname } from "@/lib/contrato/navegacao";
 import { ArrowLeftRight, Check, ChevronsUpDown, HelpCircle, ImageUp, Keyboard, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
@@ -53,8 +54,13 @@ export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
   return (
     <DropdownMenu open={aberto} onOpenChange={setAberto}>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-      {/* Véu desfocado: o menu é uma camada por cima da tela, não um balão solto. */}
-      {aberto && <div className="fixed inset-0 z-40 bg-backdrop backdrop-blur-md motion-safe:animate-[ds-fade-in_200ms_ease-out]" aria-hidden="true" />}
+      {/* Véu desfocado: o menu é uma camada por cima da tela, não um balão solto.
+          No body: dentro da barra lateral (que tem backdrop-blur) o "fixed" ficaria preso a ela. */}
+      {aberto &&
+        createPortal(
+          <div className="fixed inset-0 z-40 bg-backdrop backdrop-blur-md motion-safe:animate-[ds-fade-in_200ms_ease-out]" aria-hidden="true" />,
+          document.body
+        )}
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
