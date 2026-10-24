@@ -48,6 +48,7 @@ import { useFicha } from "@/components/crm/negocio/use-ficha";
 import type { ItemDoNegocio } from "@/lib/produtos";
 import type { FocoDoPainel } from "./quadro-contexto";
 import { CURVA, gsap, reduzMovimento, useGSAP } from "./animacao/gsap";
+import { editoresDoPainel } from "./detalhes-editaveis";
 
 export interface EtapaDaPrevia {
   id: string;
@@ -81,7 +82,7 @@ const ICONE_DO_CAMPO: Partial<Record<CampoDoCartao, LucideIcon>> = {
 /**
  * "Detalhes" do painel (e a prévia ao vivo da configuração do cartão): os
  * campos que a pessoa escolheu, cada um com ícone, rótulo e valor. A etapa
- * pode virar um seletor (`etapaEditavel`), que move com as regras.
+ * podem virar editores (`editor`, no painel do quadro), salvando no lugar.
  */
 export function ConteudoDaPrevia({
   deal,
@@ -89,15 +90,15 @@ export function ConteudoDaPrevia({
   layout,
   defs,
   agora,
-  etapaEditavel,
+  editor,
 }: {
   deal: NegocioKanban;
   etapa: EtapaDaPrevia;
   layout: LayoutDoCartao;
   defs: DefinicaoDeCampo[];
   agora: Date;
-  /** Seletor de etapa no lugar do texto (painel do quadro). */
-  etapaEditavel?: React.ReactNode;
+  /** Editor da linha no lugar do texto (undefined = só leitura). */
+  editor?: (campo: CampoDoCartao) => React.ReactNode | undefined;
   /** Compatibilidade: o título agora mora no topo do painel. */
   idDoTitulo?: string;
   comLink?: boolean;
@@ -117,9 +118,10 @@ export function ConteudoDaPrevia({
       <dl className="flex flex-col">
         {layout.previa.map((campo) => {
           const Icone = ehPersonalizado(campo) ? Tag : ICONE_DO_CAMPO[campo] ?? Tag;
+          const editavel = editor?.(campo);
           const valor =
-            campo === "etapa" && etapaEditavel ? (
-              etapaEditavel
+            editavel !== undefined ? (
+              editavel
             ) : campo === "proximoPasso" ? (
               <SinalDoProximoPasso deal={deal} tipoDaEtapa={etapa.type} agora={agora} prazoParado={etapa.rottingDays} />
             ) : campo === "valor" ? (
@@ -439,7 +441,18 @@ export function PreviaDoNegocio({
 
             {secao === "detalhes" && (
               <>
-                <ConteudoDaPrevia deal={deal} etapa={etapa} layout={layout} defs={defs} agora={agora} etapaEditavel={seletorDeEtapa} />
+                <ConteudoDaPrevia
+                  deal={deal}
+                  etapa={etapa}
+                  layout={layout}
+                  defs={defs}
+                  agora={agora}
+                  editor={
+                    ficha.deal
+                      ? editoresDoPainel({ deal: ficha.deal, defs, membros: ficha.membros, patch: ficha.patch, onSalvou: onMudou, seletorDeEtapa })
+                      : (campo) => (campo === "etapa" ? seletorDeEtapa : undefined)
+                  }
+                />
                 {aberto && (etapaGanha || etapaPerdida) && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {etapaGanha && (
