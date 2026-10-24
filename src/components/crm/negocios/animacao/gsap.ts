@@ -14,7 +14,7 @@ CustomEase.create("eva-out", "0.32,0.72,0,1");
 CustomEase.create("eva-in", "0.4,0,1,1");
 
 /** Curvas do quadro: entrar e voar com --ease-out, sair com --ease-in. */
-export const CURVA = { entrada: "eva-out", voo: "eva-out", saida: "eva-in" } as const;
+export const CURVA = { entrada: "eva-out", saida: "eva-in" } as const;
 
 /** Quem pediu menos movimento ao sistema só vê esmaecer. */
 export function reduzMovimento(): boolean {

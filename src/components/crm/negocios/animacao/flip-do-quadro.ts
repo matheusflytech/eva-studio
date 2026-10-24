@@ -50,7 +50,7 @@ export function useFlipDoQuadro(ref: React.RefObject<HTMLElement | null>, coluna
       Flip.from(f.estado, {
         targets: gsap.utils.toArray<HTMLElement>("[data-deal-id]", raiz),
         duration: 0.4,
-        ease: CURVA.voo,
+        ease: CURVA.entrada,
         prune: true,
       });
     },

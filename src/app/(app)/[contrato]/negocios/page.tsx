@@ -274,6 +274,9 @@ function NegociosConteudo() {
     if (!pronto) return;
     const { pipelineId: funil, filtro: f } = JSON.parse(chaveAtrasada) as { pipelineId: string; filtro: unknown };
     const carga = ++ultimaCarga.current;
+    // Lido já na partida: se esta carga for descartada, a marca não vaza para a próxima.
+    const silenciosa = deFundo.current;
+    deFundo.current = false;
     let vivo = true;
     const q = new URLSearchParams({ pipeline: funil, porEtapa: String(POR_ETAPA), filtro: JSON.stringify(f) });
     Promise.all([fetch(`/api/deals?${q}`), fetch(`/api/deals/funil?pipeline=${funil}`).catch(() => null)])
@@ -283,8 +286,7 @@ function NegociosConteudo() {
         const dadosDoFunil = funilRes?.ok ? await funilRes.json().catch(() => null) : null;
         if (!vivo || carga !== ultimaCarga.current) return;
         const campos: DefinicaoDeCampo[] = data.fields ?? [];
-        if (deFundo.current) {
-          deFundo.current = false;
+        if (silenciosa) {
           // Recarga silenciosa no meio de um arrasto: descarta (a próxima pega).
           if (arrastandoAgora.current) return;
           // Quem outra pessoa mudou de coluna desliza até o lugar novo.
@@ -563,6 +565,8 @@ function NegociosConteudo() {
     const para = stages.find((s) => s.id === stageId);
     if (!para || !quadro) return;
     const antes = stages;
+    // Uma recarga silenciosa já a caminho traria o cartão de volta à coluna antiga: descarta.
+    ultimaCarga.current++;
     // Move na tela antes da resposta: esperar o servidor deixa o quadro lento.
     // Perdido não: o modal do motivo vem antes.
     if (para.type !== "lost") {

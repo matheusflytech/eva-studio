@@ -22,7 +22,7 @@ export function useInclinacaoNoArrasto(): (el: HTMLElement | null) => void {
     () => {
       if (!el || reduzMovimento()) return;
       gsap.to(el, { scale: 1.03, duration: 0.18, ease: CURVA.entrada });
-      const girar = gsap.quickTo(el, "rotation", { duration: 0.3, ease: CURVA.voo });
+      const girar = gsap.quickTo(el, "rotation", { duration: 0.3, ease: CURVA.entrada });
       let ultimo: { x: number; t: number } | null = null;
       let parado: number | undefined;
       const aoMover = (e: PointerEvent) => {
