@@ -42,7 +42,7 @@ export function TrocarFoto({
 }: {
   endpoint: string;
   temFoto: boolean;
-  /** De quem é a foto ("Marcelo Duarte", "você"): entra no rótulo do botão. */
+  /** De quem é a foto ("Marcelo Duarte", "perfil"): entra no rótulo do botão. */
   rotulo: string;
   onMudou: (avatarPath: string | null) => void;
   children: React.ReactNode;

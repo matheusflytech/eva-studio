@@ -234,7 +234,7 @@ export function AbaMembros() {
       <div className={pode ? "border-t border-border-subtle pt-5" : undefined}>
         {eu && (
           <div className="mb-5 flex items-center gap-3">
-            <TrocarFoto endpoint="/api/me/foto" temFoto={!!eu.avatarPath} rotulo="você" onMudou={() => void carregar()}>
+            <TrocarFoto endpoint="/api/me/foto" temFoto={!!eu.avatarPath} rotulo="perfil" onMudou={() => void carregar()}>
               <Avatar name={eu.name || eu.email} src={urlDoAvatar(eu.avatarPath)} size="lg" />
             </TrocarFoto>
             <div className="min-w-0">
