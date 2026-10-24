@@ -219,7 +219,7 @@ export function MontarComIa({
       </button>
 
       {anterior && (
-        <div className="fixed bottom-6 left-1/2 z-40 flex w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-[22px] border border-border-subtle bg-overlay/90 px-4 py-3 shadow-overlay backdrop-blur-xl">
+        <div className="fixed bottom-6 left-1/2 z-40 flex w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-[22px] border border-border-subtle bg-overlay px-4 py-3 shadow-overlay">
           <MarcaEva size={15} className="shrink-0 text-text-secondary" />
           <span className="text-small text-text-primary">
             Rascunho da IA no canvas. O construtor salva sozinho, como em qualquer edição: revise os blocos ou desfaça para voltar ao fluxo de antes.

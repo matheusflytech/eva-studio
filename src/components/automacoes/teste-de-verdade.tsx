@@ -205,7 +205,7 @@ export function TesteDeVerdade({
       transition={MOLA}
       role="dialog"
       aria-label="Testar de verdade"
-      className="pointer-events-auto w-[380px] max-w-[calc(100vw-48px)] overflow-hidden rounded-[22px] border border-border-default bg-overlay/95 shadow-[var(--elevation-overlay)] backdrop-blur-xl"
+      className="pointer-events-auto w-[380px] max-w-[calc(100vw-48px)] overflow-hidden rounded-[22px] border border-border-default bg-overlay shadow-[var(--elevation-overlay)]"
     >
       <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3">
         <FlaskConical size={15} aria-hidden="true" className="text-accent-fg" />

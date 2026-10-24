@@ -353,7 +353,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       {/* Barra flutuante de salvar. Exclusão é rara e sem volta: fica discreta,
           em texto vermelho, não em botão cheio. */}
       {mostrarBarra && (
-        <div className="sticky bottom-4 z-10 mt-2 flex items-center justify-between gap-3 rounded-full border border-border-subtle bg-overlay/90 p-1.5 pl-2 shadow-overlay backdrop-blur-xl">
+        <div className="sticky bottom-4 z-10 mt-2 flex items-center justify-between gap-3 rounded-full border border-border-subtle bg-overlay p-1.5 pl-2 shadow-overlay">
           {isEdit ? (
             <Button type="button" variant="ghost" size="md" onClick={handleDelete} className="text-danger hover:text-danger">
               <Trash2 size={14} aria-hidden="true" /> Excluir agente
