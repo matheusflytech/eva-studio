@@ -156,14 +156,24 @@ export async function enrollByDealStage(limitPerSequence = 200): Promise<number>
   for (const sequence of sequences) {
     const corte = new Date(Date.now() - sequence.triggerStageDays * 86_400_000);
 
+    // Só contatos que ainda não estão na régua (mesma regra do segmento): sem
+    // isso, com reentrada, a régua recomeçava do passo 1 a cada minuto, e sem
+    // reentrada os mesmos 200 negócios voltavam sempre e os outros nunca.
+    const elegivel = {
+      optIn: true,
+      enrollments: sequence.allowReentry
+        ? { none: { sequenceId: sequence.id, status: "active" } }
+        : { none: { sequenceId: sequence.id } },
+    };
     const deals = await prisma.deal.findMany({
       where: {
         stageId: sequence.triggerStageId!,
         closedAt: null,
         archivedAt: null,
         stageSince: { lte: corte },
+        contacts: { some: { contact: elegivel } },
       },
-      select: { contacts: { select: { contactId: true } } },
+      select: { contacts: { where: { contact: elegivel }, select: { contactId: true } } },
       take: limitPerSequence,
     });
 
@@ -203,6 +213,13 @@ export async function processDueEnrollments(limit = 50): Promise<ProcessResult> 
   });
 
   for (const enrollment of due) {
+    // Reserva antes de enviar: uma rodada que leu a mesma inscrição não acha
+    // mais o nextRunAt lido e pula. Se o envio morrer no meio, volta em 10 min.
+    const reservada = await prisma.sequenceEnrollment.updateMany({
+      where: { id: enrollment.id, status: "active", nextRunAt: enrollment.nextRunAt },
+      data: { nextRunAt: new Date(Date.now() + 10 * 60_000) },
+    });
+    if (reservada.count === 0) continue;
     result.processed += 1;
     const { sequence, contact } = enrollment;
 
@@ -255,17 +272,7 @@ export async function processDueEnrollments(limit = 50): Promise<ProcessResult> 
         continue;
       }
       result.delivered += 1;
-      if (step.applyTagId) {
-        const { applyTag } = await import("@/lib/server/contacts");
-        await applyTag(contact.id, step.applyTagId);
-      }
-      const seguinte = sequence.steps.find((s) => s.order === step.order + 1);
-      await prisma.sequenceEnrollment.update({
-        where: { id: enrollment.id },
-        data: seguinte
-          ? { currentStep: step.order, nextRunAt: new Date(Date.now() + seguinte.delayMinutes * 60_000) }
-          : { currentStep: step.order, status: "done" },
-      });
+      await concluirPasso(enrollment.id, contact.id, sequence.steps, step);
       continue;
     }
 
@@ -338,22 +345,37 @@ export async function processDueEnrollments(limit = 50): Promise<ProcessResult> 
     }
 
     result.delivered += 1;
-
-    if (step.applyTagId) {
-      const { applyTag } = await import("@/lib/server/contacts");
-      await applyTag(contact.id, step.applyTagId);
-    }
-
-    const nextStep = sequence.steps.find((s) => s.order === step.order + 1);
-    await prisma.sequenceEnrollment.update({
-      where: { id: enrollment.id },
-      data: nextStep
-        ? { currentStep: step.order, nextRunAt: new Date(Date.now() + nextStep.delayMinutes * 60_000) }
-        : { currentStep: step.order, status: "done" },
-    });
+    await concluirPasso(enrollment.id, contact.id, sequence.steps, step);
   }
 
   return result;
+}
+
+/**
+ * Passo entregue: avança a inscrição ANTES de aplicar a etiqueta. Etiqueta
+ * apagada faz o applyTag falhar; se isso viesse antes, a inscrição não andava
+ * e o mesmo passo saía de novo a cada minuto.
+ */
+async function concluirPasso(
+  enrollmentId: string,
+  contactId: string,
+  steps: { order: number; delayMinutes: number }[],
+  step: { order: number; applyTagId: string | null }
+): Promise<void> {
+  const seguinte = steps.find((s) => s.order === step.order + 1);
+  await prisma.sequenceEnrollment.update({
+    where: { id: enrollmentId },
+    data: seguinte
+      ? { currentStep: step.order, nextRunAt: new Date(Date.now() + seguinte.delayMinutes * 60_000) }
+      : { currentStep: step.order, status: "done" },
+  });
+  if (!step.applyTagId) return;
+  try {
+    const { applyTag } = await import("@/lib/server/contacts");
+    await applyTag(contactId, step.applyTagId);
+  } catch (e) {
+    console.error("[sequencias] etiqueta do passo não aplicada", step.applyTagId, e instanceof Error ? e.message : e);
+  }
 }
 
 /** Campos da ficha disponíveis pra interpolar {nome}, {email}, ... no passo. */
