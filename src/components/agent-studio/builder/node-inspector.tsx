@@ -533,6 +533,21 @@ export function NodeInspector({
                 aria-label="Usar o cadastro do agente"
               />
             </label>
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
+              <span>
+                <span className="block text-small font-medium text-text-primary">Balões no WhatsApp</span>
+                <span className="block text-caption text-text-tertiary">
+                  {node.data.aiBaloes === false
+                    ? "A resposta sai numa mensagem só."
+                    : "Resposta longa sai em até 3 mensagens, com “digitando…” entre elas."}
+                </span>
+              </span>
+              <Switch
+                checked={node.data.aiBaloes !== false}
+                onCheckedChange={(v) => onChange({ aiBaloes: v })}
+                aria-label="Balões no WhatsApp"
+              />
+            </label>
             <div>
               <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
               <Input

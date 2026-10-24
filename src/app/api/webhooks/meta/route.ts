@@ -122,6 +122,19 @@ interface EnvioMeta extends DeliverResult {
   pulado?: boolean;
 }
 
+/**
+ * "Digitando…" na conversa antes do próximo balão da IA. Some sozinho quando a
+ * mensagem chega (ou em 25 s) e marca a mensagem do cliente como lida. Falhar
+ * aqui não impede a resposta.
+ */
+async function mostrarDigitando(phoneNumberId: string, accessToken: string, messageId: string) {
+  await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: messageId, typing_indicator: { type: "text" } }),
+  }).catch(() => {});
+}
+
 async function sendMetaMessage(
   phoneNumberId: string,
   accessToken: string,
@@ -380,6 +393,10 @@ async function handleWhatsAppEntries(entries: unknown[]) {
             externalId: message.id,
           });
           for (const reply of result.messages) {
+            if (reply.digitando) {
+              if (message.id) await mostrarDigitando(phoneNumberId, token, message.id);
+              await new Promise((r) => setTimeout(r, reply.digitando));
+            }
             const envio = await sendMetaMessage(phoneNumberId, token, message.from, reply);
             await anotarEnvioDoBot(connection.agentId, "whatsapp_meta", message.from, reply.text, envio);
           }

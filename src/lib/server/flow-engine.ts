@@ -48,6 +48,7 @@ import {
   type CaptureField,
 } from "@/lib/capture-validation";
 import { marcarComoLead } from "@/lib/server/leads";
+import { emBaloes, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
 
 export interface OutboundMessage {
   text: string;
@@ -59,6 +60,9 @@ export interface OutboundMessage {
   // Fora da janela e o bloco tem um modelo aprovado — quem manda de verdade
   // deve usar a API de templates da Meta com esses dados em vez de texto.
   template?: { name: string; languageCode: string; parameters: string[] };
+  // Mostrar "digitando…" por tanto tempo (ms) antes de mandar: os balões
+  // seguintes de uma resposta da IA no WhatsApp (ver respostaDaIa).
+  digitando?: number;
 }
 
 export interface AdvanceInput {
@@ -614,6 +618,14 @@ ${input.anexoContexto}`.trim() : texto;
 // (no Playground e na prévia o erro aparece no log, então não manda nada).
 const MSG_INDISPONIVEL = "Desculpe, estou com muita procura agora. Pode mandar sua mensagem de novo em alguns instantes?";
 const CANAIS_DE_TESTE_DA_IA = ["playground", "builder_preview"];
+
+/** Resposta da IA no jeito do canal: no WhatsApp, sem markdown e em até 3 balões. */
+function respostaDaIa(texto: string, canal: string, node: Node<FlowNodeData>): OutboundMessage[] {
+  if (canal !== "whatsapp_meta" && canal !== "whatsapp_qr") return [{ text: texto }];
+  const t = paraWhatsApp(texto);
+  if (node.data.aiBaloes === false) return [{ text: t }];
+  return emBaloes(t).map((b, i) => (i === 0 ? { text: b } : { text: b, digitando: pausaDeDigitacao(b) }));
+}
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
@@ -1422,7 +1434,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     });
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
-    if (reply.text) messages.push({ text: reply.text });
+    if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
     else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     if (seErrou) currentId = seErrou; // falhou: segue pela saída "Erro"
@@ -1696,7 +1708,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     });
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
-      if (reply.text) messages.push({ text: reply.text });
+      if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, node));
       else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       if (seErrou) {
