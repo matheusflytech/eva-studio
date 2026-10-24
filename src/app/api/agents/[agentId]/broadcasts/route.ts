@@ -60,6 +60,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
       totalCount: b.totalCount,
       sentCount: b.sentCount,
       failedCount: b.failedCount,
+      deliveredCount: b.deliveredCount,
+      readCount: b.readCount,
       status: b.status,
       lastError: b.lastError,
       scheduledAt: b.scheduledAt?.toISOString() ?? null,

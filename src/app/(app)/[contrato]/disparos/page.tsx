@@ -53,6 +53,9 @@ interface BroadcastRow {
   totalCount: number;
   sentCount: number;
   failedCount: number;
+  /** Recibos do WhatsApp (quem desligou a confirmação de leitura nunca conta como lida). */
+  deliveredCount: number;
+  readCount: number;
   status: string;
   lastError: string | null;
   scheduledAt: string | null;
@@ -243,6 +246,7 @@ function DadoDaCampanha({ b }: { b: BroadcastRow }) {
     return (
       <span className="truncate text-small tabular-nums text-text-secondary">
         {b.variants.length > 0 ? `${respostas} ${respostas === 1 ? "resposta" : "respostas"}` : `${b.sentCount} enviados`}
+        {b.readCount > 0 && ` · ${b.readCount} ${b.readCount === 1 ? "lida" : "lidas"}`}
         {b.failedCount > 0 && <span className="text-danger"> · {b.failedCount} falharam</span>}
       </span>
     );
@@ -284,6 +288,15 @@ function DetalheDaCampanha({ b, agentId, onMudou }: { b: BroadcastRow; agentId: 
           </>
         )}
       </div>
+      {!agendado && b.channel.startsWith("whatsapp") && (
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            <Numero rotulo="Entregues" valor={b.deliveredCount} />
+            <Numero rotulo="Lidas" valor={b.readCount} />
+          </div>
+          <p className="text-caption text-text-tertiary">Quem desligou a confirmação de leitura no WhatsApp aparece só como entregue.</p>
+        </div>
+      )}
       {b.status === "sending" && (
         <div className="flex items-center gap-2.5">
           <BarraDeProgresso feito={b.sentCount + b.failedCount} total={b.totalCount} />

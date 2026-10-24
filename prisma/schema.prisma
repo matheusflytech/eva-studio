@@ -555,6 +555,11 @@ model OutboundQueueItem {
   // placar do teste A/B, e por isso e gravado uma vez so (segunda resposta
   // nao conta de novo).
   repliedAt      DateTime?
+  // Id que o WhatsApp deu à mensagem enviada: o recibo de entregue/lida acha o
+  // item por ele e grava quando chegou (uma vez só; é o placar do disparo).
+  externalId     String?
+  deliveredAt    DateTime?
+  readAt         DateTime?
 
   agent     Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
   broadcast Broadcast?        @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
@@ -564,6 +569,7 @@ model OutboundQueueItem {
   @@index([broadcastId])
   @@index([variantId])
   @@index([agentId, contactId, sentAt])
+  @@index([externalId])
   @@map("eva_studio_outbound_queue")
 }
 
@@ -581,6 +587,9 @@ model Broadcast {
   totalCount  Int      @default(0)
   sentCount   Int      @default(0)
   failedCount Int      @default(0)
+  // Recibos do WhatsApp: soma uma vez por mensagem (ver outbound_queue.deliveredAt/readAt).
+  deliveredCount Int   @default(0)
+  readCount      Int   @default(0)
   status      String   @default("sending") // scheduled | sending | done | canceled
   // Como o publico foi escolhido: "manual" = lista colada a mao (comportamento
   // antigo, continua valendo), "segment" = todos os contatos que batem com um
