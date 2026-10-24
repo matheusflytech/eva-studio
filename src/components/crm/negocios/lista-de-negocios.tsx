@@ -1,5 +1,6 @@
 "use client";
 
+import { urlDoAvatar } from "@/lib/avatar";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
@@ -144,7 +145,7 @@ export function ListaDeNegocios({
           cell: (d) =>
             d.owner ? (
               <span className="flex items-center gap-1.5">
-                <Avatar name={d.owner.name || "Sem nome"} size="sm" />
+                <Avatar name={d.owner.name || "Sem nome"} size="sm" src={urlDoAvatar(d.owner.avatarPath)} />
                 <span className="truncate">{d.owner.name || "Sem nome"}</span>
               </span>
             ) : (

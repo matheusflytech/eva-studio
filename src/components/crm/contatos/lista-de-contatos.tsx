@@ -1,5 +1,6 @@
 "use client";
 
+import { urlDoAvatar } from "@/lib/avatar";
 import * as React from "react";
 import { CalendarClock, ChevronLeft, ChevronRight, Columns3, Download, List, ListFilter, Table2, Upload } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -184,7 +185,7 @@ export function ListaDeContatos({
           width: "240px",
           cell: (c) => (
             <span className="flex min-w-0 items-center gap-2">
-              <Avatar name={nomeDoContato(c)} size="sm" />
+              <Avatar name={nomeDoContato(c)} size="sm" src={urlDoAvatar(c.avatarPath)} />
               <button
                 type="button"
                 onClick={(e) => {
@@ -212,7 +213,7 @@ export function ListaDeContatos({
           cell: (c) =>
             c.owner ? (
               <span className="flex items-center gap-1.5">
-                <Avatar name={c.owner.name || "Sem nome"} size="sm" />
+                <Avatar name={c.owner.name || "Sem nome"} size="sm" src={urlDoAvatar(c.owner.avatarPath)} />
                 <span className="truncate">{c.owner.name || "Sem nome"}</span>
               </span>
             ) : (
@@ -699,7 +700,7 @@ function ListaDePessoas({
                       focusRing
                     )}
                   >
-                    <FotoDoContato nome={nome} semente={c.id} />
+                    <FotoDoContato nome={nome} semente={c.id} foto={c.avatarPath} />
                     <span className="min-w-0">
                       <span className="block truncate text-body font-semibold text-text-primary">{nome}</span>
                       <span className="block truncate text-caption text-text-tertiary">
@@ -725,7 +726,7 @@ function ListaDePessoas({
                         <span className="hidden min-w-0 items-center gap-2 text-small text-text-secondary lg:flex">
                           {c.owner ? (
                             <>
-                              <Avatar name={c.owner.name || "Sem nome"} size="sm" />
+                              <Avatar name={c.owner.name || "Sem nome"} size="sm" src={urlDoAvatar(c.owner.avatarPath)} />
                               <span className="truncate">{c.owner.name}</span>
                             </>
                           ) : (

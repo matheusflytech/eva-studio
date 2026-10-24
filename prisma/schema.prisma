@@ -110,6 +110,8 @@ model Profile {
   orgId     String
   name      String
   email     String
+  // Foto no bucket público "eva-avatares"; null = inicial.
+  avatarPath String?
   // Papel dentro da organização (RBAC). "owner" = quem criou a org, não pode
   // ser rebaixado nem removido; "admin" = mexe em tudo; "agent" = atendente,
   // só Conversas/Contatos e responder; "viewer" = só leitura. Checagem
@@ -685,6 +687,8 @@ model Contact {
   emails       Json      @default("[]")
   phones       Json      @default("[]")
   linkedinUrl  String    @default("")
+  // Foto no bucket público "eva-avatares" ({orgId}/{uuid}.webp); null = inicial.
+  avatarPath   String?
   background   String    @default("") @db.Text
   notes        String    @default("") @db.Text
   customFields Json      @default("{}")

@@ -35,8 +35,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dea
       stage: true,
       pipeline: { include: { stages: { orderBy: { position: "asc" } } } },
       company: { select: { id: true, name: true } },
-      owner: { select: { id: true, name: true } },
-      contacts: { include: { contact: { select: { id: true, name: true, email: true, phone: true, jobTitle: true } } } },
+      owner: { select: { id: true, name: true, avatarPath: true } },
+      contacts: { include: { contact: { select: { id: true, name: true, email: true, phone: true, jobTitle: true, avatarPath: true } } } },
       // Filtro por org de novo: tarefa/nota de outra org apontando para este
       // negócio (dado gravado antes da checagem nas rotas) não vaza.
       // Em aberto primeiro: no Postgres NULL vem por último no "asc".

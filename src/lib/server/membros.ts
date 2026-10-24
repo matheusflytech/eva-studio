@@ -61,6 +61,7 @@ export interface MembroDoContrato {
   id: string;
   name: string;
   email: string;
+  avatarPath: string | null;
   role: PapelDeSistema;
   roleId: string | null;
   groupIds: string[];
@@ -81,12 +82,12 @@ export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> 
       const [vinculos, legado, equipes] = await Promise.all([
         prisma.membership.findMany({
           where: { orgId, status: { in: STATUS_COM_ACESSO } },
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: { user: { select: { id: true, name: true, email: true, avatarPath: true } } },
           orderBy: { createdAt: "asc" },
         }),
         prisma.profile.findMany({
           where: { orgId, memberships: { none: { orgId } } },
-          select: { id: true, name: true, email: true, role: true, createdAt: true },
+          select: { id: true, name: true, email: true, avatarPath: true, role: true, createdAt: true },
           orderBy: { createdAt: "asc" },
         }),
         prisma.teamMember.findMany({ where: { team: { orgId } }, select: { teamId: true, userId: true } }),
@@ -97,6 +98,7 @@ export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> 
           id: p.id,
           name: p.name,
           email: p.email,
+          avatarPath: p.avatarPath,
           role: papel(p.role),
           roleId: null,
           groupIds: [],
@@ -108,6 +110,7 @@ export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> 
           id: v.userId,
           name: v.user.name,
           email: v.user.email,
+          avatarPath: v.user.avatarPath,
           role: papel(v.role),
           roleId: v.roleId,
           groupIds: v.groupIds ?? [],
@@ -123,6 +126,7 @@ export async function listarMembros(orgId: string): Promise<MembroDoContrato[]> 
         id: p.id,
         name: p.name,
         email: p.email,
+        avatarPath: p.avatarPath,
         role: papel(p.role),
         roleId: null,
         groupIds: [],

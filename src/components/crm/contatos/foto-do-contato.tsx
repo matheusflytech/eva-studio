@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/design-system/format";
+import { urlDoAvatar } from "@/lib/avatar";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import type { CategoryColor } from "@/lib/design-system/tokens";
 
@@ -29,26 +30,35 @@ export function FotoDoContato({
   semente,
   tamanho = "md",
   className,
+  foto,
 }: {
   nome: string;
+  /** Caminho da foto (avatarPath); sem foto, as iniciais na cor do contato. */
+  foto?: string | null;
   /** O que decide a cor (o id do contato). */
   semente: string;
   tamanho?: keyof typeof TAMANHOS;
   className?: string;
 }) {
   const cor = CATEGORY_CLASSES[corDa(semente || nome)];
+  const url = urlDoAvatar(foto);
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold",
+        "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-semibold",
         cor.subtle,
         cor.fg,
         TAMANHOS[tamanho],
         className
       )}
     >
-      {tamanho === "xs" ? null : initials(nome)}
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="size-full object-cover" />
+      ) : tamanho === "xs" ? null : (
+        initials(nome)
+      )}
     </span>
   );
 }

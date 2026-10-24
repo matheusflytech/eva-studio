@@ -12,12 +12,16 @@ import { Notice } from "@/components/ui/notice";
 import { focusRing } from "@/components/ui/styles";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
+import { TrocarFoto } from "@/components/crm/trocar-foto";
+import { urlDoAvatar } from "@/lib/avatar";
 import { CabecalhoDaSecao, EsqueletoDeLista, ItemDeConfig, LinhaDeConfig, ListaDeConfig, RotuloDeGrupo } from "./secao";
 
 interface Membro {
   id: string;
   name: string;
   email: string;
+  avatarPath?: string | null;
   role: string;
   roleId: string | null;
   groupIds: string[];
@@ -100,6 +104,7 @@ function Multiplo({
  */
 export function AbaMembros() {
   const [membros, setMembros] = React.useState<Membro[]>([]);
+  const eu = membros.find((m) => m.isMe);
   const [sistema, setSistema] = React.useState<PapelSistema[]>([]);
   const [personalizados, setPersonalizados] = React.useState<Opcao[]>([]);
   const [grupos, setGrupos] = React.useState<Opcao[]>([]);
@@ -227,6 +232,17 @@ export function AbaMembros() {
       )}
 
       <div className={pode ? "border-t border-border-subtle pt-5" : undefined}>
+        {eu && (
+          <div className="mb-5 flex items-center gap-3">
+            <TrocarFoto endpoint="/api/me/foto" temFoto={!!eu.avatarPath} rotulo="você" onMudou={() => void carregar()}>
+              <Avatar name={eu.name || eu.email} src={urlDoAvatar(eu.avatarPath)} size="lg" />
+            </TrocarFoto>
+            <div className="min-w-0">
+              <p className="text-body font-semibold text-text-primary">Sua foto</p>
+              <p className="text-small text-text-tertiary">Aparece para a equipe no quadro, nas listas e nas fichas.</p>
+            </div>
+          </div>
+        )}
         <RotuloDeGrupo contagem={carregado ? membros.length : undefined}>Pessoas no contrato</RotuloDeGrupo>
         {!carregado ? (
           <EsqueletoDeLista />
@@ -237,7 +253,14 @@ export function AbaMembros() {
               return (
                 <ItemDeConfig
                   key={m.id}
-                  icone={<span className="text-caption font-semibold">{iniciaisDe(m.name || m.email)}</span>}
+                  icone={
+                    m.avatarPath ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={urlDoAvatar(m.avatarPath) ?? undefined} alt="" className="size-full rounded-[10px] object-cover" />
+                    ) : (
+                      <span className="text-caption font-semibold">{iniciaisDe(m.name || m.email)}</span>
+                    )
+                  }
                   titulo={
                     <span className="flex items-center gap-2">
                       <span className="truncate">{m.name}</span>

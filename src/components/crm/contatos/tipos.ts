@@ -16,6 +16,8 @@ export interface ContactChannelRow {
 export interface Contact {
   id: string;
   name: string;
+  /** Foto no bucket de avatares (urlDoAvatar); null = iniciais. */
+  avatarPath?: string | null;
   jobTitle: string;
   email: string;
   phone: string;
@@ -27,7 +29,7 @@ export interface Contact {
   optIn: boolean;
   company: { id: string; name: string } | null;
   ownerId?: string | null;
-  owner?: { id: string; name: string } | null;
+  owner?: { id: string; name: string; avatarPath?: string | null } | null;
   lastSeenAt: string;
   createdAt: string;
   tags: ContactTag[];

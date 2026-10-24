@@ -18,6 +18,7 @@ import { nomeDoContato, type Contact, type TagRow } from "./tipos";
 import { DadosDoContato } from "./dados-do-contato";
 import { EtiquetasDoContato } from "./etiquetas-do-contato";
 import { FotoDoContato } from "./foto-do-contato";
+import { TrocarFoto } from "@/components/crm/trocar-foto";
 import { useApagarComDesfazer } from "@/components/crm/lixeira/use-apagar-com-desfazer";
 import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 
@@ -184,7 +185,9 @@ function CorpoDaFicha({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4.5">
-        <FotoDoContato nome={nome} semente={contact.id} tamanho="lg" />
+        <TrocarFoto endpoint={`/api/contacts/${contact.id}/foto`} temFoto={!!contact.avatarPath} rotulo={nome} onMudou={(avatarPath) => onChanged({ ...contact, avatarPath })}>
+          <FotoDoContato nome={nome} semente={contact.id} tamanho="lg" foto={contact.avatarPath} />
+        </TrocarFoto>
         <div className="min-w-0 flex-1">
           {mostrarNome && <h2 className="truncate text-title font-semibold tracking-tight text-text-primary">{nome}</h2>}
           <p className="mb-2 mt-0.5 truncate text-small text-text-tertiary">{subtitulo || "Sem cargo e sem empresa"}</p>

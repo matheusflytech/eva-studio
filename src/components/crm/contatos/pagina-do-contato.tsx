@@ -26,6 +26,7 @@ import { CHANNEL_LABEL, nomeDoContato, type Contact, type TagRow } from "./tipos
 import { DadosDoContato } from "./dados-do-contato";
 import { EtiquetasDoContato } from "./etiquetas-do-contato";
 import { FotoDoContato } from "./foto-do-contato";
+import { TrocarFoto } from "@/components/crm/trocar-foto";
 import { Bloco, cidadeDo, linkDeLigar } from "./ficha-do-contato";
 
 interface Ficha {
@@ -224,7 +225,9 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
       <div className="grid w-full gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex min-w-0 flex-col gap-5">
         <header className="flex flex-wrap items-center gap-5">
-          <FotoDoContato nome={nome} semente={contato.id} tamanho="xl" />
+          <TrocarFoto endpoint={`/api/contacts/${contato.id}/foto`} temFoto={!!contato.avatarPath} rotulo={nome} onMudou={() => void carregar()}>
+            <FotoDoContato nome={nome} semente={contato.id} tamanho="xl" foto={contato.avatarPath} />
+          </TrocarFoto>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h1 className="truncate text-heading font-semibold tracking-tight text-text-primary">{nome}</h1>
             <p className="truncate text-small text-text-tertiary">
