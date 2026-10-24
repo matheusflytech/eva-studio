@@ -78,14 +78,14 @@ function Indicador({
         onClick && "outline-none hover:border-border-default focus-visible:ring-2 focus-visible:ring-accent-500/60"
       )}
     >
-      <span className="flex items-center gap-1 text-[12px] font-medium text-text-tertiary">
+      <span className="flex items-center gap-1 text-caption font-medium text-text-tertiary">
         {rotulo}
         {ajuda && !onClick && <Ajuda texto={ajuda} />}
       </span>
-      <span className={cn("font-display text-[24px] font-semibold leading-tight tracking-[-0.02em] tabular-nums", alerta ? "text-amber-300" : "text-text-primary")}>
+      <span className={cn("font-display text-heading font-semibold leading-tight tracking-[-0.02em] tabular-nums", alerta ? "text-amber-300" : "text-text-primary")}>
         {valor}
       </span>
-      <span className={cn("truncate text-[11.5px] text-text-tertiary", children && "pr-24")}>{detalhe}</span>
+      <span className={cn("truncate text-caption text-text-tertiary", children && "pr-24")}>{detalhe}</span>
       {children}
     </Tag>
   );
@@ -128,12 +128,12 @@ export function ResumoDoFunilView({
   return (
     <section aria-label="Resumo do funil" className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[12px] font-medium uppercase tracking-[0.06em] text-text-tertiary">Resumo</h2>
+        <h2 className="text-caption font-medium uppercase tracking-[0.06em] text-text-tertiary">Resumo</h2>
         <button
           type="button"
           onClick={onAlternar}
           aria-expanded={!recolhido}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
+          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent-500/60"
         >
           {recolhido ? (
             <>
@@ -224,7 +224,7 @@ function JornadaDoFunil({ conversao, ciclo }: { conversao: EtapaDeConversao[]; c
   return (
     <div className="grid gap-4 rounded-xl border border-border-subtle bg-surface-1 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
       <div className="min-w-0">
-        <h3 className="mb-3 flex items-center gap-1 text-[12px] font-medium text-text-tertiary">
+        <h3 className="mb-3 flex items-center gap-1 text-caption font-medium text-text-tertiary">
           Jornada dos negócios · últimos 90 dias
           <Ajuda texto="Cada bloco mostra quantos negócios chegaram até a etapa e que fatia isso é de todos os que entraram. A seta mostra quantos dos que estavam na etapa anterior avançaram." />
         </h3>
@@ -238,7 +238,7 @@ function JornadaDoFunil({ conversao, ciclo }: { conversao: EtapaDeConversao[]; c
                 {passagem !== null && (
                   <div
                     className={cn(
-                      "flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 text-[11px] tabular-nums",
+                      "flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 text-caption tabular-nums",
                       ehGargalo ? "text-amber-300" : "text-text-tertiary"
                     )}
                     aria-label={`${Math.round(passagem * 100)}% avançaram de ${conversao[i - 1].nome} para ${c.nome}`}
@@ -256,14 +256,14 @@ function JornadaDoFunil({ conversao, ciclo }: { conversao: EtapaDeConversao[]; c
                     ehGargalo && "border-amber-400/40"
                   )}
                 >
-                  <span className="truncate text-[12px] font-medium text-text-secondary" title={c.nome}>
+                  <span className="truncate text-caption font-medium text-text-secondary" title={c.nome}>
                     {c.nome}
                   </span>
                   <span className="flex items-baseline gap-1.5">
-                    <span className={cn("font-display text-[22px] font-semibold leading-none tabular-nums", fim ? "text-emerald-400" : "text-text-primary")}>
+                    <span className={cn("font-display text-heading font-semibold leading-none tabular-nums", fim ? "text-emerald-400" : "text-text-primary")}>
                       {c.quantidade}
                     </span>
-                    <span className="text-[11px] tabular-nums text-text-tertiary">{Math.round(c.taxaDoInicio * 100)}% do total</span>
+                    <span className="text-caption tabular-nums text-text-tertiary">{Math.round(c.taxaDoInicio * 100)}% do total</span>
                   </span>
                   <span className="h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
                     <span
@@ -280,11 +280,11 @@ function JornadaDoFunil({ conversao, ciclo }: { conversao: EtapaDeConversao[]; c
 
       <aside className="grid grid-cols-2 gap-3 border-t border-border-subtle pt-3 xl:flex xl:flex-col xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
         <div>
-          <span className="text-[12px] font-medium text-text-tertiary">Taxa de ganho</span>
-          <p className="font-display text-[24px] font-semibold leading-tight tracking-[-0.02em] text-emerald-400 tabular-nums">
+          <span className="text-caption font-medium text-text-tertiary">Taxa de ganho</span>
+          <p className="font-display text-heading font-semibold leading-tight tracking-[-0.02em] text-emerald-400 tabular-nums">
             {Math.round(ultima.taxaDoInicio * 100)}%
           </p>
-          <p className="text-[12px] leading-snug text-text-secondary">
+          <p className="text-caption leading-snug text-text-secondary">
             De cada <strong className="text-text-primary">10</strong> que entram,{" "}
             <strong className="text-text-primary tabular-nums">{deCada10.toLocaleString("pt-BR")}</strong> viram {ultima.nome.toLowerCase()}.
           </p>
@@ -292,15 +292,15 @@ function JornadaDoFunil({ conversao, ciclo }: { conversao: EtapaDeConversao[]; c
         <div className="flex flex-col gap-2">
           {ciclo !== null && ciclo > 0 && (
             <div>
-              <span className="text-[12px] font-medium text-text-tertiary">Tempo até fechar</span>
-              <p className="text-[12.5px] text-text-secondary">
-                <strong className="font-display text-[17px] font-semibold text-text-primary tabular-nums">{ciclo}</strong>{" "}
+              <span className="text-caption font-medium text-text-tertiary">Tempo até fechar</span>
+              <p className="text-small text-text-secondary">
+                <strong className="font-display text-body-lg font-semibold text-text-primary tabular-nums">{ciclo}</strong>{" "}
                 {ciclo === 1 ? "dia" : "dias"} (mediana)
               </p>
             </div>
           )}
           {gargalo > 0 && (
-            <p className="rounded-lg bg-amber-400/[0.07] px-2.5 py-2 text-[12px] leading-snug text-amber-200/90">
+            <p className="rounded-lg bg-amber-400/[0.07] px-2.5 py-2 text-caption leading-snug text-amber-200/90">
               <TrendingDown size={13} aria-hidden className="mr-1 inline align-[-2px] text-amber-300" />
               Maior perda de <strong className="font-medium text-amber-200">{conversao[gargalo - 1].nome}</strong> para{" "}
               <strong className="font-medium text-amber-200">{conversao[gargalo].nome}</strong>: {Math.round((passagens[gargalo] ?? 0) * 100)}% avançam.

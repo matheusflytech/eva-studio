@@ -141,7 +141,7 @@ export function ConteudoDaPrevia({
                 <Icone size={15} aria-hidden="true" className="shrink-0" />
                 <span className="truncate">{rotuloDoCampo(campo, rotulos)}</span>
               </dt>
-              <dd className="min-w-0 break-words font-medium text-text-primary">{valor}</dd>
+              <dd className="min-w-0 break-words font-medium tabular-nums text-text-primary">{valor}</dd>
             </div>
           );
         })}

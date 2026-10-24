@@ -281,7 +281,7 @@ export function DealDrawer({
         className="glass-card glass-card-solid relative z-10 flex h-full w-full max-w-[520px] flex-col overflow-y-auto overscroll-contain rounded-l-3xl outline-none motion-safe:animate-[ds-slide-in-right_var(--dur-slow)_var(--ease-out)] motion-reduce:animate-[ds-fade-in_var(--dur-fast)_var(--ease-out)]"
       >
         {!deal ? (
-          <p className="p-8 text-[13px] text-text-tertiary">Carregando...</p>
+          <p className="p-8 text-small text-text-tertiary">Carregando...</p>
         ) : (
           <>
             <header className="flex items-start justify-between gap-3 border-b border-border-subtle p-6 pb-5">
@@ -290,9 +290,9 @@ export function DealDrawer({
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   onBlur={() => form.name !== deal.name && patch({ name: form.name })}
-                  className="w-full bg-transparent font-display text-[20px] font-semibold text-text-primary outline-none"
+                  className="w-full bg-transparent font-display text-title font-semibold text-text-primary outline-none"
                 />
-                <div className="mt-1 flex flex-wrap items-center gap-2.5 text-[12px] text-text-tertiary">
+                <div className="mt-1 flex flex-wrap items-center gap-2.5 text-caption text-text-tertiary">
                   {deal.company && (
                     <span className="inline-flex items-center gap-1"><Building2 size={12} /> {deal.company.name}</span>
                   )}
@@ -310,7 +310,7 @@ export function DealDrawer({
             </header>
 
             {erro && (
-              <p role="alert" className="border-b border-border-subtle bg-danger/10 px-6 py-2.5 text-[12.5px] text-danger">
+              <p role="alert" className="border-b border-border-subtle bg-danger/10 px-6 py-2.5 text-small text-danger">
                 {erro}
               </p>
             )}
@@ -340,7 +340,7 @@ export function DealDrawer({
                   );
                 })}
               </div>
-              <div className="mt-2 flex items-center justify-between text-[12px]">
+              <div className="mt-2 flex items-center justify-between text-caption">
                 <span className="font-medium text-text-primary">{deal.stage.name}</span>
                 <span className="text-text-tertiary">{deal.probability}% de chance</span>
               </div>
@@ -356,7 +356,7 @@ export function DealDrawer({
                     onChange={(e) => setForm({ ...form, amount: e.target.value })}
                     onBlur={salvarValor}
                   />
-                  <p className="mt-1 text-[11px] text-text-tertiary">
+                  <p className="mt-1 text-caption tabular-nums text-text-tertiary">
                     Ponderado: {money(Math.round((deal.amountCents * deal.probability) / 100))}
                   </p>
                 </div>
@@ -405,7 +405,7 @@ export function DealDrawer({
                   prefixo="d"
                   onChange={(k, v) => { setRascunho((r) => ({ ...r, [k]: v })); setSujo(true); }}
                 />
-                {erroCampos && <p className="text-[12.5px] text-danger">{erroCampos}</p>}
+                {erroCampos && <p className="text-small text-danger">{erroCampos}</p>}
                 {sujo && (
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => { setRascunho(rascunhoInicial(defs, deal.customFields)); setSujo(false); setErroCampos(null); }}>
@@ -423,13 +423,13 @@ export function DealDrawer({
               <Label>Pessoas</Label>
               <div className="mt-2 flex flex-col gap-1.5">
                 {deal.contacts.length === 0 ? (
-                  <p className="text-[12.5px] text-text-tertiary">Nenhum contato vinculado.</p>
+                  <p className="text-small text-text-tertiary">Nenhum contato vinculado.</p>
                 ) : (
                   deal.contacts.map(({ contact }) => (
                     <div key={contact.id} className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
                       <div className="min-w-0">
-                        <div className="truncate text-[13px] text-text-primary">{contact.name || "Sem nome"}</div>
-                        <div className="truncate text-[11.5px] text-text-tertiary">{contact.email || contact.phone}</div>
+                        <div className="truncate text-small text-text-primary">{contact.name || "Sem nome"}</div>
+                        <div className="truncate text-caption text-text-tertiary">{contact.email || contact.phone}</div>
                       </div>
                       <button
                         onClick={() => patch({ removeContactId: contact.id })}
@@ -451,11 +451,11 @@ export function DealDrawer({
                   <label key={t.id} className="flex cursor-pointer items-start gap-2.5 rounded-xl px-2 py-1.5 hover:bg-surface-2">
                     <Checkbox checked={!!t.doneAt} onCheckedChange={() => alternarTarefa(t, !!t.doneAt)} />
                     <span className="min-w-0 flex-1">
-                      <span className={cn("block text-[13px]", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
+                      <span className={cn("block text-small", t.doneAt ? "text-text-tertiary line-through" : "text-text-primary")}>
                         {t.text}
                       </span>
                       {t.dueAt && !t.doneAt && (
-                        <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-text-tertiary">
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-caption text-text-tertiary">
                           <Clock size={10} /> {formatRelativeDate(t.dueAt)}
                         </span>
                       )}
@@ -491,12 +491,12 @@ export function DealDrawer({
               </div>
               <div className="mt-3 flex flex-col gap-2.5">
                 {deal.notes.length === 0 ? (
-                  <p className="text-[12.5px] text-text-tertiary">Nada registrado ainda.</p>
+                  <p className="text-small text-text-tertiary">Nada registrado ainda.</p>
                 ) : (
                   deal.notes.map((n) => (
                     <div key={n.id} className="rounded-xl bg-surface-2 px-3 py-2.5">
-                      <p className="whitespace-pre-wrap text-[12.5px] text-text-secondary">{n.text}</p>
-                      <p className="mt-1 text-[11px] text-text-tertiary">{formatRelativeDate(n.createdAt)}</p>
+                      <p className="whitespace-pre-wrap text-small text-text-secondary">{n.text}</p>
+                      <p className="mt-1 text-caption text-text-tertiary">{formatRelativeDate(n.createdAt)}</p>
                     </div>
                   ))
                 )}

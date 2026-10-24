@@ -18,7 +18,7 @@ export function ComingSoon({
         title={title}
         description={description}
         action={
-          <span className="rounded-full border border-border-default bg-surface-2 px-4 py-2 text-[13px] font-medium text-text-tertiary">
+          <span className="rounded-full border border-border-default bg-surface-2 px-4 py-2 text-small font-medium text-text-tertiary">
             Em breve
           </span>
         }
