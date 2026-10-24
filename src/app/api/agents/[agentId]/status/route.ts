@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
+import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { toAgentDTO } from "@/lib/server/agent-dto";
 
 const include = { variables: true, knowledgeBase: true } as const;
 
 export async function POST(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("agents:manage");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  const orgId = ctx.orgId;
   const { agentId } = await params;
 
   const existing = await prisma.agent.findFirst({ where: { id: agentId, orgId } });

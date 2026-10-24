@@ -5,7 +5,7 @@ const db = vi.hoisted(() => ({
   agent: { findFirst: vi.fn() },
   conversation: { findFirst: vi.fn(), delete: vi.fn() },
 }));
-const keys = vi.hoisted(() => ({ requireApiKeyOrgId: vi.fn() }));
+const keys = vi.hoisted(() => ({ autenticarChave: vi.fn() }));
 const rate = vi.hoisted(() => ({ checkRateLimit: vi.fn() }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -41,7 +41,7 @@ const contatoLead = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  keys.requireApiKeyOrgId.mockResolvedValue("o1");
+  keys.autenticarChave.mockResolvedValue({ orgId: "o1", keyId: "k1", scopes: ["*"] });
   rate.checkRateLimit.mockResolvedValue({ allowed: true });
   db.agent.findFirst.mockResolvedValue({ id: "a1" });
   db.contact.findMany.mockResolvedValue([]);
@@ -53,10 +53,20 @@ beforeEach(() => {
 
 describe("/api/v1/leads", () => {
   it("chave inválida: 401; limite: 429", async () => {
-    keys.requireApiKeyOrgId.mockResolvedValueOnce(null);
+    keys.autenticarChave.mockResolvedValueOnce(null);
     expect((await GET(req(undefined, "GET"))).status).toBe(401);
     rate.checkRateLimit.mockResolvedValueOnce({ allowed: false });
     expect((await GET(req(undefined, "GET"))).status).toBe(429);
+  });
+
+  it("escopo da chave vale: sem contacts:read não lista, sem contacts:write não cria", async () => {
+    keys.autenticarChave.mockResolvedValue({ orgId: "o1", keyId: "k1", scopes: ["pipelines:read"] });
+    expect((await GET(req(undefined, "GET"))).status).toBe(403);
+    keys.autenticarChave.mockResolvedValue({ orgId: "o1", keyId: "k1", scopes: ["contacts:read"] });
+    expect((await GET(req(undefined, "GET"))).status).toBe(200);
+    expect((await POST(req({ agentId: "a1", fields: { nome: "Ana" } }))).status).toBe(403);
+    expect((await DELETE(req(undefined, "DELETE"), p("c1"))).status).toBe(403);
+    expect(db.contact.create).not.toHaveBeenCalled();
   });
 
   it("GET lista no formato público (chaves antigas + novas)", async () => {

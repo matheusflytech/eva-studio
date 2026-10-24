@@ -14,6 +14,16 @@ export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const atual = await prisma.permissionGroup.findFirst({ where: { id, orgId: ctx.orgId }, select: { id: true } });
   if (!atual) return NextResponse.json({ error: "Grupo não encontrado." }, { status: 404 });
+  // Mesmo motivo do alterarMembro: editar um grupo que a pessoa tem (direto ou pelo papel) seria escalada.
+  if (ctx.role !== "owner" && !ctx.superadmin) {
+    const meu = await prisma.membership.findUnique({
+      where: { orgId_userId: { orgId: ctx.orgId, userId: ctx.userId } },
+      select: { groupIds: true, customRole: { select: { groupIds: true } } },
+    });
+    if (meu && [...meu.groupIds, ...(meu.customRole?.groupIds ?? [])].includes(id)) {
+      return NextResponse.json({ error: "Você não pode mudar um grupo que você mesmo tem." }, { status: 403 });
+    }
+  }
 
   const body = await lerCorpo(request);
   if (!body) return NextResponse.json({ error: JSON_INVALIDO }, { status: 400 });

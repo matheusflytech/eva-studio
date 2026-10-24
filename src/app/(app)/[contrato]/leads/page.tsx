@@ -623,9 +623,9 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
   const [effectiveStage, setEffectiveStage] = React.useState<(typeof STAGES)[number]>(stage ?? "novo");
   React.useEffect(() => setOrigin(window.location.origin), []);
 
-  const snippet = `curl -X POST ${origin}/api/leads \\
+  const snippet = `curl -X POST ${origin}/api/v1/leads \\
   -H "Content-Type: application/json" \\
-  -H "X-Internal-Secret: SEU_INTERNAL_API_SECRET" \\
+  -H "Authorization: Bearer SUA_CHAVE_evs_live" \\
   -d '{
     "agentId": "ID_DO_AGENTE",
     "fields": { "nome": "...", "email": "...", "telefone": "..." },
@@ -642,8 +642,8 @@ function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onC
           </IconButton>
         </div>
         <p className="text-small text-text-secondary">
-          Pra mandar lead de um n8n, formulário externo, etc., use o mesmo <code className="font-mono">INTERNAL_API_SECRET</code> que
-          já está no seu <code className="font-mono">.env.local</code>. <code className="font-mono">fields</code> aceita
+          Pra mandar lead de um n8n, formulário externo, etc., crie uma chave de API em Integrações → API com o
+          escopo <code className="font-mono">contacts:write</code>. <code className="font-mono">fields</code> aceita
           qualquer campo, não só os do exemplo: nome, e-mail e telefone são validados e vão para a ficha do contato
           (mesmo e-mail ou telefone atualiza o contato existente em vez de duplicar); o resto vira campo livre. Cada etapa
           do funil tem seu próprio valor de <code className="font-mono">stage</code>: escolha abaixo para ver o exemplo

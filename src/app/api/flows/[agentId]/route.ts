@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
+import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { validarFluxo } from "@/lib/server/api-v1/fluxos";
 import { ErroApi } from "@/lib/server/api-v1/http";
@@ -23,8 +24,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 // não entra; bloco pela metade entra e volta como aviso, porque o canvas
 // salva enquanto a pessoa ainda está montando.
 export async function PUT(request: Request, { params }: { params: Promise<{ agentId: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("agents:manage");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  const orgId = ctx.orgId;
   const { agentId } = await params;
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId }, select: { id: true, outboundUrl: true } });
