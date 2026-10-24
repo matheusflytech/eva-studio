@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton } from "./icon-button";
+import { useDevolverFoco } from "./devolver-foco";
 
 /*
  * Gaveta lateral (direita): detalhe de registro, formulário longo, filtros
@@ -31,14 +32,17 @@ export function DrawerContent({
   footer?: React.ReactNode;
   size?: keyof typeof larguras;
 }) {
+  const foco = useDevolverFoco();
   return (
     <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_var(--dur-fast)_var(--ease-out)] data-[state=closed]:animate-[ds-fade-out_var(--dur-fast)_var(--ease-in)]" />
       <Dialog.Content
+        onOpenAutoFocus={foco.onOpenAutoFocus}
+        onCloseAutoFocus={foco.onCloseAutoFocus}
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn(
           "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden border-l border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none sm:inset-y-3 sm:right-3 sm:rounded-[22px] sm:border",
-          "data-[state=open]:animate-[ds-slide-in-right_var(--dur-slow)_var(--ease-out)]",
+          "data-[state=open]:animate-[ds-slide-in-right_var(--dur-slow)_var(--ease-out)] data-[state=closed]:animate-[ds-slide-out-right_var(--dur-fast)_var(--ease-in)]",
           larguras[size],
           className
         )}

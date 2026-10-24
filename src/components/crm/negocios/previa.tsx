@@ -150,6 +150,12 @@ export function ConteudoDaPrevia({
   );
 }
 
+/** Onde está o cartão do negócio na tela, se estiver visível (de onde o painel nasce e para onde volta). */
+function retanguloDoCartao(dealId: string): DOMRect | null {
+  const r = document.querySelector<HTMLElement>(`[data-deal-id="${CSS.escape(dealId)}"]`)?.getBoundingClientRect();
+  return r && r.width > 0 && r.bottom > 0 && r.top < window.innerHeight ? r : null;
+}
+
 /**
  * Painel do negócio (quadro v4, exemplo 2): abre por cima do quadro, pela
  * direita, sem escurecer o fundo. Topo com o título, ⤢ (ficha completa),
@@ -197,14 +203,40 @@ export function PreviaDoNegocio({
   const dealId = deal.id;
   const ficha = useFicha(dealId);
 
-  // Fechar desliza o painel para fora antes de sumir (menos movimento: some direto).
+  // Fechar volta para o cartão de onde o painel nasceu (o mesmo caminho da
+  // abertura, mais curto); sem o cartão à vista, desliza para fora. Fechar no
+  // meio da abertura parte de onde o painel está. Menos movimento: some direto.
   const fecharAnimado = React.useCallback(() => {
     const el = painel.current;
     if (fechando.current) return;
     fechando.current = true;
     if (!el || reduzMovimento()) return onFechar();
-    gsap.to(el, { x: 28, autoAlpha: 0, duration: 0.2, ease: CURVA.saida, onComplete: onFechar });
-  }, [onFechar]);
+    // Fechou no meio da abertura: para a abertura onde está e sai dali.
+    gsap.killTweensOf(el);
+    gsap.killTweensOf(el.querySelectorAll("[data-secao]"));
+    const destino = retanguloDoCartao(dealId);
+    if (!destino) {
+      gsap.to(el, { x: 28, autoAlpha: 0, duration: 0.2, ease: CURVA.saida, onComplete: onFechar });
+      return;
+    }
+    // Posição sem transform: a conta parte do lugar do painel no layout,
+    // mesmo que ele ainda esteja no meio da animação de abrir.
+    const transformAtual = el.style.transform;
+    el.style.transform = "none";
+    const b = el.getBoundingClientRect();
+    el.style.transform = transformAtual;
+    gsap.to(el, {
+      x: destino.left - b.left,
+      y: destino.top - b.top,
+      scaleX: destino.width / b.width,
+      scaleY: destino.height / b.height,
+      transformOrigin: "top left",
+      autoAlpha: 0,
+      duration: 0.24,
+      ease: CURVA.saida,
+      onComplete: onFechar,
+    });
+  }, [onFechar, dealId]);
   const fechar = React.useRef(fecharAnimado);
   React.useEffect(() => {
     fechar.current = fecharAnimado;
@@ -220,11 +252,10 @@ export function PreviaDoNegocio({
         gsap.from(el, { autoAlpha: 0, duration: 0.15 });
         return;
       }
-      const cartao = document.querySelector<HTMLElement>(`[data-deal-id="${CSS.escape(dealId)}"]`);
-      const a = cartao?.getBoundingClientRect();
+      const a = retanguloDoCartao(dealId);
       const b = el.getBoundingClientRect();
       const tl = gsap.timeline();
-      if (a && a.width > 0) {
+      if (a) {
         tl.from(el, {
           x: a.left - b.left,
           y: a.top - b.top,

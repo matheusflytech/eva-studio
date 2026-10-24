@@ -837,8 +837,18 @@ body {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
+/* Saídas: o mesmo caminho da entrada, mais curto e menor (--dur-fast, --ease-in). */
+@keyframes ds-fade-out {
+  to { opacity: 0; }
+}
+@keyframes ds-modal-out {
+  to { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes ds-slide-out-right {
+  to { opacity: 0; transform: translateX(16px); }
+}
 
-/* Reduzir movimento: entradas só com esmaecer, sem deslocamento nem escala. */
+/* Reduzir movimento: entradas e saídas só com esmaecer, sem deslocamento nem escala. */
 @keyframes eva-aparece {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -850,6 +860,8 @@ body {
   [data-state="open"][class*="ds-menu-in"],
   [data-state="open"][class*="ds-modal-in"],
   [data-state="open"][class*="ds-slide-in-right"] { animation: eva-aparece 0.2s ease both !important; }
+  [data-state="closed"][class*="ds-modal-out"],
+  [data-state="closed"][class*="ds-slide-out-right"] { animation: ds-fade-out 0.15s ease both !important; }
 }
 
 /* Troca de tela (View Transitions): só o conteúdo anima; o resto da página

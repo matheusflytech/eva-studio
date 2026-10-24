@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton } from "./icon-button";
+import { useDevolverFoco } from "./devolver-foco";
 
 /*
  * Modal: decisão curta que bloqueia a tela (confirmar, criar com poucos
@@ -33,17 +34,20 @@ export function ModalContent({
   footer?: React.ReactNode;
   size?: keyof typeof larguras;
 }) {
+  const foco = useDevolverFoco();
   return (
     <Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_160ms_var(--ease-standard)]" />
+      <Dialog.Overlay className="fixed inset-0 z-50 bg-backdrop backdrop-blur-sm data-[state=open]:animate-[ds-fade-in_var(--dur-fast)_var(--ease-out)] data-[state=closed]:animate-[ds-fade-out_var(--dur-fast)_var(--ease-in)]" />
       <Dialog.Content
+        onOpenAutoFocus={foco.onOpenAutoFocus}
+        onCloseAutoFocus={foco.onCloseAutoFocus}
         // Sem description o Radix avisa no console; o undefined explícito diz
         // que a ausência é intencional.
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col",
           "rounded-[22px] border border-border-subtle bg-overlay text-text-primary shadow-overlay outline-none",
-          "data-[state=open]:animate-[ds-modal-in_var(--dur-slow)_var(--ease-out)]",
+          "data-[state=open]:animate-[ds-modal-in_var(--dur-slow)_var(--ease-out)] data-[state=closed]:animate-[ds-modal-out_var(--dur-fast)_var(--ease-in)]",
           larguras[size],
           className
         )}
