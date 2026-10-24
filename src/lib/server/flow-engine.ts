@@ -92,6 +92,8 @@ export interface AdvanceInput {
   semResposta?: boolean;
   // Nome que o canal informa (assunto do grupo), para a ficha não ficar sem nome.
   nomeDoContato?: string;
+  // Grupo do WhatsApp: quem chamou o agente nesta mensagem. Só o worker manda isto.
+  autorNoGrupo?: string;
   // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
   // da pergunta para o modelo, mas não é gravado na conversa.
   anexoContexto?: string;
@@ -1384,7 +1386,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     } catch {
       nome = undefined;
     }
-    return contextoDaConversa({ canal: input.channel, grupo, nome });
+    return contextoDaConversa({ canal: input.channel, grupo, nome, autor: input.autorNoGrupo });
   }
 
   const variables: Variables = { ...(conversation.variables as Variables) };

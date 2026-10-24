@@ -70,3 +70,11 @@ describe("contextoDaConversa", () => {
     expect(contextoDaConversa({ canal: "website", agora })).toContain("nada de markdown");
   });
 });
+
+describe("contextoDaConversa no grupo", () => {
+  it("diz quem chamou o agente para a IA responder a essa pessoa", () => {
+    const c = contextoDaConversa({ canal: "whatsapp_qr", grupo: true, autor: "Matheus", agora: new Date() });
+    expect(c).toContain("Quem chamou você agora: Matheus.");
+    expect(contextoDaConversa({ canal: "whatsapp_qr", autor: "Matheus", agora: new Date() })).not.toContain("Quem chamou");
+  });
+});
