@@ -8,6 +8,7 @@ import { limparLixeiraVencida } from "@/lib/server/lixeira";
 import { entregarPendentes } from "@/lib/server/webhooks/entrega";
 import { entregarEventosPendentes } from "@/lib/server/eventos/barramento";
 import { rodarAutomacoes } from "@/lib/server/automacoes/varreduras";
+import { retomarEsperasVencidas } from "@/lib/server/esperas";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -69,9 +70,10 @@ export async function POST(request: Request) {
     enrollByDealStage().catch(falhou("inscrição por etapa", 0)),
   ]);
   const newlyEnrolled = porSegmento + porEtapa;
-  const [sequences, broadcasts] = await Promise.all([
+  const [sequences, broadcasts, esperas] = await Promise.all([
     processDueEnrollments(50).catch(falhou("sequências", { processed: 0, delivered: 0, stopped: 0, errors: [] as string[] })),
     runDueBroadcasts(10).catch(falhou("disparos", { ran: 0, results: [] as RunResult[] })),
+    retomarEsperasVencidas().catch(falhou("esperas", 0)),
   ]);
 
   // Importação/exportação em lote da API v1, no tempo que sobrar da rodada
@@ -117,6 +119,7 @@ export async function POST(request: Request) {
     webhooks,
     eventos,
     automacoes,
+    esperas,
     lixeira: { expiradas: lixeiraLimpa },
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
