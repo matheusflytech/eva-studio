@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgId } from "@/lib/auth/require-org";
+import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 
 async function assertOwnedAgent(agentId: string, orgId: string) {
@@ -30,8 +31,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
 
 // Pede pro worker abrir uma sessão nova e gerar um QR code.
 export async function POST(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("agents:manage");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  const orgId = ctx.orgId;
   const { agentId } = await params;
   if (!(await assertOwnedAgent(agentId, orgId))) {
     return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });
@@ -48,8 +50,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ ag
 
 // Desconecta e limpa a sessão (o worker faz logout no próximo ciclo).
 export async function DELETE(_request: Request, { params }: { params: Promise<{ agentId: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("agents:manage");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  const orgId = ctx.orgId;
   const { agentId } = await params;
   if (!(await assertOwnedAgent(agentId, orgId))) {
     return NextResponse.json({ error: "Agente não encontrado." }, { status: 404 });

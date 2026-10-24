@@ -13,6 +13,10 @@ export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const atual = await prisma.customRole.findFirst({ where: { id, orgId: ctx.orgId }, select: { id: true } });
   if (!atual) return NextResponse.json({ error: "Papel não encontrado." }, { status: 404 });
+  // Mesmo motivo do alterarMembro: editar o papel que a pessoa usa seria escalada por conta própria.
+  if (id === ctx.papelId && ctx.role !== "owner" && !ctx.superadmin) {
+    return NextResponse.json({ error: "Você não pode mudar o próprio papel." }, { status: 403 });
+  }
 
   const body = await lerCorpo(request);
   if (!body) return NextResponse.json({ error: JSON_INVALIDO }, { status: 400 });

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireOrgId } from "@/lib/auth/require-org";
+import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ agentId: string; docId: string }> }) {
-  const orgId = await requireOrgId();
-  if (!orgId) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const ctx = await requirePermission("agents:manage");
+  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
+  const orgId = ctx.orgId;
   const { agentId, docId } = await params;
 
   const agent = await prisma.agent.findFirst({ where: { id: agentId, orgId } });
