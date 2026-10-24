@@ -51,6 +51,12 @@ export async function POST(request: Request) {
   const auth = await authorize(request, agentId);
   if (!auth.ok) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
+  // Do navegador só os canais de teste (Playground e prévia do Builder):
+  // outro canal gravaria mensagem falsa na conversa de um cliente de verdade.
+  if (!auth.interno && channel !== "playground" && channel !== "builder_preview") {
+    return NextResponse.json({ error: "Canal não permitido por este caminho." }, { status: 403 });
+  }
+
   // Anexo só vem do worker. De um navegador, aceitar um caminho de storage
   // arbitrário deixaria qualquer usuário anexar arquivo que não é dele.
   let anexo: { path: string; type: string; mime: string; name?: string; size?: number } | undefined;
