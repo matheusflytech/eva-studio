@@ -129,3 +129,35 @@ describe("juntar mensagens seguidas (WhatsApp)", () => {
     expect(db.message.findFirst).not.toHaveBeenCalled();
   });
 });
+
+describe("figurinha e reação não acordam a IA sozinhas", () => {
+  it("só figurinha desde a última resposta: grava e não responde", async () => {
+    db.message.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ createdAt: T(0) });
+    db.message.findMany.mockResolvedValue([{ text: "[Figurinha]", createdAt: T(3), mediaPath: "o1/s.webp", mediaType: "sticker", mediaMime: "image/webp", mediaName: null }]);
+    const r = await rodar({ ...base, text: "[Figurinha]", media: { path: "o1/s.webp", type: "sticker", mime: "image/webp" } });
+    expect(r.messages).toEqual([]);
+    expect(llm.callLlmWithTools).not.toHaveBeenCalled();
+    expect(inbox.registrarMensagens).toHaveBeenCalledTimes(1);
+  });
+
+  it("figurinha junto de um texto: a IA recebe os dois", async () => {
+    db.message.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ createdAt: T(0) });
+    db.message.findMany.mockImplementation(async (args: { where: { role: unknown } }) =>
+      args.where.role === "contact"
+        ? [{ text: "[Reação: 👍]", createdAt: T(3) }, { text: "pode marcar amanhã", createdAt: T(1) }]
+        : []
+    );
+    const r = await rodar({ ...base, text: "[Reação: 👍]" });
+    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0].userMessage).toBe("pode marcar amanhã\n[Reação: 👍]");
+    expect(r.messages).toHaveLength(1);
+  });
+
+  it("emoji escrito é fala e responde", async () => {
+    db.message.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ createdAt: T(0) });
+    db.message.findMany.mockImplementation(async (args: { where: { role: unknown } }) =>
+      args.where.role === "contact" ? [{ text: "👍", createdAt: T(3) }] : []
+    );
+    const r = await rodar({ ...base, text: "👍" });
+    expect(r.messages).toHaveLength(1);
+  });
+});

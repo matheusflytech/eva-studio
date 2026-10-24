@@ -68,6 +68,9 @@ interface MetaMessage {
   sticker?: MetaMidia;
   location?: { latitude?: number; longitude?: number; name?: string; address?: string };
   contacts?: { name?: { formatted_name?: string }; phones?: { phone?: string }[] }[];
+  reaction?: { emoji?: string; message_id?: string };
+  // Mensagem citada (reply): id da Meta (wamid) da mensagem respondida.
+  context?: { id?: string };
 }
 
 // Recibo de entrega: a Meta avisa quando uma mensagem NOSSA foi enviada,
@@ -295,7 +298,8 @@ async function lerEntradaWhatsApp(
   const optionId = m.interactive?.button_reply?.id ?? m.interactive?.list_reply?.id;
   if (optionId) return { optionId };
 
-  if (m.type === "reaction") return null; // emoji sobre uma mensagem: não é fala
+  // Reação entra na conversa, mas não acorda a IA (soRegistra). Vazia = tirou a reação.
+  if (m.type === "reaction") return m.reaction?.emoji ? { text: `[Reação: ${m.reaction.emoji}]` } : null;
   if (m.type === "text") return m.text?.body ? { text: m.text.body } : null;
   if (m.type === "button") return m.button?.text ? { text: m.button.text } : null;
 
@@ -328,6 +332,17 @@ async function lerEntradaWhatsApp(
 
   if (m.text?.body) return { text: m.text.body };
   return { text: `[Mensagem não suportada: ${m.type}]` };
+}
+
+/** Reply: o motor recebe o trecho citado, no mesmo formato do QR (worker/tipos.js). */
+async function comCitacaoDaMeta(m: MetaMessage, texto: string | undefined): Promise<string | undefined> {
+  if (!texto || !m.context?.id) return texto;
+  const citada = await prisma.message.findFirst({
+    where: { externalId: m.context.id, conversation: { channel: "whatsapp_meta", contactId: m.from } },
+    select: { text: true },
+  });
+  const trecho = citada?.text?.trim().slice(0, 120);
+  return trecho ? `Respondendo a: «${trecho}»\n${texto}` : texto;
 }
 
 // Os handlers devolvem quantas mensagens falharam: cada uma volta a ser
@@ -377,7 +392,7 @@ async function handleWhatsAppEntries(entries: unknown[]): Promise<number> {
             agentId: connection.agentId,
             channel: "whatsapp_meta",
             contactId: message.from,
-            text: entrada.text,
+            text: entrada.optionId ? entrada.text : await comCitacaoDaMeta(message, entrada.text),
             optionId: entrada.optionId,
             media: entrada.media,
             externalId: message.id,

@@ -1126,6 +1126,15 @@ async function logMessages(
 export const JANELA_DE_JUNTAR_MS = 4000;
 
 /** WhatsApp 1:1, texto do contato, conversa parada num bloco de IA. */
+/**
+ * Figurinha, reação e tipo que a plataforma não entende entram na conversa,
+ * mas sozinhos não acordam a IA. Juntos de um texto (janela de juntar), vão
+ * com ele. Emoji escrito é fala ("👍" = sim) e responde normalmente.
+ */
+export function soRegistra(m: { text?: string | null; mediaType?: string | null }): boolean {
+  return m.mediaType === "sticker" || /^\[(Figurinha|Reação|Mensagem não suportada)/.test(m.text ?? "");
+}
+
 function deveJuntar(input: AdvanceInput, nodes: Node<FlowNodeData>[], currentNodeId: string | null): boolean {
   if (!ehWhatsApp(input.channel)) return false;
   if (input.text === undefined || input.optionId !== undefined) return false;
@@ -1173,6 +1182,7 @@ async function juntarMensagensSeguidas(conversationId: string, input: AdvanceInp
       select: { text: true, createdAt: true, mediaPath: true, mediaType: true, mediaMime: true, mediaName: true },
     })
   ).reverse();
+  if (pendentes.every(soRegistra)) return null; // só figurinha/reação desde a última resposta: espera a próxima fala
   return {
     texto: pendentes.map((m) => m.text).filter(Boolean).join("\n"),
     desde: pendentes[0]?.createdAt ?? minha.createdAt,
@@ -1336,7 +1346,11 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   // Mensagens quebradas ("E", "S", "A"… em segundos): só a última responde,
   // com tudo junto. As anteriores ficam gravadas e saem sem resposta.
   let juntadas: Juntadas | null = null;
-  if (deveJuntar(input, nodes, conversation.currentNodeId)) {
+  const vaiJuntar = deveJuntar(input, nodes, conversation.currentNodeId);
+  if (!vaiJuntar && soRegistra({ text: input.text, mediaType: input.media?.type })) {
+    return registrarSemResponder(conversation.id, conversation.status as AdvanceResult["status"]);
+  }
+  if (vaiJuntar) {
     juntadas = await juntarMensagensSeguidas(conversation.id, input);
     if (!juntadas) return { messages: [], status: conversation.status as AdvanceResult["status"] };
     input = { ...input, text: juntadas.texto };
