@@ -245,7 +245,7 @@ function AbaConta() {
           titulo={<span id="titulo-aparencia">Aparência</span>}
           descricao="Aplica na hora e vale só neste navegador."
         />
-        <LinhaDeConfig rotulo="Tema da interface" descricao="Escolha um tema ou siga o do sistema.">
+        <LinhaDeConfig rotulo="Tema da interface" descricao="Claro ou escuro, escolhido aqui.">
           <EscolhaDeTema />
         </LinhaDeConfig>
         <LinhaDeConfig rotulo="Canvas do builder" descricao="O quadro dos fluxos acompanha o tema ou fica sempre escuro.">
