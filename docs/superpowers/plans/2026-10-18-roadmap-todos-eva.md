@@ -25,7 +25,7 @@
 | 2 | Agradecimento a menção em story | **Sim** | Chega como anexo `story_mention` em `messages`. Só menção em **story** dispara (marcação em post não). Hoje esse evento cai no fluxo como "[Anexo não suportado]" — bug a corrigir junto | P |
 | 3 | Gatilho por palavra-chave na DM (IG + WhatsApp, exata/parcial, várias palavras, fluxo padrão se nada casar) | **Sim** | Nenhum, é lógica nossa. Entra no motor, então vale para todos os canais de uma vez (IG, WhatsApp oficial, WhatsApp QR, Messenger, Telegram, widget, Playground) | M |
 | 4 | Campos reais de lead (nome/e-mail/telefone no lead, validação, nova tentativa, campos livres, página Leads e `/api/v1/leads`) | **Sim** | Hoje "lead" = conversa do canal `website`. O dado capturado já vai pro Contact (`syncContactFromConversation`), mas sem validação, e a página/API de Leads não mostram o Contact. Exige decidir: **Lead passa a ser o Contact** (recomendado) | G |
-| 5 | Peças restantes do ManyChat | **Sim, por partes** | Ver Fase 3 — já existem etiquetas e sequências; faltam IA devolver controle, Esperar em todos os canais, botões no IG/Messenger, lista no WhatsApp (>3 opções), link com rastreio | G |
+| 5 | Peças restantes do builder de bots | **Sim, por partes** | Ver Fase 3 — já existem etiquetas e sequências; faltam IA devolver controle, Esperar em todos os canais, botões no IG/Messenger, lista no WhatsApp (>3 opções), link com rastreio | G |
 | 6 | WhatsApp: disparo agendado + criar template na Meta com acompanhamento | **Sim** | Disparo agendado **já existe** (`Broadcast.scheduledAt` + relógio). Falta conferir contagem dobrada no WhatsApp QR. Criar template: `POST /{WABA}/message_templates`, revisão até 24h, status por webhook `message_template_status_update` | M |
 | 7 | Prospecção de empresários fora de tecnologia (loteadoras, logística, cobrança, vendas, atendimento em massa) com sinais de CRM/stack no site | **Sim, com ressalvas** | Base CNPJ tem ~100 GB zipados: o filtro roda **fora da Vercel** (script local ou worker). Base não traz site — o site sai do domínio do e-mail cadastrado ou de busca paga (Google Places). Dado de sócio é dado pessoal (LGPD: legítimo interesse documentado + opt-out) | G |
 
@@ -60,7 +60,7 @@ Um modelo só, `AgentTrigger`, com três tipos: `dm_keyword`, `story_reply`, `st
 - `POST /api/v1/leads` e `POST /api/leads` passam a criar/atualizar o Contact (hoje não criam).
 - Testes: validadores (puro), mapeamento captura→Contact, contrato da API v1 (antes/depois).
 
-### Fase 3 — Peças do ManyChat (to-do 5), em ordem de prioridade
+### Fase 3 — Peças do builder de bots (to-do 5), em ordem de prioridade
 1. **IA devolve o controle ao fluxo** — ferramenta `concluir_atendimento` no Agente de IA + porta de saída "concluído" no bloco. Hoje a conversa fica presa na IA para sempre. (Alto valor, destrava 2 e os gatilhos.)
 2. **Sequência com atraso em todos os canais** — o bloco Esperar só acorda sozinho no WhatsApp QR. Mover a retomada para o relógio central (`/api/internal/scheduler`), valendo para Meta, IG, Messenger, Telegram. Respeitar janela de 24h (template no WhatsApp oficial; IG/Messenger fora da janela não envia).
 3. **Respostas rápidas** — IG `quick_replies` (até 13, título 20 car.) e postback; Messenger idem; WhatsApp oficial com **lista** quando há mais de 3 opções (hoje corta na 3ª).

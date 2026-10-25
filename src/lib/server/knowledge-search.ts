@@ -22,9 +22,9 @@ import { chunkText, semanticSearch, hasSemanticIndex, type SearchHit } from "@/l
 
 const RRF_K = 60;
 
-async function fullTextSearch(agentId: string, query: string, topK: number): Promise<SearchHit[]> {
+async function fullTextSearch(agentId: string, query: string, topK: number, docIds?: string[]): Promise<SearchHit[]> {
   const docs = await prisma.knowledgeDoc.findMany({
-    where: { agentId },
+    where: { agentId, ...(docIds?.length ? { id: { in: docIds } } : {}) },
     select: { fileName: true, content: true },
   });
 
@@ -77,7 +77,7 @@ function fuse(lists: SearchHit[][], topK: number): SearchHit[] {
  * Devolve os `topK` trechos mais relevantes, já formatados com o nome do
  * arquivo de origem (o modelo cita melhor quando sabe de onde veio).
  */
-export async function searchKnowledgeBase(agentId: string, query: string, topK = 4): Promise<string[]> {
+export async function searchKnowledgeBase(agentId: string, query: string, topK = 4, docIds?: string[]): Promise<string[]> {
   const semanticOn = await hasSemanticIndex(agentId);
 
   // Puxa um pouco mais de cada motor do que o necessário: a fusão só tem o
@@ -85,8 +85,8 @@ export async function searchKnowledgeBase(agentId: string, query: string, topK =
   const perEngine = semanticOn ? topK * 2 : topK;
 
   const [textHits, vectorHits] = await Promise.all([
-    fullTextSearch(agentId, query, perEngine),
-    semanticOn ? semanticSearch(agentId, query, perEngine) : Promise.resolve([] as SearchHit[]),
+    fullTextSearch(agentId, query, perEngine, docIds),
+    semanticOn ? semanticSearch(agentId, query, perEngine, docIds) : Promise.resolve([] as SearchHit[]),
   ]);
 
   const picked = vectorHits.length > 0 ? fuse([vectorHits, textHits], topK) : textHits.slice(0, topK);

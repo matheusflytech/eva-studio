@@ -39,6 +39,9 @@ export interface ResultadoComReserva extends LlmResult {
   executouFerramenta?: boolean;
 }
 
+/** O modelo terminou sem texto (pode ser legítimo, ex.: só escolheu uma saída). */
+export const SEM_RESPOSTA = "O provedor não devolveu resposta.";
+
 /** O erro é do provedor (vale tentar o próximo) ou do pedido (não adianta)? */
 export function ehErroDeReserva(error: string): boolean {
   return !/Pedido recusado|Excedeu o limite de rodadas/i.test(error);
@@ -68,7 +71,7 @@ export async function chamarComReserva(
       },
     });
 
-    const erro = result.error ?? (result.text ? undefined : "O provedor não devolveu resposta.");
+    const erro = result.error ?? (result.text ? undefined : SEM_RESPOSTA);
     aoTentar?.(passo, result, !erro);
     if (!erro) return { ...result, usado: passo, tentativas };
 

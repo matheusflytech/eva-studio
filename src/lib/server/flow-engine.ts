@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
-import type { FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
+import type { AiExit, FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
@@ -14,7 +14,7 @@ import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
 import { enviarEmailDoContrato } from "@/lib/server/email/envio";
 import { passosDaConexao } from "@/lib/server/ia/conexao";
-import { chamarComReserva, type PassoDeIa } from "@/lib/server/ia/reserva";
+import { chamarComReserva, SEM_RESPOSTA, type PassoDeIa } from "@/lib/server/ia/reserva";
 import { chavesNoLimite, registrarUso, type RegistroDeUso } from "@/lib/server/ia/uso";
 import { sendEmail } from "@/lib/server/resend";
 import { searchKnowledgeBase } from "@/lib/server/knowledge-search";
@@ -335,10 +335,40 @@ export function iaTerminou(opts: {
   return opts.dadosPedidos.length > 0 && opts.dadosPedidos.every((k) => String(opts.variables[k] ?? "").trim() !== "");
 }
 
-/** Tem ligação de saída do fluxo principal (ferramentas e a saída "Erro" não contam). */
-function temSaidaPrincipal(edges: Edge[], nodeId: string): boolean {
-  return edges.some((e) => e.source === nodeId && e.targetHandle !== "tools" && e.sourceHandle !== SAIDA_ERRO);
+/** Saída por intenção vira ferramenta "sair_<nome>"; nomes repetidos ganham sufixo. */
+function nomesDasSaidas(saidas: AiExit[]): string[] {
+  const usados = new Set<string>();
+  return saidas.map((s, i) => {
+    const slug = toToolFunctionName(s.name.normalize("NFD").replace(/[̀-ͯ]/g, ""), String(i + 1));
+    let nome = `sair_${slug}`;
+    for (let n = 2; usados.has(nome); n += 1) nome = `sair_${slug}_${n}`;
+    usados.add(nome);
+    return nome;
+  });
 }
+
+/** Valor que a IA mandou para um campo de saída, no tipo pedido; undefined = vazio. */
+function valorDoCampo(bruto: unknown, tipo: "string" | "number" | "boolean"): unknown {
+  if (bruto === undefined || bruto === null) return undefined;
+  const t = String(bruto).trim();
+  if (!t || t.toLowerCase() === "null") return undefined;
+  if (tipo === "number") {
+    const n = Number(t.replace(",", "."));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  if (tipo === "boolean") return /^(true|sim|yes|1)$/i.test(t);
+  return t;
+}
+
+/** Tem ligação de saída do fluxo principal (ferramentas e a saída "Erro" não contam). */
+function temSaidaPrincipal(edges: Edge[], nodeId: string, outras: string[] = []): boolean {
+  return edges.some(
+    (e) => e.source === nodeId && e.targetHandle !== "tools" && e.sourceHandle !== SAIDA_ERRO && !outras.includes(e.sourceHandle ?? "")
+  );
+}
+
+/** Ids das saídas por intenção da IA (não são a saída "Terminou"). */
+const saidasDaIa = (data: FlowNodeData) => (data.aiExits ?? []).map((s) => s.id);
 
 /** Para onde vai a conversa quando a IA falha; null = fica no bloco (sem ligação em "Erro"). */
 function destinoDoErroDaIa(edges: Edge[], nodeId: string, erro: string | undefined): string | null {
@@ -663,7 +693,7 @@ async function runAiAgent(
   historicoAntesDe?: Date,
   /** Hora, canal e contato (contextoDaConversa): vai no fim do prompt. */
   contexto?: string
-): Promise<{ text: string | null; error?: string; seguir: boolean }> {
+): Promise<{ text: string | null; error?: string; seguir: boolean; saida?: string; enviar?: boolean }> {
   // De onde vem a IA: a conexão do contrato (lista com reserva automática)
   // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
   let passos: PassoDeIa[];
@@ -698,8 +728,13 @@ async function runAiAgent(
     }
   }
   const consumo: RegistroDeUso[] = [];
-  const temSaida = temSaidaPrincipal(edges, node.id);
+  const temSaida = temSaidaPrincipal(edges, node.id, saidasDaIa(node.data));
   let pediuParaSeguir = false;
+  // Só as saídas por intenção que têm ligação viram ferramenta: sem destino, não há para onde ir.
+  const saidasLigadas = (node.data.aiExits ?? []).filter((s) => nextNodeId(edges, node.id, s.id));
+  const nomesDeSaida = nomesDasSaidas(saidasLigadas);
+  let saidaEscolhida: string | undefined;
+  const enviar = node.data.aiSendToCustomer !== false;
 
   const toolNodes = edges
     .filter((e) => e.target === node.id && e.targetHandle === "tools")
@@ -851,8 +886,8 @@ async function runAiAgent(
     toolNodeByName.set(tool.name, tn);
   }
 
-  // Coleta estruturada de variáveis (estilo "slots" do Rasa + function-calling
-  // do Dify): cada linha configurada vira um campo opcional de uma ferramenta
+  // Coleta estruturada de variáveis (slots preenchidos por function-calling):
+  // cada linha configurada vira um campo opcional de uma ferramenta
   // interna que o modelo chama assim que identifica um valor na conversa — o
   // system prompt lista o que já foi coletado e o que ainda falta, pra ele
   // perguntar ativamente em vez de só esperar o usuário se oferecer.
@@ -880,6 +915,17 @@ async function runAiAgent(
     });
   }
 
+  const rotuloDoTipo = { string: "texto", number: "número", boolean: "sim ou não" } as const;
+  saidasLigadas.forEach((s, i) => {
+    tools.push({
+      name: nomesDeSaida[i],
+      description: `Saída "${s.name}": ${s.description || s.name}. Chame quando a conversa se encaixar nesta saída; o atendimento segue por ela depois desta resposta.`,
+      params: (s.fields ?? [])
+        .filter((f) => f.key.trim())
+        .map((f) => ({ name: f.key, description: `${f.description} (${rotuloDoTipo[f.type]})`, required: f.required })),
+    });
+  });
+
   // Só o texto do bloco: o cadastro do agente é explicativo, não vai para a IA.
   let systemPrompt = preencherConhecidas(node.data.detail ?? "", variables).trim() || "Você é um assistente útil.";
   if (collectVars.length > 0) {
@@ -903,6 +949,7 @@ async function runAiAgent(
     const chamar = () => chamarComReserva(passos, {
       effort: node.data.aiEffort,
       temperature: node.data.aiTemperature ?? TEMPERATURA_PADRAO,
+      maxTokens: node.data.aiMaxTokens || undefined,
       timeoutMs,
       systemPrompt,
       userMessage,
@@ -912,6 +959,17 @@ async function runAiAgent(
         if (call.name === SEGUIR_TOOL) {
           pediuParaSeguir = true;
           return "Ok, o atendimento segue para o próximo passo depois desta resposta.";
+        }
+        const iSaida = nomesDeSaida.indexOf(call.name);
+        if (iSaida >= 0) {
+          const s = saidasLigadas[iSaida];
+          const campos = (s.fields ?? []).filter((f) => f.key.trim() && !UNSAFE_VAR_KEYS.has(f.key));
+          const valores = campos.map((f) => [f, valorDoCampo(call.arguments[f.key], f.type)] as const);
+          const faltam = valores.filter(([f, v]) => f.required && v === undefined).map(([f]) => f.key);
+          if (faltam.length) return `Faltam dados para sair por "${s.name}": ${faltam.join(", ")}. Pergunte ao cliente antes.`;
+          for (const [f, v] of valores) if (v !== undefined) setVar(variables, f.key, v);
+          saidaEscolhida = s.id;
+          return `Ok, o atendimento segue por "${s.name}" depois desta resposta.`;
         }
         if (call.name === SAVE_SLOTS_TOOL) {
           const saved: string[] = [];
@@ -949,7 +1007,7 @@ async function runAiAgent(
         }
         if (toolNode.data.iconKey === "tool-knowledge") {
           const query = String(call.arguments.consulta ?? userMessage);
-          const chunks = await searchKnowledgeBase(agente.id, query, 4);
+          const chunks = await searchKnowledgeBase(agente.id, query, 4, toolNode.data.knowledgeDocIds);
           return chunks.join("\n\n") || "Nenhum trecho relevante encontrado na base de conhecimento.";
         }
         // O que já foi capturado na conversa vale mais que o que a IA mandar.
@@ -982,13 +1040,22 @@ async function runAiAgent(
       console.warn("[ia] respondeu pela reserva", { usado: result.usado?.origem, falharam: result.tentativas.map((t) => t.origem) });
     }
     const falhas = result.tentativas.map((t) => `${t.origem}: ${t.error}`);
-    const error = result.error ? [...falhas, `${result.usado?.origem ?? "IA"}: ${result.error}`].join(" · ") : undefined;
-    const seguir = iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
+    // Sem texto não é erro quando a IA só escolheu a saída ou não fala com o cliente.
+    const semTextoOk = result.error === SEM_RESPOSTA && (!!saidaEscolhida || !enviar);
+    const error = result.error && !semTextoOk ? [...falhas, `${result.usado?.origem ?? "IA"}: ${result.error}`].join(" · ") : undefined;
+    const saida = error ? undefined : saidaEscolhida;
+    // Sem falar com o cliente, a IA roda uma vez e segue: ninguém responderia a ela.
+    const seguir =
+      !!saida ||
+      (!enviar && temSaida && !error) ||
+      iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
     const { texto, removidas } = semChamadaEmTexto(result.text);
     if (removidas.length) console.warn("[ia] chamada de ferramenta escrita como texto (não enviada)", { agente: agente.id, no: node.id, removidas });
-    return { text: texto, error, seguir };
+    const variavel = node.data.aiResponseVariable?.trim();
+    if (!enviar && variavel && texto && !UNSAFE_VAR_KEYS.has(variavel)) setVar(variables, variavel, texto);
+    return { text: texto, error, seguir, saida, enviar };
   } catch (err) {
-    return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false };
+    return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false, enviar };
   }
 }
 
@@ -1089,10 +1156,12 @@ export function nextNodeId(edges: Edge[], fromId: string, sourceHandle?: string 
   return edge?.target ?? null;
 }
 
-/** Saída "normal" de um bloco: a aresta sem nome; nunca a de resposta inválida. */
-function nextDefaultNodeId(edges: Edge[], fromId: string): string | null {
+/** Saída "normal" de um bloco: a aresta sem nome; nunca a de resposta inválida (nem as `outras` nomeadas). */
+function nextDefaultNodeId(edges: Edge[], fromId: string, outras: string[] = []): string | null {
   const semNome = edges.find((e) => e.source === fromId && e.sourceHandle == null);
-  const qualquer = edges.find((e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA && e.sourceHandle !== SAIDA_ERRO);
+  const qualquer = edges.find(
+    (e) => e.source === fromId && e.sourceHandle !== SAIDA_INVALIDA && e.sourceHandle !== SAIDA_ERRO && !outras.includes(e.sourceHandle ?? "")
+  );
   return (semNome ?? qualquer)?.target ?? null;
 }
 
@@ -1603,12 +1672,12 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     }, juntadas?.desde, await contextoDaIa());
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
-    if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
+    if (reply.text && reply.enviar !== false) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
     else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
     if (seErrou) currentId = seErrou; // falhou: segue pela saída "Erro"
     else if (!reply.seguir) return finish();
-    else currentId = nextDefaultNodeId(edges, parkedNode.id); // terminou: segue nesta rodada
+    else currentId = reply.saida ? nextNodeId(edges, parkedNode.id, reply.saida) : nextDefaultNodeId(edges, parkedNode.id, saidasDaIa(parkedNode.data)); // terminou: segue nesta rodada
   } else if (parkedNode?.data.iconKey === "wait") {
     const wakeAt = variables.__wait_until as string | undefined;
     if (wakeAt && new Date(wakeAt) > new Date()) {
@@ -1877,7 +1946,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     }, juntadas?.desde, await contextoDaIa());
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
-      if (reply.text) messages.push(...respostaDaIa(reply.text, input.channel, node));
+      if (reply.text && reply.enviar !== false) messages.push(...respostaDaIa(reply.text, input.channel, node));
       else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
       if (seErrou) {
@@ -1885,7 +1954,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         continue;
       }
       if (reply.seguir) {
-        currentId = nextDefaultNodeId(edges, node.id);
+        currentId = reply.saida ? nextNodeId(edges, node.id, reply.saida) : nextDefaultNodeId(edges, node.id, saidasDaIa(node.data));
         continue;
       }
       currentId = node.id; // fica com a IA até ela terminar (ou para sempre, sem ligação)

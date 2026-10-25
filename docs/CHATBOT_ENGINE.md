@@ -206,7 +206,7 @@ UI: página "Disparos" (`src/app/(app)/disparos/page.tsx`) — formulário + his
 
 ## 11. Automações de comentário do Instagram
 
-Igual o recurso de comentário do ManyChat: alguém comenta uma palavra-chave (ou qualquer comentário) num
+Alguém comenta uma palavra-chave (ou qualquer comentário) num
 post/reel, o Eva Studio responde publicamente (opcional) e manda uma DM — que a partir daí entra no canal
 `instagram` normal (§5) e cai no fluxo do Builder como qualquer conversa nova.
 
@@ -569,7 +569,7 @@ não o código.
 
 ## 24. Gatilhos (palavra-chave na DM, resposta e menção em story)
 
-Recurso estilo ManyChat: uma mensagem que bate com um gatilho dispara uma resposta e/ou pula a conversa para
+Uma mensagem que bate com um gatilho dispara uma resposta e/ou pula a conversa para
 um bloco do fluxo. Nada casou → fluxo padrão, como sempre.
 
 **Modelo** (`eva_studio_agent_triggers`, `AgentTrigger`): `kind` (`dm_keyword` | `story_reply` |

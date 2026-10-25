@@ -54,7 +54,7 @@ model Organization {
   @@map("eva_studio_organizations")
 }
 
-// Chave de API pública (igual Stripe/HubSpot/Salesforce) — dá acesso
+// Chave de API pública — dá acesso
 // programático aos dados dessa org via /api/v1/*, sem precisar de sessão
 // logada. Só o hash é guardado (SHA-256); a chave em si só existe uma vez,
 // no momento em que é criada — depois disso é irrecuperável, só dá pra
@@ -468,8 +468,7 @@ model InstagramConnection {
   @@map("eva_studio_instagram_connections")
 }
 
-// Automação "comente X e recebe DM" (igual o recurso de comentário do
-// ManyChat) — quando um comentário num post/reel do Instagram bate com o
+// Automação "comente X e recebe DM" — quando um comentário num post/reel do Instagram bate com o
 // gatilho, manda uma resposta pública opcional e uma mensagem privada (via
 // API de private reply da Meta). Depois disso, a conversa cai no fluxo
 // normal do Builder (currentNodeId fica null — a próxima mensagem do
@@ -758,7 +757,7 @@ model ContactChannel {
   @@map("eva_studio_contact_channels")
 }
 
-// Etiqueta (igual "tag" do ManyChat) — o jeito mais simples de segmentar.
+// Etiqueta — o jeito mais simples de segmentar.
 // Aplicar uma etiqueta e o gatilho mais usado pra entrar numa sequencia.
 model Tag {
   id        String   @id @default(uuid())
@@ -1311,8 +1310,7 @@ model DealActivity {
   @@map("eva_studio_deal_activity")
 }
 
-// Catálogo de produtos e serviços da organização (o "Products" do HubSpot e
-// do Pipedrive). O negócio não aponta para o preço daqui: cada item copia
+// Catálogo de produtos e serviços da organização. O negócio não aponta para o preço daqui: cada item copia
 // nome, código, unidade, preço e recorrência na hora em que entra, e mudar o
 // catálogo depois não reescreve proposta antiga.
 model Product {

@@ -30,7 +30,8 @@ vi.mock("@/lib/server/custom-fields", () => ({ carregarDefinicoes: vi.fn(async (
 vi.mock("@/lib/server/credentials", () => ({ getCredentialSecret: vi.fn(async () => "chave") }));
 vi.mock("@/lib/server/llm", () => llm);
 vi.mock("@/lib/server/ssrf", () => rede);
-vi.mock("@/lib/server/knowledge-search", () => ({ searchKnowledgeBase: vi.fn(async () => []) }));
+const kb = vi.hoisted(() => ({ searchKnowledgeBase: vi.fn(async () => [] as string[]) }));
+vi.mock("@/lib/server/knowledge-search", () => kb);
 const conexao = vi.hoisted(() => ({ passosDaConexao: vi.fn() }));
 vi.mock("@/lib/server/ia/conexao", () => conexao);
 const uso = vi.hoisted(() => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
@@ -176,6 +177,100 @@ describe("Responder com IA (ai-agent)", () => {
     iaResponde("Oi!");
     await advanceConversation({ ...base, text: "olá" });
     expect(ferramentas()).not.toContain("seguir_fluxo");
+  });
+});
+
+describe("IA com saídas, resposta em variável e base escolhida (S2-IA)", () => {
+  /** Fluxo com Terminou → "depois" e a saída por intenção "duvida" → "suporte". */
+  function comSaidas(extra: Record<string, unknown> = {}, ligarSaida = true) {
+    const f = fluxo(
+      ia({
+        aiExits: [
+          {
+            id: "duvida",
+            name: "Dúvida técnica",
+            description: "o cliente tem um problema com o produto",
+            fields: [
+              { id: "f1", key: "produto", type: "string", description: "qual produto", required: true },
+              { id: "f2", key: "urgente", type: "boolean", description: "é urgente", required: false },
+            ],
+          },
+        ],
+        ...extra,
+      }),
+      true
+    );
+    f.nodes.push({ id: "suporte", position: { x: 0, y: 0 }, data: { iconKey: "message", label: "Suporte", detail: "Suporte: {produto}" } });
+    if (ligarSaida) f.edges.push({ id: "e3", source: "bot", target: "suporte", sourceHandle: "duvida" } as (typeof f.edges)[number]);
+    return f;
+  }
+
+  it("a saída por intenção vira ferramenta (sem acento) e leva para o bloco ligado nela, com os campos em variáveis", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comSaidas());
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Vou te passar para o suporte.", [{ id: "1", name: "sair_duvida_tecnica", arguments: { produto: "Sofá", urgente: "sim" } }]);
+    const r = await advanceConversation({ ...base, text: "meu sofá quebrou" });
+    expect(ferramentas()).toContain("sair_duvida_tecnica");
+    expect(r.messages.map((m) => m.text)).toEqual(["Vou te passar para o suporte.", "Suporte: Sofá"]);
+    expect(gravado().variables).toMatchObject({ produto: "Sofá", urgente: true });
+  });
+
+  it("campo obrigatório faltando: a IA não sai e a conversa continua com ela", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comSaidas());
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    let resposta = "";
+    llm.callLlmWithTools.mockImplementation(async (opts: { executeTool: (c: LlmToolCall) => Promise<string> }) => {
+      resposta = await opts.executeTool({ id: "1", name: "sair_duvida_tecnica", arguments: {} });
+      return { text: "Qual produto?" };
+    });
+    const r = await advanceConversation({ ...base, text: "deu problema" });
+    expect(resposta).toMatch(/Faltam dados.*produto/);
+    expect(r.messages.map((m) => m.text)).toEqual(["Qual produto?"]);
+    expect(gravado().currentNodeId).toBe("bot");
+  });
+
+  it("saída sem ligação não é oferecida, e ligação de saída não conta como Terminou", async () => {
+    const f = comSaidas({}, false);
+    f.edges = f.edges.filter((e) => e.id !== "e2");
+    f.edges.push({ id: "e3", source: "bot", target: "suporte", sourceHandle: "outra" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue({ ...f, nodes: f.nodes.map((n) => (n.id === "bot" ? { ...n, data: { ...n.data, aiExits: [{ id: "outra", name: "Outra", description: "" }, { id: "duvida", name: "Dúvida", description: "" }] } } : n)) });
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Oi!");
+    await advanceConversation({ ...base, text: "olá" });
+    expect(ferramentas()).toContain("sair_outra");
+    expect(ferramentas()).not.toContain("sair_duvida");
+    expect(ferramentas()).not.toContain("seguir_fluxo");
+  });
+
+  it("sem enviar para o cliente: guarda a resposta na variável e segue por Terminou na mesma rodada", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiSendToCustomer: false, aiResponseVariable: "nome" }), true));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Carla");
+    const r = await advanceConversation({ ...base, text: "aqui é a Carla" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Anotado, Carla!"]);
+  });
+
+  it("sem enviar e só escolhendo a saída (sem texto): segue por ela, sem erro", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comSaidas({ aiSendToCustomer: false }));
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    llm.callLlmWithTools.mockImplementation(async (opts: { executeTool: (c: LlmToolCall) => Promise<string> }) => {
+      await opts.executeTool({ id: "1", name: "sair_duvida_tecnica", arguments: { produto: "Mesa" } });
+      return { text: null };
+    });
+    const r = await advanceConversation({ ...base, text: "a mesa" });
+    expect(r.messages.map((m) => m.text)).toEqual(["Suporte: Mesa"]);
+  });
+
+  it("limite de tokens e documentos da base escolhidos chegam ao provedor e à busca", async () => {
+    const f = fluxo(ia({ aiMaxTokens: 300 }), false);
+    f.nodes.push({ id: "kb", position: { x: 0, y: 0 }, data: { iconKey: "tool-knowledge", label: "Base", knowledgeDocIds: ["d1"] } } as (typeof f.nodes)[number]);
+    f.edges.push({ id: "e4", source: "kb", target: "bot", targetHandle: "tools" } as (typeof f.edges)[number]);
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado("bot"));
+    iaResponde("Achei.", [{ id: "1", name: "base", arguments: { consulta: "preço" } }]);
+    await advanceConversation({ ...base, text: "preço?" });
+    expect(llm.callLlmWithTools.mock.calls.at(-1)?.[0]).toMatchObject({ maxTokens: 300 });
+    expect(kb.searchKnowledgeBase).toHaveBeenCalledWith("a1", "preço", 4, ["d1"]);
   });
 });
 

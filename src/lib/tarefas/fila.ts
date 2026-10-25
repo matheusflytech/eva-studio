@@ -1,6 +1,5 @@
 // ---------------------------------------------------------------------------
-// Fila registro a registro (HubSpot task queues / Close power dialer): a
-// pessoa trabalha uma lista na ordem, com "Concluir e próximo" e "Pular".
+// Fila registro a registro: a pessoa trabalha uma lista na ordem, com "Concluir e próximo" e "Pular".
 // Puro: a tela guarda o estado; concluir de verdade (com resultado e próximo
 // passo) é o mesmo diálogo de sempre — a fila só decide quem vem depois.
 // ---------------------------------------------------------------------------

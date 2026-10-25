@@ -284,7 +284,7 @@ A ordem segue as conversas com o Alfredo. Planos detalhados em
 
 ### Agentes e canais
 - **Gatilhos do Instagram** (palavra-chave na DM, resposta e menção em story),
-  assinatura automática dos eventos. *Por quê:* pedido do to-do de ManyChat.
+  assinatura automática dos eventos. *Por quê:* pedido do to-do de bots.
 - **Lead de verdade:** lead passou a ser um contato com `leadStage`; leads do
   WhatsApp/Instagram aparecem em /leads. Bloco Captura valida nome, e-mail,
   telefone, com novas tentativas e saída de "resposta inválida".
@@ -501,7 +501,7 @@ Plano: `docs/superpowers/plans/2026-10-21-canais-do-contrato.md`.
   telas fora do builder, como o inbox, ainda têm `text-white`/hex soltos e
   dependem da ponte de cores do tema).
 - Roadmaps antigos ainda abertos: prospecção por CNAE/CNPJ (pedido do Lucas),
-  peças restantes de ManyChat, marketing (Google/Meta Ads,
+  peças restantes do builder de bots, marketing (Google/Meta Ads,
   `2026-10-18-marketing-integracoes-roadmap.md`), spike do Instagram.
 - Remover `[DEMO]` e `[TESTE]` de produção quando não forem mais úteis.
 - Trocar senha do banco e app secret de teste (seção 6).

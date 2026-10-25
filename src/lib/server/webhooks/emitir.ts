@@ -12,7 +12,7 @@ import { tentarEntrega } from "./entrega";
 // causa disto: sem endpoint assinado, sai só uma consulta barata; sem a
 // tabela, nada. O corpo do evento só é montado quando alguém vai receber.
 //
-// Corpo (híbrido, como HubSpot/Attio): `data` é o objeto atual no mesmo
+// Corpo (híbrido): `data` é o objeto atual no mesmo
 // formato da API v1 (o n8n não precisa buscar de novo) e `previous` traz só o
 // que mudou, quando faz sentido.
 // ---------------------------------------------------------------------------

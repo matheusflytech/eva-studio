@@ -44,7 +44,7 @@ function rotuloDoEscopo(s: string): string {
   return `${nome}: ${acao === "read" ? "ler" : acao === "write" ? "escrever" : "ler e escrever"}`;
 }
 
-// Chaves de API do contrato (/api/v1/*) — igual Pipedrive/HubSpot: cria uma
+// Chaves de API do contrato (/api/v1/*): cria uma
 // chave com nome, o que ela pode (escopos) e, se quiser, até quando vale. Ela
 // aparece completa SÓ UMA VEZ pra copiar; depois só o prefixo (o valor de
 // verdade nunca é recuperável, só revogável).

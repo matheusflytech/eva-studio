@@ -54,7 +54,7 @@ function tempoCurto(ms: number): string {
 }
 
 /**
- * Trilha de etapas (o "path" do Salesforce/Pipedrive), v5: uma barra por
+ * Trilha de etapas, v5: uma barra por
  * etapa aberta, com o nome e o tempo que o negócio passou nela; a atual em
  * destaque e as anteriores como concluídas. Clicar move pelas regras da etapa
  * (campos obrigatórios → "Complete para mover"). Ganho e perdido não entram
