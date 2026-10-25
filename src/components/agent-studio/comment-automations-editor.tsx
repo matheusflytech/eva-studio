@@ -245,7 +245,7 @@ export function CommentAutomationsEditor({ agentId }: { agentId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-small text-text-tertiary">
-        Igual o recurso de comentário do ManyChat: alguém comenta uma palavra-chave num post/reel seu, o Eva Studio
+        Alguém comenta uma palavra-chave num post/reel seu, o Eva Studio
         responde no comentário (opcional) e manda uma mensagem privada — que já entra no fluxo normal do Builder
         a partir daí.
       </p>

@@ -35,7 +35,7 @@ Esses ids/secret ficam no painel do app, em Instagram > API setup with Instagram
 variáveis, o card mostra o formulário manual (pede `igBusinessId` e `pageAccessToken` obtidos no painel do app,
 ver `docs/meta-business-runbook.html` §02) como já era feito antes desse botão existir.
 
-## Automações de comentário (ManyChat-style)
+## Automações de comentário
 
 Já funcionam sem precisar de conta Instagram conectada de verdade — o simulador na aba do agente ("Automações
 de comentário") deixa testar o casamento de palavra-chave e a conversa que viria depois, usando o mesmo motor
