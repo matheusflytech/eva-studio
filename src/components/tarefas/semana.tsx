@@ -267,9 +267,9 @@ export function CartaoDoEvento({
           e.origem === "negocio" && <HandCoins aria-hidden="true" className="size-3 shrink-0 text-text-tertiary" />
         )}
       </span>
-      {linhas >= 2 && hora && <span className={cn("truncate whitespace-nowrap font-mono text-[11px] leading-[1.25] tabular-nums", cor.fg)}>{hora}</span>}
-      {linhas >= 2 && !hora && e.negocio && apoio && <span className="truncate text-[11px] leading-[1.25] text-text-secondary">{apoio}</span>}
-      {linhas >= 3 && hora && apoio && <span className="truncate text-[11px] leading-[1.25] text-text-secondary">{apoio}</span>}
+      {linhas >= 2 && hora && <span className={cn("truncate whitespace-nowrap font-mono text-caption leading-[1.25] tabular-nums", cor.fg)}>{hora}</span>}
+      {linhas >= 2 && !hora && e.negocio && apoio && <span className="truncate text-caption leading-[1.25] text-text-secondary">{apoio}</span>}
+      {linhas >= 3 && hora && apoio && <span className="truncate text-caption leading-[1.25] text-text-secondary">{apoio}</span>}
     </button>
   );
 }
