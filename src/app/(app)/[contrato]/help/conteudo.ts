@@ -92,7 +92,7 @@ export const SECOES: Secao[] = [
     titulo: "As telas, uma a uma",
     icone: LayoutGrid,
     intro:
-      "O que dá para fazer em cada lugar do menu. O menu mostra só o do dia a dia (Início, Conversas, Negócios, Contatos, Tarefas, Dashboard e Agentes de IA). O resto fica em “Mais ferramentas”, no fim do menu, e abre sozinho quando você entra numa dessas páginas.",
+      "O que dá para fazer em cada lugar do menu. O menu mostra só o do dia a dia (Início, Conversas, Negócios, Contatos, Tarefas, Dashboard e Eva Studio). O resto fica em “Mais ferramentas”, no fim do menu, e abre sozinho quando você entra numa dessas páginas.",
     itens: [
       {
         titulo: "Início",
@@ -108,7 +108,7 @@ export const SECOES: Secao[] = [
       },
       { titulo: "Insights", resumo: "Quanto o agente resolve sozinho, onde a conversa para, horário de pico e o que mais falam.", href: "/insights", nota: "“Onde a conversa para” mostra o último bloco de cada execução — é o painel que aponta a pergunta específica que faz gente desistir." },
       {
-        titulo: "Agentes de IA",
+        titulo: "Eva Studio",
         resumo: "Lista dos agentes, com o próximo passo de cada um e sete dias de conversa em barras.",
         href: "/agent-studio",
         nota: "Ao abrir um agente, a primeira aba (Resumo) responde se ele está funcionando: lista o que falta (fluxo, instruções, canal, teste) e mostra conversas, fila e erros. As outras abas são Comportamento (quem ele é, o que deve fazer, base de conhecimento), Canais (onde atende) e Avançado (n8n, variáveis, exclusão).",

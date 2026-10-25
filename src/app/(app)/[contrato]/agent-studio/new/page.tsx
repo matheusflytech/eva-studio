@@ -11,7 +11,7 @@ export default function NewAgentPage() {
       <div className="mx-auto flex min-h-10 w-full max-w-2xl items-center gap-2">
         <Link
           href="/agent-studio"
-          aria-label="Voltar para Agentes de IA"
+          aria-label="Voltar para Eva Studio"
           className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-1.5 shrink-0" })}
         >
           <ArrowLeft aria-hidden="true" />

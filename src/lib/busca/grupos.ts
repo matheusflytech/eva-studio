@@ -29,7 +29,7 @@ export const PAGINAS: Pagina[] = [
   { caminho: "/dashboard", rotulo: "Dashboard", permissao: "relatorios:ver", palavras: "painel relatorios metricas" },
   { caminho: "/companies", rotulo: "Empresas", permissao: "empresas:ver", palavras: "contas cnpj" },
   { caminho: "/leads", rotulo: "Leads", permissao: "contatos:ver" },
-  { caminho: "/agent-studio", rotulo: "Agentes de IA", permissao: "agentes:ver", palavras: "eva bot fluxo" },
+  { caminho: "/agent-studio", rotulo: "Eva Studio", permissao: "agentes:ver", palavras: "eva bot fluxo" },
   { caminho: "/sequences", rotulo: "Sequências", permissao: "sequencias:gerenciar", palavras: "cadencia regua" },
   { caminho: "/broadcasts", rotulo: "Disparos", permissao: "disparos:ver", palavras: "campanha massa broadcast" },
   { caminho: "/approvals", rotulo: "Aprovações", permissao: "disparos:ver", palavras: "templates modelos meta" },

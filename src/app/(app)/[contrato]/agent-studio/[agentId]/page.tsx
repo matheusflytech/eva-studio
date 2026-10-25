@@ -47,7 +47,7 @@ function AgentePagina() {
       <div className="flex flex-1 flex-col items-center gap-3 px-4 py-14 text-center">
         <p className="text-body text-text-secondary">Agente não encontrado.</p>
         <Link href="/agent-studio" className="text-small font-medium text-accent-fg hover:underline">
-          Voltar para Agentes de IA
+          Voltar para Eva Studio
         </Link>
       </div>
     );

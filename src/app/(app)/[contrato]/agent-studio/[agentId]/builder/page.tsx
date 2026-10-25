@@ -292,7 +292,37 @@ export default function AgentBuilderPage() {
     return { x, y: candidatoY };
   }
 
+  /**
+   * Ferramenta não é passo do fluxo: ela pendura na porta de ferramentas de
+   * uma IA. Antes entrava como "próximo passo" (ficava solta e ainda apagava
+   * o fio que saía da IA). Vai para a IA selecionada, a IA da ferramenta
+   * selecionada ou, sem nenhuma das duas, a última IA do fluxo.
+   */
+  function adicionarFerramenta(ancoraId: string | null, iconKey: IconKey) {
+    const id = generateId();
+    const ancoraNo = ancoraId ? nodes.find((n) => n.id === ancoraId) : null;
+    const iaDaFerramenta =
+      ancoraNo && ehFerramenta(ancoraNo.data.iconKey)
+        ? edges.find((e) => e.source === ancoraNo.id && e.targetHandle === "tools")?.target
+        : undefined;
+    const ia =
+      (ancoraNo?.data.iconKey === "ai-agent" ? ancoraNo : null) ??
+      nodes.find((n) => n.id === iaDaFerramenta) ??
+      [...nodes].reverse().find((n) => n.data.iconKey === "ai-agent") ??
+      null;
+    const novo: Node<FlowNodeData> = {
+      id,
+      type: "flowNode",
+      position: ia ? vagaLivre(ia.position.x, ia.position.y + 200) : vagaLivre(120, 120),
+      data: { iconKey, label: iconKey, ...(getBlockDefault(iconKey)?.data ?? {}) },
+    };
+    setNodes((nds) => [...nds, novo]);
+    if (ia) setEdges((eds) => [...eds, { id: generateId(), source: id, target: ia.id, targetHandle: "tools" }]);
+    setSelectedId(id);
+  }
+
   function handleAddAfter(afterNodeId: string | null, iconKey: IconKey) {
+    if (ehFerramenta(iconKey)) return adicionarFerramenta(afterNodeId, iconKey);
     const id = generateId();
     const defaults = getBlockDefault(iconKey)?.data ?? {};
     const anterior = afterNodeId ? nodes.find((n) => n.id === afterNodeId) : null;
@@ -320,6 +350,12 @@ export default function AgentBuilderPage() {
         (e) => e.source === anterior.id && (e.sourceHandle ?? undefined) === handle && e.targetHandle !== "tools"
       );
       const saidaDoNovo = saidaParaNovoBloco(novo.data, id, []);
+      // Bloco sem saída (Encerrar) no meio: não dá para religar o que vinha
+      // depois, então ele entra solto em vez de cortar o fluxo.
+      if (continuacao && saidasDoBloco(novo.data).length === 0) {
+        setSelectedId(id);
+        return;
+      }
       setEdges((eds) => [
         ...eds.filter((e) => e.id !== continuacao?.id),
         { id: generateId(), source: anterior.id, target: id, ...(handle ? { sourceHandle: handle } : {}) },
@@ -495,7 +531,7 @@ export default function AgentBuilderPage() {
       <div className="flex flex-1 flex-col items-center gap-3 px-4 py-14 text-center">
         <p className="text-body text-text-secondary">Agente não encontrado.</p>
         <Link href="/agent-studio" className="text-small font-medium text-accent-fg hover:underline">
-          Voltar para Agentes de IA
+          Voltar para Eva Studio
         </Link>
       </div>
     );
