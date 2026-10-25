@@ -36,6 +36,28 @@ export interface AiExitField {
   required: boolean;
 }
 
+/** Um item do conteúdo do Bloco, mandado na ordem da lista. */
+export interface BlockContent {
+  id: string;
+  /** "typing" mostra "digitando…" antes da próxima mensagem (no WhatsApp). */
+  type: "text" | "typing";
+  text?: string;
+  seconds?: number;
+}
+
+/** Ação do Bloco: os mesmos dados de um bloco de ação (variável, CRM, HTTP, e-mail). */
+export interface BlockAction {
+  id: string;
+  data: FlowNodeData;
+}
+
+/** Saída por condição do Bloco: a primeira verdadeira (e ligada) ganha. */
+export interface BlockCondition {
+  id: string;
+  label: string;
+  expression: string;
+}
+
 /** Saída por intenção do bloco de IA: a IA escolhe por qual sair. */
 export interface AiExit {
   id: string;
@@ -126,6 +148,15 @@ export interface FlowNodeData {
   aiResponseVariable?: string;
   // Saídas por intenção, além de Terminou/Erro (ver saidasDoBloco).
   aiExits?: AiExit[];
+  // ── Bloco do Studio ("studio-block") ───────────────────────────────────
+  // Ordem no motor: ações de entrada, conteúdo, espera a resposta (se
+  // waitForReply), ações de saída, saída. A pergunta usa os mesmos campos da
+  // Captura (options, captureField, variableName...).
+  blockContents?: BlockContent[];
+  entryActions?: BlockAction[];
+  exitActions?: BlockAction[];
+  exitConditions?: BlockCondition[];
+  waitForReply?: boolean;
   // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
   // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
   mcpServerId?: string;
@@ -238,6 +269,10 @@ export function resumoDoBloco(data: FlowNodeData): { texto: string; mono: boolea
     return { texto: n > 0 ? `${n} ferramenta${n === 1 ? "" : "s"}` : "Todas as ferramentas", mono: false };
   }
   if (k === "tool-knowledge") return { texto: "Busca nos documentos", mono: false };
+  if (k === "studio-block") {
+    const fala = primeiraLinha((data.blockContents ?? []).find((c) => c.type === "text" && c.text?.trim())?.text);
+    if (fala) return { texto: fala, mono: false };
+  }
   // Mensagem e pergunta: o começo do que o agente diz é o melhor resumo.
   if (k === "message" || k === "capture") {
     const fala = primeiraLinha(data.detail);

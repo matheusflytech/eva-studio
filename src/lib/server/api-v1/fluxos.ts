@@ -31,7 +31,7 @@ import { ErroApi } from "./http";
 export const TIPOS_DE_BLOCO = [
   "start", "message", "capture", "agent", "condition", "variable", "webhook", "human", "wait", "end", "http", "email",
   "ai-agent", "tool-http", "tool-knowledge", "tool-mcp", "crm-deal", "crm-stage", "crm-task", "crm-tag", "crm-update",
-  "crm-note", "crm-lookup", "tool-crm",
+  "crm-note", "crm-lookup", "tool-crm", "studio-block",
 ] as const satisfies readonly IconKey[];
 
 export const MAX_BLOCOS_API = 200;

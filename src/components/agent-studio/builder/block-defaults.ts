@@ -9,6 +9,15 @@ export interface BlockDefault {
 
 export const BLOCK_DEFAULTS: BlockDefault[] = [
   {
+    key: "studio-block",
+    paletteLabel: "Bloco",
+    data: {
+      label: "Novo bloco",
+      kind: "Bloco",
+      blockContents: [{ id: "c1", type: "text", text: "Digite aqui o que o agente vai dizer." }],
+    },
+  },
+  {
     key: "message",
     paletteLabel: "Mensagem",
     data: { label: "Nova mensagem", kind: "Mensagem", detail: "Digite aqui o que o agente vai dizer." },
