@@ -57,7 +57,12 @@ export function MenuDeBlocos({
           {children ?? <Plus size={11} aria-hidden="true" />}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-[60vh] w-64 overflow-y-auto">
+      {/* Altura limitada ao espaço livre que o Radix mede: perto da borda o menu rola em vez de sair da tela. */}
+      <DropdownMenuContent
+        align="start"
+        collisionPadding={12}
+        className="max-h-[min(60vh,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto overscroll-contain"
+      >
         {grupos.map((g, gi) => (
           <React.Fragment key={g.id}>
             {gi > 0 && <DropdownMenuSeparator />}
