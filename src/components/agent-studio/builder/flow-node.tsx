@@ -86,9 +86,6 @@ export interface FlowNodeData {
   // Quantas mensagens anteriores da conversa entram no contexto (janela
   // deslizante, sem sumarização — ver runAiAgent em flow-engine.ts).
   aiMemoryWindow?: number;
-  // Junta ao prompt o cadastro do agente (instruções, tom, idioma, "nunca
-  // fazer"). Vazio = ligado; false = só o texto do bloco, como era antes.
-  aiUsarAgente?: boolean;
   // No WhatsApp, a resposta longa sai em até 3 balões com "digitando…" entre
   // eles. Vazio = ligado; false = uma mensagem só.
   aiBaloes?: boolean;

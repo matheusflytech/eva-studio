@@ -610,7 +610,7 @@ export default function AgentBuilderPage() {
       </div>
 
       {tab === "editor" ? (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 gap-3 overflow-hidden">
           <BlockPalette
             onAdd={handleAddBlock}
             ancora={ancora ? nodes.find((n) => n.id === ancora)?.data.label ?? null : null}
@@ -661,28 +661,27 @@ export default function AgentBuilderPage() {
                   execucaoNoCanvas?.[node.id] && !execucaoNoCanvas[node.id].ok ? "var(--danger-solid)" : "var(--border-strong)"
                 }
               />
-              <Panel position="top-right">
-                <div className="flex flex-col items-end gap-3">
-                  {selectedNode && (
-                    <NodeInspector
-                      node={selectedNode}
-                      agentId={agentId}
-                      variables={availableVariables}
-                      onChange={handleNodeDataChange}
-                      onDelete={handleDeleteNode}
-                      onClose={() => setSelectedId(null)}
-                    />
-                  )}
-                </div>
-              </Panel>
             </ReactFlow>
             </CanvasDoAgenteContext.Provider>
           </div>
 
+          {/* Coluna própria (como a paleta), não flutuando sobre o canvas:
+              em tela grande ela cresce em vez de ficar espremida num canto. */}
+          {selectedNode && (
+            <NodeInspector
+              node={selectedNode}
+              agentId={agentId}
+              variables={availableVariables}
+              onChange={handleNodeDataChange}
+              onDelete={handleDeleteNode}
+              onClose={() => setSelectedId(null)}
+            />
+          )}
+
           {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
         </div>
       ) : tab === "conversa" ? (
-        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 gap-4 overflow-hidden">
           <ConversationMode
             nodes={nodes}
             edges={edges}
@@ -692,16 +691,14 @@ export default function AgentBuilderPage() {
             onAddAfter={handleAddAfter}
           />
           {selectedNode && (
-            <div className="shrink-0 overflow-y-auto">
-              <NodeInspector
-                node={selectedNode}
-                agentId={agentId}
-                variables={availableVariables}
-                onChange={handleNodeDataChange}
-                onDelete={handleDeleteNode}
-                onClose={() => setSelectedId(null)}
-              />
-            </div>
+            <NodeInspector
+              node={selectedNode}
+              agentId={agentId}
+              variables={availableVariables}
+              onChange={handleNodeDataChange}
+              onDelete={handleDeleteNode}
+              onClose={() => setSelectedId(null)}
+            />
           )}
         </div>
       ) : (

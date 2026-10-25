@@ -75,9 +75,9 @@ beforeEach(() => {
 });
 
 describe("Responder com IA (ai-agent)", () => {
-  it("o prompt leva o cadastro do agente antes do texto do bloco; desligado, só o bloco", async () => {
+  it("o prompt é só o texto do bloco: o cadastro do agente é explicativo e não entra", async () => {
     db.agent.findUnique.mockResolvedValue({
-      id: "a1", orgId: "o1", name: "Eva", description: "", tone: "Leve.", language: "Português",
+      id: "a1", orgId: "o1", name: "Eva", description: "Atende o site.", tone: "Leve.", language: "Português",
       instructions: "Venda sofás.", guidelines: "Não dê desconto.", outboundUrl: "",
     });
     db.agentFlow.findUnique.mockResolvedValue(fluxo(ia(), false));
@@ -85,15 +85,9 @@ describe("Responder com IA (ai-agent)", () => {
     iaResponde("Oi!");
     await advanceConversation({ ...base, text: "olá" });
     const prompt = llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt as string;
-    expect(prompt).toContain("## Instruções\nVenda sofás.");
-    expect(prompt).toContain("## Nunca faça\nNão dê desconto.");
-    expect(prompt.indexOf("Venda sofás.")).toBeLessThan(prompt.indexOf("Atenda."));
-
-    db.agentFlow.findUnique.mockResolvedValue(fluxo(ia({ aiUsarAgente: false }), false));
-    await advanceConversation({ ...base, text: "olá" });
-    const soOBloco = llm.callLlmWithTools.mock.calls.at(-1)?.[0].systemPrompt;
-    expect(soOBloco).toMatch(/^Atenda\.\n\n## Contexto desta conversa/);
-    expect(soOBloco).not.toContain("Venda sofás.");
+    expect(prompt).toMatch(/^Atenda\.\n\n## Contexto desta conversa/);
+    expect(prompt).not.toContain("Venda sofás.");
+    expect(prompt).not.toContain("Atende o site.");
   });
 
   it("sem ligação: responde e a conversa continua com a IA (e ela nem recebe a ferramenta de seguir)", async () => {
