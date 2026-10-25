@@ -22,6 +22,12 @@ describe("validar", () => {
     expect(mensagens({ ...d, gatilho: { tipo: "deal.stage_entered", config: {} } })).toContain("erro:gatilho:Gatilho: falta Etapa.");
   });
 
+  it("webhook sem URL gerada não publica", () => {
+    const d = exemploProposta();
+    expect(mensagens({ ...d, gatilho: { tipo: "deal.webhook", config: {} } })).toContain("erro:gatilho:Gatilho: gere a URL do webhook.");
+    expect(mensagens({ ...d, gatilho: { tipo: "deal.webhook", config: { token: "f".repeat(32) } } }).filter((m) => m.includes("webhook"))).toEqual([]);
+  });
+
   it("campo obrigatório que só aparece com outra opção (mostrarSe)", () => {
     const d = exemploProposta();
     trocar(d, "zap", { config: { agente: "a1", modo: "texto" } });

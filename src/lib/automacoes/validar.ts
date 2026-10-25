@@ -131,7 +131,13 @@ export function validar(def: Definicao): Pendencia[] {
   if (!g) p.push({ no: "gatilho", nivel: "erro", mensagem: "Escolha o gatilho: o que faz a automação começar." });
   else if (!itemDoGatilho) p.push({ no: "gatilho", nivel: "erro", mensagem: "Gatilho desconhecido." });
   else if (itemDoGatilho.objeto !== def.objeto) p.push({ no: "gatilho", nivel: "erro", mensagem: "Este gatilho é de outro tipo de registro." });
-  else for (const f of faltando(itemDoGatilho.campos, ehObjeto(g.config) ? g.config : {})) p.push({ no: "gatilho", nivel: "erro", mensagem: `Gatilho: falta ${f}.` });
+  else {
+    for (const f of faltando(itemDoGatilho.campos, ehObjeto(g.config) ? g.config : {})) p.push({ no: "gatilho", nivel: "erro", mensagem: `Gatilho: falta ${f}.` });
+    // Sem token não há URL: a automação ficaria ligada sem nunca disparar.
+    if (itemDoGatilho.modo === "webhook" && !(ehObjeto(g.config) && typeof g.config.token === "string" && g.config.token.length >= 16)) {
+      p.push({ no: "gatilho", nivel: "erro", mensagem: "Gatilho: gere a URL do webhook." });
+    }
+  }
 
   // ---- forma: com nó malformado não dá para caminhar ----
   const ids = Object.keys(def.nos);
