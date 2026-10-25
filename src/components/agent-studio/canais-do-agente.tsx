@@ -94,7 +94,7 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
         <CardTitle>Por onde ele atende</CardTitle>
         <CardDescription>
           Escolha, em cada tipo, por qual canal do contrato este agente atende. Para conectar um número ou conta novos,
-          vá em <Link href="/configuracoes?aba=canais" className="text-accent-fg hover:underline">Configurações → Canais</Link>.
+          vá em <Link href="/settings?tab=channels" className="text-accent-fg hover:underline">Configurações → Canais</Link>.
         </CardDescription>
       </CardHeader>
 

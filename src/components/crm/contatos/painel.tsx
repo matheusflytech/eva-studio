@@ -114,7 +114,7 @@ export function ProximasAtividades({ versao, onAbrirContato }: { versao: number;
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-title font-semibold tracking-tight text-text-primary">Próximas atividades</h2>
-        <Link href="/tarefas" className={cn("rounded-full px-2 py-1 text-small font-medium text-accent-fg hover:underline", focusRing)}>
+        <Link href="/tasks" className={cn("rounded-full px-2 py-1 text-small font-medium text-accent-fg hover:underline", focusRing)}>
           Ver tarefas
         </Link>
       </div>

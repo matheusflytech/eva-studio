@@ -353,7 +353,7 @@ export function MontarComIa({
               <div className="rounded-[14px] bg-danger-subtle px-4 py-3 text-small text-danger">
                 {erro.msg}
                 {erro.semChave && (
-                  <Link href="/integracoes" className="ml-1 font-medium underline">
+                  <Link href="/integrations" className="ml-1 font-medium underline">
                     Abrir Integrações
                   </Link>
                 )}

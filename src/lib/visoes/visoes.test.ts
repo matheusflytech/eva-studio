@@ -14,8 +14,8 @@ import {
 } from "./visoes";
 
 const BARRA: FiltroDaBarra[] = [
-  { campo: "responsavel", rotulo: "Proprietário", param: "dono", tipo: "lista" },
-  { campo: "criadoEm", rotulo: "Criado em", param: "criado", tipo: "data" },
+  { campo: "responsavel", rotulo: "Proprietário", param: "owner", tipo: "lista" },
+  { campo: "criadoEm", rotulo: "Criado em", param: "created", tipo: "data" },
 ];
 const PADRAO = { visao: "todos", tamanho: 25 };
 const ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -68,10 +68,10 @@ describe("URL: id da visão + só as alterações não salvas", () => {
   it("filtro tirado vira parâmetro vazio e volta igual", () => {
     const mexido = { ...base, listas: {}, busca: "bia", ordem: null };
     const sp = estadoParaUrl(mexido, BARRA, PADRAO, base);
-    expect(sp.get("dono")).toBe("");
+    expect(sp.get("owner")).toBe("");
     expect(sp.get("q")).toBe("bia");
-    expect(sp.get("ordem")).toBe("");
-    expect(sp.has("criado")).toBe(false);
+    expect(sp.get("sort")).toBe("");
+    expect(sp.has("created")).toBe(false);
     expect(lerEstadoDaUrl(new URLSearchParams(sp.toString()), BARRA, PADRAO, ["todos"], base)).toEqual(mexido);
   });
 

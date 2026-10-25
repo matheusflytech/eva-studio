@@ -42,10 +42,10 @@ export async function GET(request: Request) {
   // Modo contrato (Configurações → Canais): o canal nasce sem agente.
   const doContrato = agentId === MODO_CONTRATO;
   const redirectBack = new URL(
-    rotaDoContrato(contrato, doContrato ? "/configuracoes" : `/agent-studio/${agentId}`),
+    rotaDoContrato(contrato, doContrato ? "/settings" : `/agent-studio/${agentId}`),
     url.origin
   );
-  if (doContrato) redirectBack.searchParams.set("aba", "canais");
+  if (doContrato) redirectBack.searchParams.set("tab", "channels");
 
   if (errorParam || !code) {
     redirectBack.searchParams.set("instagram_error", errorParam ?? "cancelado");

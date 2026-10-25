@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chaveDosRecentes, gravarRecente, lerRecentes, MAX_RECENTES, registrarRecente, type Recente } from "./recentes";
 
-const r = (id: string, tipo: Recente["tipo"] = "negocio"): Recente => ({ tipo, id, titulo: `T ${id}`, caminho: `/negocios/${id}` });
+const r = (id: string, tipo: Recente["tipo"] = "negocio"): Recente => ({ tipo, id, titulo: `T ${id}`, caminho: `/deals/${id}` });
 
 function storage(inicial: Record<string, string> = {}) {
   const dados = { ...inicial };

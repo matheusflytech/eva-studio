@@ -11,10 +11,10 @@ import { AgentResumo } from "@/components/agent-studio/agent-resumo";
 import { cn } from "@/lib/utils";
 
 const ABAS: { id: AbaDoAgente; rotulo: string; ajuda: string }[] = [
-  { id: "resumo", rotulo: "Resumo", ajuda: "Ele está funcionando?" },
-  { id: "comportamento", rotulo: "Comportamento", ajuda: "O que ele sabe e como fala" },
-  { id: "canais", rotulo: "Canais", ajuda: "Onde ele atende" },
-  { id: "avancado", rotulo: "Avançado", ajuda: "n8n, variáveis e exclusão" },
+  { id: "overview", rotulo: "Resumo", ajuda: "Ele está funcionando?" },
+  { id: "behavior", rotulo: "Comportamento", ajuda: "O que ele sabe e como fala" },
+  { id: "channels", rotulo: "Canais", ajuda: "Onde ele atende" },
+  { id: "advanced", rotulo: "Avançado", ajuda: "n8n, variáveis e exclusão" },
 ];
 
 function AgentePagina() {
@@ -22,7 +22,7 @@ function AgentePagina() {
   const params = useSearchParams();
   const { agents, isLoaded, load } = useAgentsStore();
 
-  const inicial = ABAS.find((a) => a.id === params.get("aba"))?.id ?? "resumo";
+  const inicial = ABAS.find((a) => a.id === params.get("tab"))?.id ?? "overview";
   const [aba, setAba] = React.useState<AbaDoAgente>(inicial);
 
   React.useEffect(() => {
@@ -34,7 +34,7 @@ function AgentePagina() {
     setAba(a);
     // Guarda a aba na URL: dá pra mandar o link "aba de canais" a alguém e o F5 não volta pro resumo.
     const url = new URL(window.location.href);
-    url.searchParams.set("aba", a);
+    url.searchParams.set("tab", a);
     window.history.replaceState(null, "", url.toString());
   }
 
@@ -84,10 +84,10 @@ function AgentePagina() {
         </nav>
 
         <div>
-          {aba === "resumo" && <AgentResumo agent={agent} irParaAba={trocar} />}
+          {aba === "overview" && <AgentResumo agent={agent} irParaAba={trocar} />}
           {/* O formulário fica sempre montado: o que se digita numa aba não some ao trocar. */}
-          <div className={aba === "resumo" ? "hidden" : undefined}>
-            <AgentForm agent={agent} aba={aba === "resumo" ? "comportamento" : aba} />
+          <div className={aba === "overview" ? "hidden" : undefined}>
+            <AgentForm agent={agent} aba={aba === "overview" ? "behavior" : aba} />
           </div>
         </div>
       </div>

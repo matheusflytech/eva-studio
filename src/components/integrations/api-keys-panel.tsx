@@ -148,7 +148,7 @@ export function ApiKeysPanel({ nivelDoTitulo = 1 }: { nivelDoTitulo?: 1 | 2 } = 
         descricao="Conecte sua automação, seu ERP ou um script próprio aos dados deste contrato. Cada chave tem nome, o que pode fazer e, se quiser, validade."
         acoes={
           <>
-            <Link href="/integracoes/api" className={buttonVariants({ variant: "ghost" })}>
+            <Link href="/integrations/api" className={buttonVariants({ variant: "ghost" })}>
               <FileText size={14} aria-hidden="true" /> Documentação
             </Link>
             {podeGerenciar && (

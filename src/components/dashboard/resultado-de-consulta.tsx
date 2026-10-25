@@ -153,7 +153,7 @@ function Desenho({ resultado, tipo }: { resultado: ResultadoDeConsulta; tipo: Ti
             ))}
           </tbody>
         </table>
-        <Link href="/negocios" className="mt-3 inline-flex items-center gap-1.5 px-2 text-caption font-medium text-accent-fg hover:text-accent-fg">
+        <Link href="/deals" className="mt-3 inline-flex items-center gap-1.5 px-2 text-caption font-medium text-accent-fg hover:text-accent-fg">
           Abrir o funil <ArrowRight size={12} />
         </Link>
       </div>

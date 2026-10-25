@@ -68,7 +68,7 @@ export function McpToolPicker({
         {servers && servers.length === 0 && (
           <p className="mt-1.5 inline-flex items-center gap-1.5 text-caption text-text-tertiary">
             Nenhum servidor cadastrado. Cadastre em{" "}
-            <Link href="/integracoes" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
+            <Link href="/integrations" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
               Integrações <ExternalLink size={11} />
             </Link>
           </p>

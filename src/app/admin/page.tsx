@@ -119,7 +119,7 @@ export default function AdminPage() {
       return;
     }
     // Entra no contrato novo, direto nas configurações (para convidar o cliente).
-    router.push(`/${d.contrato.id}/configuracoes?aba=membros`);
+    router.push(`/${d.contrato.id}/settings?tab=members`);
   }
 
   if (isLoading || !session) return <Palco />;
@@ -130,7 +130,7 @@ export default function AdminPage() {
         <main className="relative z-10 flex flex-1 items-center justify-center px-4">
           <div className="cartao-vidro w-full max-w-[380px] text-center">
             <h1 className="text-title font-semibold tracking-tight text-text-primary">Página não encontrada</h1>
-            <NextLink href="/contratos" className={buttonVariants({ size: "lg", className: `mt-6 h-11 w-full ${CAPSULA_CLARA}` })}>
+            <NextLink href="/contracts" className={buttonVariants({ size: "lg", className: `mt-6 h-11 w-full ${CAPSULA_CLARA}` })}>
               Voltar
             </NextLink>
           </div>
@@ -142,7 +142,7 @@ export default function AdminPage() {
   return (
     <Palco>
       <header className="relative z-10 flex items-center justify-between gap-3 px-4 pt-5 sm:px-8 sm:pt-7">
-        <NextLink href="/contratos?escolher=1" className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-2" })}>
+        <NextLink href="/contracts?choose=1" className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-2" })}>
           <ArrowLeft size={14} aria-hidden="true" /> Escolher contrato
         </NextLink>
         <span className="text-small font-semibold text-text-secondary">Eva Holding</span>
@@ -202,7 +202,7 @@ export default function AdminPage() {
               >
                 <div className="min-w-0 flex-1 py-2.5">
                   <NextLink
-                    href={`/${idCurto(l.id)}/inicio`}
+                    href={`/${idCurto(l.id)}/home`}
                     aria-label={`Entrar no contrato ${l.name}`}
                     className="block truncate text-body font-medium text-text-primary outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-focus"
                   >

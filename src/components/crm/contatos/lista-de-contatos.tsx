@@ -49,12 +49,12 @@ import { MOLA } from "@/lib/design-system/movimento";
 // ---------------------------------------------------------------------------
 
 export const BARRA_DE_CONTATOS: FiltroDaBarra[] = [
-  { campo: "responsavel", rotulo: "Proprietário", param: "dono", tipo: "lista" },
-  { campo: "equipe", rotulo: "Equipes", param: "equipe", tipo: "lista" },
-  { campo: "empresa", rotulo: "Empresas", param: "empresa", tipo: "lista" },
-  { campo: "etiqueta", rotulo: "Etiquetas", param: "etiqueta", tipo: "lista" },
-  { campo: "criadoEm", rotulo: "Criado em", param: "criado", tipo: "data" },
-  { campo: "ultimaAtividade", rotulo: "Última atividade", param: "atividade", tipo: "data" },
+  { campo: "responsavel", rotulo: "Proprietário", param: "owner", tipo: "lista" },
+  { campo: "equipe", rotulo: "Equipes", param: "team", tipo: "lista" },
+  { campo: "empresa", rotulo: "Empresas", param: "company", tipo: "lista" },
+  { campo: "etiqueta", rotulo: "Etiquetas", param: "tag", tipo: "lista" },
+  { campo: "criadoEm", rotulo: "Criado em", param: "created", tipo: "data" },
+  { campo: "ultimaAtividade", rotulo: "Última atividade", param: "activity", tipo: "data" },
 ];
 
 const VISOES: VisaoDeSistema[] = [

@@ -44,7 +44,7 @@ function montarPassos(agent: Agent, ov: AgentOverview | null): Passo[] {
       feito: agent.instructions.trim().length > 20,
       titulo: "Instruções escritas",
       detalhe: "Explica ao agente de IA quem ele é, o que a empresa vende e quando chamar uma pessoa.",
-      aba: "comportamento",
+      aba: "behavior",
     },
     {
       feito: temCanal,
@@ -52,7 +52,7 @@ function montarPassos(agent: Agent, ov: AgentOverview | null): Passo[] {
       detalhe: temCanal
         ? ov!.canais.map((c) => c.label + (c.detalhe ? ` (${c.detalhe})` : "")).join(", ")
         : "Conecte o WhatsApp, Instagram ou outro canal para os clientes alcançarem o agente.",
-      aba: "canais",
+      aba: "channels",
     },
     {
       feito: (ov?.conversasTotal ?? 0) > 0,
@@ -64,7 +64,7 @@ function montarPassos(agent: Agent, ov: AgentOverview | null): Passo[] {
       feito: (ov?.documentos ?? 0) > 0,
       titulo: "Base de conhecimento",
       detalhe: (ov?.documentos ?? 0) > 0 ? `${ov?.documentos} documento(s) para consultar.` : "Anexe preços, regras e perguntas frequentes para ele responder com precisão.",
-      aba: "comportamento",
+      aba: "behavior",
       opcional: true,
     },
   ];
@@ -168,7 +168,7 @@ export function AgentResumo({ agent, irParaAba }: { agent: Agent; irParaAba: (a:
             rotulo="Esperando atendente"
             valor={ov.aguardandoHumano}
             alerta={ov.aguardandoHumano > 0}
-            href="/conversas"
+            href="/conversations"
           />
           <Numero
             rotulo="Execuções nas 24h"

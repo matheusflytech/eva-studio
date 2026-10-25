@@ -11,9 +11,9 @@ import { contratoDoCaminho, ehIdDeContrato, rotaDoContrato, tirarContrato } from
 // ---------------------------------------------------------------------------
 // Navegação dentro do contrato. As telas importam useRouter/usePathname daqui
 // (e Link de "@/components/contrato/link") em vez de "next/navigation": assim
-// router.push("/negocios/1") vai para "/<contrato>/negocios/1" sem cada tela
+// router.push("/deals/1") vai para "/<contrato>/deals/1" sem cada tela
 // precisar saber do contrato, e usePathname() devolve o caminho sem ele (o
-// menu compara "/negocios" como sempre comparou).
+// menu compara "/deals" como sempre comparou).
 // ---------------------------------------------------------------------------
 
 export { useParams, useSearchParams } from "next/navigation";
@@ -26,13 +26,13 @@ export function useContrato(): string | null {
   return ehIdDeContrato(doParam) ? doParam : contratoDoCaminho(pathname);
 }
 
-/** Monta caminho de tela no contrato atual: rota("/negocios/1"). */
+/** Monta caminho de tela no contrato atual: rota("/deals/1"). */
 export function useRota(): (caminho: string) => string {
   const contrato = useContrato();
   return React.useCallback((caminho: string) => rotaDoContrato(contrato, caminho), [contrato]);
 }
 
-/** usePathname sem o contrato: "/<id>/negocios/1" → "/negocios/1". */
+/** usePathname sem o contrato: "/<id>/deals/1" → "/deals/1". */
 export function usePathname(): string {
   return tirarContrato(usePathnameDoNext() ?? "/");
 }

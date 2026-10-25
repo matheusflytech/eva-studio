@@ -55,7 +55,7 @@ describe("tipos de tarefa", () => {
 
   it("ação de um clique", () => {
     expect(acaoDeUmClique("ligar", { telefone: "5521981710669" })).toEqual({ href: "tel:+5521981710669", rotulo: "Ligar", externo: true });
-    expect(acaoDeUmClique("whatsapp", { telefone: "5521981710669", conversaId: "c1" })?.href).toBe("/conversas?c=c1");
+    expect(acaoDeUmClique("whatsapp", { telefone: "5521981710669", conversaId: "c1" })?.href).toBe("/conversations?c=c1");
     expect(acaoDeUmClique("whatsapp", { telefone: "5521981710669" })?.href).toBe("https://wa.me/5521981710669");
     expect(acaoDeUmClique("email", { email: "a@b.com" })?.href).toBe("mailto:a@b.com");
     expect(acaoDeUmClique("reuniao", { telefone: "5521981710669" })).toBeNull();

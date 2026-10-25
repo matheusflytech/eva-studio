@@ -44,7 +44,7 @@ export function EmailDoContrato({ data, onChange }: { data: FlowNodeData; onChan
       {verificado === false && (
         <Notice tone="warning">
           O contrato ainda não tem domínio de e-mail verificado: este bloco não envia até lá.{" "}
-          <Link href="/integracoes" className="underline">Integrações → E-mail</Link>
+          <Link href="/integrations" className="underline">Integrações → E-mail</Link>
         </Notice>
       )}
       <div>
@@ -66,7 +66,7 @@ export function EmailDoContrato({ data, onChange }: { data: FlowNodeData; onChan
           ))}
         </Select>
         <p className="mt-1 text-caption text-text-tertiary">
-          Modelos ficam na <Link href="/biblioteca?aba=emails" className="underline">Biblioteca → Modelos de e-mail</Link>.
+          Modelos ficam na <Link href="/library?tab=emails" className="underline">Biblioteca → Modelos de e-mail</Link>.
         </p>
       </div>
       {!data.emailModeloId && (

@@ -29,7 +29,7 @@ describe("interpretarTecla", () => {
     expect(g.acao).toBeNull();
     expect(g.consumir).toBe(true);
     expect(g.estado.gDesde).toBe(1000);
-    const esperado: Record<string, string> = { d: "/dashboard", n: "/negocios", c: "/contatos", e: "/empresas", t: "/tarefas" };
+    const esperado: Record<string, string> = { d: "/dashboard", n: "/deals", c: "/contacts", e: "/companies", t: "/tasks" };
     for (const [k, caminho] of Object.entries(esperado)) {
       const r = interpretarTecla(g.estado, t({ key: k.toUpperCase() }), 1500);
       expect(r.acao).toEqual({ tipo: "ir", caminho });
@@ -80,7 +80,7 @@ describe("conflitos", () => {
   });
 
   it("todo destino do G é uma tela que existe no contrato", () => {
-    for (const { caminho } of Object.values(IR_PARA_COM_G)) expect(caminho).toMatch(/^\/(dashboard|negocios|contatos|empresas|tarefas)$/);
+    for (const { caminho } of Object.values(IR_PARA_COM_G)) expect(caminho).toMatch(/^\/(dashboard|deals|contacts|companies|tasks)$/);
   });
 });
 

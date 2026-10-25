@@ -62,14 +62,14 @@ async function webhooksComProblema(orgId: string, agora: Date): Promise<Pendenci
             tipo: "atencao" as const,
             titulo: `O webhook ${nomeDoWebhook(w)} está falhando`,
             detalhe: `Os eventos não chegam desde ${w.falhandoDesde!.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. O Eva segue tentando; veja o log de entregas.`,
-            href: "/integracoes/n8n",
+            href: "/integrations/n8n",
           }
         : {
             id: `webhook-desligado-${w.id}`,
             tipo: "urgente" as const,
             titulo: `O webhook ${nomeDoWebhook(w)} foi desligado`,
             detalhe: `${w.desativadoPor} Nenhum evento sai para ele até alguém corrigir e ligar de novo.`,
-            href: "/integracoes/n8n",
+            href: "/integrations/n8n",
           }
     );
   } catch {
@@ -130,7 +130,7 @@ export async function GET() {
       tipo: "urgente",
       titulo: esperando === 1 ? "Uma pessoa esperando atendimento" : `${esperando} pessoas esperando atendimento`,
       detalhe: "O agente passou a conversa pra um humano e ela está parada.",
-      href: "/conversas",
+      href: "/conversations",
       quantidade: esperando,
     });
   }
@@ -141,7 +141,7 @@ export async function GET() {
       tipo: "urgente",
       titulo: `${atrasadas} ${atrasadas === 1 ? "tarefa atrasada" : "tarefas atrasadas"}`,
       detalhe: "O prazo já passou.",
-      href: "/tarefas",
+      href: "/tasks",
       quantidade: atrasadas,
     });
   }
@@ -152,7 +152,7 @@ export async function GET() {
       tipo: "atencao",
       titulo: `${hoje} ${hoje === 1 ? "tarefa vence hoje" : "tarefas vencem hoje"}`,
       detalhe: "Ainda dá tempo.",
-      href: "/tarefas",
+      href: "/tasks",
       quantidade: hoje,
     });
   }
@@ -163,7 +163,7 @@ export async function GET() {
       tipo: "atencao",
       titulo: `${parados} ${parados === 1 ? "negócio parado" : "negócios parados"}`,
       detalhe: "Sem atividade além do prazo da etapa. Ou avança, ou fecha como perdido.",
-      href: "/negocios",
+      href: "/deals",
       quantidade: parados,
     });
   }

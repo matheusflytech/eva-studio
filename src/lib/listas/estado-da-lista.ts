@@ -15,7 +15,7 @@ import type { SortState } from "@/lib/design-system/pagination";
 // visão, busca, filtros rápidos da barra, filtros avançados, ordem e página.
 // Vive na URL, para o link ser compartilhável:
 //
-//   ?v=meus&q=ana&dono=u1,__nenhum&criado=30d&av=<JSON>&ordem=nome:asc&p=2&pp=50
+//   ?v=meus&q=ana&owner=u1,__nenhum&created=30d&av=<JSON>&sort=nome:asc&p=2&pp=50
 //
 // Puro (sem React): a tela lê com lerEstadoDaUrl e grava com estadoParaUrl, e
 // montarFiltro transforma o estado no filtro que o servidor entende
@@ -261,10 +261,10 @@ export function lerEstadoDaUrl(
   // tela mostrar e editar.
   const av = sp.get("av");
   if (av !== null) e.avancado = av.trim() ? lerAvancado(av) : FILTROS_VAZIOS;
-  if (sp.has("ordem")) {
-    const ordem = /^([A-Za-z]+):(asc|desc)$/.exec(sp.get("ordem") ?? "");
+  if (sp.has("sort")) {
+    const ordem = /^([A-Za-z]+):(asc|desc)$/.exec(sp.get("sort") ?? "");
     if (ordem) e.ordem = { key: ordem[1], direction: ordem[2] as "asc" | "desc" };
-    else if (!sp.get("ordem")?.trim()) e.ordem = null;
+    else if (!sp.get("sort")?.trim()) e.ordem = null;
   }
   const p = Math.floor(Number(sp.get("p")));
   if (Number.isFinite(p) && p > 1) e.pagina = Math.min(p, 100_000);
@@ -305,7 +305,7 @@ export function estadoParaUrl(e: EstadoDaLista, barra: FiltroDaBarra[], padrao: 
     }
   }
   if (textoDoAvancado(e.avancado) !== textoDoAvancado(b.avancado)) sp.set("av", textoDoAvancado(e.avancado));
-  if (textoDaOrdem(e.ordem) !== textoDaOrdem(b.ordem)) sp.set("ordem", textoDaOrdem(e.ordem));
+  if (textoDaOrdem(e.ordem) !== textoDaOrdem(b.ordem)) sp.set("sort", textoDaOrdem(e.ordem));
   if (e.pagina > 1) sp.set("p", String(e.pagina));
   if (e.tamanho !== b.tamanho) sp.set("pp", String(e.tamanho));
   if (e.colunas && !mesmaOrdem(e.colunas, b.colunas)) sp.set("cols", e.colunas.join(","));

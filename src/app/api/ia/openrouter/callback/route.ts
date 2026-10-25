@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "state inválido (possível CSRF). Comece de novo em Integrações." }, { status: 400 });
   }
 
-  const volta = new URL(rotaDoContrato(salvo.orgId, "/integracoes"), url.origin);
+  const volta = new URL(rotaDoContrato(salvo.orgId, "/integrations"), url.origin);
   const code = url.searchParams.get("code");
   if (!code) {
     volta.searchParams.set("openrouter", "cancelado");

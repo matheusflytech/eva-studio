@@ -19,7 +19,7 @@ export interface Session {
   superadmin?: boolean;
   /** Contratos que a pessoa pode abrir (seletor do menu). */
   contratos?: ContratoDaSessao[];
-  /** Para onde ir quando a URL não diz (/ir, sem acesso). */
+  /** Para onde ir quando a URL não diz (/go, sem acesso). */
   contratoPadrao?: string | null;
   /** A URL pediu um contrato onde a pessoa não tem vínculo. */
   semAcesso?: boolean;

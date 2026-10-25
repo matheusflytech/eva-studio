@@ -164,7 +164,7 @@ export function ProdutosDoNegocio({ estado }: { estado: ItensDoNegocio }) {
       {itens.length === 0 && !adicionando && (
         <p className="text-caption text-text-tertiary">
           Nenhum produto. Adicione do catálogo ou um item avulso: o valor do negócio passa a ser a soma.{" "}
-          <Link href="/negocios/configurar?aba=produtos" className="text-accent-fg hover:underline">
+          <Link href="/deals/configure?tab=products" className="text-accent-fg hover:underline">
             Montar o catálogo
           </Link>
         </p>

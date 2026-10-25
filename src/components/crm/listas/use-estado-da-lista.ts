@@ -12,7 +12,7 @@ import {
 
 /** Parâmetros da URL que pertencem ao estado da lista (o resto é preservado). */
 function chavesDoEstado(barra: FiltroDaBarra[]): Set<string> {
-  return new Set(["v", "q", "av", "ordem", "p", "pp", "cols", "rec", ...barra.map((f) => f.param)]);
+  return new Set(["v", "q", "av", "sort", "p", "pp", "cols", "rec", ...barra.map((f) => f.param)]);
 }
 
 export interface OpcoesDoEstado {
@@ -31,7 +31,7 @@ export interface OpcoesDoEstado {
  * visão muda, para o Voltar do navegador voltar para a aba anterior. O
  * roteador do Next acompanha os dois sem recarregar a página (docs do Next:
  * "linking and navigating", Native History API). Parâmetros que não são da
- * lista (ex.: ?abrir=, ?funil=) ficam como estão.
+ * lista (ex.: ?open=, ?pipeline=) ficam como estão.
  *
  * `padrao.visao` pode mudar (visão padrão da pessoa, que chega do servidor):
  * a URL sem ?v= passa a ser lida como ela.

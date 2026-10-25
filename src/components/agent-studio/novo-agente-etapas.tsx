@@ -312,7 +312,7 @@ export function NovoAgenteEtapas() {
               (credenciais && credenciais.length === 0 ? (
                 <Notice tone="warning">
                   Nenhuma chave de IA cadastrada. Cadastre uma em{" "}
-                  <Link href="/integracoes" className="underline">Integrações</Link> ou use a Central de IA.
+                  <Link href="/integrations" className="underline">Integrações</Link> ou use a Central de IA.
                 </Notice>
               ) : (
                 <div className="grid grid-cols-1 gap-3 rounded-[14px] bg-raised p-3 sm:grid-cols-2">

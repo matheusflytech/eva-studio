@@ -1,20 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_CONTRATO, destinoDoCaminhoAntigo } from "@/lib/contrato/rotas";
+import { COOKIE_CONTRATO, destinoDoCaminhoAntigo, ehCaminhoDeSecao } from "@/lib/contrato/rotas";
 
 // Refreshes the Supabase auth cookie on every request so server-side reads
 // (Route Handlers, Server Components) never see an expired access token.
 // Page-level auth gating stays client-side in AuthProvider/(app)/layout.tsx.
 export async function proxy(request: NextRequest) {
-  // Caminho antigo, de antes do contrato ir para a URL (/negocios/123, link
-  // salvo, e-mail): manda para /<último contrato>/negocios/123. O layout do
-  // contrato confere o vínculo; o cookie aqui é só sugestão.
-  const antigo = destinoDoCaminhoAntigo(
-    request.nextUrl.pathname,
-    request.nextUrl.search,
-    request.cookies.get(COOKIE_CONTRATO)?.value
-  );
-  if (antigo) return NextResponse.redirect(new URL(antigo, request.url));
+  // Caminho antigo (link salvo, e-mail, aviso no banco): sem contrato
+  // (/negocios/123 → /<último contrato>/deals/123; o layout do contrato confere
+  // o vínculo, o cookie aqui é só sugestão) e/ou com nome em português
+  // (/<id>/negocios?funil=2 → /<id>/deals?pipeline=2, /convite → /invite).
+  const { pathname, search } = request.nextUrl;
+  const antigo = destinoDoCaminhoAntigo(pathname, search, request.cookies.get(COOKIE_CONTRATO)?.value);
+  // 308 (permanente) só quando o destino não depende do cookie.
+  if (antigo) return NextResponse.redirect(new URL(antigo, request.url), ehCaminhoDeSecao(pathname) ? 307 : 308);
 
   let response = NextResponse.next({ request });
 

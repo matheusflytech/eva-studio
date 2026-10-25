@@ -143,7 +143,7 @@ function ContextoDoRegistro({ item }: { item: ItemDoDiaDaTela }) {
           <div>
             <dt className="text-caption text-text-tertiary">Negócio</dt>
             <dd className="mt-0.5 flex flex-col gap-0.5">
-              <Link href={`/negocios/${negocio.id}`} className="inline-flex items-center gap-1 font-medium text-text-primary hover:text-accent-fg hover:underline">
+              <Link href={`/deals/${negocio.id}`} className="inline-flex items-center gap-1 font-medium text-text-primary hover:text-accent-fg hover:underline">
                 {negocio.nome} <ExternalLink size={12} aria-hidden />
               </Link>
               <span className="flex flex-wrap items-center gap-2 text-text-secondary">
@@ -158,7 +158,7 @@ function ContextoDoRegistro({ item }: { item: ItemDoDiaDaTela }) {
           <div>
             <dt className="text-caption text-text-tertiary">Contato</dt>
             <dd className="mt-0.5 flex flex-col gap-0.5">
-              <Link href={`/contatos?abrir=${contato.id}`} className="font-medium text-text-primary hover:text-accent-fg hover:underline">
+              <Link href={`/contacts?open=${contato.id}`} className="font-medium text-text-primary hover:text-accent-fg hover:underline">
                 {contato.nome || "Sem nome"}
               </Link>
               {contato.telefone && <PhoneNumber value={contato.telefone} whatsapp />}
@@ -174,7 +174,7 @@ function ContextoDoRegistro({ item }: { item: ItemDoDiaDaTela }) {
         )}
         {conversaId && (
           <div>
-            <Link href={`/conversas?c=${conversaId}`} className="inline-flex items-center gap-1 text-accent-fg hover:underline">
+            <Link href={`/conversations?c=${conversaId}`} className="inline-flex items-center gap-1 text-accent-fg hover:underline">
               <MessagesSquare size={14} aria-hidden /> Abrir conversa
             </Link>
           </div>

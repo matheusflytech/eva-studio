@@ -73,7 +73,7 @@ export function ModelosDeEmail({ aoContar }: { aoContar?: (n: number) => void } 
   }, [versao]);
 
   const previa = React.useMemo(
-    () => montarEmail(atual, EXEMPLO, { remetente: "Sua empresa", linkDeDescadastro: "https://exemplo.com/descadastro" }),
+    () => montarEmail(atual, EXEMPLO, { remetente: "Sua empresa", linkDeDescadastro: "https://exemplo.com/unsubscribe" }),
     [atual]
   );
 

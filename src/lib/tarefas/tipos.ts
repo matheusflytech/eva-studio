@@ -118,7 +118,7 @@ export function acaoDeUmClique(
     return n ? { href: `tel:${n}`, rotulo: "Ligar", externo: true } : null;
   }
   if (t === "whatsapp") {
-    if (contato.conversaId) return { href: `/conversas?c=${encodeURIComponent(contato.conversaId)}`, rotulo: "Abrir conversa", externo: false };
+    if (contato.conversaId) return { href: `/conversations?c=${encodeURIComponent(contato.conversaId)}`, rotulo: "Abrir conversa", externo: false };
     const n = contato.telefone ? telefoneParaLink(contato.telefone) : null;
     return n ? { href: `https://wa.me/${n.replace("+", "")}`, rotulo: "Abrir WhatsApp", externo: true } : null;
   }

@@ -268,7 +268,7 @@ export function ListaDeTarefas({ versao, onMudou, moldura }: { versao: number; o
             <p className="text-body font-medium text-text-primary">Nada para fazer.</p>
             <p className="mt-1 text-small text-text-secondary">
               Crie uma tarefa (atalho T) ou{" "}
-              <Link href="/negocios" className="font-medium text-accent-fg hover:underline">
+              <Link href="/deals" className="font-medium text-accent-fg hover:underline">
                 revise os negócios parados
               </Link>
               .

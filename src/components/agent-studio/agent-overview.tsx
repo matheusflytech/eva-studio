@@ -81,7 +81,7 @@ export function AgentOverview({ agent }: { agent: Agent }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem asChild>
-                <Link href="/conversas">
+                <Link href="/conversations">
                   <MessageSquare aria-hidden="true" /> Ver conversas
                 </Link>
               </DropdownMenuItem>

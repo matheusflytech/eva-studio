@@ -78,7 +78,7 @@ export function acoesDisponiveis(deal: NegocioKanban, acoes: AcaoDoCartao[]): Ac
   const telefone = deal.contacts.find((c) => c.phone)?.phone?.replace(/[^\d+]/g, "");
   for (const acao of acoes) {
     if (acao === "whatsapp") {
-      if (deal.whatsapp) out.push({ acao, href: `/conversas?c=${deal.whatsapp.conversationId}` });
+      if (deal.whatsapp) out.push({ acao, href: `/conversations?c=${deal.whatsapp.conversationId}` });
     } else if (acao === "ligar") {
       if (telefone) out.push({ acao, href: `tel:${telefone}` });
     } else out.push({ acao });

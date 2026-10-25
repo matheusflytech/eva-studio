@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
+import { nomeDoParametro, parametrosDaTela } from "@/lib/contrato/rotas";
 import {
   RefreshCw, Plus, X, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Ellipsis, ListFilter,
   Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel, FilterX,
@@ -257,13 +258,23 @@ export default function DashboardPage() {
 function Painel() {
   const parametros = useSearchParams();
   const consultaDaUrl = parametros.toString();
-  const globais = React.useMemo(() => sanearFiltrosGlobais(new URLSearchParams(consultaDaUrl)), [consultaDaUrl]);
+  // Na URL os nomes são em inglês (?from=&to=&days=&pipelines=&owners=); os
+  // filtros globais e a API continuam com os deles (de, ate, dias, funis, donos).
+  const globais = React.useMemo(() => {
+    const url = new URLSearchParams(consultaDaUrl);
+    const g = new URLSearchParams();
+    for (const k of ["dias", "de", "ate", "funis", "donos"]) {
+      const v = url.get(nomeDoParametro(k));
+      if (v !== null) g.set(k, v);
+    }
+    return sanearFiltrosGlobais(g);
+  }, [consultaDaUrl]);
   const dias = globais.de && globais.ate ? diasEntre(globais.de, globais.ate) : globais.dias;
 
   // A URL é o estado: replaceState avisa o roteador do Next (useSearchParams
   // acompanha) sem recarregar a página nem empilhar histórico a cada clique.
   const mudarGlobais = React.useCallback((g: FiltrosGlobais) => {
-    const q = filtrosGlobaisParaQuery(g);
+    const q = parametrosDaTela(filtrosGlobaisParaQuery(g));
     window.history.replaceState(null, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
   }, []);
 
@@ -1079,7 +1090,7 @@ function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dado
         </tbody>
       </table>
       <Link
-        href="/negocios"
+        href="/deals"
         className="mt-3 inline-flex items-center gap-1.5 px-2 text-small font-medium text-accent-fg hover:underline"
       >
         Abrir o funil <ArrowRight size={12} />

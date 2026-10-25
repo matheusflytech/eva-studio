@@ -367,7 +367,7 @@ export function PreviaDoNegocio({
       tipo: "negocio",
       id: deal.id,
       titulo: deal.name || "Negócio sem nome",
-      caminho: `/negocios/${deal.id}`,
+      caminho: `/deals/${deal.id}`,
       subtitulo: [deal.company?.name, etapa.name].filter(Boolean).join(" · "),
       etapas: etapas.map((s) => ({ id: s.id, nome: s.name, tipo: s.type })),
       etapaAtualId: etapa.id,
@@ -436,7 +436,7 @@ export function PreviaDoNegocio({
           )}
         </div>
         <span className="flex shrink-0 items-center gap-0.5">
-          <Link href={`/negocios/${deal.id}`} aria-label="Abrir ficha completa" title="Abrir ficha completa" className={CLASSE_DO_ICONE}>
+          <Link href={`/deals/${deal.id}`} aria-label="Abrir ficha completa" title="Abrir ficha completa" className={CLASSE_DO_ICONE}>
             <Maximize2 size={15} aria-hidden="true" />
           </Link>
           <DropdownMenu modal={false}>
@@ -452,7 +452,7 @@ export function PreviaDoNegocio({
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem asChild>
-                <Link href={`/negocios/${deal.id}`}>
+                <Link href={`/deals/${deal.id}`}>
                   <Maximize2 size={14} aria-hidden="true" /> Abrir ficha completa
                 </Link>
               </DropdownMenuItem>
@@ -600,7 +600,7 @@ function ContatoPrincipal({ deal, ficha, onMudouFoto }: { deal: NegocioKanban; f
       ) : (
         <Avatar nome={nome} tamanho={40} />
       )}
-      <Link href={`/contatos/${id}`} className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus">
+      <Link href={`/contacts/${id}`} className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus">
         <span className="block truncate text-small font-semibold text-text-primary hover:underline">{nome}</span>
         <span className="block truncate text-caption text-text-tertiary">{completo?.jobTitle || email || "—"}</span>
       </Link>
@@ -611,7 +611,7 @@ function ContatoPrincipal({ deal, ficha, onMudouFoto }: { deal: NegocioKanban; f
           </a>
         )}
         {deal.whatsapp && (
-          <Link href={`/conversas?c=${deal.whatsapp.conversationId}`} aria-label="Abrir conversa no WhatsApp" title="WhatsApp" className={cn(CLASSE_DO_ICONE, "border border-border-subtle")}>
+          <Link href={`/conversations?c=${deal.whatsapp.conversationId}`} aria-label="Abrir conversa no WhatsApp" title="WhatsApp" className={cn(CLASSE_DO_ICONE, "border border-border-subtle")}>
             <LogoOficial marca="whatsapp" tamanho={14} />
           </Link>
         )}
@@ -656,7 +656,7 @@ function Atividade({
       )}
       {carregando ? <Carregando /> : <LinhaDoTempoView itens={recentes} falhou={falhou} agora={agora} semFiltros />}
       {itens.length > recentes.length && (
-        <Link href={`/negocios/${dealId}`} className="self-start text-small font-medium text-accent-fg hover:underline">
+        <Link href={`/deals/${dealId}`} className="self-start text-small font-medium text-accent-fg hover:underline">
           Ver tudo na ficha
         </Link>
       )}

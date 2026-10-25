@@ -82,9 +82,9 @@ export function CabecalhoDoNegocio({
       url: `/api/deals/${id}`,
       titulo: "Negócio apagado",
       perguntaSemLixeira: `A lixeira ainda não está ativada: apagar "${deal.name}" leva junto as tarefas e notas e não tem volta. Apagar mesmo assim?`,
-      aoRestaurar: () => router.push(`/negocios/${id}`),
+      aoRestaurar: () => router.push(`/deals/${id}`),
     });
-    if (r.ok) router.push("/negocios");
+    if (r.ok) router.push("/deals");
     else if (r.erro) onErro(r.erro);
   }
 
@@ -101,7 +101,7 @@ export function CabecalhoDoNegocio({
   return (
     <header className="flex flex-col gap-1">
       <div className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2">
-        <Link href="/negocios" aria-label="Voltar para Negócios" title="Voltar para Negócios" className={cn(classeRedonda, "outline-none focus-visible:ring-2 focus-visible:ring-focus")}>
+        <Link href="/deals" aria-label="Voltar para Negócios" title="Voltar para Negócios" className={cn(classeRedonda, "outline-none focus-visible:ring-2 focus-visible:ring-focus")}>
           <ArrowLeft size={15} aria-hidden />
         </Link>
         <TituloEditavel valor={deal.name} onSalvar={(name) => patch({ name })} />
@@ -169,7 +169,7 @@ export function CabecalhoDoNegocio({
       </div>
 
       <nav aria-label="Trilha de navegação" className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[46px] font-mono text-caption text-text-tertiary">
-        <Link href="/negocios" className="rounded outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus">
+        <Link href="/deals" className="rounded outline-none transition-colors hover:text-text-primary focus-visible:ring-2 focus-visible:ring-focus">
           Negócios
         </Link>
         <span aria-hidden>/</span>
@@ -178,7 +178,7 @@ export function CabecalhoDoNegocio({
           <>
             <span aria-hidden>·</span>
             <Link
-              href={`/empresas/${deal.company.id}`}
+              href={`/companies/${deal.company.id}`}
               className="inline-flex items-center gap-1 rounded outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Building2 size={12} aria-hidden /> {deal.company.name}
@@ -189,7 +189,7 @@ export function CabecalhoDoNegocio({
           <>
             <span aria-hidden>·</span>
             <Link
-              href={`/contatos?abrir=${contato.id}`}
+              href={`/contacts?open=${contato.id}`}
               className="inline-flex items-center gap-1 rounded outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-focus"
             >
               <User size={12} aria-hidden /> {contato.name || contato.phone || contato.email || "Sem nome"}

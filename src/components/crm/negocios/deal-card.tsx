@@ -290,7 +290,7 @@ function MenuDoCartao({ deal }: { deal: NegocioKanban }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem asChild>
-          <Link href={`/negocios/${deal.id}`}>
+          <Link href={`/deals/${deal.id}`}>
             <Maximize2 size={14} aria-hidden="true" /> Abrir ficha completa
           </Link>
         </DropdownMenuItem>

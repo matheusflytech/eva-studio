@@ -13,7 +13,7 @@ import { focusRing } from "@/components/ui/styles";
 
 // ---------------------------------------------------------------------------
 // Filtros do painel: período, funis e responsável valem pra todos os cartões
-// de uma vez. O estado mora na URL (?de=&ate=&funis=&donos=), então "olha o
+// de uma vez. O estado mora na URL (?from=&to=&pipelines=&owners=), então "olha o
 // painel do funil B2B do mês passado" vira um link que se manda no chat. Não
 // é salvo no layout: o painel é compartilhado, o recorte é de quem está olhando.
 //

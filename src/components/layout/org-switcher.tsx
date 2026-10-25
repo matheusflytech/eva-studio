@@ -23,8 +23,8 @@ import {
 // Você e o contrato num lugar só: cartão no rodapé do menu lateral (foto,
 // nome, papel) que abre, por cima da tela e com o fundo desfocado, os seus
 // contratos, "Trocar de contrato" e a conta. Trocar mantém a tela (a seção)
-// e troca o contrato da URL: /A/negocios/123 → /B/negocios. A lista completa
-// (com busca, para quem tem muitos) é a tela /contratos.
+// e troca o contrato da URL: /A/deals/123 → /B/deals. A lista completa
+// (com busca, para quem tem muitos) é a tela /contracts.
 // ---------------------------------------------------------------------------
 
 const NO_MENU = 6;
@@ -116,18 +116,18 @@ export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
             );
           })}
           <DropdownMenuItem asChild>
-            <NextLink href={`/contratos?escolher=1&para=${encodeURIComponent(`/${secao}`)}`} className="h-10 text-text-secondary">
+            <NextLink href={`/contracts?choose=1&to=${encodeURIComponent(`/${secao}`)}`} className="h-10 text-text-secondary">
               <ArrowLeftRight size={15} /> Trocar de contrato
             </NextLink>
           </DropdownMenuItem>
         </div>
         <DropdownMenuItem asChild>
-          <Link href="/configuracoes?aba=conta" className="h-9">
+          <Link href="/settings?tab=account" className="h-9">
             <UserRound size={15} /> Sua conta
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/configuracoes" className="h-9">
+          <Link href="/settings" className="h-9">
             <Settings size={15} /> Configurações do contrato
           </Link>
         </DropdownMenuItem>
@@ -141,7 +141,7 @@ export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
           <span className="ml-auto font-mono text-caption text-text-tertiary">?</span>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/ajuda" className="h-9">
+          <Link href="/help" className="h-9">
             <HelpCircle size={15} /> Eva Help
           </Link>
         </DropdownMenuItem>

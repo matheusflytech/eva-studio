@@ -19,14 +19,14 @@ const ids = (e: EntradaDosGrupos) => montarGrupos(e).map((g) => g.id);
 
 const resultados = {
   ...RESULTADO_VAZIO,
-  negocios: [{ tipo: "negocio" as const, id: "d1", titulo: "Alfa", subtitulo: "", caminho: "/negocios/d1" }],
-  contatos: [{ tipo: "contato" as const, id: "c1", titulo: "Alfredo", subtitulo: "", caminho: "/contatos?abrir=c1" }],
-  empresas: [{ tipo: "empresa" as const, id: "e1", titulo: "Alfa Ltda", subtitulo: "", caminho: "/empresas/e1" }],
-  notas: [{ tipo: "nota" as const, id: "n1", titulo: "Nota", trecho: { texto: "alfa", destaques: [] }, caminho: "/negocios/d1", quando: "" }],
-  mensagens: [{ tipo: "mensagem" as const, id: "m1", titulo: "WhatsApp", trecho: { texto: "alfa", destaques: [] }, caminho: "/conversas?c=x", quando: "" }],
+  negocios: [{ tipo: "negocio" as const, id: "d1", titulo: "Alfa", subtitulo: "", caminho: "/deals/d1" }],
+  contatos: [{ tipo: "contato" as const, id: "c1", titulo: "Alfredo", subtitulo: "", caminho: "/contacts?open=c1" }],
+  empresas: [{ tipo: "empresa" as const, id: "e1", titulo: "Alfa Ltda", subtitulo: "", caminho: "/companies/e1" }],
+  notas: [{ tipo: "nota" as const, id: "n1", titulo: "Nota", trecho: { texto: "alfa", destaques: [] }, caminho: "/deals/d1", quando: "" }],
+  mensagens: [{ tipo: "mensagem" as const, id: "m1", titulo: "WhatsApp", trecho: { texto: "alfa", destaques: [] }, caminho: "/conversations?c=x", quando: "" }],
 };
 
-const recente = { tipo: "negocio" as const, id: "d9", titulo: "Alfa antigo", caminho: "/negocios/d9" };
+const recente = { tipo: "negocio" as const, id: "d9", titulo: "Alfa antigo", caminho: "/deals/d9" };
 
 describe("montarGrupos: ordem", () => {
   it("sem consulta: recentes, ações, ir para", () => {
@@ -88,16 +88,16 @@ describe("montarGrupos: permissões", () => {
     const acoes = g.find((x) => x.id === "acoes")!.itens.map((i) => (i.tipo === "acao" ? i.acao : ""));
     expect(acoes).toEqual(["enviar-whatsapp"]);
     const paginas = g.find((x) => x.id === "ir")!.itens.map((i) => (i.tipo === "pagina" ? i.caminho : ""));
-    expect(paginas).toContain("/negocios");
-    expect(paginas).not.toContain("/integracoes");
-    expect(paginas).not.toContain("/sequencias");
+    expect(paginas).toContain("/deals");
+    expect(paginas).not.toContain("/integrations");
+    expect(paginas).not.toContain("/sequences");
   });
 
   it("sem permissão nenhuma, só o que é de todos", () => {
     const g = montarGrupos(entrada({ permissoes: [] }));
     expect(g.map((x) => x.id)).toEqual(["ir"]);
     const paginas = g[0].itens.map((i) => (i.tipo === "pagina" ? i.caminho : ""));
-    expect(paginas).toEqual(["/inicio", "/biblioteca", "/configuracoes", "/ajuda"]);
+    expect(paginas).toEqual(["/home", "/library", "/settings", "/help"]);
   });
 });
 

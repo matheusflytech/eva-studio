@@ -163,7 +163,7 @@ function Transcricao({ conversa }: { conversa: ConversaDoSite }) {
             {conversa.contato?.phone ? ` · ${conversa.contato.phone}` : ""}
           </p>
         </div>
-        <Link href={`/conversas?c=${conversa.id}`} className="flex shrink-0 items-center gap-1.5 text-small text-accent-fg hover:underline">
+        <Link href={`/conversations?c=${conversa.id}`} className="flex shrink-0 items-center gap-1.5 text-small text-accent-fg hover:underline">
           <MessageCircle size={14} aria-hidden="true" /> Abrir na Caixa de entrada
         </Link>
       </div>

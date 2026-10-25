@@ -254,7 +254,7 @@ export function PainelDoCliente({
                 )}
               </div>
               <Link
-                href={`/contatos?abrir=${contato.id}`}
+                href={`/contacts?open=${contato.id}`}
                 aria-label="Abrir ficha completa"
                 title="Abrir ficha completa"
                 className={buttonVariants({ variant: "ghost", size: "icon", className: "shrink-0" })}

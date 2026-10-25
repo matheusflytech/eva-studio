@@ -444,7 +444,7 @@ export function CompleteParaMover({
           {soNaFicha.length > 0 && (
             <Notice tone="warning">
               {soNaFicha.map((c) => c.rotulo).join(", ")}: adicione na ficha do negócio e mova de novo.{" "}
-              <Link href={`/negocios/${pedido.dealId}`} className="inline-flex items-center gap-1 font-medium underline">
+              <Link href={`/deals/${pedido.dealId}`} className="inline-flex items-center gap-1 font-medium underline">
                 Abrir a ficha <ExternalLink size={12} aria-hidden="true" />
               </Link>
             </Notice>

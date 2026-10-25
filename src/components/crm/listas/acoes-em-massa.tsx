@@ -385,7 +385,7 @@ export function AcoesEmMassaDeContatos(p: BaseDaBarra & { etiquetas: { id: strin
           Apagar
         </Button>
       </BulkActionBar>
-      <ModaisDoLote entidade="contatos" lote={lote} linkDoItem={(id) => `/contatos?abrir=${id}`} />
+      <ModaisDoLote entidade="contatos" lote={lote} linkDoItem={(id) => `/contacts?open=${id}`} />
     </>
   );
 }
@@ -434,7 +434,7 @@ export function AcoesEmMassaDeNegocios(
           Apagar
         </Button>
       </BulkActionBar>
-      <ModaisDoLote entidade="negocios" lote={lote} linkDoItem={(id) => `/negocios/${id}`} />
+      <ModaisDoLote entidade="negocios" lote={lote} linkDoItem={(id) => `/deals/${id}`} />
       {lote.aberto?.tipo === "perdido" && (
         <MotivoEmMassa
           pipelineId={p.pipelineId}

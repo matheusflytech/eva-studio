@@ -114,7 +114,7 @@ function Contatos({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
                 <Avatar nome={nome} tamanho={28} rotulo="" foto={c.avatarPath} />
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={`/contatos?abrir=${c.id}`}
+                    href={`/contacts?open=${c.id}`}
                     className="block truncate rounded text-small font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     {nome}
@@ -198,7 +198,7 @@ function Empresa({ deal, patch }: { deal: NegocioDaFicha; patch: Patch }) {
             <Building2 size={14} aria-hidden />
           </span>
           <Link
-            href={`/empresas/${deal.company.id}`}
+            href={`/companies/${deal.company.id}`}
             className="min-w-0 flex-1 truncate rounded text-small font-medium text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
           >
             {deal.company.name}
@@ -238,7 +238,7 @@ function Conversas({ conversas }: { conversas: ConversaDoNegocio[] }) {
           {conversas.slice(0, 8).map((c) => (
             <li key={c.id}>
               <Link
-                href={`/conversas?c=${c.id}`}
+                href={`/conversations?c=${c.id}`}
                 aria-label={`Abrir conversa no ${rotuloDoCanal(c.canal)}${c.contato ? ` com ${c.contato.name}` : ""}${c.naoLida ? ", não lida" : ""}`}
                 className="flex gap-2.5 rounded-[14px] px-2 py-2 outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
               >

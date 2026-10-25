@@ -21,24 +21,24 @@ export interface Pagina {
 
 /** Telas do app (mesmo conjunto do menu), com a permissão de ver cada uma. */
 export const PAGINAS: Pagina[] = [
-  { caminho: "/inicio", rotulo: "Início", palavras: "home resumo" },
-  { caminho: "/conversas", rotulo: "Conversas", permissao: "conversas:ver", palavras: "inbox whatsapp atendimento" },
-  { caminho: "/negocios", rotulo: "Negócios", permissao: "negocios:ver", palavras: "funil kanban pipeline vendas" },
-  { caminho: "/contatos", rotulo: "Contatos", permissao: "contatos:ver", palavras: "pessoas clientes" },
-  { caminho: "/tarefas", rotulo: "Tarefas", permissao: "tarefas:ver", palavras: "meu dia agenda follow-up" },
+  { caminho: "/home", rotulo: "Início", palavras: "home resumo" },
+  { caminho: "/conversations", rotulo: "Conversas", permissao: "conversas:ver", palavras: "inbox whatsapp atendimento" },
+  { caminho: "/deals", rotulo: "Negócios", permissao: "negocios:ver", palavras: "funil kanban pipeline vendas" },
+  { caminho: "/contacts", rotulo: "Contatos", permissao: "contatos:ver", palavras: "pessoas clientes" },
+  { caminho: "/tasks", rotulo: "Tarefas", permissao: "tarefas:ver", palavras: "meu dia agenda follow-up" },
   { caminho: "/dashboard", rotulo: "Dashboard", permissao: "relatorios:ver", palavras: "painel relatorios metricas" },
-  { caminho: "/empresas", rotulo: "Empresas", permissao: "empresas:ver", palavras: "contas cnpj" },
+  { caminho: "/companies", rotulo: "Empresas", permissao: "empresas:ver", palavras: "contas cnpj" },
   { caminho: "/leads", rotulo: "Leads", permissao: "contatos:ver" },
   { caminho: "/agent-studio", rotulo: "Agentes de IA", permissao: "agentes:ver", palavras: "eva bot fluxo" },
-  { caminho: "/sequencias", rotulo: "Sequências", permissao: "sequencias:gerenciar", palavras: "cadencia regua" },
-  { caminho: "/disparos", rotulo: "Disparos", permissao: "disparos:ver", palavras: "campanha massa broadcast" },
-  { caminho: "/aprovacoes", rotulo: "Aprovações", permissao: "disparos:ver", palavras: "templates modelos meta" },
-  { caminho: "/biblioteca", rotulo: "Biblioteca", palavras: "modelos respostas" },
+  { caminho: "/sequences", rotulo: "Sequências", permissao: "sequencias:gerenciar", palavras: "cadencia regua" },
+  { caminho: "/broadcasts", rotulo: "Disparos", permissao: "disparos:ver", palavras: "campanha massa broadcast" },
+  { caminho: "/approvals", rotulo: "Aprovações", permissao: "disparos:ver", palavras: "templates modelos meta" },
+  { caminho: "/library", rotulo: "Biblioteca", palavras: "modelos respostas" },
   { caminho: "/insights", rotulo: "Insights", permissao: "relatorios:ver" },
-  { caminho: "/integracoes", rotulo: "Integrações", permissao: "integracoes:gerenciar", palavras: "api webhooks n8n" },
+  { caminho: "/integrations", rotulo: "Integrações", permissao: "integracoes:gerenciar", palavras: "api webhooks n8n" },
   { caminho: "/playground", rotulo: "Playground", permissao: "agentes:ver" },
-  { caminho: "/configuracoes", rotulo: "Configurações", palavras: "ajustes funis campos membros lixeira" },
-  { caminho: "/ajuda", rotulo: "Eva Help", palavras: "ajuda suporte" },
+  { caminho: "/settings", rotulo: "Configurações", palavras: "ajustes funis campos membros lixeira" },
+  { caminho: "/help", rotulo: "Eva Help", palavras: "ajuda suporte" },
 ];
 
 export type IdDaAcao = "criar-negocio" | "criar-contato" | "criar-tarefa" | "enviar-whatsapp" | "mudar-etapa" | "atribuir";

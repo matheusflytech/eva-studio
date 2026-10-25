@@ -419,7 +419,7 @@ export function negocioEncontrado(l: LinhaDeNegocio, aproximado = false): Regist
     id: l.id,
     titulo: l.name || "Negócio sem nome",
     subtitulo: subtituloDoNegocio({ empresa: l.empresa, etapa: l.etapa, amountCents: Number(l.amountCents), fechado }),
-    caminho: `/negocios/${encodeURIComponent(l.id)}`,
+    caminho: `/deals/${encodeURIComponent(l.id)}`,
     ...(aproximado ? { aproximado } : {}),
   };
 }
@@ -430,7 +430,7 @@ export function contatoEncontrado(l: LinhaDeContato, aproximado = false): Regist
     id: l.id,
     titulo: l.name || l.phone || l.email || "Contato sem nome",
     subtitulo: subtituloDoContato({ phone: l.phone, email: l.email, empresa: l.empresa }),
-    caminho: `/contatos?abrir=${encodeURIComponent(l.id)}`,
+    caminho: `/contacts?open=${encodeURIComponent(l.id)}`,
     ...(l.phone ? { telefone: l.phone } : {}),
     ...(l.conversaId ? { conversaId: l.conversaId } : {}),
     ...(aproximado ? { aproximado } : {}),
@@ -443,7 +443,7 @@ export function empresaEncontrada(l: LinhaDeEmpresa, aproximado = false): Regist
     id: l.id,
     titulo: l.name || "Empresa sem nome",
     subtitulo: subtituloDaEmpresa(l),
-    caminho: `/empresas/${encodeURIComponent(l.id)}`,
+    caminho: `/companies/${encodeURIComponent(l.id)}`,
     ...(aproximado ? { aproximado } : {}),
   };
 }
@@ -456,8 +456,8 @@ export function notaEncontrada(l: LinhaDeNota, termos: string[]): TrechoEncontra
     titulo: onde ? `Nota · ${onde}` : "Nota",
     trecho: trechoComDestaque(l.text, termos),
     caminho: l.dealId
-      ? `/negocios/${encodeURIComponent(l.dealId)}`
-      : `/contatos?abrir=${encodeURIComponent(l.contactId ?? "")}`,
+      ? `/deals/${encodeURIComponent(l.dealId)}`
+      : `/contacts?open=${encodeURIComponent(l.contactId ?? "")}`,
     quando: new Date(l.createdAt).toISOString(),
   };
 }
@@ -470,7 +470,7 @@ export function mensagemEncontrada(l: LinhaDeMensagem, termos: string[]): Trecho
     id: l.id,
     titulo: `WhatsApp · ${quem}${autor}`,
     trecho: trechoComDestaque(l.text, termos),
-    caminho: `/conversas?c=${encodeURIComponent(l.conversaId)}`,
+    caminho: `/conversations?c=${encodeURIComponent(l.conversaId)}`,
     quando: new Date(l.createdAt).toISOString(),
   };
 }
