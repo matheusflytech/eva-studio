@@ -190,7 +190,7 @@ function DealCardBase({
           {linhas.map(({ campo, texto }) => {
             return (
               <div key={campo} className={cn(compacto && "flex items-baseline justify-between gap-2")}>
-                <dt className="text-[11px] leading-4 text-text-tertiary">{rotuloDoCampo(campo, rotulos)}</dt>
+                <dt className="text-caption leading-4 text-text-tertiary">{rotuloDoCampo(campo, rotulos)}</dt>
                 <dd className={cn("truncate text-small leading-5", texto ? "font-medium text-text-primary" : "text-text-tertiary", campo === "valor" && "tabular-nums")}>
                   {campo === "responsavel" && deal.owner ? (
                     <span className="inline-flex items-center gap-1.5">

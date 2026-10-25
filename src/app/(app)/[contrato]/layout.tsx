@@ -75,7 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <span className="flex items-center gap-2">
             <MarcaEva size={18} className="text-text-primary" />
-            <span className="font-display text-[14px] font-bold text-text-primary">Eva</span>
+            <span className="font-display text-body font-bold text-text-primary">Eva</span>
           </span>
           <BotaoBuscarNoTopo />
         </header>
@@ -134,8 +134,8 @@ function SemAcesso({ padrao }: { padrao: string | null }) {
     <div className="app-backdrop flex min-h-[100dvh] items-center justify-center p-6">
       <div className="glass-card max-w-md rounded-3xl p-8 text-center">
         <ShieldOff size={28} className="mx-auto mb-3 text-text-tertiary" />
-        <h1 className="font-display text-lg font-semibold text-text-primary">Você não tem acesso a este contrato</h1>
-        <p className="mt-2 text-[13px] text-text-secondary">
+        <h1 className="font-display text-title-sm font-semibold text-text-primary">Você não tem acesso a este contrato</h1>
+        <p className="mt-2 text-small text-text-secondary">
           O link pode ser de outro cliente, ou seu acesso foi removido. Se precisa entrar, peça um convite ao dono do
           contrato.
         </p>
