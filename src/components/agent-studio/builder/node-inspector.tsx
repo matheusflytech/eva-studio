@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Trash2, X, CheckCircle2, AlertTriangle, Maximize2 } from "lucide-react";
+import Link from "@/components/contrato/link";
+import { Modal, ModalContent } from "@/components/ui/modal";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -64,6 +66,16 @@ function PreviaDaBolha({ texto, opcoes }: { texto: string; opcoes?: { id: string
         </div>
       )}
     </div>
+  );
+}
+
+/** Grupo de campos com título: separa o que é modelo, resposta e coleta. */
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 border-t border-border-subtle pt-4">
+      <h3 className="text-caption font-medium uppercase tracking-wide text-text-tertiary">{titulo}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -131,9 +143,11 @@ export function NodeInspector({
   // dita aqui dentro, onde tem o campo pra resolver.
   const pendencia = validateNode(node.data);
   const daConversa = iconKey === "message" || iconKey === "capture";
+  const ehIa = iconKey === "ai-agent";
+  const [textoAberto, setTextoAberto] = React.useState(false);
 
   return (
-    <div className="flex max-h-[calc(100vh-190px)] w-[340px] flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-overlay shadow-overlay">
+    <div className="flex h-full w-[clamp(340px,26vw,520px)] shrink-0 flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-panel max-xl:absolute max-xl:inset-y-2 max-xl:right-2 max-xl:z-20 max-xl:h-auto max-xl:shadow-overlay">
       {/* Cabeçalho: o tipo do bloco primeiro. "Bloco selecionado" não dizia
           nada — a pessoa já sabe que selecionou; o que ela não sabe é o que
           este bloco faz e se está pronto. */}
@@ -192,29 +206,93 @@ export function NodeInspector({
           </p>
         </div>
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <Label className="mb-0" htmlFor="node-detail">Detalhe / mensagem</Label>
-            <VariablePicker
-              variables={variables}
-              targetRef={detailRef}
-              value={node.data.detail ?? ""}
-              onChange={(next) => onChange({ detail: next })}
-            />
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <Label className="mb-0" htmlFor="node-detail">
+              {ehIa ? "Instruções desta etapa" : daConversa ? "Mensagem" : "Detalhe"}
+            </Label>
+            <div className="flex items-center gap-1">
+              {ehIa && (
+                <button
+                  type="button"
+                  onClick={() => setTextoAberto(true)}
+                  className="flex items-center gap-1 rounded-full px-2 py-1 text-caption text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
+                >
+                  <Maximize2 size={12} aria-hidden="true" /> Expandir
+                </button>
+              )}
+              <VariablePicker
+                variables={variables}
+                targetRef={detailRef}
+                value={node.data.detail ?? ""}
+                onChange={(next) => onChange({ detail: next })}
+              />
+            </div>
           </div>
           <Textarea
             id="node-detail"
             ref={detailRef}
-            rows={4}
+            rows={ehIa ? 12 : 4}
+            className={ehIa ? "text-small leading-relaxed" : undefined}
             value={node.data.detail ?? ""}
             onChange={(e) => onChange({ detail: e.target.value })}
           />
-          {iconKey === "ai-agent" && (node.data.detail ?? "").length > LIMITE_DO_PROMPT && (
+          {ehIa && (node.data.detail ?? "").length > LIMITE_DO_PROMPT && (
             <p className="mt-1 text-caption text-warning">
               {(node.data.detail ?? "").length.toLocaleString("pt-BR")} caracteres. Acima de uns 3 mil a IA começa a
-              esquecer partes do texto: corte o que se repete ou leve para a aba Agente.
+              esquecer partes do texto: corte o que se repete ou leve as regras gerais para o Comportamento do agente.
             </p>
           )}
         </div>
+
+        {ehIa && (
+          <>
+            {/* Duas fontes de texto confundiam: aqui fica claro que o
+                Comportamento do agente entra antes deste texto (ou não). */}
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
+              <span>
+                <span className="block text-small font-medium text-text-primary">Somar o Comportamento do agente</span>
+                <span className="block text-caption text-text-tertiary">
+                  {node.data.aiUsarAgente === false ? (
+                    <span className="text-warning">
+                      Desligado: só o texto acima vai para a IA. Tom, instruções e &quot;nunca deve fazer&quot; do
+                      agente não valem nesta etapa.
+                    </span>
+                  ) : (
+                    "Tom, instruções e o que ele nunca deve fazer entram antes do texto acima. Use este texto só para o que é desta etapa."
+                  )}{" "}
+                  <Link href={`/agent-studio/${agentId}?tab=behavior`} className="text-text-secondary underline">
+                    Abrir Comportamento
+                  </Link>
+                </span>
+              </span>
+              <Switch
+                checked={node.data.aiUsarAgente !== false}
+                onCheckedChange={(v) => onChange({ aiUsarAgente: v })}
+                aria-label="Somar o Comportamento do agente"
+              />
+            </label>
+
+            <Modal open={textoAberto} onOpenChange={setTextoAberto}>
+              <ModalContent
+                size="lg"
+                className="max-w-4xl"
+                title="Instruções desta etapa"
+                description={node.data.label}
+              >
+                <Textarea
+                  aria-label="Instruções desta etapa"
+                  rows={24}
+                  className="text-body leading-relaxed"
+                  value={node.data.detail ?? ""}
+                  onChange={(e) => onChange({ detail: e.target.value })}
+                />
+                <p className="mt-1.5 text-caption text-text-tertiary">
+                  {(node.data.detail ?? "").length.toLocaleString("pt-BR")} caracteres · salva junto com o fluxo.
+                </p>
+              </ModalContent>
+            </Modal>
+          </>
+        )}
 
         {iconKey === "message" && (
           <TemplateSelect
@@ -458,8 +536,8 @@ export function NodeInspector({
           </div>
         )}
 
-        {iconKey === "ai-agent" && (
-          <div className="flex flex-col gap-3">
+        {ehIa && (
+          <Secao titulo="Modelo">
             <div>
               <Label htmlFor="node-ai-fonte">De onde vem a IA</Label>
               <Select
@@ -527,25 +605,11 @@ export function NodeInspector({
                 )}
               </>
             )}
-            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
-              <span>
-                <span className="block text-small font-medium text-text-primary">Usar o cadastro do agente</span>
-                <span className="block text-caption text-text-tertiary">
-                  {node.data.aiUsarAgente === false ? (
-                    <span className="text-warning">
-                      Só o texto deste bloco vai para a IA: instruções, tom e &quot;Nunca faça&quot; do agente não valem aqui.
-                    </span>
-                  ) : (
-                    "Instruções, tom, idioma e o que ele nunca deve fazer entram antes do texto deste bloco."
-                  )}
-                </span>
-              </span>
-              <Switch
-                checked={node.data.aiUsarAgente !== false}
-                onCheckedChange={(v) => onChange({ aiUsarAgente: v })}
-                aria-label="Usar o cadastro do agente"
-              />
-            </label>
+          </Secao>
+        )}
+
+        {ehIa && (
+          <Secao titulo="Como responde">
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
               <span>
                 <span className="block text-small font-medium text-text-primary">Balões no WhatsApp</span>
@@ -561,8 +625,9 @@ export function NodeInspector({
                 aria-label="Balões no WhatsApp"
               />
             </label>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] items-start gap-3">
             <div>
-              <Label htmlFor="node-ai-temperatura">Criatividade (temperatura)</Label>
+              <Label htmlFor="node-ai-temperatura">Criatividade</Label>
               <Input
                 id="node-ai-temperatura"
                 type="number"
@@ -578,7 +643,7 @@ export function NodeInspector({
               </p>
             </div>
             <div>
-              <Label htmlFor="node-ai-memory">Janela de memória (mensagens anteriores)</Label>
+              <Label htmlFor="node-ai-memory">Memória</Label>
               <Input
                 id="node-ai-memory"
                 type="number"
@@ -587,23 +652,26 @@ export function NodeInspector({
                 value={node.data.aiMemoryWindow ?? ""}
                 onChange={(e) => onChange({ aiMemoryWindow: e.target.value ? Number(e.target.value) : undefined })}
               />
+              <p className="mt-1 text-caption text-text-tertiary">Mensagens anteriores que a IA relê. Vazio = 20.</p>
             </div>
+            </div>
+          </Secao>
+        )}
+
+        {ehIa && (
+          <Secao titulo="Dados para coletar">
             <KeyValueList
-              label="Variáveis para coletar"
+              label="Variáveis"
               rows={node.data.collectVars ?? []}
               onChange={(rows) => onChange({ collectVars: rows })}
               keyPlaceholder="nome_variavel"
               valuePlaceholder="descrição — o que é e como reconhecer"
             />
             <p className="text-caption text-text-tertiary">
-              O texto em &quot;Detalhe / mensagem&quot; acima diz o que a IA faz nesta etapa; o jeito de falar e as
-              regras gerais vêm do cadastro do agente (aba Agente). Conecte blocos
-              de Ferramenta na porta roxa embaixo desse card pra dar ferramentas a ele — ele decide sozinho quando
-              usar cada uma. Nas &quot;Variáveis para coletar&quot;, cada linha vira um dado que o agente tenta
-              extrair da conversa (o modelo chama uma ferramenta interna sempre que identifica um valor) e pergunta
-              ativamente pelo que ainda falta.
+              Cada linha é um dado que a IA tira da conversa e pergunta se ainda faltar. Para dar ferramentas a ela,
+              ligue blocos de Ferramenta na porta roxa embaixo do card; ela decide sozinha quando usar cada uma.
             </p>
-          </div>
+          </Secao>
         )}
 
         {(iconKey.startsWith("crm-") || iconKey === "tool-crm") && (
