@@ -8,6 +8,7 @@ import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { contextoDaConversa } from "@/lib/server/ia/prompt-do-agente";
+import { semChamadaEmTexto } from "@/lib/server/ia/chamada-em-texto";
 import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
@@ -983,7 +984,9 @@ async function runAiAgent(
     const falhas = result.tentativas.map((t) => `${t.origem}: ${t.error}`);
     const error = result.error ? [...falhas, `${result.usado?.origem ?? "IA"}: ${result.error}`].join(" · ") : undefined;
     const seguir = iaTerminou({ temSaida, erro: error, pediuParaSeguir, dadosPedidos: collectVars.map((v) => v.key), variables });
-    return { text: result.text, error, seguir };
+    const { texto, removidas } = semChamadaEmTexto(result.text);
+    if (removidas.length) console.warn("[ia] chamada de ferramenta escrita como texto (não enviada)", { agente: agente.id, no: node.id, removidas });
+    return { text: texto, error, seguir };
   } catch (err) {
     return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false };
   }

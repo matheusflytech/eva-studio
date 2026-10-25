@@ -157,6 +157,16 @@ export function validateFlow(nodes: Node<FlowNodeData>[], edges: Edge[], ctx: Co
       continue;
     }
 
+    // O texto manda usar uma ferramenta do CRM que não está ligada: a IA não
+    // recebe a ferramenta e acaba escrevendo a "chamada" para o cliente.
+    const citada = kind === "ai-agent" ? /\bcrm_[a-z_]+/i.exec(node.data.detail ?? "")?.[0] : undefined;
+    if (citada) {
+      const temCrm = edges.some(
+        (e) => e.target === node.id && e.targetHandle === "tools" && nodes.find((n) => n.id === e.source)?.data.iconKey === "tool-crm"
+      );
+      if (!temCrm) add(node, `O texto manda usar ${citada}, mas nenhuma Ferramenta: CRM está ligada nesta IA.`);
+    }
+
     const saidas = edges.filter((e) => e.source === node.id && e.targetHandle !== "tools");
     const nomeadas = temSaidasNomeadas(node.data);
 

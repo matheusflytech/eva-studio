@@ -23,6 +23,19 @@ function problemas(nodes: Node<FlowNodeData>[], edges: Edge[], ctx?: Parameters<
   return validateFlow(nodes, edges, ctx).map((i) => `${i.nivel}:${i.nodeId}:${i.motivo}`);
 }
 
+describe("IA que cita ferramenta do CRM", () => {
+  const ia = no("ia", "ai-agent", { detail: "Quando tiver nome e WhatsApp, chame crm_registrar_lead." });
+  it("sem Ferramenta: CRM ligada, avisa", () => {
+    const p = problemas([no("ini", "start"), ia], [liga("ini", "ia")]);
+    expect(p).toContainEqual(expect.stringMatching(/^erro:ia:.*crm_registrar_lead.*Ferramenta: CRM/));
+  });
+  it("com a Ferramenta: CRM na porta de ferramentas, não avisa", () => {
+    const tool: Edge = { id: "t", source: "crm", target: "ia", targetHandle: "tools" };
+    const p = problemas([no("ini", "start"), ia, no("crm", "tool-crm", { crmAction: "registrar_lead" })], [liga("ini", "ia"), tool]);
+    expect(p.filter((x) => x.includes("crm_registrar_lead"))).toEqual([]);
+  });
+});
+
 describe("validação do fluxo: ramos e saídas", () => {
   it("condição precisa dos dois ramos", () => {
     const nodes = [no("ini", "start"), no("c", "condition", { conditionExpression: "{x} > 1" }), no("fim", "end")];
