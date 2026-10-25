@@ -52,3 +52,9 @@ export async function toggleAgentStatus(id: string): Promise<Agent> {
   const data = await parseOrThrow(res);
   return data.agent;
 }
+
+export async function duplicateAgent(id: string): Promise<string> {
+  const res = await fetch(`/api/agents/${id}/duplicate`, { method: "POST" });
+  const data = await parseOrThrow(res);
+  return data.id;
+}
