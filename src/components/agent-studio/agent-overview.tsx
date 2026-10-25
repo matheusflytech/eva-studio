@@ -60,7 +60,7 @@ export function AgentOverview({ agent }: { agent: Agent }) {
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
         <Link
           href="/agent-studio"
-          aria-label="Voltar para Agentes de IA"
+          aria-label="Voltar para Eva Studio"
           className={buttonVariants({ variant: "ghost", size: "icon", className: "-ml-1.5 shrink-0" })}
         >
           <ArrowLeft aria-hidden="true" />

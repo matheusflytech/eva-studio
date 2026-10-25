@@ -56,7 +56,7 @@ const SITUACOES: { valor: SituacaoDoAgente; rotulo: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Agentes de IA (v5). A tela responde "algum agente precisa de mim?": duas
+// Eva Studio (v5). A tela responde "algum agente precisa de mim?": duas
 // abas (Todos e Precisam de você), busca e Filtros. Os números de operação
 // (respostas, execuções, erros) saíram da frente e moram no Resumo de cada
 // agente; quem espera atendente aparece na própria linha do agente.
@@ -104,7 +104,7 @@ export default function AgentStudioPage() {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
         <div className="flex min-h-10 items-center">
-          <h1 className="text-heading font-semibold tracking-tight text-text-primary">Agentes de IA</h1>
+          <h1 className="text-heading font-semibold tracking-tight text-text-primary">Eva Studio</h1>
         </div>
         <AgentEmptyState />
       </div>
@@ -133,7 +133,7 @@ export default function AgentStudioPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
       {/* Barra da tela: título, quantos atendem e, à direita, "…" e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Agentes de IA</h1>
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Eva Studio</h1>
         <span className="font-mono text-caption tabular-nums text-text-tertiary">
           {resumo
             ? `${resumo.ativos} atendendo`

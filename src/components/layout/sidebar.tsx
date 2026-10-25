@@ -62,7 +62,7 @@ const NAV_PRINCIPAL: NavGroup[] = [
       { href: "/contacts", label: "Contatos", icon: Contact },
       { href: "/tasks", label: "Tarefas", icon: CheckSquare },
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/agent-studio", label: "Agentes de IA", icon: Aperture, animated: true },
+      { href: "/agent-studio", label: "Eva Studio", icon: Aperture, animated: true },
     ],
   },
 ];

@@ -18,7 +18,7 @@ export const MODULOS = [
   { id: "tarefas", nome: "Tarefas e notas", acoes: ["ver", "gerenciar"] },
   { id: "disparos", nome: "Disparos", acoes: ["ver", "enviar"] },
   { id: "sequencias", nome: "Sequências", acoes: ["gerenciar"] },
-  { id: "agentes", nome: "Agentes de IA", acoes: ["ver", "gerenciar"] },
+  { id: "agentes", nome: "Eva Studio", acoes: ["ver", "gerenciar"] },
   { id: "automacoes", nome: "Automações", acoes: ["ver", "gerenciar"] },
   { id: "funis", nome: "Funis e campos", acoes: ["configurar"] },
   { id: "produtos", nome: "Produtos", acoes: ["gerenciar"] },
