@@ -201,6 +201,14 @@ export default function AgentBuilderPage() {
 
   const agent = agents.find((a) => a.id === agentId);
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
+  // Aba Ferramentas do bloco de IA: o que está ligado na porta dele.
+  const ferramentasDaIa =
+    selectedNode?.data.iconKey === "ai-agent"
+      ? edges
+          .filter((e) => e.target === selectedNode.id && e.targetHandle === "tools")
+          .flatMap((e) => nodes.filter((n) => n.id === e.source))
+          .map((n) => ({ id: n.id, label: n.data.label, iconKey: n.data.iconKey }))
+      : [];
 
   // Nomes de variável já usados em blocos de Captura de input, Variável e
   // Chamar webhook — é isso que alimenta o seletor visual no inspector, pra
@@ -396,7 +404,7 @@ export default function AgentBuilderPage() {
     // Opção de menu apagada (ou tipo de resposta trocado): a ligação que saía
     // dela não tem mais de onde sair. Sem isto ela ficava presa num ponto que
     // não existe e o salvamento acusava "saída que não existe".
-    if ("options" in partial || "captureField" in partial) {
+    if ("options" in partial || "captureField" in partial || "aiExits" in partial) {
       const atual = nodes.find((n) => n.id === id);
       if (!atual) return;
       const novo = { ...atual.data, ...partial } as FlowNodeData;
@@ -761,6 +769,10 @@ export default function AgentBuilderPage() {
               onChange={handleNodeDataChange}
               onDelete={handleDeleteNode}
               onClose={() => setSelectedId(null)}
+              ferramentas={ferramentasDaIa}
+              aoAdicionarFerramenta={(iconKey) => adicionarFerramenta(selectedNode.id, iconKey)}
+              aoAbrirBloco={setSelectedId}
+              documentos={agent.knowledgeBase}
             />
           )}
 
@@ -784,6 +796,10 @@ export default function AgentBuilderPage() {
               onChange={handleNodeDataChange}
               onDelete={handleDeleteNode}
               onClose={() => setSelectedId(null)}
+              ferramentas={ferramentasDaIa}
+              aoAdicionarFerramenta={(iconKey) => adicionarFerramenta(selectedNode.id, iconKey)}
+              aoAbrirBloco={setSelectedId}
+              documentos={agent.knowledgeBase}
             />
           )}
         </div>

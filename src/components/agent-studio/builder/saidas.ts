@@ -50,6 +50,7 @@ export function saidasDoBloco(data: FlowNodeData): Saida[] {
     // "Terminou" sem id: ligações antigas do bloco continuam valendo.
     return [
       { id: null, rotulo: "Terminou", tipo: "padrao" },
+      ...(data.aiExits ?? []).map((s, i) => ({ id: s.id, rotulo: s.name.trim() || `Saída ${i + 1}`, tipo: "opcao" as const })),
       { id: SAIDA_ERRO, rotulo: "Erro", tipo: "erro" },
     ];
   }

@@ -27,6 +27,24 @@ export interface KeyValueRow {
   value: string;
 }
 
+/** Campo que a IA preenche ao sair por uma saída; vira a variável `key`. */
+export interface AiExitField {
+  id: string;
+  key: string;
+  type: "string" | "number" | "boolean";
+  description: string;
+  required: boolean;
+}
+
+/** Saída por intenção do bloco de IA: a IA escolhe por qual sair. */
+export interface AiExit {
+  id: string;
+  name: string;
+  /** Quando usar esta saída (vai para a IA). */
+  description: string;
+  fields?: AiExitField[];
+}
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type HttpAuthType = "none" | "bearer" | "header";
 
@@ -100,10 +118,20 @@ export interface FlowNodeData {
   // Modelos reserva (mesma credencial) usados quando o principal bate no limite de
   // tokens por minuto do provedor.
   aiFallbackModels?: string[];
+  // Limite de tokens da resposta. Vazio = padrão do provedor (llm.ts).
+  aiMaxTokens?: number;
+  // false = a resposta não vai para o cliente, só para aiResponseVariable
+  // (IA que classifica ou resume). Vazio = envia.
+  aiSendToCustomer?: boolean;
+  aiResponseVariable?: string;
+  // Saídas por intenção, além de Terminou/Erro (ver saidasDoBloco).
+  aiExits?: AiExit[];
   // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
   // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
   mcpServerId?: string;
   mcpTools?: string[];
+  // Ferramenta: Base de conhecimento — só estes documentos (vazio = todos).
+  knowledgeDocIds?: string[];
   // ── Blocos de CRM ──────────────────────────────────────────────────────
   // Funil e etapa escolhidos em seletor, nunca digitados: id de etapa em
   // campo de texto é erro garantido depois que alguém renomeia a coluna.

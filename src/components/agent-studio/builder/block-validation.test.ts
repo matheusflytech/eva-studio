@@ -135,3 +135,19 @@ describe("bloco Enviar e-mail", () => {
     expect(problemas(velho, [liga("ini", "m")])).toContainEqual(expect.stringMatching(/^erro:m:.*destinatário/));
   });
 });
+
+describe("bloco de IA: saídas por intenção e resposta em variável", () => {
+  const saida = { id: "s1", name: "Quer comprar", description: "pediu preço" };
+
+  it("ligação na saída por intenção é válida", () => {
+    const nodes = [no("ini", "start"), no("ia", "ai-agent", { aiExits: [saida] }), no("fim", "end")];
+    expect(problemas(nodes, [liga("ini", "ia"), liga("ia", "fim", "s1")]).filter((p) => p.startsWith("erro"))).toEqual([]);
+  });
+
+  it("saída sem nome e resposta sem variável viram aviso no bloco", () => {
+    const semNome = [no("ini", "start"), no("ia", "ai-agent", { aiExits: [{ ...saida, name: " " }] })];
+    expect(problemas(semNome, [liga("ini", "ia")]).join()).toContain("Dê um nome a cada saída");
+    const semVar = [no("ini", "start"), no("ia", "ai-agent", { aiSendToCustomer: false })];
+    expect(problemas(semVar, [liga("ini", "ia")]).join()).toContain("variável que guarda a resposta");
+  });
+});

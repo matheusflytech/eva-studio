@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, X, CheckCircle2, AlertTriangle, Maximize2 } from "lucide-react";
+import { Trash2, X, CheckCircle2, AlertTriangle, Maximize2, Plus } from "lucide-react";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -20,6 +20,12 @@ import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
 import { CaptureConfig } from "./capture-config";
+import { SaidasDaIa } from "./saidas-da-ia";
+import { MenuDeBlocos } from "./menu-de-blocos";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { IconKey } from "./icon-registry";
+import type { KnowledgeDoc } from "@/lib/data/types";
 
 import { LLM_PROVIDERS, getProvider } from "@/lib/llm-providers";
 import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
@@ -71,10 +77,52 @@ function PreviaDaBolha({ texto, opcoes }: { texto: string; opcoes?: { id: string
 /** Grupo de campos com título: separa o que é modelo, resposta e coleta. */
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 border-t border-border-subtle pt-4">
+    <section className="flex flex-col gap-3 border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
       <h3 className="text-caption font-medium uppercase tracking-wide text-text-tertiary">{titulo}</h3>
       {children}
     </section>
+  );
+}
+
+/** Quais documentos da base esta ferramenta consulta; nenhum marcado = todos. */
+function DocumentosDaBase({
+  documentos,
+  escolhidos,
+  onChange,
+}: {
+  documentos: KnowledgeDoc[];
+  escolhidos: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (documentos.length === 0) {
+    return (
+      <p className="text-caption text-text-tertiary">
+        O agente ainda não tem documentos. Envie na tela do agente, em Base de conhecimento; esta ferramenta passa a
+        buscar neles.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <Label className="mb-0">Documentos que esta IA consulta</Label>
+      <p className="text-caption text-text-tertiary">
+        {escolhidos.length === 0 ? "Nenhum marcado: busca em todos." : `Busca só em ${escolhidos.length} de ${documentos.length}.`}
+      </p>
+      <ul className="flex flex-col gap-1">
+        {documentos.map((d) => (
+          <li key={d.id}>
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1.5 hover:bg-hover">
+              <Checkbox
+                checked={escolhidos.includes(d.id)}
+                onCheckedChange={(v) => onChange(v === true ? [...escolhidos, d.id] : escolhidos.filter((id) => id !== d.id))}
+                aria-label={d.fileName}
+              />
+              <span className="min-w-0 truncate text-small text-text-primary">{d.fileName}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -124,6 +172,10 @@ export function NodeInspector({
   onChange,
   onDelete,
   onClose,
+  ferramentas = [],
+  aoAdicionarFerramenta,
+  aoAbrirBloco,
+  documentos = [],
 }: {
   node: Node<FlowNodeData>;
   agentId: string;
@@ -131,6 +183,12 @@ export function NodeInspector({
   onChange: (data: Partial<FlowNodeData>) => void;
   onDelete: () => void;
   onClose: () => void;
+  /** Ferramentas ligadas na porta da IA selecionada (aba Ferramentas). */
+  ferramentas?: { id: string; label: string; iconKey: IconKey }[];
+  aoAdicionarFerramenta?: (iconKey: IconKey) => void;
+  aoAbrirBloco?: (id: string) => void;
+  /** Base de conhecimento do agente (a Ferramenta: Base escolhe quais usar). */
+  documentos?: KnowledgeDoc[];
 }) {
   const { iconKey } = node.data;
   const detailRef = React.useRef<HTMLTextAreaElement>(null);
@@ -144,6 +202,9 @@ export function NodeInspector({
   const daConversa = iconKey === "message" || iconKey === "capture";
   const ehIa = iconKey === "ai-agent";
   const [textoAberto, setTextoAberto] = React.useState(false);
+  // Abas só no bloco de IA: é o bloco com mais coisa para configurar.
+  const [abaIa, setAbaIa] = React.useState<"instrucoes" | "saidas" | "ferramentas" | "configurar">("instrucoes");
+  const naAba = (aba: typeof abaIa) => !ehIa || abaIa === aba;
 
   return (
     <div className="flex h-full w-[clamp(340px,26vw,520px)] shrink-0 flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-panel max-xl:absolute max-xl:inset-y-2 max-xl:right-2 max-xl:z-20 max-xl:h-auto max-xl:shadow-overlay">
@@ -189,7 +250,25 @@ export function NodeInspector({
         <span>{pendencia ?? "Pronto pra rodar."}</span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+      {ehIa && (
+        <div className="border-b border-border-subtle px-4 py-2.5">
+          <SegmentedControl
+            label="Partes do bloco de IA"
+            value={abaIa}
+            onChange={setAbaIa}
+            // Quatro abas no painel mais estreito (340px): dividem a largura e encolhem a letra.
+            className="flex w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:px-1 [&>button]:text-caption"
+            options={[
+              { value: "instrucoes", label: "Instruções" },
+              { value: "saidas", label: "Saídas" },
+              { value: "ferramentas", label: "Ferramentas" },
+              { value: "configurar", label: "Configurar" },
+            ]}
+          />
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
         {daConversa && (
           <PreviaDaBolha
             texto={node.data.detail ?? ""}
@@ -197,6 +276,8 @@ export function NodeInspector({
           />
         )}
 
+        {naAba("instrucoes") && (
+        <>
         <div>
           <Label htmlFor="node-label">Nome do bloco</Label>
           <Input id="node-label" value={node.data.label} onChange={(e) => onChange({ label: e.target.value })} />
@@ -247,6 +328,47 @@ export function NodeInspector({
             </p>
           )}
         </div>
+        </>
+        )}
+
+        {ehIa && abaIa === "saidas" && (
+          <SaidasDaIa saidas={node.data.aiExits ?? []} onChange={(aiExits) => onChange({ aiExits })} />
+        )}
+
+        {ehIa && abaIa === "ferramentas" && (
+          <Secao titulo="Ferramentas">
+            <p className="text-caption text-text-tertiary">
+              A IA decide sozinha quando usar cada uma. Clique numa para configurar.
+            </p>
+            {ferramentas.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {ferramentas.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      type="button"
+                      onClick={() => aoAbrirBloco?.(f.id)}
+                      className="flex w-full items-center gap-2.5 rounded-[12px] bg-raised px-3 py-2 text-left transition-colors hover:bg-hover"
+                    >
+                      <IconeDoBloco iconKey={f.iconKey} size={15} className="shrink-0 text-text-secondary" />
+                      <span className="min-w-0 flex-1 truncate text-small text-text-primary">{f.label}</span>
+                      <span className="shrink-0 text-caption text-text-tertiary">{DICIONARIO.get(f.iconKey)?.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {aoAdicionarFerramenta && (
+              <MenuDeBlocos
+                ferramentas
+                escolher={aoAdicionarFerramenta}
+                rotulo="Adicionar ferramenta"
+                className="h-9 w-full gap-1.5 border-dashed text-small font-medium"
+              >
+                <Plus size={14} aria-hidden="true" /> Adicionar ferramenta
+              </MenuDeBlocos>
+            )}
+          </Secao>
+        )}
 
         {ehIa && (
           <>
@@ -514,7 +636,7 @@ export function NodeInspector({
           </div>
         )}
 
-        {ehIa && (
+        {ehIa && abaIa === "configurar" && (
           <Secao titulo="Modelo">
             <div>
               <Label htmlFor="node-ai-fonte">De onde vem a IA</Label>
@@ -583,10 +705,54 @@ export function NodeInspector({
                 )}
               </>
             )}
+            <div>
+              <Label htmlFor="node-ai-max-tokens">Limite de tokens da resposta</Label>
+              <Input
+                id="node-ai-max-tokens"
+                type="number"
+                min={1}
+                placeholder="padrão do provedor"
+                value={node.data.aiMaxTokens ?? ""}
+                onChange={(e) => onChange({ aiMaxTokens: e.target.value ? Math.max(1, Number(e.target.value)) : undefined })}
+              />
+              <p className="mt-1 text-caption text-text-tertiary">Corta respostas longas demais (e o custo). Vazio = padrão.</p>
+            </div>
           </Secao>
         )}
 
-        {ehIa && (
+        {ehIa && abaIa === "configurar" && (
+          <Secao titulo="Resposta">
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
+              <span>
+                <span className="block text-small font-medium text-text-primary">Enviar para o cliente</span>
+                <span className="block text-caption text-text-tertiary">
+                  {node.data.aiSendToCustomer === false
+                    ? "A resposta não vai para a conversa: fica numa variável e o fluxo segue."
+                    : "A resposta da IA aparece na conversa."}
+                </span>
+              </span>
+              <Switch
+                checked={node.data.aiSendToCustomer !== false}
+                onCheckedChange={(v) => onChange({ aiSendToCustomer: v ? undefined : false })}
+                aria-label="Enviar para o cliente"
+              />
+            </label>
+            {node.data.aiSendToCustomer === false && (
+              <div>
+                <Label htmlFor="node-ai-resposta-var">Guardar a resposta na variável</Label>
+                <Input
+                  id="node-ai-resposta-var"
+                  placeholder="ex: resumo"
+                  value={node.data.aiResponseVariable ?? ""}
+                  onChange={(e) => onChange({ aiResponseVariable: e.target.value.replace(/\s+/g, "_") || undefined })}
+                />
+                <p className="mt-1 text-caption text-text-tertiary">Use depois como {"{variavel}"} em outros blocos.</p>
+              </div>
+            )}
+          </Secao>
+        )}
+
+        {ehIa && abaIa === "configurar" && (
           <Secao titulo="Como responde">
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
               <span>
@@ -636,8 +802,8 @@ export function NodeInspector({
           </Secao>
         )}
 
-        {ehIa && (
-          <Secao titulo="Dados para coletar">
+        {ehIa && abaIa === "ferramentas" && (
+          <Secao titulo="Definir variáveis">
             <KeyValueList
               label="Variáveis"
               rows={node.data.collectVars ?? []}
@@ -646,8 +812,7 @@ export function NodeInspector({
               valuePlaceholder="descrição — o que é e como reconhecer"
             />
             <p className="text-caption text-text-tertiary">
-              Cada linha é um dado que a IA tira da conversa e pergunta se ainda faltar. Para dar ferramentas a ela,
-              ligue blocos de Ferramenta na porta roxa embaixo do card; ela decide sozinha quando usar cada uma.
+              Cada linha é um dado que a IA tira da conversa, grava na variável e pergunta se ainda faltar.
             </p>
           </Secao>
         )}
@@ -672,11 +837,11 @@ export function NodeInspector({
         )}
 
         {iconKey === "tool-knowledge" && (
-          <p className="text-caption text-text-tertiary">
-            Sem configuração — quando conectado a um Agente de IA, ele pode buscar nos documentos já carregados na
-            base de conhecimento desse agente sempre que achar relevante. A busca rankeia os trechos mais relevantes
-            pra pergunta (não manda o documento inteiro), então funciona bem mesmo com bases maiores.
-          </p>
+          <DocumentosDaBase
+            documentos={documentos}
+            escolhidos={node.data.knowledgeDocIds ?? []}
+            onChange={(ids) => onChange({ knowledgeDocIds: ids.length ? ids : undefined })}
+          />
         )}
 
         {iconKey === "wait" && (

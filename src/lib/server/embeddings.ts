@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { getCredentialSecret } from "@/lib/server/credentials";
 
 // ---------------------------------------------------------------------------
@@ -184,7 +185,8 @@ export interface SearchHit {
  * embeddings configurados ou ainda não indexou nada — quem chama decide se
  * cai pro full-text.
  */
-export async function semanticSearch(agentId: string, query: string, topK: number): Promise<SearchHit[]> {
+/** docIds vazio/ausente = todos os documentos do agente. */
+export async function semanticSearch(agentId: string, query: string, topK: number, docIds?: string[]): Promise<SearchHit[]> {
   if (!query.trim()) return [];
 
   const embedded = await embedTexts(agentId, [query]);
@@ -202,6 +204,7 @@ export async function semanticSearch(agentId: string, query: string, topK: numbe
     WHERE c."agentId" = ${agentId}
       AND c.model = ${embedded.model}
       AND c.embedding IS NOT NULL
+      ${docIds?.length ? Prisma.sql`AND c."docId" IN (${Prisma.join(docIds)})` : Prisma.empty}
     ORDER BY c.embedding <=> ${literal}::vector
     LIMIT ${topK}
   `;

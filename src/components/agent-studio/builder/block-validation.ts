@@ -62,9 +62,10 @@ export function validateNode(data: FlowNodeData): string | null {
 
     case "ai-agent":
       // Na conexão do contrato a chave vem da Central de IA, não do bloco.
-      return fonteDaIa(data) === "bloco" && vazio(data.aiCredentialId)
-        ? "Escolha a credencial do provedor de IA."
-        : null;
+      if (fonteDaIa(data) === "bloco" && vazio(data.aiCredentialId)) return "Escolha a credencial do provedor de IA.";
+      if (data.aiSendToCustomer === false && vazio(data.aiResponseVariable)) return "Escolha a variável que guarda a resposta.";
+      if ((data.aiExits ?? []).some((s) => vazio(s.name))) return "Dê um nome a cada saída: é por ele que a IA escolhe.";
+      return null;
 
     case "tool-mcp":
       return vazio(data.mcpServerId) ? "Escolha o servidor MCP." : null;
