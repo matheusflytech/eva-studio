@@ -22,6 +22,7 @@ import { fraseDaAutomacao } from "@/lib/automacoes/frase";
 import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
 import type { Definicao, Ponta, Regra } from "@/lib/automacoes/tipos";
 import { CanvasDaAutomacao, resumoDoPasso, type EstadoDoNo } from "@/components/automacoes/canvas";
+import type { NumerosDoPasso } from "@/lib/server/automacoes/telas";
 import { PainelDoProximoPasso } from "@/components/automacoes/seletor";
 import { PainelDeConfiguracoes, PainelDoPasso, type ConfigDaAutomacao } from "@/components/automacoes/painel";
 import { duracao, nomesDasOpcoes, STATUS_DA_AUTOMACAO, useOpcoes } from "@/components/automacoes/comum";
@@ -208,6 +209,14 @@ export default function EditorDaAutomacao() {
   // Testar de verdade: painel flutuante sobre o quadro (o fluxo fica à vista).
   const [testeAberto, setTesteAberto] = React.useState(false);
   const [estados, setEstados] = React.useState<Record<string, { estado: EstadoDoNo; ms?: number }> | undefined>();
+  // Quantas vezes cada bloco rodou (30 dias) e o último erro: aparece no canvas.
+  const [numeros, setNumeros] = React.useState<Record<string, NumerosDoPasso> | undefined>();
+  React.useEffect(() => {
+    void fetch(`/api/automacoes/${id}/step-stats`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.passos && setNumeros(d.passos))
+      .catch(() => {});
+  }, [id]);
   const carregado = React.useRef(false);
   // O que está gravado no servidor (rascunho + configurações, serializado).
   // Só salva quando mudou de verdade: abrir a tela, Fast Refresh ou a corrida
@@ -475,6 +484,7 @@ export default function EditorDaAutomacao() {
             inserir={abrirInsercao}
             inserindo={inserindo}
             estados={estados}
+            numeros={numeros}
             barra={{
               testar: () => setTesteAberto(true),
               organizar: () => aplicar({ op: "posicionar", posicoes: null }),
