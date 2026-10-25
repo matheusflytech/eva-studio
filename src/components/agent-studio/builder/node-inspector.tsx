@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Trash2, X, CheckCircle2, AlertTriangle, Maximize2 } from "lucide-react";
-import Link from "@/components/contrato/link";
 import { Modal, ModalContent } from "@/components/ui/modal";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -208,7 +207,7 @@ export function NodeInspector({
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <Label className="mb-0" htmlFor="node-detail">
-              {ehIa ? "Instruções desta etapa" : daConversa ? "Mensagem" : "Detalhe"}
+              {ehIa ? "Instruções desta IA" : daConversa ? "Mensagem" : "Detalhe"}
             </Label>
             <div className="flex items-center gap-1">
               {ehIa && (
@@ -236,51 +235,30 @@ export function NodeInspector({
             value={node.data.detail ?? ""}
             onChange={(e) => onChange({ detail: e.target.value })}
           />
+          {ehIa && (
+            <p className="mt-1 text-caption text-text-tertiary">
+              Tudo o que esta IA precisa: papel, tom, regras e o que nunca fazer. Cada IA do fluxo tem o seu.
+            </p>
+          )}
           {ehIa && (node.data.detail ?? "").length > LIMITE_DO_PROMPT && (
             <p className="mt-1 text-caption text-warning">
               {(node.data.detail ?? "").length.toLocaleString("pt-BR")} caracteres. Acima de uns 3 mil a IA começa a
-              esquecer partes do texto: corte o que se repete ou leve as regras gerais para o Comportamento do agente.
+              esquecer partes do texto: corte o que se repete ou divida a conversa em mais de uma IA.
             </p>
           )}
         </div>
 
         {ehIa && (
           <>
-            {/* Duas fontes de texto confundiam: aqui fica claro que o
-                Comportamento do agente entra antes deste texto (ou não). */}
-            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
-              <span>
-                <span className="block text-small font-medium text-text-primary">Somar o Comportamento do agente</span>
-                <span className="block text-caption text-text-tertiary">
-                  {node.data.aiUsarAgente === false ? (
-                    <span className="text-warning">
-                      Desligado: só o texto acima vai para a IA. Tom, instruções e &quot;nunca deve fazer&quot; do
-                      agente não valem nesta etapa.
-                    </span>
-                  ) : (
-                    "Tom, instruções e o que ele nunca deve fazer entram antes do texto acima. Use este texto só para o que é desta etapa."
-                  )}{" "}
-                  <Link href={`/agent-studio/${agentId}?tab=behavior`} className="text-text-secondary underline">
-                    Abrir Comportamento
-                  </Link>
-                </span>
-              </span>
-              <Switch
-                checked={node.data.aiUsarAgente !== false}
-                onCheckedChange={(v) => onChange({ aiUsarAgente: v })}
-                aria-label="Somar o Comportamento do agente"
-              />
-            </label>
-
             <Modal open={textoAberto} onOpenChange={setTextoAberto}>
               <ModalContent
                 size="lg"
                 className="max-w-4xl"
-                title="Instruções desta etapa"
+                title="Instruções desta IA"
                 description={node.data.label}
               >
                 <Textarea
-                  aria-label="Instruções desta etapa"
+                  aria-label="Instruções desta IA"
                   rows={24}
                   className="text-body leading-relaxed"
                   value={node.data.detail ?? ""}

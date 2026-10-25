@@ -7,7 +7,7 @@ import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
-import { contextoDaConversa, montarPromptDoAgente, type AgenteParaPrompt } from "@/lib/server/ia/prompt-do-agente";
+import { contextoDaConversa } from "@/lib/server/ia/prompt-do-agente";
 import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
@@ -650,7 +650,7 @@ function respostaDaIa(texto: string, canal: string, node: Node<FlowNodeData>): O
 
 async function runAiAgent(
   node: Node<FlowNodeData>,
-  agente: AgenteParaPrompt & { id: string; orgId: string },
+  agente: { id: string; orgId: string },
   userMessage: string,
   variables: Variables,
   nodes: Node<FlowNodeData>[],
@@ -879,7 +879,8 @@ async function runAiAgent(
     });
   }
 
-  let systemPrompt = montarPromptDoAgente(agente, preencherConhecidas(node.data.detail ?? "", variables), { usarAgente: node.data.aiUsarAgente });
+  // Só o texto do bloco: o cadastro do agente é explicativo, não vai para a IA.
+  let systemPrompt = preencherConhecidas(node.data.detail ?? "", variables).trim() || "Você é um assistente útil.";
   if (collectVars.length > 0) {
     const lines = ["", "## Dados que você precisa coletar nesta conversa"];
     if (collectedVars.length) lines.push(`Já coletados: ${collectedVars.map((v) => `${v.key}=${variables[v.key]}`).join(", ")}.`);

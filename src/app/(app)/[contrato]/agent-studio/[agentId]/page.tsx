@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const ABAS: { id: AbaDoAgente; rotulo: string; ajuda: string }[] = [
   { id: "overview", rotulo: "Resumo", ajuda: "Ele está funcionando?" },
-  { id: "behavior", rotulo: "Comportamento", ajuda: "O que ele sabe e como fala" },
+  { id: "behavior", rotulo: "Sobre", ajuda: "Como ele funciona e o que ele consulta" },
   { id: "channels", rotulo: "Canais", ajuda: "Onde ele atende" },
   { id: "advanced", rotulo: "Avançado", ajuda: "n8n, variáveis e exclusão" },
 ];

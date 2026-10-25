@@ -15,6 +15,17 @@ describe("montarFluxoInicial", () => {
     expect(precisaOrganizar(nodes)).toBe(false);
   });
 
+  it("o jeito de falar da criação vai para o texto do bloco de IA, antes do objetivo", () => {
+    const jeito = { tone: "Direto.", language: "Português", instructions: "Venda sofás.", guidelines: "Sem desconto." };
+    const { nodes } = montarFluxoInicial({ inicio: "ia", ia: { fonte: "conexao" }, objetivo: "Qualifique.", jeito });
+    expect(nodes.find((n) => n.data.iconKey === "ai-agent")!.data.detail).toBe(
+      "## Instruções\nVenda sofás.\n\n## Tom de voz\nDireto.\n\nResponda sempre em Português.\n\n## Nunca faça\nSem desconto.\n\nQualifique."
+    );
+    // Só o idioma (sempre preenchido) não mexe no texto.
+    const soIdioma = montarFluxoInicial({ inicio: "ia", ia: { fonte: "conexao" }, objetivo: "Qualifique.", jeito: { language: "Português" } });
+    expect(soIdioma.nodes.find((n) => n.data.iconKey === "ai-agent")!.data.detail).toBe("Qualifique.");
+  });
+
   it("IA só deste agente: grava provedor, credencial e modelo no bloco", () => {
     const { nodes } = montarFluxoInicial({
       inicio: "ia",

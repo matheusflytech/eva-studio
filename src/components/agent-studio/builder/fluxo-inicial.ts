@@ -24,8 +24,36 @@ export interface FluxoInicialOpcoes {
   inicio: "ia" | "branco" | string;
   ia: IaDoAgente;
   boasVindas?: string;
-  /** O que a IA faz nesta etapa (texto do bloco). O jeito de falar vem do cadastro do agente. */
+  /** O que a IA faz (texto do bloco). */
   objetivo?: string;
+  /** Respostas da etapa "Como fala": vão para o texto de cada bloco de IA. */
+  jeito?: { tone?: string; language?: string; instructions?: string; guidelines?: string };
+}
+
+/** Tom, idioma, instruções e "nunca fazer" no formato do texto do bloco de IA. */
+export function textoDoJeito(j: FluxoInicialOpcoes["jeito"]): string {
+  const t = (v?: string) => (v ?? "").trim();
+  // Idioma sozinho (sempre vem preenchido) não muda o texto de quem não escreveu nada.
+  if (!t(j?.instructions) && !t(j?.tone) && !t(j?.guidelines)) return "";
+  return [
+    t(j?.instructions) && `## Instruções\n${t(j?.instructions)}`,
+    t(j?.tone) && `## Tom de voz\n${t(j?.tone)}`,
+    t(j?.language) && `Responda sempre em ${t(j?.language)}.`,
+    t(j?.guidelines) && `## Nunca faça\n${t(j?.guidelines)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** Cada IA tem o próprio texto: o jeito de falar entra antes do que ela faz. */
+function comJeito(fluxo: { nodes: Node<FlowNodeData>[]; edges: Edge[] }, jeito: string) {
+  if (!jeito) return fluxo;
+  const nodes = fluxo.nodes.map((n) =>
+    n.data.iconKey === "ai-agent"
+      ? { ...n, data: { ...n.data, detail: [jeito, (n.data.detail ?? "").trim()].filter(Boolean).join("\n\n") } }
+      : n
+  );
+  return { ...fluxo, nodes };
 }
 
 const no = (id: string, data: FlowNodeData): Node<FlowNodeData> => ({ id, type: "flowNode", position: { x: 0, y: 0 }, data });
@@ -42,6 +70,10 @@ function dadosDaIa(ia: IaDoAgente): Partial<FlowNodeData> {
 }
 
 export function montarFluxoInicial(opts: FluxoInicialOpcoes): { nodes: Node<FlowNodeData>[]; edges: Edge[] } {
+  return comJeito(fluxoSemJeito(opts), textoDoJeito(opts.jeito));
+}
+
+function fluxoSemJeito(opts: FluxoInicialOpcoes): { nodes: Node<FlowNodeData>[]; edges: Edge[] } {
   const inicio = generateId();
   const nodeInicio = no(inicio, { iconKey: "start", label: "Início", kind: "Ponto de entrada", hasTarget: false });
 

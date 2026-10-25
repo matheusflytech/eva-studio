@@ -37,7 +37,7 @@ const MOSTRAR_CAMPOS_DECORATIVOS = false;
 
 /**
  * Uma seção do formulário. Fica sempre montada e só some da tela quando não é a
- * aba ativa: o que a pessoa digitou em "Comportamento" não pode se perder ao
+ * aba ativa: o que a pessoa digitou em "Sobre" não pode se perder ao
  * olhar "Canais", e um só botão Salvar vale para todas as abas.
  */
 function Secao({ id, aba, children }: { id: AbaDoAgente; aba?: AbaDoAgente; children: React.ReactNode }) {
@@ -53,11 +53,13 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
 
   const [name, setName] = React.useState(agent?.name ?? "");
   const [description, setDescription] = React.useState(agent?.description ?? "");
-  const [tone, setTone] = React.useState(agent?.tone ?? "");
-  const [language, setLanguage] = React.useState(agent?.language ?? AGENT_LANGUAGES[0]);
+  // Tom, idioma, instruções e "nunca fazer" saíram da tela (cada bloco de IA tem
+  // os seus); seguem como estão para salvar não apagar o que o webhook do n8n lê.
+  const tone = agent?.tone ?? "";
+  const language = agent?.language ?? AGENT_LANGUAGES[0];
   const [primaryChannel, setPrimaryChannel] = React.useState(agent?.primaryChannel ?? CHANNELS[0].name);
-  const [instructions, setInstructions] = React.useState(agent?.instructions ?? "");
-  const [guidelines, setGuidelines] = React.useState(agent?.guidelines ?? "");
+  const instructions = agent?.instructions ?? "";
+  const guidelines = agent?.guidelines ?? "";
   const [knowledgeBase, setKnowledgeBase] = React.useState<KnowledgeDoc[]>(agent?.knowledgeBase ?? []);
   const [skills, setSkills] = React.useState<string[]>(agent?.skills ?? []);
   const [tools, setTools] = React.useState<string[]>(agent?.tools ?? []);
@@ -123,8 +125,11 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       <Secao id="behavior" aba={aba}>
         <Card>
           <CardHeader>
-            <CardTitle>Quem é este agente</CardTitle>
-            <CardDescription>Como ele se apresenta e em que língua fala.</CardDescription>
+            <CardTitle>Sobre este agente</CardTitle>
+            <CardDescription>
+              Para a equipe entender o que ele faz. A IA não lê isto: o que cada IA faz, o tom e o que ela nunca deve
+              fazer ficam no bloco dela, no Builder.
+            </CardDescription>
           </CardHeader>
           <div className="flex flex-col gap-4">
             <div>
@@ -137,35 +142,17 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
               />
             </div>
             <div>
-              <Label htmlFor="agent-tone">Tom de voz</Label>
-              <Input
-                id="agent-tone"
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                placeholder="Ex: Consultivo, direto e acolhedor"
-              />
-            </div>
-            <div>
-              <Label htmlFor="agent-desc">Resumo curto</Label>
-              <Input
+              <Label htmlFor="agent-desc">Como ele funciona</Label>
+              <Textarea
                 id="agent-desc"
+                rows={6}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Uma frase que aparece na lista de agentes."
+                placeholder="Ex: Atende quem chega pelo Instagram. A IA de vendas tira dúvidas e qualifica; se o cliente pedir, passa para o atendente; depois do atendimento, a IA de pós-venda pede avaliação."
               />
+              <p className="mt-1 text-caption text-text-tertiary">A primeira linha aparece na lista de agentes.</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="agent-language">Idioma principal</Label>
-                <Select id="agent-language" value={language} onChange={(e) => setLanguage(e.target.value as typeof language)}>
-                  {AGENT_LANGUAGES.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              {MOSTRAR_CAMPOS_DECORATIVOS && (
+            {MOSTRAR_CAMPOS_DECORATIVOS && (
               <div>
                 <Label htmlFor="agent-channel">Canal principal</Label>
                 <Select id="agent-channel" value={primaryChannel} onChange={(e) => setPrimaryChannel(e.target.value)}>
@@ -176,41 +163,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
                   ))}
                 </Select>
               </div>
-              )}
-            </div>
-          </div>
-        </Card>
-      </Secao>
-
-      <Secao id="behavior" aba={aba}>
-        <Card>
-          <CardHeader>
-            <CardTitle>O que ele deve fazer</CardTitle>
-            <CardDescription>
-              Escreva como se estivesse treinando uma pessoa nova. O agente de IA lê isto em toda conversa.
-            </CardDescription>
-          </CardHeader>
-          <div className="flex flex-col gap-4">
-            <div>
-              <Label htmlFor="agent-instructions">Instruções</Label>
-              <Textarea
-                id="agent-instructions"
-                rows={10}
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Qual é o papel dele, o que a sua empresa vende, que perguntas fazer ao cliente e quando chamar uma pessoa. Quanto mais completo, melhor."
-              />
-            </div>
-            <div>
-              <Label htmlFor="agent-guidelines">O que ele nunca deve fazer</Label>
-              <Textarea
-                id="agent-guidelines"
-                rows={5}
-                value={guidelines}
-                onChange={(e) => setGuidelines(e.target.value)}
-                placeholder="Ex: nunca citar concorrentes, sempre confirmar antes de agendar, chamar uma pessoa se o cliente pedir."
-              />
-            </div>
+            )}
           </div>
         </Card>
       </Secao>

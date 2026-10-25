@@ -41,12 +41,6 @@ function montarPassos(agent: Agent, ov: AgentOverview | null): Passo[] {
       href: `/agent-studio/${agent.id}/builder`,
     },
     {
-      feito: agent.instructions.trim().length > 20,
-      titulo: "Instruções escritas",
-      detalhe: "Explica ao agente de IA quem ele é, o que a empresa vende e quando chamar uma pessoa.",
-      aba: "behavior",
-    },
-    {
       feito: temCanal,
       titulo: "Canal conectado",
       detalhe: temCanal

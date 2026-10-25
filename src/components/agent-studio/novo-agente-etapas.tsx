@@ -163,11 +163,12 @@ export function NovoAgenteEtapas() {
       await create(agentId, {
         name: name.trim(),
         description: description.trim(),
-        tone: tone.trim(),
+        // Tom, instruções e "nunca fazer" vão para o bloco de IA (ver jeito abaixo).
+        tone: "",
         language,
         primaryChannel: CHANNELS[0].name,
-        instructions: instructions.trim(),
-        guidelines: guidelines.trim(),
+        instructions: "",
+        guidelines: "",
         knowledgeBase: [],
         skills: [],
         tools: [],
@@ -180,7 +181,7 @@ export function NovoAgenteEtapas() {
       return;
     }
     try {
-      await saveFlow(agentId, montarFluxoInicial({ inicio, ia, boasVindas, objetivo }));
+      await saveFlow(agentId, montarFluxoInicial({ inicio, ia, boasVindas, objetivo, jeito: { tone, language, instructions, guidelines } }));
       router.push(`/agent-studio/${agentId}/builder`);
     } catch {
       // O agente já existe: leva para ele em vez de deixar a pessoa criar outro igual.
