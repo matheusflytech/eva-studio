@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowLeft, Ellipsis, MessageSquare, Palette, PlayCircle, Workflow } from "lucide-react";
+import { ArrowLeft, Copy, Ellipsis, MessageSquare, Palette, PlayCircle, Workflow } from "lucide-react";
+import { useRouter } from "@/lib/contrato/navegacao";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { buttonVariants } from "@/components/ui/button";
@@ -24,8 +25,24 @@ import type { Agent } from "@/lib/data/types";
 // "Ver conversas" vai no "…". O interruptor pausa o agente de verdade (ele
 // deixa de responder), por isso fica sempre à vista, com Desfazer na ilha.
 export function AgentOverview({ agent }: { agent: Agent }) {
-  const { toggleStatus } = useAgentsStore();
+  const { toggleStatus, duplicate } = useAgentsStore();
+  const router = useRouter();
+  const [duplicando, setDuplicando] = React.useState(false);
   const isActive = agent.status === "active";
+
+  // A cópia nasce pausada e sem canais: abre direto nela para conectar/ajustar.
+  async function duplicar() {
+    setDuplicando(true);
+    try {
+      const novoId = await duplicate(agent.id);
+      avisarNaIlha({ titulo: "Agente duplicado", detalhe: `${agent.name} (cópia), pausado` });
+      router.push(`/agent-studio/${novoId}`);
+    } catch (erro) {
+      avisarNaIlha({ titulo: "Não deu para duplicar", detalhe: erro instanceof Error ? erro.message : undefined });
+    } finally {
+      setDuplicando(false);
+    }
+  }
 
   async function alternar(el: HTMLElement) {
     pulsar(el, 1.2);
@@ -75,7 +92,7 @@ export function AgentOverview({ agent }: { agent: Agent }) {
           </label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <IconButton aria-label="Mais: ver conversas" variant="secondary">
+              <IconButton aria-label="Mais ações do agente" variant="secondary">
                 <Ellipsis />
               </IconButton>
             </DropdownMenuTrigger>
@@ -84,6 +101,9 @@ export function AgentOverview({ agent }: { agent: Agent }) {
                 <Link href="/conversations">
                   <MessageSquare aria-hidden="true" /> Ver conversas
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={duplicando} onSelect={() => void duplicar()}>
+                <Copy aria-hidden="true" /> Duplicar agente
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

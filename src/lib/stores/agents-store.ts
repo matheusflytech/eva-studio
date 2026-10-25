@@ -10,6 +10,7 @@ interface AgentsState {
   update: (id: string, input: AgentInput) => Promise<Agent>;
   remove: (id: string) => Promise<void>;
   toggleStatus: (id: string) => Promise<Agent>;
+  duplicate: (id: string) => Promise<string>;
 }
 
 export const useAgentsStore = create<AgentsState>((set, get) => ({
@@ -42,5 +43,11 @@ export const useAgentsStore = create<AgentsState>((set, get) => ({
     const agent = await agentsApi.toggleAgentStatus(id);
     set({ agents: get().agents.map((a) => (a.id === id ? agent : a)) });
     return agent;
+  },
+
+  duplicate: async (id) => {
+    const novoId = await agentsApi.duplicateAgent(id);
+    await get().load();
+    return novoId;
   },
 }));
