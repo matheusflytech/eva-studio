@@ -86,3 +86,43 @@ export async function opcoesDoEditor(orgId: string) {
 }
 
 export type OpcoesDoEditor = Awaited<ReturnType<typeof opcoesDoEditor>>;
+
+export interface NumerosDoPasso {
+  /** Execuções (não teste) que passaram por este bloco no período. */
+  execucoes: number;
+  /** Erro da última vez que o bloco rodou, se ela falhou. */
+  ultimoErro: string | null;
+  ultimaEm: string | null;
+}
+
+/**
+ * Números de cada bloco no canvas (últimos 30 dias, sem execuções de teste):
+ * quantas vezes rodou e o erro da última vez, se falhou. "gatilho" = total
+ * de execuções que começaram.
+ */
+export async function numerosDosPassos(orgId: string, automacaoId: string, agora = new Date()): Promise<Record<string, NumerosDoPasso>> {
+  const desde = new Date(agora.getTime() - 30 * DIA_MS);
+  const [linhas, total] = await Promise.all([
+    prisma.$queryRaw<{ noId: string; execucoes: number; ultimoStatus: string; ultimoErro: string | null; ultimaEm: Date }[]>`
+      select p."noId" as "noId",
+             count(distinct p."execucaoId")::int as execucoes,
+             (array_agg(p.status order by p."iniciadoEm" desc))[1] as "ultimoStatus",
+             (array_agg(p.erro order by p."iniciadoEm" desc))[1] as "ultimoErro",
+             max(p."iniciadoEm") as "ultimaEm"
+        from eva_studio_automacao_passos p
+        join eva_studio_automacao_execucoes e on e.id = p."execucaoId"
+       where e."automacaoId" = ${automacaoId} and e."orgId" = ${orgId}
+         and e.teste = false and e."createdAt" >= ${desde}
+       group by p."noId"`,
+    prisma.automacaoExecucao.count({ where: { automacaoId, orgId, teste: false, createdAt: { gte: desde } } }),
+  ]);
+  const numeros: Record<string, NumerosDoPasso> = { gatilho: { execucoes: total, ultimoErro: null, ultimaEm: null } };
+  for (const l of linhas) {
+    numeros[l.noId] = {
+      execucoes: l.execucoes,
+      ultimoErro: l.ultimoStatus === "falhou" ? l.ultimoErro || "Falhou." : null,
+      ultimaEm: l.ultimaEm ? new Date(l.ultimaEm).toISOString() : null,
+    };
+  }
+  return numeros;
+}

@@ -3,19 +3,36 @@
 import * as React from "react";
 import { Plus } from "lucide-react";
 import { Modal, ModalContent } from "@/components/ui/modal";
-import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { MODELOS } from "@/lib/automacoes/modelos";
-import { NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
+import { gatilhosDoObjeto, NOMES_DOS_OBJETOS } from "@/lib/automacoes/catalogo";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { fraseDaAutomacao } from "@/lib/automacoes/frase";
 import { OBJETOS, type Objeto } from "@/lib/automacoes/tipos";
 import { ICONE_DO_OBJETO, IconeDoPasso, visualDoPasso } from "./comum";
 
-// Galeria antes da tela em branco: modelos prontos (o que depende do contrato
-// fica para escolher no editor) ou "Em branco" escolhendo o tipo de registro.
-export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: () => void; criar: (p: { modeloId?: string; objeto?: Objeto }) => Promise<void> }) {
+// Como começar uma automação: do zero (escolhe sobre o que ela roda e monta
+// tudo no canvas) ou por um modelo pronto (o que depende do contrato fica
+// para escolher no editor). "Nova automação" abre em "Do zero"; "Modelos", nos modelos.
+type Aba = "zero" | "modelos";
+
+export function Galeria({
+  aberta,
+  aba: abaInicial = "zero",
+  fechar,
+  criar,
+}: {
+  aberta: boolean;
+  aba?: Aba;
+  fechar: () => void;
+  criar: (p: { modeloId?: string; objeto?: Objeto }) => Promise<void>;
+}) {
+  const [aba, setAba] = React.useState<Aba>(abaInicial);
+  React.useEffect(() => {
+    if (aberta) setAba(abaInicial);
+  }, [aberta, abaInicial]);
   const [ocupado, setOcupado] = React.useState<string | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
   const categorias = [...new Set(MODELOS.map((m) => m.categoria))];
@@ -33,23 +50,51 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
 
   return (
     <Modal open={aberta} onOpenChange={(v) => !v && fechar()}>
-      <ModalContent size="lg" title="Nova automação" description="Comece por um modelo pronto ou em branco.">
+      <ModalContent size="lg" title="Nova automação" description="Monte do zero ou comece por um modelo pronto.">
         <div className="flex flex-col gap-5 overflow-y-auto px-5 pb-5">
+          <SegmentedControl
+            label="Como começar"
+            value={aba}
+            onChange={setAba}
+            options={[
+              { value: "zero", label: "Do zero" },
+              { value: "modelos", label: "Modelos" },
+            ]}
+            className="self-start"
+          />
           {erro && <Notice tone="danger">{erro}</Notice>}
-          <section>
-            <p className="mb-2 font-mono text-caption text-text-tertiary">Em branco</p>
-            <div className="flex flex-wrap gap-2">
-              {OBJETOS.map((o) => {
-                const Icone = ICONE_DO_OBJETO[o];
-                return (
-                  <Button key={o} type="button" variant="secondary" size="sm" disabled={!!ocupado} onClick={() => void escolher(`branco:${o}`, { objeto: o })}>
-                    <Icone size={14} aria-hidden="true" /> {NOMES_DOS_OBJETOS[o].plural}
-                  </Button>
-                );
-              })}
-            </div>
-          </section>
-          {categorias.map((cat) => (
+          {aba === "zero" && (
+            <section className="flex flex-col gap-3">
+              <p className="text-small text-text-secondary">Sobre o que ela roda? Depois você escolhe o gatilho e monta os passos no canvas.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {OBJETOS.map((o) => {
+                  const Icone = ICONE_DO_OBJETO[o];
+                  const exemplos = gatilhosDoObjeto(o).slice(0, 3).map((g) => g.nome);
+                  return (
+                    <button
+                      key={o}
+                      type="button"
+                      disabled={!!ocupado}
+                      onClick={() => void escolher(`branco:${o}`, { objeto: o })}
+                      className={cn(
+                        "flex gap-3 rounded-[14px] border border-border-subtle bg-panel p-3 text-left transition-colors hover:bg-raised disabled:opacity-60",
+                        ocupado === `branco:${o}` && "border-accent-solid ring-1 ring-accent-solid"
+                      )}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-raised text-text-secondary">
+                        <Icone size={16} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-small font-medium text-text-primary">{NOMES_DOS_OBJETOS[o].plural}</span>
+                        <span className="mt-0.5 block text-caption text-text-tertiary">{exemplos.join(" · ")}{exemplos.length ? "…" : ""}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+          {aba === "modelos" && categorias.map((cat) => (
             <section key={cat}>
               <p className="mb-2 font-mono text-caption text-text-tertiary">{cat}</p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -89,9 +134,11 @@ export function Galeria({ aberta, fechar, criar }: { aberta: boolean; fechar: ()
               </div>
             </section>
           ))}
-          <p className="flex items-start gap-1.5 text-caption text-text-tertiary">
-            <Plus size={12} aria-hidden="true" className="mt-0.5 shrink-0" /> O que o modelo não sabe do seu contrato (etapa, pessoas, modelo aprovado) fica marcado para você escolher antes de ligar.
-          </p>
+          {aba === "modelos" && (
+            <p className="flex items-start gap-1.5 text-caption text-text-tertiary">
+              <Plus size={12} aria-hidden="true" className="mt-0.5 shrink-0" /> O que o modelo não sabe do seu contrato (etapa, pessoas, modelo aprovado) fica marcado para você escolher antes de ligar.
+            </p>
+          )}
         </div>
       </ModalContent>
     </Modal>

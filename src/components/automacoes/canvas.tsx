@@ -33,6 +33,7 @@ import { layoutDaAutomacao, NO_ALTURA, PASSO_X, VAZIO_ALTURA } from "@/lib/autom
 import { EVENTOS_DE_ESPERA } from "@/lib/automacoes/catalogo";
 import type { Definicao, No, Ponta } from "@/lib/automacoes/tipos";
 import type { Pendencia } from "@/lib/automacoes/validar";
+import type { NumerosDoPasso } from "@/lib/server/automacoes/telas";
 import { IconeDoPasso, visualDoPasso } from "./comum";
 import { MOLA } from "@/lib/design-system/movimento";
 
@@ -59,6 +60,9 @@ interface DadosDoPasso extends Record<string, unknown> {
   selecionado: boolean;
   estado?: EstadoDoNo;
   ms?: number;
+  /** Execuções reais nos últimos 30 dias e o erro da última vez, se falhou. */
+  execucoes?: number;
+  ultimoErro?: string | null;
   /** Atraso da entrada em cascata (s); só na primeira montagem. */
   atraso: number;
 }
@@ -151,7 +155,9 @@ const CartaoDoPasso = React.memo(function CartaoDoPasso({ data }: NodeProps<Node
             ? BORDA_DO_ESTADO[data.estado]
             : data.selecionado
               ? "border-accent-solid shadow-[0_0_0_1px_var(--accent-solid),0_0_24px_-6px_color-mix(in_srgb,var(--accent-solid)_50%,transparent)]"
-              : "border-border-default hover:border-border-strong"
+              : data.ultimoErro
+                ? "border-danger"
+                : "border-border-default hover:border-border-strong"
         )}
       >
         {data.estado === "rodando" && (
@@ -202,6 +208,16 @@ const CartaoDoPasso = React.memo(function CartaoDoPasso({ data }: NodeProps<Node
       >
         <p className={cn("max-w-full truncate text-small font-medium leading-tight", data.selecionado ? "text-accent-fg" : "text-text-primary")}>{data.titulo}</p>
         <p className="max-w-full truncate text-caption leading-tight text-text-tertiary">{data.subtitulo}</p>
+        {/* Como o bloco anda de verdade (30 dias, sem testes). */}
+        {data.ultimoErro ? (
+          <p className="max-w-full truncate text-caption leading-tight text-danger" title={data.ultimoErro}>
+            Último erro: {data.ultimoErro}
+          </p>
+        ) : data.execucoes ? (
+          <p className="font-mono text-caption leading-tight tabular-nums text-text-tertiary" title="Execuções nos últimos 30 dias">
+            {data.execucoes.toLocaleString("pt-BR")}× em 30 dias
+          </p>
+        ) : null}
       </motion.div>
 
       {data.tipo !== "fim" && <Handle type="source" position={Position.Right} className={cn(ALCA, aceso && ALCA_ACESA)} isConnectable={false} />}
@@ -402,6 +418,7 @@ function CanvasInterno({
   inserir,
   inserindo,
   estados,
+  numeros,
   barra,
   posicionar,
   mover,
@@ -415,6 +432,8 @@ function CanvasInterno({
   /** Ponta onde o painel "O que vem depois?" vai colocar o passo (acende o "+"). */
   inserindo?: Ponta | null;
   estados?: Record<string, { estado: EstadoDoNo; ms?: number }>;
+  /** Números reais de cada bloco (step-stats); "gatilho" = execuções que começaram. */
+  numeros?: Record<string, NumerosDoPasso>;
   barra: BarraDoCanvas;
   /** Guarda onde o bloco foi solto. */
   posicionar: (id: string, x: number, y: number) => void;
@@ -481,6 +500,7 @@ function CanvasInterno({
           pendencias: contagem.get("gatilho") ?? 0,
           selecionado: selecionado === "gatilho",
           atraso: 0,
+          execucoes: numeros?.gatilho?.execucoes,
           ...(estados?.gatilho ?? {}),
         } satisfies DadosDoPasso,
       };
@@ -500,6 +520,8 @@ function CanvasInterno({
         pendencias: contagem.get(no.id) ?? 0,
         selecionado: selecionado === no.id,
         atraso: atrasoDe(c.x),
+        execucoes: numeros?.[no.id]?.execucoes,
+        ultimoErro: numeros?.[no.id]?.ultimoErro,
         ...(estados?.[no.id] ?? {}),
       } satisfies DadosDoPasso,
     };

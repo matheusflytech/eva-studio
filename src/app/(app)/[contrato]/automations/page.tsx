@@ -78,7 +78,8 @@ export default function AutomacoesPage() {
   const opcoes = useOpcoes();
   const nomes = React.useMemo(() => nomesDasOpcoes(opcoes), [opcoes]);
   const [dados, setDados] = React.useState<Dados | null>(null);
-  const [galeria, setGaleria] = React.useState(false);
+  // Galeria fechada = null; aberta diz em qual aba começa.
+  const [galeria, setGaleria] = React.useState<"zero" | "modelos" | null>(null);
   const [busca, setBusca] = React.useState("");
   const [status, setStatus] = React.useState<string[]>([]);
   const [objetos, setObjetos] = React.useState<Objeto[]>([]);
@@ -129,10 +130,10 @@ export default function AutomacoesPage() {
           >
             <CircleHelp />
           </IconButton>
-          <Button variant="secondary" onClick={() => setGaleria(true)} disabled={!dados?.disponivel}>
+          <Button variant="secondary" onClick={() => setGaleria("modelos")} disabled={!dados?.disponivel}>
             <BookOpen size={14} aria-hidden="true" /> Modelos
           </Button>
-          <Button variant="primary" onClick={() => setGaleria(true)} disabled={!dados?.disponivel}>
+          <Button variant="primary" onClick={() => setGaleria("zero")} disabled={!dados?.disponivel}>
             <Plus size={14} aria-hidden="true" /> Nova automação
           </Button>
         </div>
@@ -197,10 +198,15 @@ export default function AutomacoesPage() {
         </div>
       ) : dados.disponivel && lista.length === 0 ? (
         <div className="flex flex-col items-start gap-3 py-6">
-          <p className="text-small text-text-secondary">Nenhuma automação ainda. Comece por um modelo: lead novo no WhatsApp, proposta sem resposta, negócio parado.</p>
-          <Button variant="secondary" onClick={() => setGaleria(true)}>
-            <Plus size={14} aria-hidden="true" /> Escolher um modelo
-          </Button>
+          <p className="text-small text-text-secondary">Nenhuma automação ainda. Monte a sua do zero ou comece por um modelo: lead novo no WhatsApp, proposta sem resposta, negócio parado.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => setGaleria("zero")}>
+              <Plus size={14} aria-hidden="true" /> Criar do zero
+            </Button>
+            <Button variant="secondary" onClick={() => setGaleria("modelos")}>
+              <BookOpen size={14} aria-hidden="true" /> Ver modelos
+            </Button>
+          </div>
         </div>
       ) : lista.length > 0 && visiveis.length === 0 ? (
         <div className="flex flex-col items-start gap-3 py-6">
@@ -260,7 +266,7 @@ export default function AutomacoesPage() {
         </ul>
       )}
 
-      <Galeria aberta={galeria} fechar={() => setGaleria(false)} criar={criar} />
+      <Galeria aberta={galeria !== null} aba={galeria ?? "zero"} fechar={() => setGaleria(null)} criar={criar} />
     </div>
   );
 }
