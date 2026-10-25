@@ -26,6 +26,7 @@ interface Etapa {
 }
 interface Funil {
   id: string;
+  numero?: number;
   name: string;
   isDefault: boolean;
   dealCount: number;
@@ -59,7 +60,7 @@ async function chamar(url: string, metodo: string, corpo?: unknown): Promise<{ o
 /** `funilInicial`: abre com esse funil selecionado; `criarAoAbrir`: já abre o "Novo funil" (vindo do quadro). */
 export function FunisEditor({ funilInicial, criarAoAbrir }: { funilInicial?: string; criarAoAbrir?: boolean } = {}) {
   const [funis, setFunis] = React.useState<Funil[]>([]);
-  const [selecionado, setSelecionado] = React.useState(funilInicial ?? "");
+  const [selecionado, setSelecionado] = React.useState("");
   const [carregando, setCarregando] = React.useState(true);
   const [erro, setErro] = React.useState<string | null>(null);
   const [novoFunil, setNovoFunil] = React.useState(!!criarAoAbrir);
@@ -71,9 +72,13 @@ export function FunisEditor({ funilInicial, criarAoAbrir }: { funilInicial?: str
     const d = await res.json().catch(() => ({}));
     const lista: Funil[] = d.pipelines ?? [];
     setFunis(lista);
-    setSelecionado((atual) => (lista.some((f) => f.id === atual) ? atual : lista[0]?.id ?? ""));
+    // Na primeira carga vale o funil da URL (número, ou UUID de link antigo).
+    setSelecionado((atual) => {
+      const alvo = atual || funilInicial;
+      return lista.find((f) => f.id === alvo || String(f.numero) === alvo)?.id ?? lista[0]?.id ?? "";
+    });
     setCarregando(false);
-  }, []);
+  }, [funilInicial]);
 
   React.useEffect(() => { carregar(); }, [carregar]);
 

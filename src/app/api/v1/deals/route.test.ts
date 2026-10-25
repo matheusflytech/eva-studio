@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const db = vi.hoisted(() => ({
   apiKey: { findFirst: vi.fn(), update: vi.fn() },
   deal: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), count: vi.fn(), delete: vi.fn() },
-  pipelineStage: { findFirst: vi.fn() },
+  pipeline: { findFirst: vi.fn(), findMany: vi.fn() },
+  pipelineStage: { findFirst: vi.fn(), findMany: vi.fn() },
   dealContact: { createMany: vi.fn(), findMany: vi.fn() },
   externalRef: { findUnique: vi.fn(), findMany: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
   contact: { count: vi.fn() },
@@ -70,7 +71,8 @@ const negocio = (extra: Record<string, unknown> = {}) => ({
   customFields: {},
   createdAt: new Date("2026-10-20T00:00:00Z"),
   updatedAt: new Date("2026-10-20T00:00:00Z"),
-  stage: { type: "open" },
+  stage: { type: "open", numero: 1 },
+  pipeline: { numero: 1 },
   contacts: [],
   ...extra,
 });
@@ -116,21 +118,36 @@ describe("POST /v1/deals", () => {
 });
 
 describe("mover etapa", () => {
-  it("mesma etapa do funil: moveDealStage com origem api", async () => {
+  it("mesma etapa do funil: moveDealStage com origem api; funil e etapa saem pelo número", async () => {
     db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
-    const res = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
+    const res = await MOVER(req("POST", { stage_id: 2 }), p({ id: "d1" }));
     expect(res.status).toBe(200);
+    expect(db.pipelineStage.findFirst.mock.calls[0][0].where).toEqual({ orgId: "o1", numero: 2 });
     expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s2", expect.objectContaining({ origem: "api", reabrir: false }));
+    expect((await res.json()).data).toMatchObject({ pipeline_id: 1, stage_id: 1 });
+  });
+
+  it("stage_id com UUID: 400 invalid_parameter; número que não existe: 404 invalid_reference", async () => {
+    const r1 = await MOVER(req("POST", { stage_id: "8d8d3a8c-2ff6-485e-a325-17384e9990cf" }), p({ id: "d1" }));
+    expect(r1.status).toBe(400);
+    expect((await r1.json()).error).toMatchObject({ code: "invalid_parameter", param: "stage_id" });
+    db.pipelineStage.findFirst.mockResolvedValue(null);
+    const r2 = await MOVER(req("POST", { stage_id: "99" }), p({ id: "d1" }));
+    expect(r2.status).toBe(404);
+    expect((await r2.json()).error).toMatchObject({ code: "invalid_reference", param: "stage_id" });
+    expect(crm.moveDealStage).not.toHaveBeenCalled();
   });
 
   it("etapa de outro funil sem pipeline_id: 422; com pipeline_id: move", async () => {
     db.pipelineStage.findFirst.mockResolvedValue({ id: "x1", pipelineId: "p2", type: "open" });
-    const r1 = await MOVER(req("POST", { stage_id: "x1" }), p({ id: "d1" }));
+    db.pipeline.findMany.mockResolvedValue([{ id: "p1", numero: 1 }, { id: "p2", numero: 2 }]);
+    const r1 = await MOVER(req("POST", { stage_id: 7 }), p({ id: "d1" }));
     expect(r1.status).toBe(422);
-    expect((await r1.json()).error.code).toBe("stage_in_other_pipeline");
+    expect((await r1.json()).error).toMatchObject({ code: "stage_in_other_pipeline", details: { deal_pipeline_id: 1, stage_pipeline_id: 2 } });
     expect(crm.moveDealStage).not.toHaveBeenCalled();
 
-    const r2 = await MOVER(req("POST", { stage_id: "x1", pipeline_id: "p2" }), p({ id: "d1" }));
+    db.pipeline.findFirst.mockResolvedValue({ id: "p2" });
+    const r2 = await MOVER(req("POST", { stage_id: 7, pipeline_id: 2 }), p({ id: "d1" }));
     expect(r2.status).toBe(200);
     expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "x1", expect.objectContaining({ origem: "api" }));
   });
@@ -152,21 +169,22 @@ describe("mover etapa", () => {
         { campo: "valor", rotulo: "Valor", etapaId: "s2", etapa: "Proposta" },
       ])
     );
-    const res = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
+    db.pipelineStage.findMany.mockResolvedValue([{ id: "s2", numero: 2 }]);
+    const res = await MOVER(req("POST", { stage_id: 2 }), p({ id: "d1" }));
     expect(res.status).toBe(422);
     const corpo = await res.json();
     expect(corpo.error.code).toBe("stage_requirements_missing");
-    expect(corpo.error.details.missing_fields).toEqual([{ field: "valor", label: "Valor", stage_id: "s2", stage_name: "Proposta" }]);
+    expect(corpo.error.details.missing_fields).toEqual([{ field: "valor", label: "Valor", stage_id: 2, stage_name: "Proposta" }]);
   });
 
   it("negócio fechado sem reopen → 409 deal_closed; reopen e motivo estruturado seguem para moveDealStage", async () => {
     db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
     crm.moveDealStage.mockRejectedValueOnce(new ErroDaMudanca("Este negócio está ganho.", 409, "negocio_fechado"));
-    const r1 = await MOVER(req("POST", { stage_id: "s2" }), p({ id: "d1" }));
+    const r1 = await MOVER(req("POST", { stage_id: 2 }), p({ id: "d1" }));
     expect(r1.status).toBe(409);
     expect((await r1.json()).error.code).toBe("deal_closed");
 
-    await MOVER(req("POST", { stage_id: "s2", reopen: true, lost_reason_id: "m1", lost_note: "x" }), p({ id: "d1" }));
+    await MOVER(req("POST", { stage_id: 2, reopen: true, lost_reason_id: "m1", lost_note: "x" }), p({ id: "d1" }));
     expect(crm.moveDealStage).toHaveBeenLastCalledWith(
       "d1",
       "s2",
@@ -177,7 +195,7 @@ describe("mover etapa", () => {
   it("PATCH: valida a etapa (simulando) com os campos do mesmo PATCH, grava os campos e só depois move", async () => {
     db.pipelineStage.findFirst.mockResolvedValue({ id: "s2", pipelineId: "p1", type: "open" });
     db.customField.findMany.mockResolvedValue([]);
-    const res = await PATCH(req("PATCH", { stage_id: "s2", amount_cents: 5000 }), p({ id: "d1" }));
+    const res = await PATCH(req("PATCH", { stage_id: 2, amount_cents: 5000 }), p({ id: "d1" }));
     expect(res.status).toBe(200);
     const [simulado, real] = crm.moveDealStage.mock.calls;
     expect(simulado[2]).toMatchObject({ simular: true, pendente: { amountCents: 5000 } });
@@ -191,7 +209,7 @@ describe("mover etapa", () => {
     db.customField.findMany.mockResolvedValue([
       { id: "f1", entity: "deal", pipelineId: null, key: "kwh", label: "Consumo", type: "number", options: [], required: false, helpText: "", showOnCard: false, position: 0 },
     ]);
-    const res = await PATCH(req("PATCH", { stage_id: "s2", custom_fields: { kwh: "muito" } }), p({ id: "d1" }));
+    const res = await PATCH(req("PATCH", { stage_id: "2", custom_fields: { kwh: "muito" } }), p({ id: "d1" }));
     expect(res.status).toBe(422);
     expect(crm.moveDealStage).not.toHaveBeenCalled();
     expect(db.deal.update).not.toHaveBeenCalled();

@@ -104,7 +104,7 @@ async function lerLinhas(job: BulkJob): Promise<LinhaDeEntrada[]> {
 
 async function processarImportacao(job: BulkJob, temTempo: () => boolean): Promise<number> {
   const linhas = await lerLinhas(job);
-  const options = (job.options ?? {}) as { tag_ids?: string[]; pipeline_id?: string | null; stage_id?: string | null; skip_stage_requirements?: boolean };
+  const options = (job.options ?? {}) as { tag_ids?: string[]; pipeline_id?: number | null; stage_id?: number | null; skip_stage_requirements?: boolean };
   let cursor = Number(job.cursor || "0") || 0;
   const cont = { processed: job.processed, created: job.created, updated: job.updated, unchanged: job.unchanged, failed: job.failed };
   const erros = (Array.isArray(job.errors) ? job.errors : []) as unknown as ErroDeLinha[];

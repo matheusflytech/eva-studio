@@ -12,7 +12,7 @@ import { ProdutosEditor } from "@/components/crm/config/produtos-editor";
 
 const ABAS = ["funis", "cartao", "deal", "contact", "produtos"] as const;
 
-// ?aba=cartao&funil=<id> abre direto no cartão daquele funil (o botão
+// ?aba=cartao&funil=<número do funil (ou UUID antigo)> abre direto no cartão daquele funil (o botão
 // "Personalizar" do quadro manda assim).
 export default function PersonalizarCrmPage({
   searchParams,

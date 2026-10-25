@@ -154,8 +154,8 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       query: [
         ...LISTA,
         ["updated_since", "ISO-8601"],
-        ["pipeline", "Id do funil"],
-        ["stage", "Id da etapa"],
+        ["pipeline", "Número do funil no contrato (1, 2...)"],
+        ["stage", "Número da etapa no contrato"],
         ["owner", "Id do responsável"],
         ["company", "Id da empresa"],
         ["contact", "Id do contato"],
@@ -171,7 +171,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       scope: "deals:write",
       idempotency: "optional",
       status: 201,
-      body: { name: "Proposta ACME", pipeline_id: "<pipelineId>", amount_cents: 150000, contact_id: "<contactId>", external_id: "erp-d1", custom_fields: {} },
+      body: { name: "Proposta ACME", pipeline_id: 1, amount_cents: 150000, contact_id: "<contactId>", external_id: "erp-d1", custom_fields: {} },
     },
   },
   "/deals/by-external-id/{externalId}": {
@@ -196,7 +196,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
         "texto que não bate com um motivo vira \"Outro\" com a nota) — 422 lost_reason_required.",
       scope: "deals:write",
       idempotency: "optional",
-      body: { stage_id: "<stageId>", lost_reason_id: "<motivoId>", lost_note: "", reopen: false },
+      body: { stage_id: 3, lost_reason_id: "<motivoId>", lost_note: "", reopen: false },
     },
   },
   "/deals/{id}/won": {
@@ -243,14 +243,14 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     delete: { tag: "Tarefas e notas", summary: "Apagar nota", scope: "notes:write" },
   },
   "/custom-fields": {
-    get: { tag: "Configuração", summary: "Campos personalizados (leitura)", scope: "custom_fields:read", query: [["entity", "deal | contact"], ["pipeline", "Id do funil"]] },
+    get: { tag: "Configuração", summary: "Campos personalizados (leitura)", scope: "custom_fields:read", query: [["entity", "deal | contact"], ["pipeline", "Número do funil"]] },
   },
   "/tags": { get: { tag: "Configuração", summary: "Etiquetas", scope: "tags:read" } },
   "/me": {
     get: {
       tag: "Configuração",
       summary: "Quem é esta chave",
-      description: "Contrato, chave e escopos. Serve para testar a credencial (o node do n8n chama aqui). Qualquer chave válida.",
+      description: "Contrato (id curto, o mesmo da URL do app), chave e escopos. Serve para testar a credencial (o node do n8n chama aqui). Qualquer chave válida.",
       scope: "(qualquer)",
     },
   },
@@ -303,7 +303,14 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   },
 
   "/pipelines": {
-    get: { tag: "Funis", summary: "Funis com etapas", scope: "pipelines:read" },
+    get: {
+      tag: "Funis",
+      summary: "Funis com etapas",
+      description:
+        "O id do funil é o número dele no contrato (1, 2, 3...) e o da etapa, o número dela no contrato inteiro (1..N somando os funis): " +
+        "stage_id sozinho já identifica a etapa. É esse número que vai em pipeline_id/stage_id no resto da API.",
+      scope: "pipelines:read",
+    },
     post: {
       tag: "Funis",
       summary: "Criar funil (até 15 funis, 20 etapas)",
@@ -313,19 +320,19 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       body: { name: "Pós-venda", stages: [{ name: "Novo" }, { name: "Ganho", type: "won" }, { name: "Perdido", type: "lost" }] },
     },
   },
-  "/pipelines/reorder": { post: { tag: "Funis", summary: "Reordenar funis", scope: "pipelines:write", body: { ids: ["<p1>", "<p2>"] } } },
+  "/pipelines/reorder": { post: { tag: "Funis", summary: "Reordenar funis", scope: "pipelines:write", body: { ids: [2, 1] } } },
   "/pipelines/{id}": {
     get: { tag: "Funis", summary: "Ler funil", scope: "pipelines:read" },
     patch: { tag: "Funis", summary: "Renomear / tornar padrão", scope: "pipelines:write", body: { name: "Vendas B2B", is_default: true } },
-    delete: { tag: "Funis", summary: "Apagar (move_to obrigatório com negócios)", scope: "pipelines:write", query: [["move_to", "Id do funil de destino"]] },
+    delete: { tag: "Funis", summary: "Apagar (move_to obrigatório com negócios)", scope: "pipelines:write", query: [["move_to", "Número do funil de destino"]] },
   },
   "/pipelines/{id}/stages": {
     post: { tag: "Funis", summary: "Criar etapa", scope: "pipelines:write", status: 201, body: { name: "Proposta", type: "open", probability: 60 } },
   },
-  "/pipelines/{id}/stages/reorder": { post: { tag: "Funis", summary: "Reordenar etapas", scope: "pipelines:write", body: { ids: ["<s1>", "<s2>"] } } },
+  "/pipelines/{id}/stages/reorder": { post: { tag: "Funis", summary: "Reordenar etapas", scope: "pipelines:write", body: { ids: [4, 3, 5] } } },
   "/pipelines/{id}/stages/{stageId}": {
     patch: { tag: "Funis", summary: "Editar etapa", scope: "pipelines:write", body: { name: "Negociação", probability: 80 } },
-    delete: { tag: "Funis", summary: "Apagar etapa (move_to com negócios)", scope: "pipelines:write", query: [["move_to", "Id da etapa de destino"]] },
+    delete: { tag: "Funis", summary: "Apagar etapa (move_to com negócios)", scope: "pipelines:write", query: [["move_to", "Número da etapa de destino (mesmo funil)"]] },
   },
 
   "/imports": {
@@ -334,7 +341,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       summary: "Importar em lote (assíncrono)",
       description:
         "records (até 5 mil), csv inline, ou upload: true para receber upload_url. Um import ativo por organização. " +
-        "Negócios: options { pipeline_id, stage_id, skip_stage_requirements } — negócio existente que muda de etapa segue os campos " +
+        "Negócios: options { pipeline_id, stage_id (números), skip_stage_requirements } — negócio existente que muda de etapa segue os campos " +
         "obrigatórios da etapa, a menos que skip_stage_requirements: true (fica registrado no histórico de etapas).",
       scope: "imports:write",
       idempotency: "required",
@@ -353,7 +360,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       summary: "Exportar (CSV ou JSONL)",
       scope: "exports:read",
       status: 202,
-      body: { entity: "deals", format: "csv", filters: { pipeline: "<pipelineId>", updated_since: "2026-10-01T00:00:00Z" } },
+      body: { entity: "deals", format: "csv", filters: { pipeline: 1, updated_since: "2026-10-01T00:00:00Z" } },
     },
   },
   "/exports/{id}": { get: { tag: "Importação e exportação", summary: "Estado e download_url (15 min)", scope: "exports:read" } },
@@ -409,7 +416,14 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
 export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const [caminho, metodos] of Object.entries(ROTAS)) {
-    const params = [...caminho.matchAll(/\{(\w+)\}/g)].map((m) => ({ name: m[1], in: "path", required: true, schema: { type: "string" } }));
+    // Funil e etapa no caminho: o número no contrato.
+    const numerico = (nome: string) => caminho.startsWith("/pipelines/") && (nome === "id" || nome === "stageId");
+    const params = [...caminho.matchAll(/\{(\w+)\}/g)].map((m) => ({
+      name: m[1],
+      in: "path",
+      required: true,
+      schema: { type: numerico(m[1]) ? "integer" : "string" },
+    }));
     paths[caminho] = { ...(params.length ? { parameters: params } : {}) };
     for (const [metodo, op] of Object.entries(metodos)) paths[caminho][metodo] = operacao(op!);
   }
@@ -420,6 +434,7 @@ export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
       version: "1.0.0",
       description:
         "Autenticação: Authorization: Bearer evs_live_... (Integrações → API). JSON em snake_case, datas ISO-8601 em UTC, dinheiro em centavos. " +
+        "Funil e etapa são identificados pelo número no contrato (inteiro; veja GET /pipelines), não por UUID. " +
         "Listas: { data, has_more, next_cursor }. Erro: { error: { type, code, message, param?, details?, request_id } }. " +
         "Limite por chave: 600 leituras e 300 escritas por minuto (headers RateLimit-*). Escopo exigido em x-scope.",
     },

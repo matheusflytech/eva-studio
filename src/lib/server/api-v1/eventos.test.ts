@@ -23,7 +23,7 @@ beforeEach(() => {
     { id: "e1", dealId: "d1", fromStageId: null, toStageId: "s1", at: t(30) },
     { id: "e2", dealId: "d1", fromStageId: "s1", toStageId: "s9", at: t(10) },
   ]);
-  db.pipelineStage.findMany.mockResolvedValue([{ id: "s1", type: "open" }, { id: "s9", type: "won" }]);
+  db.pipelineStage.findMany.mockResolvedValue([{ id: "s1", type: "open", numero: 1 }, { id: "s9", type: "won", numero: 9 }]);
   db.contact.findMany.mockImplementation(async (q: { where: Record<string, unknown>; include?: unknown }) =>
     q.include ? [{ id: "c1" }] : "createdAt" in q.where ? [{ id: "c1", createdAt: t(20) }] : []
   );
@@ -35,7 +35,7 @@ describe("listarEventos", () => {
   it("monta do histórico, em ordem, com ganho derivado do tipo da etapa e o objeto atual", async () => {
     const r = await listarEventos("o1", { tipos: ["*"], cursor: null, limite: 50, agora });
     expect(r.data.map((e) => e.type)).toEqual(["deal.created", "contact.created", "deal.stage_changed", "deal.won"]);
-    expect(r.data[3]).toMatchObject({ data: { id: "d1", obj: "deal" }, previous: { stage_id: "s1" } });
+    expect(r.data[3]).toMatchObject({ data: { id: "d1", obj: "deal" }, previous: { stage_id: 1 } });
     expect(r.has_more).toBe(false);
     expect(lerCursor(r.next_cursor)).toEqual({ t: t(10).toISOString(), k: "dse:e2:2" });
   });

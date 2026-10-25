@@ -105,16 +105,16 @@ export async function listarEventos(
       select: { id: true, dealId: true, fromStageId: true, toStageId: true, at: true },
     });
     const ids = [...new Set(linhas.flatMap((l) => [l.fromStageId, l.toStageId]).filter((x): x is string => !!x))];
-    const tipos = new Map(
-      (await prisma.pipelineStage.findMany({ where: { id: { in: ids } }, select: { id: true, type: true } })).map((s) => [s.id, s.type])
-    );
+    const etapasDoCrm = await prisma.pipelineStage.findMany({ where: { id: { in: ids } }, select: { id: true, type: true, numero: true } });
+    const tipos = new Map(etapasDoCrm.map((s) => [s.id, s.type]));
+    const numeros = new Map(etapasDoCrm.map((s) => [s.id, s.numero]));
     for (const l of linhas) {
       const base = { em: l.at, objeto: "deal" as const, objetoId: l.dealId };
       if (!l.fromStageId) {
         brutos.push({ ...base, chave: `dse:${l.id}:0`, tipo: "deal.created" });
         continue;
       }
-      const previous = { stage_id: l.fromStageId };
+      const previous = { stage_id: numeros.get(l.fromStageId) ?? null };
       brutos.push({ ...base, chave: `dse:${l.id}:1`, tipo: "deal.stage_changed", previous });
       const de = tipos.get(l.fromStageId) ?? "open";
       const para = tipos.get(l.toStageId) ?? "open";

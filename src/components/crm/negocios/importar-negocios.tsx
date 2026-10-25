@@ -60,7 +60,7 @@ export function ImportarNegocios({
     <Modal open onOpenChange={(v) => !v && onClose()}>
       <ModalContent
         title="Importar negócios"
-        description={`CSV com cabeçalho para o funil ${pipeline.name}. Colunas reconhecidas: nome, valor, previsao, responsavel_id, empresa_id, etapa_id, contato_email, contato_telefone, contato_nome; outras viram campo personalizado. O contato é achado por e-mail ou telefone (ou criado). Até 1.000 linhas.`}
+        description={`CSV com cabeçalho para o funil ${pipeline.name}. Colunas reconhecidas: nome, valor, previsao, responsavel_id, empresa_id, etapa_id (número da etapa), contato_email, contato_telefone, contato_nome; outras viram campo personalizado. O contato é achado por e-mail ou telefone (ou criado). Até 1.000 linhas.`}
         footer={
           res ? (
             <Button variant="primary" onClick={onDone}>

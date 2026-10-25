@@ -16,6 +16,7 @@ const MAX_ERROS = 20;
 // contato_telefone..., coluna desconhecida = campo personalizado; contato
 // achado por id externo, e-mail ou telefone, e criado se não existir).
 // Sem pipeline_id/stage_id na linha, entra no funil (e etapa) escolhido na tela.
+// Na planilha, funil_id/etapa_id são os números do contrato (como na API v1).
 // Resposta: { created, updated, unchanged, failed, errors: [{ row, message }] }.
 export async function POST(request: Request) {
   const ctx = await requirePermission("negocios:criar");
@@ -32,10 +33,11 @@ export async function POST(request: Request) {
   const ignorarObrigatorios = corpo.ignorarObrigatorios === true;
 
   const funil = pipelineId
-    ? await prisma.pipeline.findFirst({ where: { id: pipelineId, orgId: ctx.orgId }, select: { id: true, stages: { select: { id: true } } } })
+    ? await prisma.pipeline.findFirst({ where: { id: pipelineId, orgId: ctx.orgId }, select: { id: true, numero: true, stages: { select: { id: true, numero: true } } } })
     : null;
   if (!funil) return erro("Funil não encontrado.", 404);
-  if (stageId && !funil.stages.some((s) => s.id === stageId)) return erro("Etapa não é deste funil.");
+  const etapa = stageId ? funil.stages.find((s) => s.id === stageId) : undefined;
+  if (stageId && !etapa) return erro("Etapa não é deste funil.");
 
   let linhas;
   try {
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
   // Uma linha por vez: cada uma é o mesmo upsert da API (com contato).
   for (const linha of linhas) {
     try {
-      const r = await processarLinha(ctx.orgId, "deals", linha, { modo: "upsert", simular: false, pipelineId: funil.id, stageId, ignorarObrigatorios });
+      const r = await processarLinha(ctx.orgId, "deals", linha, { modo: "upsert", simular: false, pipelineId: funil.numero, stageId: etapa?.numero, ignorarObrigatorios });
       cont[r.result] += 1;
     } catch (e) {
       cont.failed += 1;
