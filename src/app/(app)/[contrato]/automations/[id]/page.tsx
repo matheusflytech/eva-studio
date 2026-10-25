@@ -537,7 +537,7 @@ export default function EditorDaAutomacao() {
             ) : selecionado === "config" ? (
               <PainelDeConfiguracoes def={def} config={config} mudar={(c) => setConfig({ ...config, ...c })} opcoes={opcoes} fechar={() => setSelecionado(null)} />
             ) : (
-              <PainelDoPasso def={def} selecionado={selecionado!} aplicar={aplicar} opcoes={opcoes} nomes={nomes} pendencias={pendencias} fechar={() => setSelecionado(null)} />
+              <PainelDoPasso automacaoId={id} def={def} selecionado={selecionado!} aplicar={aplicar} opcoes={opcoes} nomes={nomes} pendencias={pendencias} fechar={() => setSelecionado(null)} />
             )}
           </motion.aside>
         )}

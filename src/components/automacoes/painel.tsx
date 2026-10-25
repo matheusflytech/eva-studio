@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, ArrowDown, ArrowUp, Copy, Plus, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Check, Copy, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -85,6 +85,80 @@ function Pendencias({ lista }: { lista: Pendencia[] }) {
   );
 }
 
+// Token da URL do gatilho Webhook: 128 bits aleatórios (o navegador já tem
+// gerador seguro). Fica no gatilho e vale a partir da próxima publicação.
+const novoToken = () => crypto.randomUUID().replaceAll("-", "");
+
+const EXEMPLO_DO_WEBHOOK: Record<string, string> = {
+  contact: '{ "name": "Ana Souza", "email": "ana@exemplo.com", "phone": "5511999990000", "origem": "landing" }',
+  deal: '{ "email": "ana@exemplo.com", "valor": "1500", "plano": "anual" }',
+  company: '{ "id": "<id da empresa>", "evento": "contrato_assinado" }',
+};
+
+function UrlDoWebhook({ automacaoId, objeto, token, trocar }: { automacaoId: string; objeto: string; token: string | undefined; trocar: () => void }) {
+  const [copiou, setCopiou] = React.useState(false);
+  const [origem, setOrigem] = React.useState("");
+  React.useEffect(() => setOrigem(window.location.origin), []);
+  const url = token && origem ? `${origem}/api/hooks/automations/${automacaoId}/${token}` : null;
+  return (
+    <div className="flex flex-col gap-2 border-t border-border-subtle pt-3">
+      <Label>URL desta automação</Label>
+      {url ? (
+        <>
+          <div className="flex items-center gap-1.5 rounded-xl border border-border-subtle bg-raised px-3 py-2">
+            <code className="min-w-0 flex-1 break-all font-mono text-caption text-text-primary">{url}</code>
+            <IconButton
+              aria-label="Copiar URL"
+              tooltip
+              size="sm"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(url);
+                  setCopiou(true);
+                  setTimeout(() => setCopiou(false), 1500);
+                } catch {
+                  /* sem área de transferência */
+                }
+              }}
+            >
+              {copiou ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+            </IconButton>
+          </div>
+          <p className="text-caption text-text-tertiary">
+            POST com JSON. Exemplo: <code className="break-all font-mono">{EXEMPLO_DO_WEBHOOK[objeto] ?? '{ "id": "..." }'}</code>
+          </p>
+          <p className="text-caption text-text-tertiary">
+            {objeto === "contact"
+              ? "Acha o contato pelo id, e-mail ou telefone; se não existir, cria."
+              : objeto === "deal"
+                ? "Acha o negócio pelo id, ou o negócio aberto do contato pelo e-mail ou telefone."
+                : "Acha a empresa pelo id."}{" "}
+            Cada campo do corpo vira <code className="font-mono">{"{{gatilho.campo}}"}</code> nos passos. Vale depois de publicar e ligar.
+          </p>
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                if (confirm("Trocar a URL? Depois de publicar, a antiga para de funcionar; atualize quem chama.")) trocar();
+              }}
+            >
+              <RotateCcw size={13} /> Trocar URL
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div>
+          <Button type="button" size="sm" variant="secondary" onClick={trocar} disabled={!origem}>
+            Gerar URL
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Apagar({ def, no, aplicar }: { def: Definicao; no: No; aplicar: (op: Operacao) => void }) {
   const saidas = saidasDe(no);
   const [manter, setManter] = React.useState(saidas[0]?.saida ?? "");
@@ -129,6 +203,7 @@ function Apagar({ def, no, aplicar }: { def: Definicao; no: No; aplicar: (op: Op
 }
 
 export function PainelDoPasso({
+  automacaoId,
   def,
   selecionado,
   aplicar,
@@ -136,6 +211,7 @@ export function PainelDoPasso({
   pendencias,
   fechar,
 }: {
+  automacaoId: string;
   def: Definicao;
   selecionado: string;
   aplicar: (op: Operacao) => void;
@@ -161,7 +237,11 @@ export function PainelDoPasso({
               value={def.gatilho?.tipo ?? ""}
               onChange={(e) => {
                 const novo = gatilhoDoTipo(e.target.value);
-                if (novo) aplicar({ op: "definir_gatilho", gatilho: { tipo: novo.tipo, config: configPadrao(novo.campos) } });
+                if (novo)
+                  aplicar({
+                    op: "definir_gatilho",
+                    gatilho: { tipo: novo.tipo, config: { ...configPadrao(novo.campos), ...(novo.modo === "webhook" ? { token: novoToken() } : {}) } },
+                  });
               }}
             >
               <option value="">Escolha...</option>
@@ -170,7 +250,7 @@ export function PainelDoPasso({
               ))}
             </Select>
           </div>
-          {item && def.gatilho && (
+          {item && def.gatilho && item.modo !== "webhook" && (
             <FormularioDoCatalogo
               campos={item.campos}
               config={def.gatilho.config ?? {}}
@@ -178,6 +258,14 @@ export function PainelDoPasso({
               objeto={def.objeto}
               opcoes={opcoes}
               variaveis={variaveisDisponiveis(def.objeto, opcoes, [])}
+            />
+          )}
+          {item?.modo === "webhook" && def.gatilho && (
+            <UrlDoWebhook
+              automacaoId={automacaoId}
+              objeto={def.objeto}
+              token={typeof def.gatilho.config?.token === "string" ? def.gatilho.config.token : undefined}
+              trocar={() => aplicar({ op: "definir_gatilho", gatilho: { tipo: item.tipo, config: { ...(def.gatilho?.config ?? {}), token: novoToken() } } })}
             />
           )}
         </div>
