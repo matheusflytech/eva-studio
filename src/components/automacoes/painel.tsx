@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Plus, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowDown, ArrowUp, Copy, Plus, Trash2, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -10,7 +10,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { acaoDoTipo, configPadrao, EVENTOS_DE_ESPERA, gatilhoDoTipo, gatilhosDoObjeto, NOMES_DOS_OBJETOS, type Nomes } from "@/lib/automacoes/catalogo";
-import { paiDe, type Operacao } from "@/lib/automacoes/operacoes";
+import { paiDe, pontaParaBaixo, pontaParaCima, type Operacao } from "@/lib/automacoes/operacoes";
 import { saidasDe, UNIDADES, type Definicao, type No, type Regra } from "@/lib/automacoes/tipos";
 import type { Pendencia } from "@/lib/automacoes/validar";
 import { camposDeData, FormularioDoCatalogo, variaveisDisponiveis } from "./campos";
@@ -85,12 +85,30 @@ function Pendencias({ lista }: { lista: Pendencia[] }) {
   );
 }
 
-function Apagar({ no, aplicar }: { no: No; aplicar: (op: Operacao) => void }) {
+function Apagar({ def, no, aplicar }: { def: Definicao; no: No; aplicar: (op: Operacao) => void }) {
   const saidas = saidasDe(no);
   const [manter, setManter] = React.useState(saidas[0]?.saida ?? "");
   const variasSaidas = saidas.length > 1;
+  // Subir, descer e duplicar: só ação e espera (uma saída só); o motor
+  // continua sem ciclo nem dois pais.
+  const simples = no.tipo === "acao" || no.tipo === "espera";
+  const cima = simples ? pontaParaCima(def, no.id) : null;
+  const baixo = simples ? pontaParaBaixo(def, no.id) : null;
   return (
     <div className="mt-2 flex flex-col gap-2 border-t border-border-subtle pt-3">
+      {simples && (
+        <div className="flex flex-wrap gap-1">
+          <Button type="button" variant="ghost" size="sm" disabled={!cima} onClick={() => cima && aplicar({ op: "mover", id: no.id, ponta: cima })}>
+            <ArrowUp size={13} /> Subir
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={!baixo} onClick={() => baixo && aplicar({ op: "mover", id: no.id, ponta: baixo })}>
+            <ArrowDown size={13} /> Descer
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => aplicar({ op: "duplicar", id: no.id })}>
+            <Copy size={13} /> Duplicar
+          </Button>
+        </div>
+      )}
       {variasSaidas && (
         <div>
           <Label htmlFor="manter-ramo">Ao apagar, o que continua</Label>
@@ -195,7 +213,7 @@ export function PainelDoPasso({
             <Switch checked={no.erro !== undefined} onCheckedChange={(v) => atualizar({ comErro: v })} />
           </div>
           {item?.falaComCliente && <p className="text-caption text-text-tertiary">Fala com o cliente: respeita quem não aceita mensagens e só sai em horário comercial (seg–sáb, 8h–20h).</p>}
-          <Apagar no={no} aplicar={aplicar} />
+          <Apagar def={def} no={no} aplicar={aplicar} />
         </div>
       </div>
     );
@@ -209,7 +227,7 @@ export function PainelDoPasso({
           <Pendencias lista={doNo} />
           <EditorDeRegra regra={no.regra} mudar={(regra) => atualizar({ regra })} objeto={def.objeto} opcoes={opcoes} />
           {rotulo}
-          <Apagar no={no} aplicar={aplicar} />
+          <Apagar def={def} no={no} aplicar={aplicar} />
         </div>
       </div>
     );
@@ -242,7 +260,7 @@ export function PainelDoPasso({
             </Button>
           </div>
           {rotulo}
-          <Apagar no={no} aplicar={aplicar} />
+          <Apagar def={def} no={no} aplicar={aplicar} />
         </div>
       </div>
     );
@@ -310,7 +328,7 @@ export function PainelDoPasso({
             </>
           )}
           {rotulo}
-          <Apagar no={no} aplicar={aplicar} />
+          <Apagar def={def} no={no} aplicar={aplicar} />
         </div>
       </div>
     );
@@ -344,7 +362,7 @@ export function PainelDoPasso({
             </div>
           </div>
           {rotulo}
-          <Apagar no={no} aplicar={aplicar} />
+          <Apagar def={def} no={no} aplicar={aplicar} />
         </div>
       </div>
     );
@@ -354,7 +372,7 @@ export function PainelDoPasso({
     <div className="flex h-full flex-col">
       <Cabecalho tipo="fim" titulo="Fim" descricao="A execução termina aqui." fechar={fechar} />
       <div className="p-4">
-        <Apagar no={no} aplicar={aplicar} />
+        <Apagar def={def} no={no} aplicar={aplicar} />
       </div>
     </div>
   );

@@ -475,7 +475,16 @@ export default function EditorDaAutomacao() {
             inserir={abrirInsercao}
             inserindo={inserindo}
             estados={estados}
-            barra={{ testar: () => setTesteAberto(true), desfazer, refazer, podeDesfazer: passado.length > 0, podeRefazer: futuro.length > 0 }}
+            barra={{
+              testar: () => setTesteAberto(true),
+              organizar: () => aplicar({ op: "posicionar", posicoes: null }),
+              desfazer,
+              refazer,
+              podeDesfazer: passado.length > 0,
+              podeRefazer: futuro.length > 0,
+            }}
+            posicionar={(noId, x, y) => aplicar({ op: "posicionar", posicoes: { [noId]: { x, y } } })}
+            mover={(noId, ponta) => aplicar({ op: "mover", id: noId, ponta })}
           />
           {/* No canto de cima: o fluxo fica à vista enquanto o teste anda. */}
           <div className="pointer-events-none absolute right-4 top-4 z-20">
