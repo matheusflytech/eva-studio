@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* dark: segue o tema escolhido no app (data-theme), nunca o do sistema operacional. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ===========================================================================
    Design system do Eva Studio — tokens.
 
