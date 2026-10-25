@@ -170,7 +170,7 @@ describe("buscarTudo", () => {
     const ctx = { ...ctxBase, escopo: { negocios: "todos" as const, contatos: "proprios" as const, conversas: "todos" as const } };
     const r = await buscarTudo(ctx, normalizarConsulta("mar"), ["contatos"]);
     expect(r.contatos).toEqual([
-      expect.objectContaining({ id: "c1", conversaId: "cv1", titulo: "Maria", caminho: "/contatos?abrir=c1", subtitulo: expect.stringContaining("m@x.com") }),
+      expect.objectContaining({ id: "c1", conversaId: "cv1", titulo: "Maria", caminho: "/contacts?open=c1", subtitulo: expect.stringContaining("m@x.com") }),
     ]);
     expect(r.modo).toEqual({ semAcento: "translate", similaridade: false });
     const chamada = db.$queryRaw.mock.calls.find(([s]) => ((s as Prisma.Sql).sql ?? "").includes(`FROM "eva_studio_contacts" ct`))!;
@@ -204,7 +204,7 @@ describe("buscarTudo", () => {
     });
     const r = await buscarTudo(ctxBase, normalizarConsulta("proposta"), ["notas", "mensagens"]);
     expect(db.$executeRaw).toHaveBeenCalled();
-    expect(r.notas[0]).toMatchObject({ titulo: "Nota · Negócio Alfa", caminho: "/negocios/d1" });
+    expect(r.notas[0]).toMatchObject({ titulo: "Nota · Negócio Alfa", caminho: "/deals/d1" });
     expect(r.notas[0].trecho.destaques.length).toBe(1);
     expect(r.mensagens).toEqual([]);
     expect(r.avisos).toEqual(["A busca em mensagens demorou demais e foi interrompida."]);

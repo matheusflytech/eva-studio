@@ -27,7 +27,7 @@ import {
 import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { cn } from "@/lib/utils";
 
-// Aba "Cartão do negócio" de /negocios/configurar: o padrão do funil para o
+// Aba "Cartão do negócio" de /deals/configure: o padrão do funil para o
 // cartão do quadro (campos, ações do rodapé, densidade) e para o painel ao clicar
 // (seções e campos de Detalhes), com um cartão de exemplo mudando ao vivo. Cada
 // pessoa pode personalizar por cima no quadro. Só quem configura funil salva.

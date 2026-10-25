@@ -71,7 +71,7 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
           ) : campos.length === 0 ? (
             <p className="text-caption leading-relaxed text-text-tertiary">
               Nenhum campo de contato criado ainda.{" "}
-              <Link href="/negocios/configurar" className="text-accent-fg underline-offset-2 hover:underline">
+              <Link href="/deals/configure" className="text-accent-fg underline-offset-2 hover:underline">
                 Criar campos
               </Link>
             </p>

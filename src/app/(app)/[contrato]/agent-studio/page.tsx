@@ -153,7 +153,7 @@ export default function AgentStudioPage() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/conversas">
+                <Link href="/conversations">
                   <MessageSquare aria-hidden="true" /> Conversas esperando atendente
                   {resumo && resumo.aguardandoHumano > 0 && (
                     <span className="ml-auto font-mono text-caption tabular-nums text-danger">{resumo.aguardandoHumano}</span>

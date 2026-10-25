@@ -141,7 +141,7 @@ export default function InsightsPage() {
               alerta={(v?.escalaram ?? 0) > 0}
               apoio={
                 (v?.escalaram ?? 0) > 0 ? (
-                  <Link href="/conversas" className="inline-flex items-center gap-1 font-sans text-small font-medium text-accent-fg hover:underline">
+                  <Link href="/conversations" className="inline-flex items-center gap-1 font-sans text-small font-medium text-accent-fg hover:underline">
                     Abrir conversas <ArrowRight size={13} aria-hidden="true" />
                   </Link>
                 ) : undefined

@@ -18,10 +18,10 @@ import {
 } from "./estado-da-lista";
 
 const BARRA: FiltroDaBarra[] = [
-  { campo: "responsavel", rotulo: "Proprietário", param: "dono", tipo: "lista" },
+  { campo: "responsavel", rotulo: "Proprietário", param: "owner", tipo: "lista" },
   { campo: "empresa", rotulo: "Empresas", param: "empresa", tipo: "lista" },
-  { campo: "criadoEm", rotulo: "Criado em", param: "criado", tipo: "data" },
-  { campo: "ultimaAtividade", rotulo: "Última atividade", param: "atividade", tipo: "data" },
+  { campo: "criadoEm", rotulo: "Criado em", param: "created", tipo: "data" },
+  { campo: "ultimaAtividade", rotulo: "Última atividade", param: "activity", tipo: "data" },
 ];
 const PADRAO = { visao: "todos", tamanho: 25 };
 const HOJE = "2026-10-19";
@@ -108,9 +108,9 @@ describe("estado na URL", () => {
       tamanho: 50,
     });
     const sp = estadoParaUrl(e, BARRA, PADRAO);
-    expect(sp.get("dono")).toBe(`u1,${SEM_VALOR}`);
-    expect(sp.get("criado")).toBe("30d");
-    expect(sp.get("ordem")).toBe("nome:asc");
+    expect(sp.get("owner")).toBe(`u1,${SEM_VALOR}`);
+    expect(sp.get("created")).toBe("30d");
+    expect(sp.get("sort")).toBe("nome:asc");
     expect(lerEstadoDaUrl(new URLSearchParams(sp.toString()), BARRA, PADRAO)).toEqual(e);
   });
 
@@ -119,7 +119,7 @@ describe("estado na URL", () => {
   });
 
   it("parâmetro inválido vira padrão, sem lançar", () => {
-    const sp = new URLSearchParams("v=outra&p=-3&pp=33&ordem=nome;drop&av={quebrado&criado=ontem&dono=,,");
+    const sp = new URLSearchParams("v=outra&p=-3&pp=33&sort=nome;drop&av={quebrado&created=ontem&owner=,,");
     expect(lerEstadoDaUrl(sp, BARRA, PADRAO, ["todos", "meus"])).toEqual(estado());
   });
 });

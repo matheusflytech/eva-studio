@@ -77,7 +77,7 @@ export function LinhaDeTarefa({
           {tarefa.deal && (
             <>
               <span aria-hidden="true">·</span>
-              <Link href={`/negocios/${tarefa.deal.id}`} className="truncate hover:text-accent-fg hover:underline">
+              <Link href={`/deals/${tarefa.deal.id}`} className="truncate hover:text-accent-fg hover:underline">
                 {tarefa.deal.name}
               </Link>
             </>
@@ -85,7 +85,7 @@ export function LinhaDeTarefa({
           {tarefa.contact && (
             <>
               <span aria-hidden="true">·</span>
-              <Link href={`/contatos?abrir=${tarefa.contact.id}`} className="truncate hover:text-accent-fg hover:underline">
+              <Link href={`/contacts?open=${tarefa.contact.id}`} className="truncate hover:text-accent-fg hover:underline">
                 {tarefa.contact.name || tarefa.contact.phone}
               </Link>
             </>

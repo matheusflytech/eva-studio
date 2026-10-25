@@ -36,7 +36,7 @@ interface Ficha {
 type AbaDaPagina = "resumo" | "atividade" | "dados";
 
 // ---------------------------------------------------------------------------
-// Página completa do contato (/contatos/<id>), no mesmo espírito da ficha da
+// Página completa do contato (/contacts/<id>), no mesmo espírito da ficha da
 // lista: foto grande, nome, cargo · empresa, etiquetas e quatro botões
 // redondos (WhatsApp em destaque). Abaixo, três abas: Resumo (dados em
 // blocos, tarefas, negócios, conversas e réguas), Atividade (nota + linha do
@@ -119,7 +119,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
       tipo: "contato",
       id: contato.id,
       titulo: contato.name || contato.phone || contato.email || "Contato sem nome",
-      caminho: `/contatos/${contato.id}`,
+      caminho: `/contacts/${contato.id}`,
       subtitulo: [contato.phone, contato.email].filter(Boolean).join(" · "),
       whatsapp: { nome: contato.name || "o contato", telefone: contato.phone },
       tarefa: { contactId: contato.id },
@@ -135,9 +135,9 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
       url: `/api/contacts/${contato.id}`,
       titulo: "Contato apagado",
       perguntaSemLixeira: `A lixeira ainda não está ativada: apagar ${nomeDoContato(contato)} leva junto tarefas, notas e etiquetas e não tem volta. Apagar mesmo assim?`,
-      aoRestaurar: () => router.push(`/contatos/${contato.id}`),
+      aoRestaurar: () => router.push(`/contacts/${contato.id}`),
     });
-    if (r.ok) router.push("/contatos");
+    if (r.ok) router.push("/contacts");
     else if (r.erro) setErro(r.erro);
   }
 
@@ -196,7 +196,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
     <div className="flex flex-col gap-5 px-4 pb-8 pt-2 lg:px-6">
       <div className="flex items-center gap-2">
         <nav aria-label="Caminho" className="flex min-w-0 items-center gap-1 text-small">
-          <Link href="/contatos" className={cn("rounded-full px-1 text-text-secondary hover:text-text-primary", focusRing)}>
+          <Link href="/contacts" className={cn("rounded-full px-1 text-text-secondary hover:text-text-primary", focusRing)}>
             Contatos
           </Link>
           <ChevronRight size={14} aria-hidden className="shrink-0 text-text-tertiary" />
@@ -233,7 +233,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
             <p className="truncate text-small text-text-tertiary">
               {contato.jobTitle && <>{contato.jobTitle} · </>}
               {contato.company ? (
-                <Link href={`/empresas/${contato.company.id}`} className="text-accent-fg hover:underline">
+                <Link href={`/companies/${contato.company.id}`} className="text-accent-fg hover:underline">
                   {contato.company.name}
                 </Link>
               ) : (
@@ -369,7 +369,7 @@ function AcaoRedonda({
 
 function VoltarParaContatos() {
   return (
-    <Link href="/contatos" className={cn("inline-flex h-9 items-center gap-2 rounded-full px-4 text-body font-medium text-text-secondary hover:bg-hover hover:text-text-primary", focusRing)}>
+    <Link href="/contacts" className={cn("inline-flex h-9 items-center gap-2 rounded-full px-4 text-body font-medium text-text-secondary hover:bg-hover hover:text-text-primary", focusRing)}>
       <ArrowLeft size={15} aria-hidden /> Contatos
     </Link>
   );

@@ -91,9 +91,9 @@ function consulta(f: Filtros, cursor?: string | null): string {
 }
 
 const LINK_DO_REGISTRO: Partial<Record<string, (id: string) => string>> = {
-  deal: (id) => `/negocios/${id}`,
-  contact: (id) => `/contatos/${id}`,
-  company: (id) => `/empresas/${id}`,
+  deal: (id) => `/deals/${id}`,
+  contact: (id) => `/contacts/${id}`,
+  company: (id) => `/companies/${id}`,
 };
 
 // Configurações → Auditoria: tudo o que foi feito no contrato, de quem, mais

@@ -25,7 +25,7 @@ import { AGENT_LANGUAGES } from "@/lib/data/types";
 import { CHANNELS } from "@/lib/data/channels";
 import type { Agent, AgentVariable, KnowledgeDoc } from "@/lib/data/types";
 
-export type AbaDoAgente = "resumo" | "comportamento" | "canais" | "avancado";
+export type AbaDoAgente = "overview" | "behavior" | "channels" | "advanced";
 
 /*
  * "Canal principal", "Habilidades" e "Ferramentas do n8n" ficam escondidos:
@@ -116,11 +116,11 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
   }
 
   // Canais se salvam sozinhos, cada um no seu cartão: botão Salvar ali só confundiria.
-  const mostrarBarra = !aba || aba === "comportamento" || aba === "avancado";
+  const mostrarBarra = !aba || aba === "behavior" || aba === "advanced";
 
   return (
     <form onSubmit={handleSubmit} className={aba ? "flex flex-col gap-5 pb-10" : "mx-auto flex max-w-2xl flex-col gap-5 pb-10"}>
-      <Secao id="comportamento" aba={aba}>
+      <Secao id="behavior" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle>Quem é este agente</CardTitle>
@@ -182,7 +182,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Card>
       </Secao>
 
-      <Secao id="comportamento" aba={aba}>
+      <Secao id="behavior" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle>O que ele deve fazer</CardTitle>
@@ -215,7 +215,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Card>
       </Secao>
 
-      <Secao id="comportamento" aba={aba}>
+      <Secao id="behavior" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle>Base de conhecimento</CardTitle>
@@ -230,14 +230,14 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       </Secao>
 
       {isEdit && (
-        <Secao id="comportamento" aba={aba}>
+        <Secao id="behavior" aba={aba}>
           <SemanticSearchConfig agentId={agentId} />
         </Secao>
       )}
 
       {MOSTRAR_CAMPOS_DECORATIVOS && (
       <>
-      <Secao id="avancado" aba={aba}>
+      <Secao id="advanced" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle>Habilidades</CardTitle>
@@ -249,7 +249,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Card>
       </Secao>
 
-      <Secao id="avancado" aba={aba}>
+      <Secao id="advanced" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -265,7 +265,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       </>
       )}
 
-      <Secao id="avancado" aba={aba}>
+      <Secao id="advanced" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle>Variáveis</CardTitle>
@@ -275,7 +275,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
         </Card>
       </Secao>
 
-      <Secao id="avancado" aba={aba}>
+      <Secao id="advanced" aba={aba}>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -293,13 +293,13 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
 
       {/* Canais são do contrato (Configurações → Canais); aqui o agente escolhe por onde atende. */}
       {isEdit && (
-        <Secao id="canais" aba={aba}>
+        <Secao id="channels" aba={aba}>
           <CanaisDoAgente agentId={agentId} agentNome={agent?.name ?? name} />
         </Secao>
       )}
 
       {isEdit && (
-        <Secao id="canais" aba={aba}>
+        <Secao id="channels" aba={aba}>
           <Card>
             <CardHeader>
               <CardTitle>Chat no seu site</CardTitle>
@@ -311,7 +311,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       )}
 
       {isEdit && (
-        <Secao id="canais" aba={aba}>
+        <Secao id="channels" aba={aba}>
           <Card>
             <CardHeader>
               <CardTitle>Modelos de mensagem</CardTitle>
@@ -323,7 +323,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       )}
 
       {isEdit && (
-        <Secao id="canais" aba={aba}>
+        <Secao id="channels" aba={aba}>
           <Card>
             <CardHeader>
               <CardTitle>Gatilhos</CardTitle>
@@ -337,7 +337,7 @@ export function AgentForm({ agent, aba }: { agent?: Agent; aba?: AbaDoAgente }) 
       )}
 
       {isEdit && (
-        <Secao id="canais" aba={aba}>
+        <Secao id="channels" aba={aba}>
           <Card>
             <CardHeader>
               <CardTitle>Respostas automáticas a comentários (Instagram)</CardTitle>

@@ -140,7 +140,7 @@ function SemAcesso({ padrao }: { padrao: string | null }) {
           contrato.
         </p>
         <NextLink
-          href={padrao ? `/${idCurto(padrao)}/inicio` : "/ir"}
+          href={padrao ? `/${idCurto(padrao)}/home` : "/go"}
           className={buttonVariants({ size: "md", className: "mt-5" })}
         >
           Ir para o meu contrato

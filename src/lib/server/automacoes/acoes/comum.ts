@@ -45,10 +45,10 @@ export function lerJson(texto: unknown, padrao: unknown = {}): { ok: true; valor
 }
 
 const LINKS: Record<string, (id: string) => string> = {
-  deal: (id) => `/negocios/${id}`,
-  contact: (id) => `/contatos/${id}`,
-  company: (id) => `/empresas/${id}`,
-  task: () => "/tarefas",
-  conversation: () => "/conversas",
+  deal: (id) => `/deals/${id}`,
+  contact: (id) => `/contacts/${id}`,
+  company: (id) => `/companies/${id}`,
+  task: () => "/tasks",
+  conversation: () => "/conversations",
 };
 export const linkDoRegistro = (objeto: string, id: string) => LINKS[objeto]?.(id) ?? null;

@@ -44,7 +44,7 @@ export interface DadosDoFunil {
   funil?: { id: string; name: string } | null;
 }
 
-/** Filtros extras do Dashboard. O /negocios não passa nenhum. */
+/** Filtros extras do Dashboard. O /deals não passa nenhum. */
 export interface FiltrosDoFunil {
   /** Responsáveis; "__nenhum" = sem responsável. */
   donos?: string[];

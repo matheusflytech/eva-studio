@@ -22,7 +22,7 @@ import { useMudancaDeEtapa, type EtapaDoMovimento } from "@/components/crm/negoc
 import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/registro-em-foco";
 
 /**
- * Ficha completa do negócio, com endereço próprio (/negocios/<id>) para
+ * Ficha completa do negócio, com endereço próprio (/deals/<id>) para
  * mandar o link a alguém. A prévia do kanban continua para o ajuste rápido;
  * aqui é onde se lê a história inteira.
  *
@@ -70,7 +70,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
       tipo: "negocio",
       id: deal.id,
       titulo: deal.name || "Negócio sem nome",
-      caminho: `/negocios/${deal.id}`,
+      caminho: `/deals/${deal.id}`,
       subtitulo: [deal.company?.name, deal.stage.name].filter(Boolean).join(" · "),
       etapas: deal.pipeline.stages.map((s) => ({ id: s.id, nome: s.name, tipo: s.type })),
       etapaAtualId: deal.stageId,
@@ -100,7 +100,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         title="Negócio não encontrado"
         description="Ele pode ter sido apagado, ou o link é de outra organização."
         action={
-          <Link href="/negocios" className={buttonVariants({ variant: "primary" })}>
+          <Link href="/deals" className={buttonVariants({ variant: "primary" })}>
             <ArrowLeft size={15} aria-hidden /> Voltar para Negócios
           </Link>
         }
@@ -116,7 +116,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
         description="Verifique a conexão e tente de novo."
         action={
           <div className="flex gap-2">
-            <Link href="/negocios" className={buttonVariants({ variant: "ghost" })}>
+            <Link href="/deals" className={buttonVariants({ variant: "ghost" })}>
               <ArrowLeft size={15} aria-hidden /> Negócios
             </Link>
             <Button onClick={() => carregar()}>

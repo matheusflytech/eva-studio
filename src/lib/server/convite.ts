@@ -45,7 +45,7 @@ const clientePublico = () =>
 /** Manda o link pelo e-mail de "redefinir senha" do Supabase, o mesmo envio do convite de conta nova. */
 export async function enviarLinkDoConvite(email: string, orgId: string, userId: string, origem: string): Promise<string | null> {
   const t = criarTokenDeConvite(orgId, userId);
-  const { error } = await clientePublico().auth.resetPasswordForEmail(email, { redirectTo: `${origem}/convite?t=${encodeURIComponent(t)}` });
+  const { error } = await clientePublico().auth.resetPasswordForEmail(email, { redirectTo: `${origem}/invite?t=${encodeURIComponent(t)}` });
   return error ? error.message : null;
 }
 

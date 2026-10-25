@@ -45,7 +45,7 @@ export function CartaoLateral({
           <span className={rotulo}>Empresa</span>
           {deal.company ? (
             <Link
-              href={`/empresas/${deal.company.id}`}
+              href={`/companies/${deal.company.id}`}
               className="flex min-w-0 items-center gap-2 rounded-md text-body font-semibold text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Avatar name={deal.company.name} className="rounded-md" />

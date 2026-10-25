@@ -12,7 +12,7 @@ export interface Recente {
   tipo: TipoDeRecente;
   id: string;
   titulo: string;
-  /** Caminho de tela SEM o contrato (/negocios/1, /contatos?abrir=2). */
+  /** Caminho de tela SEM o contrato (/deals/1, /contacts?open=2; os antigos, em português, o proxy traduz). */
   caminho: string;
   subtitulo?: string;
 }

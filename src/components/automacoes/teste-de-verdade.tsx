@@ -48,7 +48,7 @@ function guardar(chave: string, valor: string) {
 }
 
 const caminhoDoRegistro = (objeto: Definicao["objeto"], id: string) =>
-  objeto === "deal" ? `/negocios/${id}` : objeto === "contact" ? `/contatos?abrir=${id}` : objeto === "company" ? `/empresas/${id}` : objeto === "task" ? "/tarefas" : "/conversas";
+  objeto === "deal" ? `/deals/${id}` : objeto === "contact" ? `/contacts?open=${id}` : objeto === "company" ? `/companies/${id}` : objeto === "task" ? "/tasks" : "/conversations";
 
 export function TesteDeVerdade({
   automacaoId,

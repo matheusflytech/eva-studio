@@ -292,7 +292,7 @@ export function ContactActivity({
           {data.conversations.map((c) => (
             <Link
               key={c.id}
-              href={`/conversas?c=${c.id}`}
+              href={`/conversations?c=${c.id}`}
               className={cn(bloco, "group flex min-h-11 items-center gap-2.5 py-2 transition-colors duration-120 hover:bg-hover", focusRing)}
             >
               {marcaDoCanal(c.channel) ? (

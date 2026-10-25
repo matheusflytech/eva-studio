@@ -140,7 +140,7 @@ describe("pessoas", () => {
     db.aviso.createMany.mockResolvedValue({ count: 1 });
     const r = await rodar("team.notify", { mensagem: "Olhar o negócio", email: true }, ctx({ teste: true }));
     expect(r).toMatchObject({ ok: true, saida: { avisados: ["u1"], no_app: 1, emails: [] } });
-    expect(db.aviso.createMany.mock.calls[0][0].data[0]).toMatchObject({ userId: "u1", titulo: "Automação: Proposta parada", link: "/negocios/d1" });
+    expect(db.aviso.createMany.mock.calls[0][0].data[0]).toMatchObject({ userId: "u1", titulo: "Automação: Proposta parada", link: "/deals/d1" });
     expect(email.enviarEmailDoContrato).not.toHaveBeenCalled();
   });
 

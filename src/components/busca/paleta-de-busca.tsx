@@ -230,9 +230,9 @@ export function BuscaGlobal({ children }: { children: React.ReactNode }) {
     switch (acao) {
       case "criar-negocio":
         // Carimbo novo a cada pedido: a tela abre o "novo negócio" uma vez por carimbo.
-        return ir(`/negocios?novo=${Date.now()}`);
+        return ir(`/deals?new=${Date.now()}`);
       case "criar-contato":
-        return ir(`/contatos?novo=${Date.now()}`);
+        return ir(`/contacts?new=${Date.now()}`);
       case "criar-tarefa":
         setTarefaDoRegistro(doRegistro);
         return trocarModo("tarefa");

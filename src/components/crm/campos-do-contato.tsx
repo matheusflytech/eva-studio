@@ -71,7 +71,7 @@ export function CamposDoContato({
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <Label className="mb-0">Dados do contato</Label>
-          <Link href="/negocios/configurar" className="inline-flex items-center gap-1 text-caption text-text-tertiary hover:text-text-primary">
+          <Link href="/deals/configure" className="inline-flex items-center gap-1 text-caption text-text-tertiary hover:text-text-primary">
             <SlidersHorizontal size={12} /> Personalizar
           </Link>
         </div>

@@ -144,7 +144,7 @@ describe("cartão v4", () => {
   it("ações: WhatsApp só com conversa, ligar só com telefone; tarefa e nota sempre", () => {
     const todas = ["whatsapp", "ligar", "tarefa", "nota"] as const;
     expect(acoesDisponiveis(negocio(), [...todas])).toEqual([
-      { acao: "whatsapp", href: "/conversas?c=cv1" },
+      { acao: "whatsapp", href: "/conversations?c=cv1" },
       { acao: "ligar", href: "tel:+5511987654321" },
       { acao: "tarefa" },
       { acao: "nota" },

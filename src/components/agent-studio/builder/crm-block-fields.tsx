@@ -144,7 +144,7 @@ function MapaDeCampos({
     return (
       <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-tertiary">
         Você ainda não criou campos {entidade === "deal" ? "do negócio" : "do contato"}.{" "}
-        <Link href="/negocios/configurar" className="text-accent-fg hover:underline">Criar campos</Link> para o agente poder preenchê-los.
+        <Link href="/deals/configure" className="text-accent-fg hover:underline">Criar campos</Link> para o agente poder preenchê-los.
       </p>
     );
   }
@@ -426,7 +426,7 @@ export function CrmBlockFields({
           {tags.length === 0 && (
             <p className="mt-1.5 inline-flex items-center gap-1 text-caption text-text-tertiary">
               Nenhuma etiqueta ainda. Crie em{" "}
-              <Link href="/contatos" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
+              <Link href="/contacts" className="inline-flex items-center gap-1 text-accent-fg hover:underline">
                 Contatos <ExternalLink size={11} />
               </Link>
             </p>

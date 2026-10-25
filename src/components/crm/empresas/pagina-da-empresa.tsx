@@ -58,7 +58,7 @@ interface Payload {
 type AbaDaPagina = "resumo" | "pessoas" | "negocios" | "dados";
 
 // ---------------------------------------------------------------------------
-// Página da empresa (/empresas/<id>), irmã da página do contato: caminho
+// Página da empresa (/companies/<id>), irmã da página do contato: caminho
 // "Empresas › Nome" com o "…" (copiar link, apagar), logo grande, nome que se
 // edita no lugar, setor · cidade, botões redondos (site, ligar, LinkedIn).
 // Embaixo, três números da conta (em conta B2B se pergunta quanto está
@@ -155,7 +155,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
             tipo: "empresa",
             id: empresa.id,
             titulo: empresa.name || "Empresa sem nome",
-            caminho: `/empresas/${empresa.id}`,
+            caminho: `/companies/${empresa.id}`,
             subtitulo: subtituloDaEmpresa(empresa),
           }
         : null,
@@ -171,9 +171,9 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
       url: `/api/companies/${companyId}`,
       titulo: "Empresa apagada",
       perguntaSemLixeira: "A lixeira ainda não está ativada: apagar esta empresa não tem volta (contatos e negócios continuam, sem empresa). Apagar mesmo assim?",
-      aoRestaurar: () => router.push(`/empresas/${companyId}`),
+      aoRestaurar: () => router.push(`/companies/${companyId}`),
     });
-    if (r.ok) router.push("/empresas");
+    if (r.ok) router.push("/companies");
     else if (r.erro) setErro(r.erro);
   }
 
@@ -260,7 +260,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
     <div className="flex flex-col gap-5 px-4 pb-8 pt-1 lg:px-6">
       <div className="flex items-center gap-2">
         <nav aria-label="Caminho" className="flex min-w-0 items-center gap-1 text-small">
-          <Link href="/empresas" className={cn("rounded-full px-1 text-text-secondary hover:text-text-primary", focusRing)}>
+          <Link href="/companies" className={cn("rounded-full px-1 text-text-secondary hover:text-text-primary", focusRing)}>
             Empresas
           </Link>
           <ChevronRight size={14} aria-hidden className="shrink-0 text-text-tertiary" />
@@ -411,7 +411,7 @@ export function PaginaDaEmpresa({ companyId }: { companyId: string }) {
               {contacts.map((c) => (
                 <li key={c.id} className="flex h-14.5 items-center gap-3 border-b border-border-subtle px-2 last:border-b-0">
                   <FotoDaPessoa nome={c.name || "Sem nome"} semente={c.id} tamanho="md" />
-                  <Link href={`/contatos/${c.id}`} className={cn("min-w-0 flex-1 rounded-lg", focusRing)}>
+                  <Link href={`/contacts/${c.id}`} className={cn("min-w-0 flex-1 rounded-lg", focusRing)}>
                     <span className="block truncate text-body font-medium text-text-primary hover:underline">{c.name || "Sem nome"}</span>
                     <span className="block truncate text-caption text-text-tertiary">
                       {[c.jobTitle, c.email || c.phone].filter(Boolean).join(" · ") || "—"}
@@ -542,7 +542,7 @@ function Campo({
 function VoltarParaEmpresas() {
   return (
     <Link
-      href="/empresas"
+      href="/companies"
       className={cn("inline-flex h-8 items-center gap-2 rounded-full px-3.5 text-small font-medium text-text-secondary hover:bg-hover hover:text-text-primary", focusRing)}
     >
       <ArrowLeft size={14} aria-hidden /> Empresas

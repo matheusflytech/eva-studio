@@ -7,7 +7,7 @@ import { rotaDoContrato } from "@/lib/contrato/rotas";
 
 /**
  * O Link do Next com o contrato da URL na frente de caminhos de tela
- * (href="/negocios" vira "/<contrato>/negocios"). Links externos, /api,
+ * (href="/deals" vira "/<contrato>/deals"). Links externos, /api,
  * /login etc. passam intactos. Ver src/lib/contrato/rotas.ts.
  */
 export default function Link({ href, ...rest }: React.ComponentProps<typeof NextLink>) {

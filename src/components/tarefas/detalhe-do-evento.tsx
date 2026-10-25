@@ -54,8 +54,8 @@ export function DetalheDoEvento({
     if (e.negocio.empresa) linhas.push({ rotulo: "Empresa", valor: e.negocio.empresa });
   }
   if (t) {
-    if (t.deal) linhas.push({ rotulo: "Negócio", valor: <Link href={`/negocios/${t.deal.id}`} className="font-medium text-accent-fg hover:underline">{t.deal.name}</Link> });
-    if (t.contact) linhas.push({ rotulo: "Contato", valor: <Link href={`/contatos/${t.contact.id}`} className="font-medium text-accent-fg hover:underline">{t.contact.name}</Link> });
+    if (t.deal) linhas.push({ rotulo: "Negócio", valor: <Link href={`/deals/${t.deal.id}`} className="font-medium text-accent-fg hover:underline">{t.deal.name}</Link> });
+    if (t.contact) linhas.push({ rotulo: "Contato", valor: <Link href={`/contacts/${t.contact.id}`} className="font-medium text-accent-fg hover:underline">{t.contact.name}</Link> });
     if (t.assignedTo) linhas.push({ rotulo: "Responsável", valor: t.assignedTo.name });
   }
 
@@ -121,7 +121,7 @@ export function DetalheDoEvento({
           </Button>
         )}
         {negocio && (
-          <Link href={`/negocios/${negocio.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+          <Link href={`/deals/${negocio.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
             <SquareArrowOutUpRight size={14} aria-hidden="true" /> Abrir negócio
           </Link>
         )}

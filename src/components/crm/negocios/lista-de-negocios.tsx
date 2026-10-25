@@ -109,7 +109,7 @@ export function ListaDeNegocios({
           width: "260px",
           cell: (d) => (
             <Link
-              href={`/negocios/${d.id}`}
+              href={`/deals/${d.id}`}
               onClick={(e) => e.stopPropagation()}
               className="block truncate font-medium text-text-primary hover:text-accent-fg hover:underline"
             >

@@ -254,11 +254,11 @@ function ItemDaLinha({ item, destacado }: { item: ItemDaLinhaDoTempo; destacado:
         <div className="flex items-baseline justify-between gap-3">
           <p className={cn("min-w-0 truncate text-small font-semibold", destacado ? "text-inverse-fg" : "text-text-primary")}>
             {item.tipo === "conversa" ? (
-              <Link href={`/conversas?c=${item.conversaId}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
+              <Link href={`/conversations?c=${item.conversaId}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
                 {titulo}
               </Link>
             ) : (item.tipo === "criado" || item.tipo === "etapa") && item.negocio ? (
-              <Link href={`/negocios/${item.negocio.id}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
+              <Link href={`/deals/${item.negocio.id}`} className="rounded outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
                 {titulo}
               </Link>
             ) : (

@@ -46,7 +46,7 @@ export const linkDeLigar = (telefone: string) => `tel:${telefone.replace(/[^\d+]
  * Topo: foto, nome, cargo · empresa, botões redondos e etiquetas. Abaixo:
  * Resumo (dados em blocos, tarefas, negócios), Atividade (notas, conversas,
  * sequências) e Dados (os campos que salvam ao sair). A história inteira
- * fica na página completa (/contatos/<id>).
+ * fica na página completa (/contacts/<id>).
  */
 export function FichaDoContato({
   contact,
@@ -73,7 +73,7 @@ export function FichaDoContato({
       tipo: "contato",
       id: contact.id,
       titulo: contact.name || contact.phone || contact.email || "Contato sem nome",
-      caminho: `/contatos/${contact.id}`,
+      caminho: `/contacts/${contact.id}`,
       subtitulo: [contact.phone, contact.email].filter(Boolean).join(" · "),
       whatsapp: { nome: contact.name || "o contato", telefone: contact.phone },
       tarefa: { contactId: contact.id },
@@ -152,7 +152,7 @@ export function FichaDoContato({
 function AbrirPaginaCompleta({ id }: { id: string }) {
   return (
     <Link
-      href={`/contatos/${id}`}
+      href={`/contacts/${id}`}
       className={cn("inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-small font-medium text-accent-fg hover:bg-hover", focusRing)}
     >
       <Maximize2 size={13} aria-hidden /> Abrir página completa

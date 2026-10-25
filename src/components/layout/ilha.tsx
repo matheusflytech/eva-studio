@@ -86,7 +86,7 @@ export function Ilha({ className }: { className?: string }) {
       abrir({
         titulo: dados.esperando - antes === 1 ? "Uma pessoa quer falar com a equipe" : `${dados.esperando - antes} pessoas querem falar com a equipe`,
         detalhe: "O agente passou a conversa",
-        acao: { rotulo: "Atender", href: "/conversas" },
+        acao: { rotulo: "Atender", href: "/conversations" },
       });
     }
     anterior.current = dados.esperando;

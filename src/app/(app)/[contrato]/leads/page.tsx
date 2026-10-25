@@ -382,7 +382,7 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
             <p className="truncate text-body font-semibold text-text-primary">{name}</p>
             <p className="truncate text-caption text-text-tertiary">
               {lead.agentName ? `${lead.agentName} · ` : ""}lead {formatRelativeDate(lead.createdAt)} ·{" "}
-              <Link href={`/contatos?abrir=${lead.id}`} className="text-accent-fg hover:underline">
+              <Link href={`/contacts?open=${lead.id}`} className="text-accent-fg hover:underline">
                 Abrir ficha
               </Link>
             </p>

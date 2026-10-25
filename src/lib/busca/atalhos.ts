@@ -19,10 +19,10 @@ export const ESPERA_DO_G = 1500;
 
 export const IR_PARA_COM_G: Record<string, { caminho: string; rotulo: string }> = {
   d: { caminho: "/dashboard", rotulo: "Dashboard" },
-  n: { caminho: "/negocios", rotulo: "Negócios" },
-  c: { caminho: "/contatos", rotulo: "Contatos" },
-  e: { caminho: "/empresas", rotulo: "Empresas" },
-  t: { caminho: "/tarefas", rotulo: "Tarefas" },
+  n: { caminho: "/deals", rotulo: "Negócios" },
+  c: { caminho: "/contacts", rotulo: "Contatos" },
+  e: { caminho: "/companies", rotulo: "Empresas" },
+  t: { caminho: "/tasks", rotulo: "Tarefas" },
 };
 
 export interface Tecla {

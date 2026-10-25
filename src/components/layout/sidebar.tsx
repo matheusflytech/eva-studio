@@ -56,11 +56,11 @@ const NAV_PRINCIPAL: NavGroup[] = [
   {
     label: null,
     items: [
-      { href: "/inicio", label: "Início", icon: Home },
-      { href: "/conversas", label: "Conversas", icon: MessageSquare },
-      { href: "/negocios", label: "Negócios", icon: Handshake },
-      { href: "/contatos", label: "Contatos", icon: Contact },
-      { href: "/tarefas", label: "Tarefas", icon: CheckSquare },
+      { href: "/home", label: "Início", icon: Home },
+      { href: "/conversations", label: "Conversas", icon: MessageSquare },
+      { href: "/deals", label: "Negócios", icon: Handshake },
+      { href: "/contacts", label: "Contatos", icon: Contact },
+      { href: "/tasks", label: "Tarefas", icon: CheckSquare },
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/agent-studio", label: "Agentes de IA", icon: Aperture, animated: true },
     ],
@@ -71,17 +71,17 @@ const NAV_AVANCADO: NavGroup[] = [
   {
     label: "Automação",
     items: [
-      { href: "/automacoes", label: "Automações", icon: Workflow },
-      { href: "/sequencias", label: "Sequências", icon: Repeat },
-      { href: "/disparos", label: "Disparos", icon: Send },
-      { href: "/aprovacoes", label: "Aprovações", icon: CheckCheck },
-      { href: "/biblioteca", label: "Biblioteca", icon: BookOpen },
+      { href: "/automations", label: "Automações", icon: Workflow },
+      { href: "/sequences", label: "Sequências", icon: Repeat },
+      { href: "/broadcasts", label: "Disparos", icon: Send },
+      { href: "/approvals", label: "Aprovações", icon: CheckCheck },
+      { href: "/library", label: "Biblioteca", icon: BookOpen },
     ],
   },
   {
     label: "Dados",
     items: [
-      { href: "/empresas", label: "Empresas", icon: Building2 },
+      { href: "/companies", label: "Empresas", icon: Building2 },
       { href: "/leads", label: "Leads", icon: Users },
       { href: "/insights", label: "Insights", icon: Zap },
     ],
@@ -89,7 +89,7 @@ const NAV_AVANCADO: NavGroup[] = [
   {
     label: "Ferramentas",
     items: [
-      { href: "/integracoes", label: "Integrações", icon: Plug },
+      { href: "/integrations", label: "Integrações", icon: Plug },
       { href: "/playground", label: "Playground", icon: PlayCircle },
     ],
   },
@@ -175,7 +175,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
     >
       <div className="mb-1 flex items-center justify-between px-1 pb-2">
         {!collapsed && (
-          <Link href="/inicio" className="flex items-center gap-2">
+          <Link href="/home" className="flex items-center gap-2">
             <MarcaEva size={20} className="text-text-primary" />
             <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
           </Link>
@@ -199,7 +199,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               <SidebarNavItem
                 key={item.href}
                 {...item}
-                badge={item.href === "/conversas" && naoLidas > 0 ? (naoLidas > 99 ? "99+" : String(naoLidas)) : item.badge}
+                badge={item.href === "/conversations" && naoLidas > 0 ? (naoLidas > 99 ? "99+" : String(naoLidas)) : item.badge}
                 collapsed={collapsed}
               />
             ))}

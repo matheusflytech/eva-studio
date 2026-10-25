@@ -43,7 +43,7 @@ export function baseDoApp(): string {
 }
 
 /** Página que a pessoa vê (rodapé do e-mail). */
-export const linkDaPaginaDeDescadastro = (token: string) => `${baseDoApp()}/descadastro?t=${encodeURIComponent(token)}`;
+export const linkDaPaginaDeDescadastro = (token: string) => `${baseDoApp()}/unsubscribe?t=${encodeURIComponent(token)}`;
 
 /** Endereço do descadastro em um clique (List-Unsubscribe-Post, RFC 8058). */
 export const linkDoDescadastroDireto = (token: string) => `${baseDoApp()}/api/email/descadastro?t=${encodeURIComponent(token)}`;

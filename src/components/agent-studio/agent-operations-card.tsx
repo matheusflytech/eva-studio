@@ -66,7 +66,7 @@ function proximoPasso(agent: AgentOverview): ProximoPasso {
         agent.aguardandoHumano === 1
           ? "Uma pessoa esperando atendimento"
           : `${agent.aguardandoHumano} pessoas esperando atendimento`,
-      href: "/conversas",
+      href: "/conversations",
       tom: "urgente",
       icone: <UserCheck size={13} aria-hidden="true" />,
     };
@@ -98,7 +98,7 @@ function proximoPasso(agent: AgentOverview): ProximoPasso {
   if (agent.canais.length === 0) {
     return {
       texto: "Conecte um canal",
-      href: `/agent-studio/${agent.id}?aba=canais`,
+      href: `/agent-studio/${agent.id}?tab=channels`,
       tom: "atencao",
       icone: <PlugZap size={13} aria-hidden="true" />,
     };

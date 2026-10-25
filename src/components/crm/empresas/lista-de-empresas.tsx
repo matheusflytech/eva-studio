@@ -252,7 +252,7 @@ function LinhaDaEmpresa({ empresa: c }: { empresa: Company }) {
   return (
     <li className="border-b border-border-subtle last:border-b-0">
       <Link
-        href={`/empresas/${c.id}`}
+        href={`/companies/${c.id}`}
         className={cn(
           "grid h-16 w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-4 rounded-xl px-2 transition-colors duration-120 hover:bg-raised",
           "sm:grid-cols-[36px_minmax(0,1fr)_150px_170px]",
