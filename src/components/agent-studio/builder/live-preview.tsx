@@ -17,7 +17,7 @@ interface ChatMessage {
 // última versão salva (o autosave do canvas roda em paralelo). Usa um canal
 // próprio ("builder_preview") pra não misturar com conversas reais do
 // Playground/WhatsApp.
-export function LivePreview({ agentId, agentName }: { agentId: string; agentName: string }) {
+export function LivePreview({ agentId, agentName, aoResponder }: { agentId: string; agentName: string; /** Depois de cada resposta (o canvas acende o caminho). */ aoResponder?: () => void }) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [draft, setDraft] = React.useState("");
   const [isTyping, setIsTyping] = React.useState(false);
@@ -46,6 +46,7 @@ export function LivePreview({ agentId, agentName }: { agentId: string; agentName
       setMessages((prev) => [...prev, { id: generateId(), role: "agent", text: "Erro ao processar essa mensagem." }]);
     } finally {
       setIsTyping(false);
+      aoResponder?.();
     }
   }
 

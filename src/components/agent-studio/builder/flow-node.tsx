@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Handle, Position, useNodeConnections, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useNodeConnections, useNodesData, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { ehFerramenta, saidasDoBloco, type Saida } from "./saidas";
 import { fonteDaIa } from "./fonte-da-ia";
 import { ESTILO_DA_SAIDA } from "./saida-estilo";
 import { MOLA } from "@/lib/design-system/movimento";
+import { MenuDeBlocos } from "./menu-de-blocos";
 
 export interface MenuOption {
   id: string;
@@ -241,6 +242,10 @@ export interface CanvasDoAgente {
   /** Primeiros instantes do canvas: os nós entram em cascata da esquerda. */
   abrindo: boolean;
   xInicial: number;
+  /** "+" de uma saída livre: cria o bloco já ligado nela. */
+  adicionarNaSaida?: (noId: string, saida: string | null, iconKey: IconKey) => void;
+  /** "+ ferramenta" do card da IA. */
+  adicionarFerramenta?: (iaId: string, iconKey: IconKey) => void;
 }
 
 export const CanvasDoAgenteContext = React.createContext<CanvasDoAgente>({ abrindo: false, xInicial: 0 });
@@ -250,8 +255,9 @@ export const CanvasDoAgenteContext = React.createContext<CanvasDoAgente>({ abrin
  * saída ainda não tem fio, o nome dela aparece ao lado do ponto (com fio, o
  * nome já está no meio da ligação).
  */
-function PontoDeSaida({ saida, topo, aceso, mostrarNome }: { saida: Saida; topo: number; aceso: boolean; mostrarNome: boolean }) {
+function PontoDeSaida({ noId, saida, topo, aceso, mostrarNome }: { noId?: string; saida: Saida; topo: number; aceso: boolean; mostrarNome: boolean }) {
   const estilo = ESTILO_DA_SAIDA[saida.tipo];
+  const { adicionarNaSaida } = React.useContext(CanvasDoAgenteContext);
   const ligacoes = useNodeConnections({ handleType: "source", handleId: saida.id ?? undefined });
   // Saída padrão de um bloco que também tem nomeadas: o hook sem handleId
   // traria todas; filtra pela saída sem id.
@@ -266,12 +272,24 @@ function PontoDeSaida({ saida, topo, aceso, mostrarNome }: { saida: Saida; topo:
         style={{ top: topo }}
         className={cn(ALCA, aceso ? ALCA_ACESA : saida.tipo === "padrao" ? ALCA_PADRAO : estilo.ponto)}
       />
+      {/* Saída sem fio: "+" que cria o próximo bloco já ligado aqui. */}
+      {livre && noId && adicionarNaSaida && (
+        <span style={{ top: topo }} className="absolute left-[calc(100%+8px)] z-10 -translate-y-1/2">
+          <MenuDeBlocos
+            ferramentas={false}
+            rotulo={saida.rotulo ? `Adicionar depois de "${saida.rotulo}"` : "Adicionar o próximo bloco"}
+            escolher={(k) => adicionarNaSaida(noId, saida.id ?? null, k)}
+            className="h-5 w-5"
+          />
+        </span>
+      )}
       {mostrarNome && saida.rotulo && livre && (
         <span
           aria-hidden="true"
           style={{ top: topo }}
           className={cn(
-            "pointer-events-none absolute left-[calc(100%+10px)] max-w-[104px] -translate-y-1/2 truncate font-mono text-caption leading-4",
+            "pointer-events-none absolute max-w-[104px] -translate-y-1/2 truncate font-mono text-caption leading-4",
+            noId && adicionarNaSaida ? "left-[calc(100%+32px)]" : "left-[calc(100%+10px)]",
             estilo.texto
           )}
         >
@@ -408,6 +426,7 @@ export function FlowNode({
         {saidas.map((s, i) => (
           <PontoDeSaida
             key={s.id ?? "padrao"}
+            noId={id}
             saida={s}
             topo={saidas.length === 1 ? LADO_DO_NO / 2 : ((i + 1) / (saidas.length + 1)) * altura}
             aceso={aceso && saidas.length === 1}
@@ -438,6 +457,7 @@ export function FlowNode({
         {resumo.texto && (
           <p className={cn("max-w-full truncate text-caption leading-tight text-text-tertiary", resumo.mono && "font-mono")}>{resumo.texto}</p>
         )}
+        {isAiAgent && id && <FerramentasDaIa iaId={id} />}
       </motion.div>
 
       {/* Porta de ferramentas do bloco de IA: embaixo, depois do nome (o fio
@@ -450,6 +470,35 @@ export function FlowNode({
             ferramentas
           </span>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O que a IA pode usar, escrito no próprio card ("usa: Buscar na base ·
+ * Registrar lead") com "+ ferramenta". Antes só havia blocos redondos
+ * pendurados embaixo, e não dava para saber qual IA usava o quê.
+ */
+function FerramentasDaIa({ iaId }: { iaId: string }) {
+  const { adicionarFerramenta } = React.useContext(CanvasDoAgenteContext);
+  const ligacoes = useNodeConnections({ id: iaId, handleType: "target", handleId: "tools" });
+  const dados = useNodesData<Node<FlowNodeData>>(ligacoes.map((l) => l.source));
+  const nomes = dados.map((d) => d.data.label).filter(Boolean);
+  return (
+    <div className="pointer-events-auto mt-1 flex max-w-full items-center justify-center gap-1">
+      <span className="max-w-[140px] truncate text-caption leading-tight text-text-tertiary" title={nomes.join(", ")}>
+        {nomes.length ? `usa: ${nomes.join(" · ")}` : "sem ferramentas"}
+      </span>
+      {adicionarFerramenta && (
+        <MenuDeBlocos
+          ferramentas
+          rotulo="Dar uma ferramenta a esta IA"
+          escolher={(k) => adicionarFerramenta(iaId, k)}
+          className="h-5 shrink-0 gap-0.5 px-1.5 text-caption"
+        >
+          + ferramenta
+        </MenuDeBlocos>
       )}
     </div>
   );

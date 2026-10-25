@@ -176,6 +176,9 @@ export default function AgentBuilderPage() {
 
   // Última execução, pra pintar o canvas. Recarrega junto com a aba Editor
   // em vez de ficar em polling: quem quer acompanhar ao vivo usa o Playground.
+  // A prévia ao vivo chama de novo a cada resposta: o canvas acende o
+  // caminho que a conversa de teste acabou de fazer.
+  const [rodadaDaPrevia, setRodadaDaPrevia] = React.useState(0);
   React.useEffect(() => {
     if (!agentId) return;
     let vivo = true;
@@ -194,7 +197,7 @@ export default function AgentBuilderPage() {
       })
       .catch(() => {});
     return () => { vivo = false; };
-  }, [agentId, tab]);
+  }, [agentId, tab, rodadaDaPrevia]);
 
   const agent = agents.find((a) => a.id === agentId);
   const selectedNode = nodes.find((n) => n.id === selectedId) ?? null;
@@ -320,6 +323,27 @@ export default function AgentBuilderPage() {
     if (ia) setEdges((eds) => [...eds, { id: generateId(), source: id, target: ia.id, targetHandle: "tools" }]);
     setSelectedId(id);
   }
+
+  /** "+" de uma saída livre no canvas: o bloco novo nasce ligado nela. */
+  function adicionarNaSaida(noId: string, saida: string | null, iconKey: IconKey) {
+    const anterior = nodes.find((n) => n.id === noId);
+    if (!anterior) return;
+    const id = generateId();
+    const novo: Node<FlowNodeData> = {
+      id,
+      type: "flowNode",
+      position: vagaLivre(anterior.position.x + 320, anterior.position.y),
+      data: { iconKey, label: iconKey, ...(getBlockDefault(iconKey)?.data ?? {}) },
+    };
+    setNodes((nds) => [...nds, novo]);
+    setEdges((eds) => [...eds, { id: generateId(), source: noId, target: id, ...(saida ? { sourceHandle: saida } : {}) }]);
+    setSelectedId(id);
+  }
+
+  // Os nós chamam pelo contexto; a ref evita recriar o contexto (e redesenhar
+  // todos os nós) a cada mudança de nodes/edges.
+  const acoesDoCanvas = React.useRef({ adicionarNaSaida, adicionarFerramenta });
+  acoesDoCanvas.current = { adicionarNaSaida, adicionarFerramenta };
 
   function handleAddAfter(afterNodeId: string | null, iconKey: IconKey) {
     if (ehFerramenta(iconKey)) return adicionarFerramenta(afterNodeId, iconKey);
@@ -501,9 +525,28 @@ export default function AgentBuilderPage() {
     [flowLoaded]
   );
   const contextoDoCanvas = React.useMemo<CanvasDoAgente>(
-    () => ({ execucao: execucaoNoCanvas, abrindo, xInicial }),
+    () => ({
+      execucao: execucaoNoCanvas,
+      abrindo,
+      xInicial,
+      adicionarNaSaida: (noId, saida, k) => acoesDoCanvas.current.adicionarNaSaida(noId, saida, k),
+      adicionarFerramenta: (iaId, k) => acoesDoCanvas.current.adicionarFerramenta(iaId, k),
+    }),
     [execucaoNoCanvas, abrindo, xInicial]
   );
+
+  // Abre legível: se o fluxo inteiro cabe com zoom de leitura, mostra tudo;
+  // senão começa pelo Início (viewportInicial) em vez de virar miniatura.
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+  function abrirLegivel(caixaDoFluxo: () => { width: number; height: number } | null, enquadrar: () => void) {
+    setTimeout(() => {
+      const el = canvasRef.current;
+      const caixa = caixaDoFluxo();
+      if (!el || !caixa) return;
+      const zoom = Math.min(el.clientWidth / (caixa.width + 160), el.clientHeight / (caixa.height + 160));
+      if (zoom >= 0.6) enquadrar();
+    }, 80);
+  }
 
   const issues = validateFlow(nodes, edges, { temUrlDoFluxo: agent ? !!agent.webhook.outboundUrl.trim() : undefined });
 
@@ -657,6 +700,7 @@ export default function AgentBuilderPage() {
               os blocos (tokens), não só para o fundo do React Flow. */}
           <div
             data-theme={temaDoCanvas}
+            ref={canvasRef}
             className="fluxo-agente relative flex-1 overflow-hidden rounded-[18px] border border-border-subtle bg-page text-text-primary"
           >
             <style>{CSS_DO_FLUXO_DO_AGENTE + CSS_DO_MINIMAPA}</style>
@@ -678,6 +722,12 @@ export default function AgentBuilderPage() {
               edgeTypes={edgeTypes}
               connectionLineType={ConnectionLineType.Bezier}
               defaultViewport={viewportInicial}
+              onInit={(rf) =>
+                abrirLegivel(
+                  () => (rf.getNodes().length ? rf.getNodesBounds(rf.getNodes()) : null),
+                  () => void rf.fitView({ padding: 0.12, maxZoom: 0.9 })
+                )
+              }
               minZoom={0.3}
               maxZoom={1.5}
               proOptions={{ hideAttribution: true }}
@@ -714,7 +764,7 @@ export default function AgentBuilderPage() {
             />
           )}
 
-          {showPreview && <LivePreview agentId={agentId} agentName={agent.name} />}
+          {showPreview && <LivePreview agentId={agentId} agentName={agent.name} aoResponder={() => setRodadaDaPrevia((n) => n + 1)} />}
         </div>
       ) : tab === "conversa" ? (
         <div className="relative flex min-h-0 flex-1 gap-4 overflow-hidden">
