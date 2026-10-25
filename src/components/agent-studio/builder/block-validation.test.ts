@@ -151,3 +151,30 @@ describe("bloco de IA: saídas por intenção e resposta em variável", () => {
     expect(problemas(semVar, [liga("ini", "ia")]).join()).toContain("variável que guarda a resposta");
   });
 });
+
+describe("Bloco do Studio", () => {
+  const texto = { id: "c1", type: "text" as const, text: "Oi!" };
+
+  it("bloco com conteúdo, condição e ações completas não tem erro; condição ligada é saída válida", () => {
+    const bloco = no("b", "studio-block", {
+      blockContents: [texto],
+      exitConditions: [{ id: "vip", label: "VIP", expression: '{vip} == "sim"' }],
+      entryActions: [{ id: "a1", data: { iconKey: "variable", label: "Marca", variableName: "x" } }],
+    });
+    const nodes = [no("ini", "start"), bloco, no("fim", "end"), no("fim2", "end")];
+    const edges = [liga("ini", "b"), liga("b", "fim"), liga("b", "fim2", "vip")];
+    expect(problemas(nodes, edges).filter((p) => p.startsWith("erro"))).toEqual([]);
+  });
+
+  it("pergunta sem texto, condição vazia e ação incompleta viram erro no bloco", () => {
+    const comoErro = (extra: Partial<FlowNodeData>) =>
+      problemas([no("ini", "start"), no("b", "studio-block", extra), no("fim", "end")], [liga("ini", "b"), liga("b", "fim")]).join();
+    expect(comoErro({ waitForReply: true, variableName: "v" })).toContain("Escreva a pergunta no conteúdo");
+    expect(comoErro({ blockContents: [texto], exitConditions: [{ id: "c", label: "C", expression: " " }] })).toContain(
+      "Escreva a condição de cada saída"
+    );
+    expect(comoErro({ exitActions: [{ id: "a", data: { iconKey: "variable", label: "Marca" } }] })).toContain(
+      'Ação "Marca": Dê um nome à variável.'
+    );
+  });
+});

@@ -32,9 +32,14 @@ const FERRAMENTAS = new Set(["tool-http", "tool-knowledge", "tool-mcp", "tool-cr
 
 export const ehFerramenta = (iconKey: string) => FERRAMENTAS.has(iconKey);
 
-/** Captura que valida a resposta (tem tipo e não é menu de botões). Mesma regra do motor. */
+/** Captura, ou Bloco que espera a resposta: os dois usam os campos de pergunta. */
+export function esperaResposta(data: FlowNodeData): boolean {
+  return data.iconKey === "capture" || (data.iconKey === "studio-block" && !!data.waitForReply);
+}
+
+/** Pergunta que valida a resposta (tem tipo e não é menu de botões). Mesma regra do motor. */
 export function capturaComValidacao(data: FlowNodeData): boolean {
-  return data.iconKey === "capture" && (data.options ?? []).length === 0 && !!data.captureField && data.captureField !== "text";
+  return esperaResposta(data) && (data.options ?? []).length === 0 && !!data.captureField && data.captureField !== "text";
 }
 
 /** As saídas do bloco, de cima para baixo. Lista vazia = bloco sem saída. */
@@ -54,19 +59,26 @@ export function saidasDoBloco(data: FlowNodeData): Saida[] {
       { id: SAIDA_ERRO, rotulo: "Erro", tipo: "erro" },
     ];
   }
-  const opcoes = data.iconKey === "capture" ? data.options ?? [] : [];
+  // Bloco: as condições vêm primeiro (a primeira verdadeira ganha), depois o
+  // que a pergunta decide.
+  const condicoes: Saida[] =
+    data.iconKey === "studio-block"
+      ? (data.exitConditions ?? []).map((c, i) => ({ id: c.id, rotulo: c.label.trim() || `Condição ${i + 1}`, tipo: "opcao" }))
+      : [];
+  const opcoes = esperaResposta(data) ? data.options ?? [] : [];
   if (opcoes.length > 0) {
-    return opcoes.map((o, i) => ({ id: o.id, rotulo: o.label?.trim() || `Opção ${i + 1}`, tipo: "opcao" as const }));
+    return [...condicoes, ...opcoes.map((o, i) => ({ id: o.id, rotulo: o.label?.trim() || `Opção ${i + 1}`, tipo: "opcao" as const }))];
   }
   if (capturaComValidacao(data)) {
     // "Respondeu" fica sem id de propósito: ligações antigas desse bloco
     // continuam valendo como a saída normal.
     return [
+      ...condicoes,
       { id: null, rotulo: "Respondeu", tipo: "respondeu" },
       { id: SAIDA_INVALIDA, rotulo: "Não respondeu certo", tipo: "invalida" },
     ];
   }
-  return [{ id: null, rotulo: null, tipo: "padrao" }];
+  return [...condicoes, { id: null, rotulo: condicoes.length ? "Nenhuma das condições" : null, tipo: "padrao" }];
 }
 
 /** O bloco tem mais de uma saída, cada uma com nome (o motor exige o id certo na ligação). */

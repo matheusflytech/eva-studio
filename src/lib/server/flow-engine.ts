@@ -2,14 +2,14 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
-import type { AiExit, FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
+import type { AiExit, BlockAction, FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { contextoDaConversa } from "@/lib/server/ia/prompt-do-agente";
 import { semChamadaEmTexto } from "@/lib/server/ia/chamada-em-texto";
-import { SAIDA_ERRO } from "@/components/agent-studio/builder/saidas";
+import { SAIDA_ERRO, esperaResposta } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
 import { enviarEmailDoContrato } from "@/lib/server/email/envio";
@@ -1575,6 +1575,261 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return { messages, status };
   }
 
+  // Blocos que só fazem alguma coisa e seguem pela saída única (variável,
+  // CRM, webhook, HTTP, e-mail). Mora fora do laço porque o Bloco do Studio
+  // roda os mesmos passos como ações de entrada e de saída.
+  async function executarPasso(node: Node<FlowNodeData>): Promise<boolean> {
+    const kind = node.data.iconKey;
+    const orgId = agent!.orgId;
+      if (kind === "variable") {
+        if (node.data.variableName && !UNSAFE_VAR_KEYS.has(node.data.variableName)) {
+          if (node.data.variableExpression) {
+            setVar(variables, node.data.variableName, resolveVariableExpression(node.data.variableExpression, variables));
+          } else if (!(node.data.variableName in variables)) {
+            setVar(variables, node.data.variableName, "");
+          }
+        }
+        pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
+        return true;
+      }
+
+      if (kind.startsWith("crm-")) {
+        const startedAt = Date.now();
+        let output: string | undefined;
+        let stepError: string | undefined;
+
+        try {
+          const contactId = await ensureContactId();
+          if (!contactId) throw new Error("Não foi possível resolver o contato da conversa.");
+
+          if (kind === "crm-deal") {
+            const deal = await createDeal({
+              orgId: orgId,
+              name: interpolate(node.data.crmDealName || "Negócio de {nome}", variables),
+              pipelineId: node.data.crmPipelineId || undefined,
+              stageId: node.data.crmStageId || undefined,
+              contactId,
+              amountCents: toCents(node.data.crmDealAmount),
+              description: interpolate(node.data.crmDealDescription ?? "", variables),
+              origem: "fluxo",
+            });
+            // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
+            if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
+            output = `negócio ${deal.name}`;
+            const defsDoNegocio = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
+            const preenchido = await preencherCamposDoNegocio(orgId, deal.id, entradaDeCampos(defsDoNegocio, node, variables));
+            if (preenchido.aplicados > 0) output += `, ${preenchido.aplicados} campo(s)`;
+            if (preenchido.erros.length > 0) stepError = preenchido.erros.join(" ");
+          }
+
+          if (kind === "crm-update") {
+            if (node.data.crmUpdateTarget === "contact") {
+              const defs = await carregarDefinicoes(orgId, "contact");
+              const r = await preencherCamposDoContato(orgId, contactId, entradaDeCampos(defs, node, variables));
+              output = `${r.aplicados} campo(s) do contato`;
+              if (r.erros.length > 0) stepError = r.erros.join(" ");
+            } else {
+              const deal = await findOpenDealForContact(contactId);
+              if (!deal) throw new Error("O contato não tem negócio aberto para atualizar.");
+              const defs = await carregarDefinicoes(orgId, "deal", deal.pipelineId);
+              const r = await preencherCamposDoNegocio(orgId, deal.id, entradaDeCampos(defs, node, variables));
+              output = `${r.aplicados} campo(s) do negócio`;
+              if (r.erros.length > 0) stepError = r.erros.join(" ");
+            }
+          }
+
+          if (kind === "crm-stage") {
+            const deal = await findOpenDealForContact(contactId);
+            if (!deal) throw new Error("O contato não tem negócio aberto para mover.");
+            if (!node.data.crmStageId) throw new Error("Etapa de destino não configurada no bloco.");
+            // Mesmas regras da tela: faltou campo obrigatório (ou motivo da
+            // perda) e o bloco não tem a flag explícita → erro do bloco.
+            const moved = await moveDealStage(deal.id, node.data.crmStageId, {
+              origem: "fluxo",
+              perda: { motivo: interpolate(node.data.crmLostReason ?? "", variables) },
+              ignorarObrigatorios: node.data.crmIgnorarObrigatorios === true,
+            });
+            output = `negócio movido (prob. ${moved?.probability ?? deal.probability}%)`;
+          }
+
+          if (kind === "crm-task") {
+            const deal = await findOpenDealForContact(contactId);
+            const task = await createTask({
+              orgId: orgId,
+              text: interpolate(node.data.crmTaskText ?? "", variables),
+              type: node.data.crmTaskType ?? "ligar",
+              contactId,
+              dealId: deal?.id ?? null,
+              assignedToId: node.data.crmTaskAssigneeId || null,
+              dueAt: parseRelativeDue(node.data.crmTaskDue ?? ""),
+              origem: "automacao",
+            });
+            output = `tarefa ${task.type}`;
+          }
+
+          if (kind === "crm-tag") {
+            if (!node.data.crmTagId) throw new Error("Etiqueta não escolhida no bloco.");
+            if (node.data.crmTagAction === "remove") {
+              const { removeTag } = await import("@/lib/server/contacts");
+              await removeTag(contactId, node.data.crmTagId);
+              output = "etiqueta removida";
+            } else {
+              const { applyTag } = await import("@/lib/server/contacts");
+              await applyTag(contactId, node.data.crmTagId);
+              output = "etiqueta aplicada";
+            }
+          }
+
+          if (kind === "crm-note") {
+            const deal = await findOpenDealForContact(contactId);
+            await addNote({
+              orgId: orgId,
+              text: interpolate(node.data.crmNoteText ?? "", variables),
+              contactId,
+              dealId: deal?.id ?? null,
+            });
+            output = "nota registrada";
+          }
+
+          if (kind === "crm-lookup") {
+            // Carrega o estado do CRM em variáveis para o bloco de Condição
+            // poder ramificar. Sem isso o fluxo escreveria no CRM mas nunca
+            // leria, e não daria pra fazer "se já tem negócio aberto, ...".
+            const crm = await lookupCrmForContact(contactId);
+            setVar(variables, "crm_empresa", crm.contact?.company?.name ?? "");
+            setVar(variables, "crm_tem_negocio", crm.deal ? "sim" : "nao");
+            setVar(variables, "crm_negocio_id", crm.deal?.id ?? "");
+            setVar(variables, "crm_negocio_etapa", crm.deal?.stage.name ?? "");
+            setVar(variables, "crm_negocio_valor", crm.deal ? (crm.deal.amountCents / 100).toFixed(2) : "0");
+            setVar(variables, "crm_tarefas_abertas", String(crm.openTasks));
+            setVar(variables, "crm_etiquetas", (crm.contact?.tags ?? []).map((t) => t.tag.name).join(", "));
+            output = crm.deal ? `negócio em ${crm.deal.stage.name}` : "sem negócio aberto";
+          }
+        } catch (err) {
+          // Falha de CRM não trava a conversa: o cliente continua sendo
+          // atendido e o erro aparece na aba Execuções.
+          stepError = err instanceof Error ? err.message : String(err);
+        }
+
+        pushStep(node, { output, error: stepError }, startedAt);
+        return true;
+      }
+
+      if (kind === "webhook") {
+        const startedAt = Date.now();
+        let stepError: string | undefined;
+        if (node.data.webhookUrl) {
+          try {
+            const res = await safeFetch(node.data.webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ variables, contactId: input.contactId, agentId: input.agentId }),
+            });
+            const raw = await res.text();
+            let value: unknown = raw;
+            try {
+              const parsed = JSON.parse(raw);
+              value = parsed?.value ?? parsed?.reply ?? parsed?.result ?? parsed;
+            } catch {
+              // resposta não era JSON, usa o texto puro mesmo
+            }
+            if (node.data.variableName) setVar(variables, node.data.variableName, value);
+          } catch (err) {
+            // um webhook falhando não deve travar o fluxo inteiro
+            stepError = err instanceof Error ? err.message : String(err);
+          }
+        }
+        pushStep(node, { error: stepError }, startedAt);
+        return true;
+      }
+
+      if (kind === "http") {
+        const startedAt = Date.now();
+        const result = await performHttpRequest(node.data, variables);
+        if (node.data.variableName) setVar(variables, node.data.variableName, result.value);
+        pushStep(node, { output: result.error ? undefined : JSON.stringify(result.value ?? null), error: result.error }, startedAt);
+        return true;
+      }
+
+      if (kind === "email" && fonteDoEmail(node.data) === "contrato") {
+        // Pelo domínio do contrato: modelo da Biblioteca ou texto do bloco (com
+        // as variáveis do fluxo já trocadas); sem "Para", o e-mail do contato.
+        const startedAt = Date.now();
+        const para = interpolate(node.data.emailTo ?? "", variables).trim();
+        const r = await enviarEmailDoContrato(orgId, {
+          contactId: await ensureContactId(),
+          email: para || null,
+          conteudo: node.data.emailModeloId
+            ? { modeloId: node.data.emailModeloId }
+            : { assunto: interpolate(node.data.emailSubject ?? "", variables), corpo: interpolate(node.data.emailBody ?? "", variables), modo: "simples" },
+          origem: "fluxo",
+          refId: node.id,
+        });
+        pushStep(node, r.ok ? { output: "e-mail enviado" } : { error: r.erro }, startedAt);
+        return true;
+      }
+
+      if (kind === "email") {
+        const startedAt = Date.now();
+        const apiKey = node.data.emailCredentialId ? await getCredentialSecret(orgId, node.data.emailCredentialId) : null;
+        let stepError: string | undefined;
+        if (!apiKey) {
+          stepError = "Credencial Resend não configurada nesse bloco.";
+        } else {
+          const result = await sendEmail({
+            apiKey,
+            from: interpolate(node.data.emailFrom ?? "", variables),
+            to: interpolate(node.data.emailTo ?? "", variables),
+            subject: interpolate(node.data.emailSubject ?? "", variables),
+            html: interpolate(node.data.emailBody ?? "", variables),
+          });
+          if (!result.ok) stepError = result.error;
+        }
+        pushStep(node, { error: stepError, output: stepError ? undefined: "e-mail enviado" }, startedAt);
+        return true;
+      }
+
+    return false;
+  }
+
+  // ── Bloco do Studio ──────────────────────────────────────────────────────
+  // Ação do Bloco vira um "bloco" de mentira para executarPasso; o id composto
+  // separa as ações de cada Bloco na aba Execuções.
+  const acaoComoNo = (no: Node<FlowNodeData>, a: BlockAction): Node<FlowNodeData> => ({
+    id: `${no.id}:${a.id}`,
+    position: no.position,
+    data: a.data,
+  });
+
+  /** Texto da pergunta: no Bloco, o último texto do conteúdo; na Captura, o do bloco. */
+  function textoDaPergunta(data: FlowNodeData): string {
+    if (data.iconKey !== "studio-block") return interpolate(data.detail ?? "", variables);
+    const ultimo = [...(data.blockContents ?? [])].reverse().find((c) => c.type === "text" && c.text?.trim());
+    return ultimo ? interpolate(ultimo.text ?? "", variables) : "Escolha uma opção:";
+  }
+
+  /**
+   * Saída do Bloco depois da resposta (ou direto, se ele não pergunta): roda as
+   * ações de saída e escolhe a primeira condição verdadeira que tem ligação;
+   * sem nenhuma, a saída da pergunta (botão, inválida) ou a padrão.
+   */
+  async function sairDoBloco(no: Node<FlowNodeData>, saida: string | null): Promise<string | null> {
+    for (const a of no.data.exitActions ?? []) await executarPasso(acaoComoNo(no, a));
+    const condicoes = no.data.exitConditions ?? [];
+    const valeu = condicoes.find(
+      (c) => c.expression.trim() && nextNodeId(edges, no.id, c.id) && evaluateCondition(c.expression, variables)
+    );
+    if (valeu) return nextNodeId(edges, no.id, valeu.id);
+    const nomeadas = [...condicoes.map((c) => c.id), ...(no.data.options ?? []).map((o) => o.id)];
+    if (saida === SAIDA_INVALIDA) return nextNodeId(edges, no.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, no.id, nomeadas);
+    if (saida) return nextNodeId(edges, no.id, saida);
+    return nextDefaultNodeId(edges, no.id, nomeadas);
+  }
+
+  /** Depois da resposta: o Bloco passa pelas ações e condições; a Captura segue como sempre. */
+  const seguirDaPergunta = (no: Node<FlowNodeData>, saida: string | null, daCaptura: () => string | null) =>
+    no.data.iconKey === "studio-block" ? sairDoBloco(no, saida) : Promise.resolve(daCaptura());
+
   // Resolve o nó em que a conversa estava parada (Captura, Agente de IA ou
   // Esperar) usando a mensagem que acabou de chegar, antes de continuar
   // andando pelo fluxo.
@@ -1596,14 +1851,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   } else if (inboundKind === "story_mention") {
     // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
     return finish();
-  } else if (parkedNode?.data.iconKey === "capture" && capturaValida(parkedNode.data)) {
+  } else if (parkedNode && esperaResposta(parkedNode.data) && capturaValida(parkedNode.data)) {
     // Captura com tipo (nome/e-mail/telefone/campo do contato): valida, pede de
     // novo até captureMaxRetries e, se não der, sai por "não respondeu certo".
     const campo = parkedNode.data.captureField as CaptureField;
     const tentativas = Number(variables.__capture_tries ?? 0);
     if (parkedNode.data.captureRequired === false && isSkip(input.text)) {
       delete variables.__capture_tries;
-      currentId = nextDefaultNodeId(edges, parkedNode.id);
+      currentId = await seguirDaPergunta(parkedNode, null, () => nextDefaultNodeId(edges, parkedNode.id));
     } else {
       const def =
         campo === "custom"
@@ -1614,7 +1869,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         setVar(variables, variavelDaCaptura(parkedNode.data), r.value);
         delete variables.__capture_tries;
         virouLead = true;
-        currentId = nextDefaultNodeId(edges, parkedNode.id);
+        currentId = await seguirDaPergunta(parkedNode, null, () => nextDefaultNodeId(edges, parkedNode.id));
       } else if (tentativas < (parkedNode.data.captureMaxRetries ?? 2)) {
         variables.__capture_tries = tentativas + 1;
         messages.push({ text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables) });
@@ -1624,10 +1879,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       } else {
         delete variables.__capture_tries;
         pushStep(parkedNode, { error: "desistiu depois das tentativas" });
-        currentId = nextNodeId(edges, parkedNode.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, parkedNode.id);
+        currentId = await seguirDaPergunta(
+          parkedNode,
+          SAIDA_INVALIDA,
+          () => nextNodeId(edges, parkedNode.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, parkedNode.id)
+        );
       }
     }
-  } else if (parkedNode?.data.iconKey === "capture") {
+  } else if (parkedNode && esperaResposta(parkedNode.data)) {
     const options = parkedNode.data.options ?? [];
     let resolvedOptionId = input.optionId;
     // Se não veio um id de botão (ex: o cliente respondeu em texto livre em
@@ -1643,7 +1902,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     if (options.length > 0 && !resolvedOptionId) {
       // Não reconheceu a opção — repete a pergunta em vez de travar a conversa.
       messages.push({
-        text: interpolate(parkedNode.data.detail ?? "", variables),
+        text: textoDaPergunta(parkedNode.data),
         options: options.map((o) => ({ id: o.id, label: o.label })),
       });
       currentId = parkedNode.id;
@@ -1658,7 +1917,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       );
     }
     const handle = options.length > 0 ? resolvedOptionId : undefined;
-    currentId = nextNodeId(edges, parkedNode.id, handle);
+    currentId = await seguirDaPergunta(parkedNode, handle ?? null, () => nextNodeId(edges, parkedNode.id, handle));
   } else if (parkedNode?.data.iconKey === "agent") {
     const conversationId = `${input.channel}:${input.contactId}`;
     const { reply, done } = await callAgentWebhook(agent, input.text ?? "", conversationId, variables, input.lang);
@@ -1706,6 +1965,38 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       continue;
     }
 
+    if (kind === "studio-block") {
+      const startedAt = Date.now();
+      for (const a of node.data.entryActions ?? []) await executarPasso(acaoComoNo(node, a));
+      // "Digitando" vale para a mensagem seguinte; o último texto leva os botões.
+      let digitando: number | undefined;
+      const doBloco: OutboundMessage[] = [];
+      for (const c of node.data.blockContents ?? []) {
+        if (c.type === "typing") {
+          digitando = Math.min(Math.max(c.seconds ?? 2, 1), 10) * 1000;
+          continue;
+        }
+        const text = interpolate(c.text ?? "", variables).trim();
+        if (!text) continue;
+        doBloco.push(digitando ? { text, digitando } : { text });
+        digitando = undefined;
+      }
+      const options = node.data.waitForReply ? node.data.options ?? [] : [];
+      if (options.length > 0) {
+        const botoes = options.map((o) => ({ id: o.id, label: o.label }));
+        if (doBloco.length > 0) doBloco[doBloco.length - 1].options = botoes;
+        else doBloco.push({ text: textoDaPergunta(node.data), options: botoes });
+      }
+      messages.push(...doBloco);
+      pushStep(node, { output: doBloco.map((m) => m.text).join(" · ") || undefined }, startedAt);
+      if (node.data.waitForReply) {
+        currentId = node.id; // fica parado esperando a resposta
+        break;
+      }
+      currentId = await sairDoBloco(node, null);
+      continue;
+    }
+
     if (kind === "capture") {
       const options = node.data.options ?? [];
       const text = interpolate(node.data.detail ?? "", variables);
@@ -1725,216 +2016,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       continue;
     }
 
-    if (kind === "variable") {
-      if (node.data.variableName && !UNSAFE_VAR_KEYS.has(node.data.variableName)) {
-        if (node.data.variableExpression) {
-          setVar(variables, node.data.variableName, resolveVariableExpression(node.data.variableExpression, variables));
-        } else if (!(node.data.variableName in variables)) {
-          setVar(variables, node.data.variableName, "");
-        }
-      }
-      pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
-      currentId = nextNodeId(edges, node.id);
-      continue;
-    }
-
-    if (kind.startsWith("crm-")) {
-      const startedAt = Date.now();
-      let output: string | undefined;
-      let stepError: string | undefined;
-
-      try {
-        const contactId = await ensureContactId();
-        if (!contactId) throw new Error("Não foi possível resolver o contato da conversa.");
-
-        if (kind === "crm-deal") {
-          const deal = await createDeal({
-            orgId: agent.orgId,
-            name: interpolate(node.data.crmDealName || "Negócio de {nome}", variables),
-            pipelineId: node.data.crmPipelineId || undefined,
-            stageId: node.data.crmStageId || undefined,
-            contactId,
-            amountCents: toCents(node.data.crmDealAmount),
-            description: interpolate(node.data.crmDealDescription ?? "", variables),
-            origem: "fluxo",
-          });
-          // Guarda o id pra os blocos seguintes poderem agir nesse negócio.
-          if (node.data.variableName) setVar(variables, node.data.variableName, deal.id);
-          output = `negócio ${deal.name}`;
-          const defsDoNegocio = await carregarDefinicoes(agent.orgId, "deal", deal.pipelineId);
-          const preenchido = await preencherCamposDoNegocio(agent.orgId, deal.id, entradaDeCampos(defsDoNegocio, node, variables));
-          if (preenchido.aplicados > 0) output += `, ${preenchido.aplicados} campo(s)`;
-          if (preenchido.erros.length > 0) stepError = preenchido.erros.join(" ");
-        }
-
-        if (kind === "crm-update") {
-          if (node.data.crmUpdateTarget === "contact") {
-            const defs = await carregarDefinicoes(agent.orgId, "contact");
-            const r = await preencherCamposDoContato(agent.orgId, contactId, entradaDeCampos(defs, node, variables));
-            output = `${r.aplicados} campo(s) do contato`;
-            if (r.erros.length > 0) stepError = r.erros.join(" ");
-          } else {
-            const deal = await findOpenDealForContact(contactId);
-            if (!deal) throw new Error("O contato não tem negócio aberto para atualizar.");
-            const defs = await carregarDefinicoes(agent.orgId, "deal", deal.pipelineId);
-            const r = await preencherCamposDoNegocio(agent.orgId, deal.id, entradaDeCampos(defs, node, variables));
-            output = `${r.aplicados} campo(s) do negócio`;
-            if (r.erros.length > 0) stepError = r.erros.join(" ");
-          }
-        }
-
-        if (kind === "crm-stage") {
-          const deal = await findOpenDealForContact(contactId);
-          if (!deal) throw new Error("O contato não tem negócio aberto para mover.");
-          if (!node.data.crmStageId) throw new Error("Etapa de destino não configurada no bloco.");
-          // Mesmas regras da tela: faltou campo obrigatório (ou motivo da
-          // perda) e o bloco não tem a flag explícita → erro do bloco.
-          const moved = await moveDealStage(deal.id, node.data.crmStageId, {
-            origem: "fluxo",
-            perda: { motivo: interpolate(node.data.crmLostReason ?? "", variables) },
-            ignorarObrigatorios: node.data.crmIgnorarObrigatorios === true,
-          });
-          output = `negócio movido (prob. ${moved?.probability ?? deal.probability}%)`;
-        }
-
-        if (kind === "crm-task") {
-          const deal = await findOpenDealForContact(contactId);
-          const task = await createTask({
-            orgId: agent.orgId,
-            text: interpolate(node.data.crmTaskText ?? "", variables),
-            type: node.data.crmTaskType ?? "ligar",
-            contactId,
-            dealId: deal?.id ?? null,
-            assignedToId: node.data.crmTaskAssigneeId || null,
-            dueAt: parseRelativeDue(node.data.crmTaskDue ?? ""),
-            origem: "automacao",
-          });
-          output = `tarefa ${task.type}`;
-        }
-
-        if (kind === "crm-tag") {
-          if (!node.data.crmTagId) throw new Error("Etiqueta não escolhida no bloco.");
-          if (node.data.crmTagAction === "remove") {
-            const { removeTag } = await import("@/lib/server/contacts");
-            await removeTag(contactId, node.data.crmTagId);
-            output = "etiqueta removida";
-          } else {
-            const { applyTag } = await import("@/lib/server/contacts");
-            await applyTag(contactId, node.data.crmTagId);
-            output = "etiqueta aplicada";
-          }
-        }
-
-        if (kind === "crm-note") {
-          const deal = await findOpenDealForContact(contactId);
-          await addNote({
-            orgId: agent.orgId,
-            text: interpolate(node.data.crmNoteText ?? "", variables),
-            contactId,
-            dealId: deal?.id ?? null,
-          });
-          output = "nota registrada";
-        }
-
-        if (kind === "crm-lookup") {
-          // Carrega o estado do CRM em variáveis para o bloco de Condição
-          // poder ramificar. Sem isso o fluxo escreveria no CRM mas nunca
-          // leria, e não daria pra fazer "se já tem negócio aberto, ...".
-          const crm = await lookupCrmForContact(contactId);
-          setVar(variables, "crm_empresa", crm.contact?.company?.name ?? "");
-          setVar(variables, "crm_tem_negocio", crm.deal ? "sim" : "nao");
-          setVar(variables, "crm_negocio_id", crm.deal?.id ?? "");
-          setVar(variables, "crm_negocio_etapa", crm.deal?.stage.name ?? "");
-          setVar(variables, "crm_negocio_valor", crm.deal ? (crm.deal.amountCents / 100).toFixed(2) : "0");
-          setVar(variables, "crm_tarefas_abertas", String(crm.openTasks));
-          setVar(variables, "crm_etiquetas", (crm.contact?.tags ?? []).map((t) => t.tag.name).join(", "));
-          output = crm.deal ? `negócio em ${crm.deal.stage.name}` : "sem negócio aberto";
-        }
-      } catch (err) {
-        // Falha de CRM não trava a conversa: o cliente continua sendo
-        // atendido e o erro aparece na aba Execuções.
-        stepError = err instanceof Error ? err.message : String(err);
-      }
-
-      pushStep(node, { output, error: stepError }, startedAt);
-      currentId = nextNodeId(edges, node.id);
-      continue;
-    }
-
-    if (kind === "webhook") {
-      const startedAt = Date.now();
-      let stepError: string | undefined;
-      if (node.data.webhookUrl) {
-        try {
-          const res = await safeFetch(node.data.webhookUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ variables, contactId: input.contactId, agentId: input.agentId }),
-          });
-          const raw = await res.text();
-          let value: unknown = raw;
-          try {
-            const parsed = JSON.parse(raw);
-            value = parsed?.value ?? parsed?.reply ?? parsed?.result ?? parsed;
-          } catch {
-            // resposta não era JSON, usa o texto puro mesmo
-          }
-          if (node.data.variableName) setVar(variables, node.data.variableName, value);
-        } catch (err) {
-          // um webhook falhando não deve travar o fluxo inteiro
-          stepError = err instanceof Error ? err.message : String(err);
-        }
-      }
-      pushStep(node, { error: stepError }, startedAt);
-      currentId = nextNodeId(edges, node.id);
-      continue;
-    }
-
-    if (kind === "http") {
-      const startedAt = Date.now();
-      const result = await performHttpRequest(node.data, variables);
-      if (node.data.variableName) setVar(variables, node.data.variableName, result.value);
-      pushStep(node, { output: result.error ? undefined : JSON.stringify(result.value ?? null), error: result.error }, startedAt);
-      currentId = nextNodeId(edges, node.id);
-      continue;
-    }
-
-    if (kind === "email" && fonteDoEmail(node.data) === "contrato") {
-      // Pelo domínio do contrato: modelo da Biblioteca ou texto do bloco (com
-      // as variáveis do fluxo já trocadas); sem "Para", o e-mail do contato.
-      const startedAt = Date.now();
-      const para = interpolate(node.data.emailTo ?? "", variables).trim();
-      const r = await enviarEmailDoContrato(agent.orgId, {
-        contactId: await ensureContactId(),
-        email: para || null,
-        conteudo: node.data.emailModeloId
-          ? { modeloId: node.data.emailModeloId }
-          : { assunto: interpolate(node.data.emailSubject ?? "", variables), corpo: interpolate(node.data.emailBody ?? "", variables), modo: "simples" },
-        origem: "fluxo",
-        refId: node.id,
-      });
-      pushStep(node, r.ok ? { output: "e-mail enviado" } : { error: r.erro }, startedAt);
-      currentId = nextNodeId(edges, node.id);
-      continue;
-    }
-
-    if (kind === "email") {
-      const startedAt = Date.now();
-      const apiKey = node.data.emailCredentialId ? await getCredentialSecret(agent.orgId, node.data.emailCredentialId) : null;
-      let stepError: string | undefined;
-      if (!apiKey) {
-        stepError = "Credencial Resend não configurada nesse bloco.";
-      } else {
-        const result = await sendEmail({
-          apiKey,
-          from: interpolate(node.data.emailFrom ?? "", variables),
-          to: interpolate(node.data.emailTo ?? "", variables),
-          subject: interpolate(node.data.emailSubject ?? "", variables),
-          html: interpolate(node.data.emailBody ?? "", variables),
-        });
-        if (!result.ok) stepError = result.error;
-      }
-      pushStep(node, { error: stepError, output: stepError ? undefined: "e-mail enviado" }, startedAt);
+    if (await executarPasso(node)) {
       currentId = nextNodeId(edges, node.id);
       continue;
     }

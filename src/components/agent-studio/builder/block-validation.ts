@@ -33,6 +33,23 @@ export function validateNode(data: FlowNodeData): string | null {
       return null;
     }
 
+    case "studio-block": {
+      const textos = (data.blockContents ?? []).filter((c) => c.type === "text" && !vazio(c.text));
+      if (data.waitForReply) {
+        if (textos.length === 0) return "Escreva a pergunta no conteúdo.";
+        const campo = data.captureField ?? "text";
+        if (campo === "custom" && vazio(data.captureCustomKey)) return "Escolha qual campo do contato a resposta preenche.";
+        if (campo === "text" && vazio(data.variableName)) return "Escolha em qual variável guardar a resposta.";
+      }
+      if ((data.exitConditions ?? []).some((c) => vazio(c.expression))) return "Escreva a condição de cada saída.";
+      // Ação incompleta aparece aqui, no Bloco que a carrega.
+      for (const a of [...(data.entryActions ?? []), ...(data.exitActions ?? [])]) {
+        const problema = validateNode(a.data);
+        if (problema) return `Ação "${a.data.label}": ${problema}`;
+      }
+      return null;
+    }
+
     case "condition":
       return vazio(data.conditionExpression)
         ? 'Defina a condição, por exemplo {orcamento} > 5000.'

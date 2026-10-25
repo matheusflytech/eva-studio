@@ -39,6 +39,7 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
     id: "conversa",
     label: "Conversa",
     items: [
+      { key: "studio-block", label: "Bloco", hint: "Mensagens, pergunta, ações e saídas num lugar só." },
       { key: "message", label: "Mensagem", hint: "O agente fala alguma coisa." },
       // "Captura de input" era nome de programador. Perguntar é o que o
       // bloco faz: pergunta e espera a resposta.

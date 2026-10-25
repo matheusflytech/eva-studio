@@ -22,6 +22,7 @@ import {
   Search,
   Building2,
   PencilLine,
+  LayoutList,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -50,6 +51,7 @@ export const ICON_REGISTRY = {
   "crm-note": StickyNote,
   "crm-lookup": Search,
   "tool-crm": Building2,
+  "studio-block": LayoutList,
 } satisfies Record<string, LucideIcon>;
 
 export type IconKey = keyof typeof ICON_REGISTRY;

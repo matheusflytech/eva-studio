@@ -21,6 +21,7 @@ import { McpToolPicker } from "./mcp-tool-picker";
 import { CrmBlockFields } from "./crm-block-fields";
 import { CaptureConfig } from "./capture-config";
 import { SaidasDaIa } from "./saidas-da-ia";
+import { PainelDoBloco, type AbaDoBloco } from "./bloco-do-studio";
 import { MenuDeBlocos } from "./menu-de-blocos";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -176,6 +177,7 @@ export function NodeInspector({
   aoAdicionarFerramenta,
   aoAbrirBloco,
   documentos = [],
+  embutido = false,
 }: {
   node: Node<FlowNodeData>;
   agentId: string;
@@ -189,6 +191,8 @@ export function NodeInspector({
   aoAbrirBloco?: (id: string) => void;
   /** Base de conhecimento do agente (a Ferramenta: Base escolhe quais usar). */
   documentos?: KnowledgeDoc[];
+  /** Dentro do painel de outro bloco (ação do Bloco): cartão, sem coluna própria. */
+  embutido?: boolean;
 }) {
   const { iconKey } = node.data;
   const detailRef = React.useRef<HTMLTextAreaElement>(null);
@@ -204,10 +208,19 @@ export function NodeInspector({
   const [textoAberto, setTextoAberto] = React.useState(false);
   // Abas só no bloco de IA: é o bloco com mais coisa para configurar.
   const [abaIa, setAbaIa] = React.useState<"instrucoes" | "saidas" | "ferramentas" | "configurar">("instrucoes");
-  const naAba = (aba: typeof abaIa) => !ehIa || abaIa === aba;
+  const ehBloco = iconKey === "studio-block";
+  const [abaBloco, setAbaBloco] = React.useState<AbaDoBloco>("conteudo");
+  // Nome do bloco: na primeira aba da IA e do Bloco; nos outros, sempre.
+  const mostraNome = ehIa ? abaIa === "instrucoes" : ehBloco ? abaBloco === "conteudo" : true;
 
   return (
-    <div className="flex h-full w-[clamp(340px,26vw,520px)] shrink-0 flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-panel max-xl:absolute max-xl:inset-y-2 max-xl:right-2 max-xl:z-20 max-xl:h-auto max-xl:shadow-overlay">
+    <div
+      className={
+        embutido
+          ? "flex flex-col overflow-hidden rounded-[14px] border border-border-subtle bg-panel"
+          : "flex h-full w-[clamp(340px,26vw,520px)] shrink-0 flex-col overflow-hidden rounded-[18px] border border-border-subtle bg-panel max-xl:absolute max-xl:inset-y-2 max-xl:right-2 max-xl:z-20 max-xl:h-auto max-xl:shadow-overlay"
+      }
+    >
       {/* Cabeçalho: o tipo do bloco primeiro. "Bloco selecionado" não dizia
           nada — a pessoa já sabe que selecionou; o que ela não sabe é o que
           este bloco faz e se está pronto. */}
@@ -268,6 +281,22 @@ export function NodeInspector({
         </div>
       )}
 
+      {ehBloco && (
+        <div className="border-b border-border-subtle px-4 py-2.5">
+          <SegmentedControl
+            label="Partes do bloco"
+            value={abaBloco}
+            onChange={setAbaBloco}
+            className="flex w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:px-1 [&>button]:text-caption"
+            options={[
+              { value: "conteudo", label: "Conteúdo" },
+              { value: "saidas", label: "Saídas" },
+              { value: "acoes", label: "Ações" },
+            ]}
+          />
+        </div>
+      )}
+
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
         {daConversa && (
           <PreviaDaBolha
@@ -276,7 +305,7 @@ export function NodeInspector({
           />
         )}
 
-        {naAba("instrucoes") && (
+        {mostraNome && (
         <>
         <div>
           <Label htmlFor="node-label">Nome do bloco</Label>
@@ -285,6 +314,7 @@ export function NodeInspector({
             Só aparece no canvas, pra você achar o bloco. O cliente não vê.
           </p>
         </div>
+        {!ehBloco && (
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
             <Label className="mb-0" htmlFor="node-detail">
@@ -328,7 +358,19 @@ export function NodeInspector({
             </p>
           )}
         </div>
+        )}
         </>
+        )}
+
+        {ehBloco && (
+          <PainelDoBloco
+            data={node.data}
+            aba={abaBloco}
+            onChange={onChange}
+            inspetorDaAcao={(p) => (
+              <NodeInspector {...p} embutido agentId={agentId} variables={variables} documentos={documentos} />
+            )}
+          />
         )}
 
         {ehIa && abaIa === "saidas" && (
@@ -881,7 +923,7 @@ export function NodeInspector({
           onClick={onDelete}
           className="flex h-8 w-full items-center justify-center gap-1.5 rounded-full px-3 text-small font-medium text-text-tertiary transition-colors hover:bg-danger-subtle hover:text-danger"
         >
-          <Trash2 size={13} /> Excluir bloco
+          <Trash2 size={13} /> {embutido ? "Remover ação" : "Excluir bloco"}
         </button>
       </footer>
     </div>
