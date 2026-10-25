@@ -141,7 +141,7 @@ function CelulaDoDia({
             )}
           >
             <span aria-hidden="true" className={cn("absolute inset-y-1 left-1 w-[2px] rounded-full", cor.solid)} />
-            {!e.diaTodo && <span className={cn("shrink-0 font-mono text-[11px] tabular-nums", cor.fg)}>{horaDoEvento(e)}</span>}
+            {!e.diaTodo && <span className={cn("shrink-0 font-mono text-caption tabular-nums", cor.fg)}>{horaDoEvento(e)}</span>}
             <span className={cn("truncate text-caption font-medium", e.feita ? "text-text-tertiary line-through" : "text-text-primary")}>{e.titulo}</span>
           </button>
         );
