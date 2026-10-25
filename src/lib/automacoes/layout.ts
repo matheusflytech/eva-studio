@@ -116,5 +116,23 @@ export function layoutDaAutomacao(def: Definicao): Layout {
   colocarSaida("gatilho", { de: "gatilho", saida: "proximo" }, "", def.inicio, 1, (alturaTotal - medir(def.inicio)) / 2);
   maxX = Math.max(maxX, NO_LARGURA);
   maxY = Math.max(maxY, alturaTotal);
-  return { caixas, ligacoes, largura: maxX, altura: maxY };
+  return { caixas: comPosicoesSalvas(caixas, def), ligacoes, largura: maxX, altura: maxY };
+}
+
+/**
+ * Blocos arrastados ficam onde a pessoa deixou; o "+" vazio de um bloco
+ * arrastado vai junto (mesmo deslocamento). O resto segue o layout automático.
+ */
+function comPosicoesSalvas(caixas: Caixa[], def: Definicao): Caixa[] {
+  const salvas = def.posicoes;
+  if (!salvas || Object.keys(salvas).length === 0) return caixas;
+  const deslocamento = new Map<string, { dx: number; dy: number }>();
+  for (const c of caixas) {
+    const p = c.tipo === "vazio" ? undefined : salvas[c.id];
+    if (p) deslocamento.set(c.id, { dx: p.x - c.x, dy: p.y - c.y });
+  }
+  return caixas.map((c) => {
+    const d = deslocamento.get(c.tipo === "vazio" ? (c.ponta?.de ?? "") : c.id);
+    return d ? { ...c, x: c.x + d.dx, y: c.y + d.dy } : c;
+  });
 }

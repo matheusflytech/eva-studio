@@ -21,6 +21,8 @@ export type Operacao =
   | { op: "duplicar"; id: string }
   /** Leva um nó de saída única para outra ligação. */
   | { op: "mover"; id: string; ponta: Ponta }
+  /** Guarda onde os blocos foram arrastados; null apaga todas (volta ao layout automático). */
+  | { op: "posicionar"; posicoes: Record<string, { x: number; y: number }> | null }
   | { op: "adicionar_caminho"; id: string; nome?: string }
   | { op: "remover_caminho"; id: string; caminhoId: string };
 
@@ -61,7 +63,32 @@ export function subarvore(def: Definicao, id: string | null, visto = new Set<str
 function semNos(def: Definicao, ids: Set<string>): Definicao {
   const nos = { ...def.nos };
   for (const id of ids) delete nos[id];
-  return { ...def, nos };
+  if (!def.posicoes) return { ...def, nos };
+  const posicoes = { ...def.posicoes };
+  for (const id of ids) delete posicoes[id];
+  return { ...def, nos, posicoes };
+}
+
+/**
+ * Onde o passo entra ao "subir" uma posição: antes do passo que vem antes
+ * dele. null quando já é o primeiro do caminho.
+ */
+export function pontaParaCima(def: Definicao, id: string): Ponta | null {
+  const pai = paiDe(def, id);
+  if (!pai || pai.de === "gatilho") return null;
+  return paiDe(def, pai.de);
+}
+
+/**
+ * Onde o passo entra ao "descer": logo depois do seguinte. Só quando o
+ * seguinte tem uma saída só (ação ou espera); num desvio, mover não é óbvio.
+ */
+export function pontaParaBaixo(def: Definicao, id: string): Ponta | null {
+  const no = def.nos[id];
+  if (!no || (no.tipo !== "acao" && no.tipo !== "espera")) return null;
+  const seguinte = no.proximo ? def.nos[no.proximo] : null;
+  if (!seguinte || (seguinte.tipo !== "acao" && seguinte.tipo !== "espera")) return null;
+  return { de: seguinte.id, saida: "proximo" };
 }
 
 const TIPOS_DE_NO = new Set(["acao", "condicao", "caminhos", "espera", "esperar_evento", "fim"]);
@@ -180,6 +207,21 @@ export function aplicar(def: Definicao, op: Operacao): Definicao {
       const tirado = aplicar(def, { op: "apagar", id: op.id });
       if (op.ponta.de !== "gatilho" && !tirado.nos[op.ponta.de]) throw new ErroDeOperacao("Destino não existe.");
       return aplicar(tirado, { op: "inserir", ponta: op.ponta, no });
+    }
+
+    case "posicionar": {
+      if (op.posicoes === null) {
+        const semPosicoes: Definicao = { ...def };
+        delete semPosicoes.posicoes;
+        return semPosicoes;
+      }
+      const posicoes = { ...(def.posicoes ?? {}) };
+      for (const [id, p] of Object.entries(op.posicoes ?? {})) {
+        if (id !== "gatilho" && !def.nos[id]) throw new ErroDeOperacao("Passo não existe.");
+        if (!Number.isFinite(p?.x) || !Number.isFinite(p?.y)) throw new ErroDeOperacao("Posição inválida.");
+        posicoes[id] = { x: Math.round(p.x), y: Math.round(p.y) };
+      }
+      return { ...def, posicoes };
     }
 
     case "adicionar_caminho": {

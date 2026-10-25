@@ -17,11 +17,12 @@ import {
   type Edge,
   type EdgeProps,
   type Node,
+  type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, Check, FlaskConical, Maximize, Minus, Plus, Redo2, Undo2, X } from "lucide-react";
+import { AlertCircle, Check, FlaskConical, LayoutGrid, Maximize, Minus, Plus, Redo2, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
 import { useCanvasTheme } from "@/components/ui/theme";
@@ -37,7 +38,9 @@ import { MOLA } from "@/lib/design-system/movimento";
 
 // ---------------------------------------------------------------------------
 // Canvas da automação: layout automático da esquerda para a direita (puro, em
-// layout.ts), sem arrastar nem ligar fio à mão. O "+" no meio de cada ligação
+// layout.ts). Os blocos se arrastam livremente (a posição fica salva na
+// definição); soltar uma ação ou espera num "+" vazio muda o passo de lugar.
+// Fio não se liga à mão: a árvore continua sem ciclo. O "+" no meio de cada ligação
 // e nos espaços vazios abre o painel "O que vem depois?". `estados` pinta cada
 // nó durante uma execução (parte F: ao vivo).
 // v6: nó quadrado com ícone grande e rótulo embaixo; fio curvo fino que acende
@@ -64,6 +67,8 @@ interface DadosDoVazio extends Record<string, unknown> {
   ponta: Ponta;
   inserir: (p: Ponta) => void;
   ativo: boolean;
+  /** Um bloco arrastado está em cima: soltar muda o passo para cá. */
+  soltar?: boolean;
   atraso: number;
 }
 
@@ -78,6 +83,8 @@ interface DadosDaLigacao extends Record<string, unknown> {
 
 export interface BarraDoCanvas {
   testar: () => void;
+  /** Volta todos os blocos ao layout automático. */
+  organizar: () => void;
   desfazer: () => void;
   refazer: () => void;
   podeDesfazer: boolean;
@@ -109,6 +116,7 @@ const CSS_DO_FLUXO = `
 .fluxo-eva .fluxo-pulso { stroke-dasharray: 9 91; animation: fluxo-pulso 1.8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .fluxo-eva .fluxo-pulso { animation-duration: 5.4s; } }
 .fluxo-eva .react-flow__node { cursor: pointer; }
+.fluxo-eva .react-flow__node.dragging { cursor: grabbing; }
 .fluxo-eva .react-flow__node:focus-visible { outline: none; }
 .fluxo-eva .react-flow__node:focus-visible .fluxo-quadrado { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 `;
@@ -220,7 +228,7 @@ const EspacoVazio = React.memo(function EspacoVazio({ data }: NodeProps<Node<Dad
         transition={{ ...MOLA, delay: data.atraso }}
         className={cn(
           "nodrag absolute inset-0 flex items-center justify-center rounded-[16px] border border-dashed transition-colors duration-150",
-          data.ativo
+          data.ativo || data.soltar
             ? "border-solid border-accent-solid bg-accent-subtle text-accent-fg"
             : "border-border-strong text-text-tertiary hover:border-accent-solid hover:text-accent-fg"
         )}
@@ -228,7 +236,7 @@ const EspacoVazio = React.memo(function EspacoVazio({ data }: NodeProps<Node<Dad
         <Plus size={18} aria-hidden="true" />
       </motion.button>
       <p className="pointer-events-none absolute left-1/2 top-[calc(100%+10px)] -translate-x-1/2 whitespace-nowrap font-mono text-caption text-text-tertiary">
-        próximo passo
+        {data.soltar ? "soltar aqui" : "próximo passo"}
       </p>
     </div>
   );
@@ -370,6 +378,9 @@ function BarraFlutuante({ barra }: { barra: BarraDoCanvas }) {
         <IconButton aria-label="Enquadrar o fluxo" tooltip onClick={() => void rf.fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}>
           <Maximize />
         </IconButton>
+        <IconButton aria-label="Organizar os blocos" tooltip onClick={barra.organizar}>
+          <LayoutGrid />
+        </IconButton>
         <span aria-hidden="true" className="mx-1 h-4 w-px bg-border-default" />
         <IconButton aria-label="Desfazer (Ctrl+Z)" tooltip disabled={!barra.podeDesfazer} onClick={barra.desfazer}>
           <Undo2 />
@@ -392,6 +403,8 @@ function CanvasInterno({
   inserindo,
   estados,
   barra,
+  posicionar,
+  mover,
 }: {
   def: Definicao;
   nomes: Nomes;
@@ -403,6 +416,10 @@ function CanvasInterno({
   inserindo?: Ponta | null;
   estados?: Record<string, { estado: EstadoDoNo; ms?: number }>;
   barra: BarraDoCanvas;
+  /** Guarda onde o bloco foi solto. */
+  posicionar: (id: string, x: number, y: number) => void;
+  /** Leva o passo para outro lugar da árvore (soltou num "+"). */
+  mover: (id: string, ponta: Ponta) => void;
 }) {
   const { resolved: tema } = useCanvasTheme();
   const rf = useReactFlow();
@@ -421,6 +438,20 @@ function CanvasInterno({
   }, []);
   const atrasoDe = (x: number) => (abrindo ? Math.min(Math.round(x / PASSO_X), 8) * 0.07 : 0);
 
+  // Posição durante o arraste (os nós são recriados a cada render; sem isto
+  // o bloco não acompanha o ponteiro). Ao soltar vira posição salva.
+  const [arrastando, setArrastando] = React.useState<Record<string, { x: number; y: number }>>({});
+  const [alvoDoArraste, setAlvoDoArraste] = React.useState<string | null>(null);
+  const aoMudarNos = React.useCallback((mudancas: NodeChange[]) => {
+    const novas: Record<string, { x: number; y: number }> = {};
+    for (const m of mudancas) if (m.type === "position" && m.dragging && m.position) novas[m.id] = m.position;
+    if (Object.keys(novas).length) setArrastando((a) => ({ ...a, ...novas }));
+  }, []);
+  // Só ação e espera mudam de lugar na árvore; os outros só se reposicionam.
+  const podeMudarDeLugar = (n: Node) => n.data?.tipo === "acao" || n.data?.tipo === "espera";
+  const vazioEmBaixo = (n: Node) =>
+    podeMudarDeLugar(n) ? rf.getIntersectingNodes(n).find((o) => o.type === "vazio" && (o.data as DadosDoVazio).ponta.de !== n.id) : undefined;
+
   const nos: Node[] = layout.caixas.map((c) => {
     if (c.tipo === "vazio")
       return {
@@ -431,15 +462,16 @@ function CanvasInterno({
         // ResizeObserver (que se perde a cada render, porque os nós são recriados).
         width: VAZIO_ALTURA,
         height: VAZIO_ALTURA,
-        data: { ponta: c.ponta!, inserir, ativo: mesmaPonta(inserindo, c.ponta!), atraso: atrasoDe(c.x) } satisfies DadosDoVazio,
+        data: { ponta: c.ponta!, inserir, ativo: mesmaPonta(inserindo, c.ponta!), soltar: alvoDoArraste === c.id, atraso: atrasoDe(c.x) } satisfies DadosDoVazio,
         selectable: false,
+        draggable: false,
       };
     if (c.tipo === "gatilho") {
       const item = def.gatilho ? gatilhoDoTipo(def.gatilho.tipo) : undefined;
       return {
         id: "gatilho",
         type: "passo",
-        position: { x: c.x, y: c.y },
+        position: arrastando.gatilho ?? { x: c.x, y: c.y },
         width: NO_ALTURA,
         height: NO_ALTURA,
         data: {
@@ -458,7 +490,7 @@ function CanvasInterno({
     return {
       id: c.id,
       type: "passo",
-      position: { x: c.x, y: c.y },
+      position: arrastando[c.id] ?? { x: c.x, y: c.y },
       width: NO_ALTURA,
       height: NO_ALTURA,
       data: {
@@ -488,12 +520,8 @@ function CanvasInterno({
     } satisfies DadosDaLigacao,
   }));
 
-  // Reenquadra quando a árvore muda de tamanho (passo novo, ramo apagado).
-  const tamanho = `${layout.caixas.length}:${Math.round(layout.altura)}`;
-  React.useEffect(() => {
-    const t = setTimeout(() => rf.fitView({ padding: 0.2, maxZoom: 1, duration: 200 }), 50);
-    return () => clearTimeout(t);
-  }, [tamanho, rf]);
+  // Sem reenquadrar sozinho: a vista fica onde a pessoa deixou (o botão
+  // "Enquadrar" da barra faz isso quando ela quiser).
 
   // data-theme no contêiner: "canvas sempre escuro" vale também para os
   // cartões (tokens), não só para o fundo do React Flow.
@@ -506,9 +534,22 @@ function CanvasInterno({
         edges={ligacoes}
         nodeTypes={TIPOS_DE_NO}
         edgeTypes={TIPOS_DE_LIGACAO}
-        nodesDraggable={false}
+        nodesDraggable
         nodesConnectable={false}
         elementsSelectable
+        onNodesChange={aoMudarNos}
+        onNodeDrag={(_e, n) => setAlvoDoArraste(vazioEmBaixo(n)?.id ?? null)}
+        onNodeDragStop={(_e, n) => {
+          const vazio = vazioEmBaixo(n);
+          if (vazio) mover(n.id, (vazio.data as DadosDoVazio).ponta);
+          else posicionar(n.id, n.position.x, n.position.y);
+          setAlvoDoArraste(null);
+          setArrastando((a) => {
+            const resto = { ...a };
+            delete resto[n.id];
+            return resto;
+          });
+        }}
         onNodeClick={(_e, n) => n.type === "passo" && selecionar(n.id)}
         onPaneClick={() => selecionar(null)}
         fitView

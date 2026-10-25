@@ -134,6 +134,11 @@ export interface Definicao {
   /** Primeiro passo depois do gatilho. */
   inicio: string | null;
   nos: Record<string, No>;
+  /**
+   * Onde a pessoa arrastou cada bloco no canvas (id do nó ou "gatilho").
+   * Só visual: o motor ignora. Sem posição = layout automático.
+   */
+  posicoes?: Record<string, { x: number; y: number }>;
 }
 
 /** Onde uma ligação sai: do gatilho ou de uma saída de um nó. */
