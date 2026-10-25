@@ -8,7 +8,7 @@ O resto do app herda os tokens e é migrado depois.
 Fontes: skills `crm-design-system`, `crm-ux-pain-points`,
 `crm-list-views-search`, `crm-pipeline-kanban` e `ui-ux-pro-max` (busca
 `--design-system` para "CRM SaaS sales inbox B2B", densidade 8), mais a
-documentação pública de HubSpot, Pipedrive, Close, Kommo, RD Station e o blog
+documentação pública de Close, Kommo, RD Station e o blog
 de design da Linear (links no fim).
 
 ---
@@ -172,7 +172,7 @@ Auditoria feita no código (`conversas/page.tsx`, `lista-de-conversas.tsx`,
    rounded-3xl` com 12px de vão sobre um fundo cinza: menu lateral é uma caixa,
    o conteúdo é outra, e a Caixa de entrada são três caixas lado a lado. É o
    visual padrão de gerador de dashboard. CRM de verdade (Attio, Linear,
-   HubSpot novo, Front) é **uma superfície só**, dividida por linhas finas.
+   Front) é **uma superfície só**, dividida por linhas finas.
 2. **Raio grande em tudo.** `rounded-3xl`/`rounded-2xl` em lista, coluna,
    cartão, bolha e modal. O token achatou para 8/12px, mas o desenho continua
    de "bolhas empilhadas". Controle de CRM usa 4–8px; pílula só em etiqueta e
@@ -217,9 +217,9 @@ Auditoria feita no código (`conversas/page.tsx`, `lista-de-conversas.tsx`,
 |---|---|---|
 | **Linear** (refresh 2024 e 2026) | Navegação recua para o trabalho aparecer: menu com texto inativo apagado, ícones menores, menos separadores ("estrutura se sente, não se vê"), cabeçalho previsível com as mesmas ações no mesmo lugar | Tema escuro como padrão |
 | **Attio** | Canvas branco, linhas finas, uma cor de acento só para link/foco/seleção, Inter 500 como peso de interface, avatar e chip de relação em toda célula | Marketing com serifa |
-| **HubSpot (Inbox)** | Trocar de caixa (inbox) por um menu no topo esquerdo; visões por responsável, canal e status | Bordas pesadas `#cbd6e2` e raio grande em tudo |
+| **Caixa de entrada (padrão de mercado)** | Trocar de caixa (inbox) por um menu no topo esquerdo; visões por responsável, canal e status | Bordas pesadas `#cbd6e2` e raio grande em tudo |
 | **Front / Intercom / Kommo** | Três colunas lista ∣ conversa ∣ contexto do cliente, coladas, sem vão | Kommo: arco-íris de etapas e fundo de coluna pintado |
-| **Pipedrive** | Cartão do funil com título, contato, valor, dono e sinal de atividade; contagem e soma no topo da coluna | Canvas cinza com cartões brancos |
+| **Funil (padrão de mercado)** | Cartão do funil com título, contato, valor, dono e sinal de atividade; contagem e soma no topo da coluna | Canvas cinza com cartões brancos |
 | **Close** | Caixa de entrada como lista de trabalho do dia; filtros em um botão "Filtros", não espalhados | Visual utilitário demais |
 | **Folk** | Calor de SMB sem perder densidade: avatar colorido, chip de etiqueta suave | Ilustração em todo estado vazio |
 | **RD Station CRM** | Vocabulário que o vendedor brasileiro já conhece (Funil, Negociação, Ganhou/Perdeu, Tarefas) | Azul da marca pintando menu e cabeçalho |
@@ -425,9 +425,6 @@ artifact da proposta. Resumo do que muda em cada tela:
 - Linear, *Behind the latest design refresh* (2026): https://linear.app/now/behind-the-latest-design-refresh
 - Linear, *How we redesigned the Linear UI*: https://linear.app/now/how-we-redesigned-the-linear-ui
 - Linear changelog, UI refresh 12/03/2026: https://linear.app/changelog/2026-03-12-ui-refresh
-- HubSpot, *Use the conversations inbox*: https://knowledge.hubspot.com/inbox/use-the-conversations-inbox
-- Pipedrive, *Pipeline view*: https://support.pipedrive.com/en/article/pipeline-view
-- Pipedrive, *Deal card customization*: https://support.pipedrive.com/en/article/deal-card-customization-sorting
 - Close, *Inbox*: https://help.close.com/docs/inbox.md
 - Kommo, *Incoming leads*: https://www.kommo.com/support/crm/incoming-leads/
 - RD Station, *Funil de vendas*: https://www.rdstation.com/crm/funil-de-vendas/

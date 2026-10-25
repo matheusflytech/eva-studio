@@ -15,7 +15,7 @@ import { AcaoRapida, IconeDoTipo } from "./pecas";
 import { useConcluirTarefa } from "./concluir";
 import { QuickAdd } from "./quick-add";
 
-// Modo fila (HubSpot task queues / Close power dialer): um registro por vez,
+// Modo fila: um registro por vez,
 // com a ação de 1 clique, o contexto do negócio/contato ao lado e "Concluir e
 // próximo" (o diálogo de conclusão de sempre; ao concluir, avança).
 // Itens sintéticos: "Responder" e "Primeiro contato" avançam com "Feito,

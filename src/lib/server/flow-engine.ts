@@ -886,8 +886,8 @@ async function runAiAgent(
     toolNodeByName.set(tool.name, tn);
   }
 
-  // Coleta estruturada de variáveis (estilo "slots" do Rasa + function-calling
-  // do Dify): cada linha configurada vira um campo opcional de uma ferramenta
+  // Coleta estruturada de variáveis (slots preenchidos por function-calling):
+  // cada linha configurada vira um campo opcional de uma ferramenta
   // interna que o modelo chama assim que identifica um valor na conversa — o
   // system prompt lista o que já foi coletado e o que ainda falta, pra ele
   // perguntar ativamente em vez de só esperar o usuário se oferecer.

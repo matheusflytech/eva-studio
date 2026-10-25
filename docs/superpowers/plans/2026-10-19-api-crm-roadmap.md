@@ -1,6 +1,6 @@
 # Roadmap — API pública do CRM da Eva (v1)
 
-> Documento-mãe. Cada fase vira um plano de implementação próprio, com código e testes, na hora de executar. Pesquisa de referência: Beeno (collection e ETL locais), Mautic (base do Beeno), HubSpot CRM v3, Twenty, Stripe.
+> Documento-mãe. Cada fase vira um plano de implementação próprio, com código e testes, na hora de executar. Pesquisa de referência: Beeno (collection e ETL locais), Mautic (base do Beeno), Twenty, Stripe.
 
 ## Escopo pedido
 - Contatos, empresas e negócios: CRUD, **importar e exportar de forma robusta**, sem duplicar.

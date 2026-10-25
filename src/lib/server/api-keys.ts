@@ -3,7 +3,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { comFallbackLegado } from "@/lib/server/contratos";
 
-// Chave pública de API — mesmo modelo que Stripe/OpenAI/HubSpot usam:
+// Chave pública de API:
 // "evs_live_<32 bytes em hex>", só o SHA-256 vai pro banco, a chave completa
 // só existe uma vez (no momento da criação) e nunca mais é recuperável.
 

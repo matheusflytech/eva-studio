@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Steps em checkbox (`- [ ]`). TDD: teste primeiro, vê falhar, implementa, vê passar.
 
-**Goal:** o negócio deixa de ser só "um valor digitado" e passa a ter **itens** vindos de um **catálogo de produtos** da organização (como HubSpot Products/Line items, Pipedrive Products, RD Station CRM e Agendor). O valor do negócio vira a soma dos itens (com opção de valor manual), a ficha mostra MRR/ARR quando há recorrência, o cartão do quadro pode mostrar "3 produtos · Plano Pro +2", a planilha do funil ganha a coluna "Produtos" (e uma exportação de itens, uma linha por item) e o dashboard ganha o agrupamento "Por produto".
+**Goal:** o negócio deixa de ser só "um valor digitado" e passa a ter **itens** vindos de um **catálogo de produtos** da organização (como RD Station CRM e Agendor). O valor do negócio vira a soma dos itens (com opção de valor manual), a ficha mostra MRR/ARR quando há recorrência, o cartão do quadro pode mostrar "3 produtos · Plano Pro +2", a planilha do funil ganha a coluna "Produtos" (e uma exportação de itens, uma linha por item) e o dashboard ganha o agrupamento "Por produto".
 
 **Architecture:** contas puras (total do item, desconto, soma, MRR/ARR, resumo do cartão, leitura de quantidade e desconto) em `src/lib/produtos.ts`, testadas sem banco. O servidor (`src/lib/server/produtos.ts`) só busca, grava e **recalcula o valor do negócio numa transação** sempre que os itens mudam. Rotas finas em `/api/products` e `/api/deals/[dealId]/items`. Tudo filtrado por `orgId` vindo da sessão.
 
@@ -16,16 +16,15 @@
 
 | CRM | Catálogo | Item no negócio | Valor do negócio |
 |---|---|---|---|
-| HubSpot | Products (nome, SKU, preço, recorrência, prazo) | Line item = cópia do produto (preço/nome congelados), qtd, desconto % ou valor | "Amount" = soma dos line items, recalculado; MRR/ARR/TCV calculados |
-| Pipedrive | Products (código, unidade, preço por moeda, categoria, ativo) | qtd, preço, desconto % ou valor, "duração" | Valor = soma dos produtos, com opção de editar manualmente |
+| CRMs internacionais | Produtos (nome, código, unidade, preço por moeda, recorrência, prazo) | Item = cópia do produto (preço/nome congelados), qtd, desconto % ou valor | Valor = soma dos itens, recalculado, com opção de editar manualmente; MRR/ARR/TCV calculados |
 | RD Station CRM | Produtos (nome, preço, recorrência) | qtd, desconto | Valor total do negócio = soma; separa único x recorrente |
 | Agendor | Produtos/Serviços (código, preço, categoria) | qtd, desconto | Valor = soma dos itens |
 
 Decisões tiradas daí:
 1. **Nome, código, unidade, preço e recorrência são congelados no item.** Mudar o preço no catálogo não reescreve proposta antiga. Apagar o produto não apaga o item (FK `SET NULL`).
-2. **Item avulso** (sem produto do catálogo) é permitido, como no HubSpot/Pipedrive.
+2. **Item avulso** (sem produto do catálogo) é permitido.
 3. **Desconto por item**, em % ou em R$, nunca maior que o bruto.
-4. **Valor = soma dos itens**, recalculado no servidor; o usuário pode ligar "usar valor manual" (Pipedrive).
+4. **Valor = soma dos itens**, recalculado no servidor; o usuário pode ligar "usar valor manual".
 5. **MRR/ARR** só aparecem quando há item recorrente: mensal conta inteiro no MRR; anual conta 1/12. ARR = MRR × 12.
 
 ## Modelo (Prisma + SQL)
@@ -142,6 +141,6 @@ Sem a tabela no banco: GET devolve `disponivel: false`; escrita devolve 503 "Pro
 ## Pendências (fora desta entrega)
 - Filtro "Produto" no montador do dashboard (precisa de fonte de opções `produtos` no `opcoes.ts` do dashboard e pré-seleção `items: { some: { productId: { in } } }`).
 - Linha do tempo com "Produtos atualizados" (tabela de eventos de item).
-- Preço por moeda, impostos, tabela de preços, prazo de contrato/TCV (HubSpot "term").
+- Preço por moeda, impostos, tabela de preços, prazo de contrato/TCV.
 - API pública v1 de produtos (outro agente cuida de `src/app/api/v1/**`).
 - Itens na gaveta do quadro (`deal-drawer.tsx`) — hoje a gaveta mostra o valor e, se a soma manda, o servidor recusa a edição com mensagem.
