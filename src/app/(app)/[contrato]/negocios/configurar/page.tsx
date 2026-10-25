@@ -58,7 +58,7 @@ export default function PersonalizarCrmPage({
           </TabsList>
         </div>
         <div className="entrada-de-tela">
-          <TabsContent value="funis"><FunisEditor /></TabsContent>
+          <TabsContent value="funis"><FunisEditor funilInicial={funil} criarAoAbrir={params.novo === "1"} /></TabsContent>
           <TabsContent value="cartao"><CartaoEditor funilInicial={funil} /></TabsContent>
           <TabsContent value="deal"><CamposEditor entity="deal" /></TabsContent>
           <TabsContent value="contact"><CamposEditor entity="contact" /></TabsContent>

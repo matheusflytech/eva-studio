@@ -15,6 +15,7 @@ import {
   FileText,
   Handshake,
   ListFilter,
+  Pencil,
   Plus,
   Rows3,
   Search,
@@ -706,6 +707,17 @@ function NegociosConteudo() {
                   {p.name}
                 </DropdownMenuCheckboxItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`/negocios/configurar?aba=funis${pipelineId ? `&funil=${pipelineId}` : ""}`}>
+                  <Pencil aria-hidden="true" /> Editar este funil
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/negocios/configurar?aba=funis&novo=1">
+                  <Plus aria-hidden="true" /> Novo funil
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
