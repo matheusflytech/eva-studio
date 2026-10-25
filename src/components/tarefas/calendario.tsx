@@ -309,7 +309,8 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border-subtle px-5 py-4">
           <div aria-hidden="true" className="flex w-12 flex-col overflow-hidden rounded-[10px] border border-border-subtle text-center shadow-[0_1px_2px_rgb(0_0_0/0.05)]">
             <span className="bg-danger-solid py-0.5 text-caption font-semibold tracking-widest text-text-on-accent">{MESES_CURTOS[dia.mes - 1]}</span>
-            <span className="bg-panel py-1 text-title font-semibold leading-none tabular-nums text-text-primary">{dia.dia}</span>
+            {/* Ícone de calendário: branco nos dois temas (no escuro, bg-panel sumia no fundo). */}
+            <span className="bg-white py-1 text-title font-semibold leading-none tabular-nums text-[#1d1d1f]">{dia.dia}</span>
           </div>
           <div className="min-w-0">
             <h2 className="text-body font-semibold text-text-primary" aria-live="polite">
