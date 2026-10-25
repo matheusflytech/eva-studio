@@ -65,7 +65,6 @@ import { StageColumn } from "@/components/crm/negocios/stage-column";
 import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/lista-de-negocios";
 import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
 import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
-import type { EtapaDeConversao } from "@/components/crm/negocios/resumo";
 import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
 import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
@@ -97,6 +96,14 @@ import type { FilterOption } from "@/components/ui/filter-button";
 // configurar no "…", o recado da Eva vai para a ilha e "Seu dia" (desde
 // ontem / pede atenção) abre numa gaveta.
 // ---------------------------------------------------------------------------
+
+/** Conversão entre etapas (vem de /api/deals/funil; alimenta o gargalo da voz da Eva). */
+interface EtapaDeConversao {
+  etapaId: string;
+  nome: string;
+  quantidade: number;
+  taxaDoInicio: number;
+}
 
 const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
   { campo: "contato", rotulo: "Contatos", param: "contato", tipo: "lista" },
