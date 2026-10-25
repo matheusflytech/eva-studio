@@ -13,6 +13,7 @@ import { reaisDigitados } from "@/lib/dinheiro";
 
 export interface FunilDaTela {
   id: string;
+  numero?: number;
   name: string;
   stages: { id: string; name: string; type: string }[];
 }

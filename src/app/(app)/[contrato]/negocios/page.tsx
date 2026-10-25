@@ -15,6 +15,7 @@ import {
   FileText,
   Handshake,
   ListFilter,
+  Pencil,
   Plus,
   Rows3,
   Search,
@@ -157,8 +158,9 @@ function NegociosConteudo() {
   const sp = useSearchParams();
   const opcoes = useOpcoesDoCrm("negocios");
   const [pipelines, setPipelines] = React.useState<FunilDaTela[]>([]);
+  // ?funil= leva o número do funil no contrato; o UUID de links antigos ainda abre.
   const funilDaUrl = sp.get("funil");
-  const pipelineId = pipelines.find((p) => p.id === funilDaUrl)?.id ?? pipelines[0]?.id ?? "";
+  const pipelineId = pipelines.find((p) => String(p.numero) === funilDaUrl || p.id === funilDaUrl)?.id ?? pipelines[0]?.id ?? "";
   const pipeline = pipelines.find((p) => p.id === pipelineId);
   // Visões salvas do funil (e as de todos os funis) + a padrão da pessoa.
   const visoes = useVisoesDaLista("negocios", VISOES_DE_NEGOCIO, PADRAO, pipelineId || undefined);
@@ -700,12 +702,23 @@ function NegociosConteudo() {
                   onCheckedChange={() => {
                     if (p.id === pipelineId) return;
                     setPrevia(null);
-                    gravarParametro("funil", p.id);
+                    gravarParametro("funil", String(p.numero ?? p.id));
                   }}
                 >
                   {p.name}
                 </DropdownMenuCheckboxItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href={`/negocios/configurar?aba=funis${pipeline ? `&funil=${pipeline.numero ?? pipeline.id}` : ""}`}>
+                  <Pencil aria-hidden="true" /> Editar este funil
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/negocios/configurar?aba=funis&novo=1">
+                  <Plus aria-hidden="true" /> Novo funil
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -775,7 +788,7 @@ function NegociosConteudo() {
                 <SlidersHorizontal aria-hidden="true" /> Personalizar card (só para você)
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href={`/negocios/configurar?aba=cartao${pipelineId ? `&funil=${pipelineId}` : ""}`}>
+                <Link href={`/negocios/configurar?aba=cartao${pipeline ? `&funil=${pipeline.numero ?? pipeline.id}` : ""}`}>
                   <Settings aria-hidden="true" /> Configurar funil, cartão e campos
                 </Link>
               </DropdownMenuItem>

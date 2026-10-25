@@ -95,7 +95,7 @@ const seletor = (displayName: string, property: string, metodo: keyof typeof lis
 	type: 'options',
 	default: '',
 	typeOptions: { loadOptionsMethod: metodo },
-	description: 'Escolha da lista ou use uma expressão com o ID',
+	description: 'Escolha da lista ou use uma expressão com o número (funil/etapa no contrato)',
 	routing: { send: { type: 'body', property } },
 	...extra,
 });
@@ -205,7 +205,7 @@ const propriedades: INodeProperties[] = [
 		type: 'options',
 		default: '',
 		typeOptions: { loadOptionsMethod: 'getPipelines' },
-		description: 'Só para filtrar a lista de etapas abaixo. Choose from the list, or specify an ID using an expression.',
+		description: 'Só para filtrar a lista de etapas abaixo. Choose from the list, or specify the pipeline number using an expression.',
 		displayOptions: mostrar('deal', ['move']),
 	},
 	{

@@ -1054,6 +1054,9 @@ model Pipeline {
   name      String
   isDefault Boolean  @default(false)
   position  Int      @default(0)
+  // Número do funil no contrato (1, 2, 3...): é o id que a API mostra. 0 no
+  // create = o gatilho do banco põe o próximo (prisma/sql/2026-10-30-numeros-de-funil.sql).
+  numero    Int      @default(0)
   createdAt DateTime @default(now())
 
   organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -1064,6 +1067,7 @@ model Pipeline {
   layoutsDasPessoas UserCardLayout[]
   lostReasons  PipelineLostReason[]
 
+  @@unique([orgId, numero])
   @@index([orgId])
   @@map("eva_studio_pipelines")
 }
@@ -1106,6 +1110,11 @@ model UserCardLayout {
 model PipelineStage {
   id         String @id @default(uuid())
   pipelineId String
+  // Contrato e número da etapa no contrato inteiro (somando os funis): o id da
+  // API. Ambos preenchidos pelo gatilho do banco no create (orgId opcional
+  // aqui só para o create mandar NULL).
+  orgId      String?
+  numero     Int    @default(0)
   name       String
   position   Int    @default(0)
   // Probabilidade padrao da etapa: o negocio herda ao entrar e pode

@@ -131,6 +131,8 @@ export interface CampoFaltando {
   rotulo: string;
   /** Etapa que exige (a alvo ou uma pulada). */
   etapaId: string;
+  /** Número da etapa no contrato, quando quem chama precisa (API v1). */
+  etapaNumero?: number;
   etapa: string;
 }
 

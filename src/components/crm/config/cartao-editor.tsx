@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 
 interface FunilSimples {
   id: string;
+  numero?: number;
   name: string;
   stages: EtapaDaPrevia[];
 }
@@ -133,7 +134,7 @@ export function CartaoEditor({ funilInicial }: { funilInicial?: string }) {
       if (!ativo) return;
       const lista = d?.pipelines ?? [];
       setFunis(lista);
-      setFunilId(lista.find((f) => f.id === funilInicial)?.id ?? lista[0]?.id ?? "");
+      setFunilId(lista.find((f) => f.id === funilInicial || String(f.numero) === funilInicial)?.id ?? lista[0]?.id ?? "");
       if (lista.length === 0) setErroDeCarga("Nenhum funil encontrado.");
     });
     lerJson<{ me?: { role?: string } }>("/api/members").then(({ dados: d }) => {

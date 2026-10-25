@@ -15,6 +15,8 @@ export async function GET() {
   return NextResponse.json({
     pipelines: pipelines.map((p) => ({
       id: p.id,
+      // Número do funil no contrato: é o que vai na URL (?funil=) e na API v1.
+      numero: p.numero,
       name: p.name,
       isDefault: p.isDefault,
       dealCount: p._count.deals,

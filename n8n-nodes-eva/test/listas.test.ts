@@ -4,8 +4,8 @@ import type { ILoadOptionsFunctions } from 'n8n-workflow';
 import { listas } from '../nodes/EvaStudio/listas';
 
 const funis = [
-	{ id: 'p1', name: 'Vendas', stages: [{ id: 's1', name: 'Novo', type: 'open' }, { id: 's2', name: 'Ganho', type: 'won' }] },
-	{ id: 'p2', name: 'Pós-venda', stages: [{ id: 's3', name: 'Onboarding', type: 'open' }] },
+	{ id: 1, name: 'Vendas', stages: [{ id: 1, name: 'Novo', type: 'open' }, { id: 2, name: 'Ganho', type: 'won' }] },
+	{ id: 2, name: 'Pós-venda', stages: [{ id: 3, name: 'Onboarding', type: 'open' }] },
 ];
 
 function ctx(params: Record<string, unknown>) {
@@ -23,20 +23,20 @@ function ctx(params: Record<string, unknown>) {
 	return { c: c as unknown as ILoadOptionsFunctions, pedidos };
 }
 
-test('funis: nome e id, sem barra dupla no endereço', async () => {
+test('funis: número e nome, sem barra dupla no endereço', async () => {
 	const { c, pedidos } = ctx({});
-	assert.deepEqual(await listas.getPipelines.call(c), [{ name: 'Vendas', value: 'p1' }, { name: 'Pós-venda', value: 'p2' }]);
+	assert.deepEqual(await listas.getPipelines.call(c), [{ name: '1 · Vendas', value: 1 }, { name: '2 · Pós-venda', value: 2 }]);
 	assert.equal(pedidos[0], 'https://eva.test/api/v1/pipelines');
 });
 
 test('etapas: só do funil escolhido no topo (mover)', async () => {
-	const { c } = ctx({ pipelineFilter: 'p1' });
-	assert.deepEqual(await listas.getStages.call(c), [{ name: 'Novo', value: 's1' }, { name: 'Ganho (ganho)', value: 's2' }]);
+	const { c } = ctx({ pipelineFilter: 1 });
+	assert.deepEqual(await listas.getStages.call(c), [{ name: '1 · Novo', value: 1 }, { name: '2 · Ganho (ganho)', value: 2 }]);
 });
 
 test('etapas: funil dos campos adicionais (criar) ou todas com o nome do funil', async () => {
-	assert.deepEqual((await listas.getStages.call(ctx({ additionalFields: { pipeline_id: 'p2' } }).c)).map((o) => o.value), ['s3']);
+	assert.deepEqual((await listas.getStages.call(ctx({ additionalFields: { pipeline_id: '2' } }).c)).map((o) => o.value), [3]);
 	const todas = await listas.getStages.call(ctx({}).c);
 	assert.equal(todas.length, 3);
-	assert.equal(todas[2].name, 'Pós-venda › Onboarding');
+	assert.equal(todas[2].name, 'Pós-venda › 3 · Onboarding');
 });

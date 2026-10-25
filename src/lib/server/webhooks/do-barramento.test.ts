@@ -9,6 +9,9 @@ const emitir = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("./emitir", () => emitir);
+vi.mock("@/lib/server/api-v1/funis", () => ({
+  comNumeros: async (o: Record<string, unknown> | undefined) => (o?.stage_id === "s1" ? { ...o, stage_id: 1 } : o),
+}));
 
 import { paraWebhooks } from "./do-barramento";
 import type { EventoPublicado } from "@/lib/server/eventos/barramento";
@@ -28,9 +31,9 @@ const evento = (over: Partial<EventoPublicado>): EventoPublicado => ({
 beforeEach(() => vi.clearAllMocks());
 
 describe("webhooks a partir do barramento", () => {
-  it("negócio: previous vem do detalhe do evento (etapa anterior)", async () => {
+  it("negócio: previous vem do detalhe do evento (etapa anterior), com a etapa pelo número", async () => {
     await paraWebhooks(evento({ tipo: "deal.stage_changed", dados: { previous: { stage_id: "s1" } } }));
-    expect(emitir.emitirEventoDeNegocio).toHaveBeenCalledWith("o1", "d1", "deal.stage_changed", { stage_id: "s1" });
+    expect(emitir.emitirEventoDeNegocio).toHaveBeenCalledWith("o1", "d1", "deal.stage_changed", { stage_id: 1 });
   });
 
   it("alteração: previous é o lado 'de' do diff", async () => {

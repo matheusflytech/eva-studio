@@ -59,11 +59,12 @@ export class EvaStudioTrigger implements INodeType {
 				],
 			},
 			{
-				displayName: 'Só Do Funil (ID)',
+				displayName: 'Só Do Funil (Número)',
 				name: 'pipelineId',
 				type: 'string',
 				default: '',
-				description: 'Opcional. Nos eventos de negócio, deixa passar só os deste funil.',
+				placeholder: '1',
+				description: 'Opcional. Número do funil no contrato (1, 2...); nos eventos de negócio, deixa passar só os deste funil.',
 			},
 		],
 	};
@@ -138,8 +139,8 @@ export class EvaStudioTrigger implements INodeType {
 		}
 
 		const evento = JSON.parse(corpo) as IDataObject & { type?: string; data?: IDataObject };
-		const funil = (this.getNodeParameter('pipelineId', '') as string).trim();
-		if (funil && String(evento.type ?? '').startsWith('deal.') && evento.data?.pipeline_id !== funil) {
+		const funil = String(this.getNodeParameter('pipelineId', '') ?? '').trim();
+		if (funil && String(evento.type ?? '').startsWith('deal.') && String(evento.data?.pipeline_id ?? '') !== funil) {
 			return { workflowData: [] };
 		}
 		return { workflowData: [this.helpers.returnJsonArray([{ ...evento, webhook_id: req.headers['webhook-id'] }])] };

@@ -84,7 +84,7 @@ describe("/v1/sequences", () => {
         agent_id: "ag1",
         name: "Proposta parada",
         trigger: "stage",
-        trigger_stage_id: "s1",
+        trigger_stage_id: 4,
         trigger_tag_id: "ignorado",
         trigger_stage_days: 7,
         steps: [{ delay_minutes: -5, text: "  Oi {nome}  " }, { text: "" }],
@@ -92,9 +92,16 @@ describe("/v1/sequences", () => {
       semParams
     );
     expect(res.status).toBe(201);
+    expect(db.pipelineStage.findFirst.mock.calls[0][0].where).toEqual({ orgId: "o1", numero: 4 });
     const data = db.sequence.create.mock.calls[0][0].data;
     expect(data).toMatchObject({ trigger: "stage", triggerStageId: "s1", triggerTagId: null, triggerStageDays: 7, active: false });
     expect(data.steps.create).toEqual([{ order: 1, delayMinutes: 0, text: "Oi {nome}", templateId: null, applyTagId: null }]);
+  });
+
+  it("trigger_stage_id sai pelo número da etapa", async () => {
+    db.sequence.findFirst.mockResolvedValue(sequencia({ trigger: "stage", triggerStageId: "s1", triggerStage: { numero: 4 } }));
+    const res = await PATCH(req("PATCH", { name: "Outro nome" }), p("q1"));
+    expect((await res.json()).data.trigger_stage_id).toBe(4);
   });
 
   it("edição troca gatilho para segment e confere o segmento pela org; ativar sem passo é 422", async () => {

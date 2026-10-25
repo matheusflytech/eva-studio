@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { MAX_CENTAVOS, conferirReferencias, reaisParaCentavos, type Corpo } from "@/lib/server/api-validacao";
 import { createDeal, moveDealStage, resolverEtapaDeEntrada, type OpcoesDaMudanca } from "@/lib/server/crm";
-import { gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
+import { ErroDaMudanca, gravarPerda, lerMotivos } from "@/lib/server/regras-de-etapa";
 import { tocarAtividade } from "@/lib/server/atividade-do-negocio";
 import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteracoes";
 import { resolverPerda } from "@/lib/regras-de-etapa";
@@ -23,6 +23,7 @@ import {
 } from "./entrada";
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerBooleano, lerDataDaConsulta } from "./paginacao";
+import { lerNumero, numerosDeEtapas, numerosDeFunis, refOpc, uuidDaEtapa, uuidDoFunil } from "./funis";
 
 // ---------------------------------------------------------------------------
 // Negócios na API v1. Criação passa por createDeal e todo movimento de etapa
@@ -30,10 +31,12 @@ import { lerBooleano, lerDataDaConsulta } from "./paginacao";
 // é o que mantém probabilidade, closedAt, stageSince e DealStageEvent iguais
 // aos da tela e do Builder. Diferença deliberada para a tela: etapa de OUTRO
 // funil só com `pipeline_id` explícito (troca de funil é decisão, não acidente).
+// pipeline_id e stage_id são os números do contrato (src/lib/server/api-v1/funis.ts).
 // ---------------------------------------------------------------------------
 
 export const INCLUDE_NEGOCIO = {
-  stage: { select: { type: true } },
+  stage: { select: { type: true, numero: true } },
+  pipeline: { select: { numero: true } },
   contacts: { select: { contactId: true, role: true } },
 } as const;
 
@@ -46,8 +49,8 @@ export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null =
     name: d.name,
     description: d.description,
     category: d.category,
-    pipeline_id: d.pipelineId,
-    stage_id: d.stageId,
+    pipeline_id: d.pipeline?.numero ?? null,
+    stage_id: d.stage?.numero ?? null,
     status: d.stage?.type ?? "open",
     amount_cents: d.amountCents,
     currency: d.currency,
@@ -151,8 +154,8 @@ export async function lerDadosDeNegocio(orgId: string, corpo: Corpo): Promise<Da
   d.name = textoOpc(corpo, "name", 200);
   d.description = textoOpc(corpo, "description", 5000);
   d.category = textoOpc(corpo, "category", 100);
-  d.pipelineId = idOpc(corpo, "pipeline_id");
-  d.stageId = idOpc(corpo, "stage_id");
+  d.pipelineId = await refOpc(corpo.pipeline_id, (v) => uuidDoFunil(orgId, v, "pipeline_id"));
+  d.stageId = await refOpc(corpo.stage_id, (v) => uuidDaEtapa(orgId, v, "stage_id"));
   d.lostReason = textoOpc(corpo, "lost_reason", 500);
   d.lostReasonId = textoOpc(corpo, "lost_reason_id", 80);
   d.lostNote = textoOpc(corpo, "lost_note", 500);
@@ -291,11 +294,15 @@ export async function moverNegocio(
     throw new ErroApi(422, "stage_not_in_pipeline", "A etapa não pertence ao funil informado.", { param: "stage_id" });
   }
   if (etapa.pipelineId !== deal.pipelineId && alvo.pipelineId !== etapa.pipelineId) {
+    const numeros = await numerosDeFunis([deal.pipelineId, etapa.pipelineId]);
     throw new ErroApi(
       422,
       "stage_in_other_pipeline",
       "A etapa é de outro funil. Para trocar o negócio de funil, envie também pipeline_id com o funil da etapa.",
-      { param: "stage_id", details: { deal_pipeline_id: deal.pipelineId, stage_pipeline_id: etapa.pipelineId } }
+      {
+        param: "stage_id",
+        details: { deal_pipeline_id: numeros.get(deal.pipelineId) ?? null, stage_pipeline_id: numeros.get(etapa.pipelineId) ?? null },
+      }
     );
   }
   if (etapa.id === deal.stageId) {
@@ -317,14 +324,23 @@ export async function moverNegocio(
     }
     return { mudou: false, pipelineId: etapa.pipelineId };
   }
-  await moveDealStage(dealId, etapa.id, {
-    origem: op.origem ?? "api",
-    reabrir: alvo.reopen === true,
-    ignorarObrigatorios: op.ignorarObrigatorios,
-    perda: { motivoId: alvo.lostReasonId ?? null, motivo: alvo.lostReason ?? null, nota: alvo.lostNote ?? null },
-    pendente: op.pendente,
-    simular: op.simular,
-  });
+  try {
+    await moveDealStage(dealId, etapa.id, {
+      origem: op.origem ?? "api",
+      reabrir: alvo.reopen === true,
+      ignorarObrigatorios: op.ignorarObrigatorios,
+      perda: { motivoId: alvo.lostReasonId ?? null, motivo: alvo.lostReason ?? null, nota: alvo.lostNote ?? null },
+      pendente: op.pendente,
+      simular: op.simular,
+    });
+  } catch (e) {
+    // A lista do que falta cita as etapas: na API, pelo número.
+    if (e instanceof ErroDaMudanca && e.faltando.length) {
+      const numeros = await numerosDeEtapas(e.faltando.map((f) => f.etapaId));
+      for (const f of e.faltando) f.etapaNumero = numeros.get(f.etapaId);
+    }
+    throw e;
+  }
   return { mudou: true, pipelineId: etapa.pipelineId };
 }
 
@@ -479,8 +495,8 @@ export async function whereDeNegocios(orgId: string, sp: URLSearchParams): Promi
   const and: Prisma.DealWhereInput[] = [{ orgId }];
   const desde = lerDataDaConsulta(sp, "updated_since");
   if (desde) and.push({ updatedAt: { gte: desde } });
-  if (sp.get("pipeline")) and.push({ pipelineId: sp.get("pipeline")! });
-  if (sp.get("stage")) and.push({ stageId: sp.get("stage")! });
+  if (sp.get("pipeline")) and.push({ pipeline: { numero: lerNumero(sp.get("pipeline"), "pipeline") } });
+  if (sp.get("stage")) and.push({ stage: { numero: lerNumero(sp.get("stage"), "stage") } });
   if (sp.get("owner")) and.push({ ownerId: sp.get("owner")! });
   if (sp.get("company")) and.push({ companyId: sp.get("company")! });
   if (sp.get("contact")) and.push({ contacts: { some: { contactId: sp.get("contact")! } } });

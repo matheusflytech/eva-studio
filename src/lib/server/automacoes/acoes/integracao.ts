@@ -70,8 +70,13 @@ async function chamar(url: string, init: RequestInit): Promise<ResultadoDaAcao> 
   }
 }
 
-/** O que vai no corpo para o n8n: o registro e o que mais ele precisa para decidir. */
-function corpoParaN8n(ctx: CtxDaAcao, extra: unknown) {
+/**
+ * O que vai no corpo para o n8n: o registro e o que mais ele precisa para
+ * decidir. Funil e etapa pelo número do contrato, como na API v1 (a foto
+ * interna guarda o UUID).
+ */
+async function corpoParaN8n(ctx: CtxDaAcao, extra: unknown) {
+  const { comNumeros } = await import("@/lib/server/api-v1/funis");
   return {
     evento: "automacao.passo",
     // true quando veio do botão Testar do editor: o fluxo do n8n pode ignorar
@@ -80,10 +85,10 @@ function corpoParaN8n(ctx: CtxDaAcao, extra: unknown) {
     execucao_id: ctx.execucaoId,
     passo_id: ctx.noId,
     objeto: ctx.objeto,
-    registro: ctx.contexto.registro,
+    registro: await comNumeros(ctx.contexto.registro),
     contato: ctx.contexto.contato,
     empresa: ctx.contexto.empresa,
-    gatilho: ctx.contexto.gatilho,
+    gatilho: await comNumeros(ctx.contexto.gatilho),
     extra: extra ?? {},
   };
 }
@@ -95,7 +100,7 @@ export const ACOES_DE_INTEGRACAO: Record<string, ManipuladorDeAcao> = {
       if (!/^https?:\/\//i.test(url)) return { ok: false, erro: "Informe a URL completa do nó Webhook do n8n." };
       const extra = lerJson(config.extra, {});
       if (!extra.ok) return { ok: false, erro: "Dados extras: JSON inválido." };
-      const corpo = JSON.stringify(corpoParaN8n(ctx, extra.valor));
+      const corpo = JSON.stringify(await corpoParaN8n(ctx, extra.valor));
       const segredo = typeof config.segredo === "string" && config.segredo.startsWith("whsec_") ? config.segredo : null;
       return chamar(url, {
         method: "POST",

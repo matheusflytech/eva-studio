@@ -6,9 +6,10 @@ import type { Corpo } from "@/lib/server/api-validacao";
 import { midiaExiste, urlAssinada, urlDeUpload } from "@/lib/server/storage";
 import { parseCsv } from "@/app/api/contacts/import/csv";
 import { ErroApi, iso } from "./http";
-import { boolOpc, conferirCampos, enumOpc, idOpc, listaDeIdsOpc, objetoOpc } from "./entrada";
+import { boolOpc, conferirCampos, enumOpc, listaDeIdsOpc, objetoOpc } from "./entrada";
 import { whereDeContatos } from "./contatos";
 import { whereDeNegocios } from "./negocios";
+import { lerNumero } from "./funis";
 import { registrarHistorico } from "@/lib/server/historico";
 
 // ---------------------------------------------------------------------------
@@ -99,8 +100,9 @@ export async function criarImportacao(orgId: string, keyId: string, corpo: Corpo
     ...(entity === "contacts" ? { tag_ids: listaDeIdsOpc(opcoes, "tag_ids", 20) ?? [] } : {}),
     ...(entity === "deals"
       ? {
-          pipeline_id: idOpc(opcoes, "pipeline_id") ?? null,
-          stage_id: idOpc(opcoes, "stage_id") ?? null,
+          // Números do funil/etapa no contrato; cada linha resolve na importação.
+          pipeline_id: opcoes.pipeline_id == null || opcoes.pipeline_id === "" ? null : lerNumero(opcoes.pipeline_id, "options.pipeline_id"),
+          stage_id: opcoes.stage_id == null || opcoes.stage_id === "" ? null : lerNumero(opcoes.stage_id, "options.stage_id"),
           // Flag explícita: mover negócio existente sem os campos obrigatórios
           // da etapa. Fica registrada em cada mudança de etapa (DealStageEvent).
           skip_stage_requirements: boolOpc(opcoes, "skip_stage_requirements") ?? false,

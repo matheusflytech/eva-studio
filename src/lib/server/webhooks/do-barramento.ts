@@ -24,8 +24,12 @@ export async function paraWebhooks(e: EventoPublicado): Promise<void> {
     await emitirEvento(e.orgId, tipo, async () => ({ data: e.dados }));
     return;
   }
-  if (e.objeto === "deal") await emitirEventoDeNegocio(e.orgId, e.objetoId, tipo, previous);
-  else if (e.objeto === "contact") await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous);
+  if (e.objeto === "deal") {
+    // Funil/etapa no `previous` saem pelo número do contrato, como no `data`.
+    // Import tardio pelo mesmo motivo do emitir.ts (api-v1 → crm → eventos).
+    const { comNumeros } = await import("@/lib/server/api-v1/funis");
+    await emitirEventoDeNegocio(e.orgId, e.objetoId, tipo, await comNumeros(previous));
+  } else if (e.objeto === "contact") await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous);
   else if (e.objeto === "company") await emitirEventoDeEmpresa(e.orgId, e.objetoId, tipo, previous);
   else if (e.objeto === "task") await emitirEventoDeTarefa(e.orgId, e.objetoId, tipo);
 }

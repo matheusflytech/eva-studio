@@ -12,7 +12,7 @@ import { ProdutosEditor } from "@/components/crm/config/produtos-editor";
 
 const ABAS = ["funis", "cartao", "deal", "contact", "produtos"] as const;
 
-// ?aba=cartao&funil=<id> abre direto no cartão daquele funil (o botão
+// ?aba=cartao&funil=<número do funil (ou UUID antigo)> abre direto no cartão daquele funil (o botão
 // "Personalizar" do quadro manda assim).
 export default function PersonalizarCrmPage({
   searchParams,
@@ -58,7 +58,7 @@ export default function PersonalizarCrmPage({
           </TabsList>
         </div>
         <div className="entrada-de-tela">
-          <TabsContent value="funis"><FunisEditor /></TabsContent>
+          <TabsContent value="funis"><FunisEditor funilInicial={funil} criarAoAbrir={params.novo === "1"} /></TabsContent>
           <TabsContent value="cartao"><CartaoEditor funilInicial={funil} /></TabsContent>
           <TabsContent value="deal"><CamposEditor entity="deal" /></TabsContent>
           <TabsContent value="contact"><CamposEditor entity="contact" /></TabsContent>

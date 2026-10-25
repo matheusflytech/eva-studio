@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/sequences";
 import { ErroApi, iso } from "./http";
 import { boolOpc, idOpc, inteiroOpc, textoOpc } from "./entrada";
+import { refOpc, uuidDaEtapa } from "./funis";
 
 // ---------------------------------------------------------------------------
 // Sequências (réguas) na API v1 (API-5). Mesmas regras da tela (canal e
@@ -19,7 +20,7 @@ import { boolOpc, idOpc, inteiroOpc, textoOpc } from "./entrada";
 // e etapa do gatilho conferidos contra a organização — também na edição.
 // ---------------------------------------------------------------------------
 
-export const INCLUDE_SEQUENCIA = { steps: { orderBy: { order: "asc" as const } } } as const;
+export const INCLUDE_SEQUENCIA = { steps: { orderBy: { order: "asc" as const } }, triggerStage: { select: { numero: true } } } as const;
 type LinhaDeSequencia = Prisma.SequenceGetPayload<{ include: typeof INCLUDE_SEQUENCIA }>;
 
 export function serializarSequencia(s: LinhaDeSequencia, ativos?: number) {
@@ -32,7 +33,8 @@ export function serializarSequencia(s: LinhaDeSequencia, ativos?: number) {
     trigger: s.trigger,
     trigger_tag_id: s.triggerTagId,
     trigger_segment_id: s.triggerSegmentId,
-    trigger_stage_id: s.triggerStageId,
+    // Número da etapa no contrato (o UUID não sai da API).
+    trigger_stage_id: s.triggerStage?.numero ?? null,
     trigger_stage_days: s.triggerStageDays,
     allow_reentry: s.allowReentry,
     stop_on_reply: s.stopOnReply,
@@ -109,7 +111,7 @@ export async function lerSequencia(orgId: string, corpo: Corpo, atual?: LinhaDeS
 
   const tagId = idOpc(corpo, "trigger_tag_id");
   const segmentId = idOpc(corpo, "trigger_segment_id");
-  const stageId = idOpc(corpo, "trigger_stage_id");
+  const stageId = await refOpc(corpo.trigger_stage_id, (v) => uuidDaEtapa(orgId, v, "trigger_stage_id"));
   const finalTag = tagId !== undefined ? tagId : atual?.triggerTagId ?? null;
   const finalSegmento = segmentId !== undefined ? segmentId : atual?.triggerSegmentId ?? null;
   const finalEtapa = stageId !== undefined ? stageId : atual?.triggerStageId ?? null;

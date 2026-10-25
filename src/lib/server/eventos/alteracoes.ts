@@ -20,8 +20,11 @@ export async function fotoDoRegistro(orgId: string, objeto: ObjetoComFoto, id: s
   try {
     if (objeto === "deal") {
       const { carregarNegocio, serializarNegocios } = await import("@/lib/server/api-v1/negocios");
-      const [d] = await serializarNegocios(orgId, [await carregarNegocio(orgId, id)]);
-      return d as Foto;
+      const linha = await carregarNegocio(orgId, id);
+      const [d] = await serializarNegocios(orgId, [linha]);
+      // A API mostra funil/etapa pelo número; automações, histórico e regras
+      // salvas comparam pelo UUID interno, então a foto fica com ele.
+      return { ...d, pipeline_id: linha.pipelineId, stage_id: linha.stageId } as Foto;
     }
     if (objeto === "contact") {
       const { carregarContato, serializarContatos } = await import("@/lib/server/api-v1/contatos");

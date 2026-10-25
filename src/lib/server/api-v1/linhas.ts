@@ -111,8 +111,9 @@ export interface OpcoesDeLote {
   modo: "upsert" | "create";
   simular: boolean;
   tagIds?: string[];
-  pipelineId?: string;
-  stageId?: string;
+  /** Números do funil/etapa no contrato (como no corpo da API). */
+  pipelineId?: number;
+  stageId?: number;
   /** Flag explícita: negócio existente muda de etapa sem os campos obrigatórios (registrado no histórico). */
   ignorarObrigatorios?: boolean;
 }
