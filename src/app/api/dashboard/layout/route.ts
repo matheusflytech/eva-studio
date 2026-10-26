@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/server/permissions";
 import { prisma } from "@/lib/db/prisma";
 import { FONTE_POR_CHAVE } from "@/lib/server/analytics";
 import { sanearConsulta, tiposPermitidos, type Consulta } from "@/lib/consulta";
+import { sanearRelatorio, tipoDoCartao, type ReportQuery, type VizType } from "@/lib/report-query";
 
 // ---------------------------------------------------------------------------
 // O painel que a pessoa montou.
@@ -26,6 +27,8 @@ export interface Widget {
   largura: number;
   /** Só para fonte "custom": o que o cliente montou. */
   consulta?: Consulta;
+  /** Só para fonte "report": o cartão do construtor (v2). */
+  relatorio?: { query: ReportQuery; viz: VizType };
 }
 
 /** O painel de quem nunca mexeu. Mostra o essencial de venda sem pedir configuração. */
@@ -48,6 +51,10 @@ export async function GET() {
   // sai já no formato novo: a tela só conhece um.
   const widgets = Array.isArray(salvo?.widgets)
     ? (salvo.widgets as unknown as Widget[]).flatMap((w) => {
+        if (w?.fonte === "report") {
+          const relatorio = sanearRelatorio(w.relatorio);
+          return relatorio ? [{ ...w, relatorio }] : [];
+        }
         if (w?.fonte !== "custom") {
           // Fonte de funil salva antes da correção acima voltou como "numero" e
           // aparece vazia: devolve o tipo que a fonte desenha.
@@ -86,6 +93,14 @@ export async function PUT(request: Request) {
       const permitidos = tiposPermitidos(consulta);
       const tipo = permitidos.find((t) => t === w?.tipo) ?? permitidos[0];
       widgets.push({ id, tipo, fonte, titulo: String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão", largura, consulta });
+      continue;
+    }
+
+    if (fonte === "report") {
+      const relatorio = sanearRelatorio(w?.relatorio);
+      if (!relatorio) continue;
+      const titulo = String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão";
+      widgets.push({ id, tipo: tipoDoCartao(relatorio.viz), fonte, titulo, largura, relatorio });
       continue;
     }
 

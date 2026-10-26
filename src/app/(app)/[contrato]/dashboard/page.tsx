@@ -41,6 +41,9 @@ import { BarraEmPilha, Porcentagens } from "@/components/charts/proporcao";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
+import { ReportBuilder, type ReportCard } from "@/components/reports/report-builder";
+import { ReportView, useReportResult } from "@/components/reports/report-view";
+import { DATASET_BY_KEY, formatarDimensao, formatarValor, tipoDoCartao, type ReportQuery, type ReportResult, type VizType } from "@/lib/report-query";
 import { PainelDeFiltros, SeletorDePeriodo, contarFiltros, periodoCurto } from "@/components/dashboard/barra-de-filtros";
 import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
 import { VisaoGeral } from "@/components/dashboard/visao-geral";
@@ -99,6 +102,8 @@ interface Widget {
   largura: number;
   /** Só para fonte "custom": o cartão que a pessoa montou. */
   consulta?: Consulta;
+  /** Só para fonte "report": o cartão do construtor (v2). */
+  relatorio?: { query: ReportQuery; viz: VizType };
 }
 
 interface Ponto { label: string; value: number }
@@ -217,6 +222,20 @@ async function tabelaDoWidget(
   dados: Dados | null,
   globais: FiltrosGlobais
 ): Promise<{ tabela: TabelaDoCartao | null; erro?: string }> {
+  if (widget.fonte === "report" && widget.relatorio) {
+    try {
+      const res = await fetch("/api/reports/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: widget.relatorio.query, globals: globais }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.result) return { tabela: null, erro: d.error ?? "Não foi possível calcular." };
+      return { tabela: tabelaDoRelatorio(d.result as ReportResult) };
+    } catch {
+      return { tabela: null, erro: "Sem conexão." };
+    }
+  }
   if (widget.fonte === "custom" && widget.consulta) {
     try {
       const res = await fetch("/api/analytics/consulta", {
@@ -234,6 +253,21 @@ async function tabelaDoWidget(
   if (!fonte) return { tabela: null, erro: "Fonte não encontrada." };
   if (!dados) return { tabela: null, erro: "Os números ainda não carregaram." };
   return { tabela: tabelaDaFonte(fonte, dados, rotular) };
+}
+
+/** Resultado do construtor (v2) como tabela de CSV: número cru, o resto como aparece na tela. */
+function tabelaDoRelatorio(r: ReportResult): TabelaDoCartao {
+  return {
+    cabecalho: r.columns.map((c) => c.label),
+    linhas: r.rows.map((l) =>
+      r.columns.map((c, i) => {
+        const v = l[i];
+        if (typeof v === "number") return v;
+        if (v === null) return "";
+        return c.role === "dimension" ? formatarDimensao(v, c) : formatarValor(v, c.type);
+      })
+    ),
+  };
 }
 
 /** Linhas do topo do "Todos os cartões": de quando e com que filtros. */
@@ -285,6 +319,7 @@ function Painel() {
   const [selecionado, setSelecionado] = React.useState<string | null>(null);
   const [adicionando, setAdicionando] = React.useState(false);
   const [construtor, setConstrutor] = React.useState<{ editandoId: string | null } | null>(null);
+  const [construtorV2, setConstrutorV2] = React.useState<{ editandoId: string | null } | null>(null);
   const { opcoes } = useOpcoesDoDashboard();
   const rotulos = React.useMemo(() => rotulosDasOpcoes(opcoes), [opcoes]);
   const [carregando, setCarregando] = React.useState(true);
@@ -421,6 +456,21 @@ function Painel() {
       setEditando(true);
     }
     setConstrutor(null);
+  }
+
+  function salvarDoConstrutorV2(r: ReportCard) {
+    const alvo = construtorV2?.editandoId;
+    const relatorio = { query: r.query, viz: r.viz };
+    const tipo = tipoDoCartao(r.viz);
+    if (alvo) {
+      alterar(alvo, { relatorio, tipo, titulo: r.titulo });
+    } else {
+      const id = `w${Date.now().toString(36)}`;
+      setWidgets((ws) => [...(ws ?? []), { id, tipo, fonte: "report", titulo: r.titulo, largura: tipo === "numero" ? 1 : 2, relatorio }]);
+      setSelecionado(id);
+      setEditando(true);
+    }
+    setConstrutorV2(null);
   }
 
   async function restaurarPadrao() {
@@ -687,7 +737,11 @@ function Painel() {
                 catalogo={catalogo}
                 onChange={(m) => alterar(widgetSelecionado.id, m)}
                 rotulos={rotulos}
-                onEditarConsulta={() => setConstrutor({ editandoId: widgetSelecionado.id })}
+                onEditarConsulta={() =>
+                  widgetSelecionado.fonte === "report"
+                    ? setConstrutorV2({ editandoId: widgetSelecionado.id })
+                    : setConstrutor({ editandoId: widgetSelecionado.id })
+                }
                 onRemover={() => remover(widgetSelecionado.id)}
                 onFechar={() => setSelecionado(null)}
               />
@@ -792,8 +846,20 @@ function Painel() {
         <EscolherFonte
           catalogo={catalogo}
           onEscolher={adicionar}
-          onMontar={() => { setAdicionando(false); setConstrutor({ editandoId: null }); }}
+          onMontar={() => { setAdicionando(false); setConstrutorV2({ editandoId: null }); }}
           onFechar={() => setAdicionando(false)}
+        />
+      )}
+
+      {construtorV2 && (
+        <ReportBuilder
+          globals={globais}
+          inicial={(() => {
+            const w = (widgets ?? []).find((x) => x.id === construtorV2.editandoId);
+            return w?.relatorio ? { ...w.relatorio, titulo: w.titulo } : undefined;
+          })()}
+          aoSalvar={salvarDoConstrutorV2}
+          aoFechar={() => setConstrutorV2(null)}
         />
       )}
 
@@ -921,7 +987,9 @@ function Cartao({
     widget.largura === 3 ? "md:col-span-2 xl:col-span-3" : widget.largura === 2 ? "md:col-span-2" : "";
   // O que antes era texto embaixo de cada cartão (de onde sai o número) vira a dica do título.
   const explicacao =
-    widget.fonte === "custom" && widget.consulta ? descreverConsulta(widget.consulta, rotulos) : fonte?.explicacao;
+    widget.fonte === "report" && widget.relatorio
+      ? DATASET_BY_KEY.get(widget.relatorio.query.dataset)?.description
+      : widget.fonte === "custom" && widget.consulta ? descreverConsulta(widget.consulta, rotulos) : fonte?.explicacao;
   const selo = fonte && !editando ? seloDeFiltro(fonte, globais, dados, opcoes.funis.length) : null;
 
   return (
@@ -970,7 +1038,11 @@ function Cartao({
         {widget.titulo}
       </h2>
 
-      {widget.fonte === "custom" && widget.consulta ? (
+      {widget.fonte === "report" && widget.relatorio ? (
+        <div className="mt-3 flex min-h-48 flex-1 flex-col">
+          <CartaoDeRelatorio relatorio={widget.relatorio} globais={globais} />
+        </div>
+      ) : widget.fonte === "custom" && widget.consulta ? (
         <div className="mt-3 flex-1">
           <ConteudoDeConsulta consulta={widget.consulta} tipo={tipoDeConsulta(widget.tipo)} globais={globais} />
         </div>
@@ -1015,6 +1087,11 @@ function BotaoMini({
       {children}
     </button>
   );
+}
+
+function CartaoDeRelatorio({ relatorio, globais }: { relatorio: NonNullable<Widget["relatorio"]>; globais: FiltrosGlobais }) {
+  const { result, error, loading } = useReportResult(relatorio.query, globais, 0);
+  return <ReportView result={result} viz={relatorio.viz} loading={loading} error={error} className="flex-1" />;
 }
 
 function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dados: Dados | null }) {
@@ -1135,6 +1212,7 @@ function Propriedades({
   onFechar: () => void;
 }) {
   const ehCustom = widget.fonte === "custom" && !!widget.consulta;
+  const ehRelatorio = widget.fonte === "report" && !!widget.relatorio;
   const tiposPermitidos = ehCustom
     ? tiposPermitidos_(widget.consulta!)
     : fonte ? TIPOS_POR_FONTE[fonte.tipo] : (["numero"] as Widget["tipo"][]);
@@ -1165,7 +1243,21 @@ function Propriedades({
           />
         </div>
 
-        {ehCustom ? (
+        {ehRelatorio ? (
+          <div>
+            <Label>O que o cartão mostra</Label>
+            <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-secondary">
+              Base: {DATASET_BY_KEY.get(widget.relatorio!.query.dataset)?.label}
+            </p>
+            <button
+              type="button"
+              onClick={onEditarConsulta}
+              className="mt-2 h-8 w-full rounded-full border border-border-subtle bg-raised px-3 text-small font-medium text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Editar dados e visual
+            </button>
+          </div>
+        ) : ehCustom ? (
           <div>
             <Label>O que o cartão mostra</Label>
             <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-secondary">{descreverConsulta(widget.consulta!, rotulos)}</p>
@@ -1207,6 +1299,7 @@ function Propriedades({
         </div>
         )}
 
+        {!ehRelatorio && (
         <div>
           <Label>Como mostrar</Label>
           <div className="mt-1 flex flex-wrap gap-1.5">
@@ -1235,6 +1328,7 @@ function Propriedades({
             </p>
           )}
         </div>
+        )}
 
         <div>
           <Label>Largura</Label>
@@ -1331,7 +1425,7 @@ function EscolherFonte({
             <span className="min-w-0">
               <span className="block text-small font-medium text-text-primary">Montar do meu jeito</span>
               <span className="block text-caption text-text-secondary">
-                Some, conte ou tire a média de qualquer valor ou campo seu, separe por etapa, responsável ou mês, e filtre.
+                Escolha a base (negócios, tarefas, produtos, conversas, equipe...), filtre, resuma e escolha o visual.
               </span>
             </span>
           </button>
