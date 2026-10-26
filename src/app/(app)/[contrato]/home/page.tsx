@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowRight, CalendarDays, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, Search, SquareCheck, Workflow, Bot } from "lucide-react";
+import { ArrowRight, CalendarDays, ChartColumn, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, Search, SquareCheck, Workflow, Bot } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { FundoVivo } from "@/components/layout/fundo-vivo";
@@ -14,6 +14,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { Calendario } from "@/components/tarefas/calendario";
+import { ReportView, useReportResult } from "@/components/reports/report-view";
+import { FILTROS_GLOBAIS_PADRAO } from "@/lib/consulta";
+import type { ReportQuery, VizType } from "@/lib/report-query";
 
 // ---------------------------------------------------------------------------
 // Início.
@@ -62,6 +65,24 @@ const CHAVE = "eva.inicio.blocos";
 const NOVOS: IdDoBloco[] = ["calendario"];
 const CHAVE_DOS_OFERECIDOS = "eva.inicio.oferecidos";
 
+// Cartões montados no Dashboard ("Montar do meu jeito") que a pessoa trouxe
+// para o Início: só os ids, o cartão em si continua morando no painel.
+const CHAVE_DOS_CARTOES = "eva.inicio.cartoes";
+interface CartaoDoPainel {
+  id: string;
+  titulo: string;
+  relatorio: { query: ReportQuery; viz: VizType; meta?: number };
+}
+
+function lerCartoes(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CHAVE_DOS_CARTOES) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function lerBlocos(): IdDoBloco[] {
   try {
     const v = JSON.parse(localStorage.getItem(CHAVE) ?? "null");
@@ -100,9 +121,18 @@ export default function InicioPage() {
   const [editando, setEditando] = React.useState(false);
   const [hora, setHora] = React.useState(9);
   const [falando, setFalando] = React.useState(false);
+  const [doPainel, setDoPainel] = React.useState<CartaoDoPainel[]>([]);
+  const [cartoes, setCartoes] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     setBlocos(lerBlocos());
+    setCartoes(lerCartoes());
+    fetch("/api/dashboard/layout")
+      .then((r) => (r.ok ? r.json() : { widgets: [] }))
+      .then((d: { widgets?: (CartaoDoPainel & { fonte?: string })[] }) =>
+        setDoPainel((d.widgets ?? []).filter((w) => w.fonte === "report" && w.relatorio))
+      )
+      .catch(() => {});
     setHora(new Date().getHours());
     fetch("/api/inicio")
       .then((r) => r.json())
@@ -129,6 +159,21 @@ export default function InicioPage() {
     }
   }
 
+  function guardarCartoes(novos: string[]) {
+    setCartoes(novos);
+    try {
+      localStorage.setItem(CHAVE_DOS_CARTOES, JSON.stringify(novos));
+    } catch {
+      // sem armazenamento: vale só nesta visita
+    }
+  }
+
+  function tirarCartao(c: CartaoDoPainel) {
+    const antes = cartoes;
+    guardarCartoes(cartoes.filter((id) => id !== c.id));
+    avisarNaIlha({ titulo: "Cartão tirado do Início", detalhe: c.titulo, acao: { rotulo: "Desfazer", aoClicar: () => guardarCartoes(antes) } });
+  }
+
   function tirar(id: IdDoBloco) {
     const antes = blocos;
     guardar(blocos.filter((b) => b !== id));
@@ -147,6 +192,9 @@ export default function InicioPage() {
   const semAgente = !!dados && dados.resumo.agentes === 0;
   const comecar = !!dados?.onboardingPendente;
   const fora = BLOCOS.filter((b) => !blocos.includes(b.id));
+  // Na ordem em que a pessoa trouxe; cartão apagado do painel some sozinho.
+  const noInicio = cartoes.map((id) => doPainel.find((c) => c.id === id)).filter((c): c is CartaoDoPainel => !!c);
+  const cartoesFora = doPainel.filter((c) => !cartoes.includes(c.id));
 
   return (
     <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6 lg:-mt-5">
@@ -277,6 +325,16 @@ export default function InicioPage() {
         </div>
       )}
 
+      {!carregando && !semAgente && !comecar && noInicio.length > 0 && (
+        <div className="grid gap-4 px-6 lg:grid-cols-2">
+          {noInicio.map((c) => (
+            <Bloco key={c.id} editando={editando} onTirar={() => tirarCartao(c)} titulo={c.titulo}>
+              <CartaoNoInicio relatorio={c.relatorio} />
+            </Bloco>
+          ))}
+        </div>
+      )}
+
       {/* Calendário: o mesmo da aba de Tarefas, em largura toda. */}
       {!carregando && !semAgente && !comecar && blocos.includes("calendario") && (
         <div className="px-6">
@@ -312,8 +370,48 @@ export default function InicioPage() {
               ))}
             </div>
           )}
+
+          <p className="mb-2 mt-4 text-caption font-medium uppercase tracking-wide text-text-tertiary">Do seu painel</p>
+          {doPainel.length === 0 ? (
+            <p className="text-small text-text-tertiary">
+              Monte um cartão no{" "}
+              <Link href="/dashboard" className="font-medium text-accent-fg hover:underline">
+                Dashboard
+              </Link>{" "}
+              (&ldquo;Montar do meu jeito&rdquo;) para trazer aqui.
+            </p>
+          ) : cartoesFora.length === 0 ? (
+            <p className="text-small text-text-tertiary">Todos os cartões montados já estão no Início.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {cartoesFora.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={(e) => {
+                    guardarCartoes([...cartoes, c.id]);
+                    pulsar(e.currentTarget, 1.6);
+                  }}
+                  className="flex flex-col gap-3 rounded-2xl border border-border-subtle bg-raised p-3 text-left text-small text-text-primary hover:bg-hover"
+                >
+                  <ChartColumn size={15} className="text-text-secondary" />
+                  <span className="line-clamp-2">{c.titulo}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Um cartão do painel no Início, com o período padrão do painel (últimos 30 dias). */
+function CartaoNoInicio({ relatorio }: { relatorio: CartaoDoPainel["relatorio"] }) {
+  const { result, error, loading } = useReportResult(relatorio.query, FILTROS_GLOBAIS_PADRAO, 0);
+  return (
+    <div className="flex h-60 flex-col">
+      <ReportView result={result} viz={relatorio.viz} meta={relatorio.meta} loading={loading} error={error} className="flex-1" />
     </div>
   );
 }
