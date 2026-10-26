@@ -8,6 +8,7 @@ vi.mock("@supabase/ssr", () => ({
 import { proxy } from "./proxy";
 
 const A = "11111111-1111-4111-8111-111111111111";
+const a = "11111111"; // id curto: o que vai na URL
 
 function pedir(caminho: string, cookie?: string) {
   return new NextRequest(new URL(caminho, "https://app.eva"), {
@@ -30,7 +31,13 @@ describe("proxy: caminhos antigos", () => {
   it("com contrato, nome em português vira inglês com 308", async () => {
     const res = await proxy(pedir(`/${A}/negocios/123?funil=2&aba=funis`, A));
     expect(res.status).toBe(308);
-    expect(res.headers.get("location")).toBe(`https://app.eva/${A}/deals/123?pipeline=2&tab=pipelines`);
+    expect(res.headers.get("location")).toBe(`https://app.eva/${a}/deals/123?pipeline=2&tab=pipelines`);
+  });
+
+  it("id completo na URL vira o curto", async () => {
+    const res = await proxy(pedir(`/${A}/deals?pipeline=2`, A));
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe(`https://app.eva/${a}/deals?pipeline=2`);
   });
 
   it("e-mails já enviados: /convite, /descadastro e /ir continuam funcionando", async () => {
@@ -48,7 +55,7 @@ describe("proxy: caminhos antigos", () => {
   });
 
   it("caminho atual, /api e /login passam direto", async () => {
-    for (const c of [`/${A}/deals?pipeline=2`, "/api/deals?busca=x", "/login", "/contracts", "/invite?t=1"]) {
+    for (const c of [`/${a}/deals?pipeline=2`, "/api/deals?busca=x", "/login", "/contracts", "/invite?t=1"]) {
       const res = await proxy(pedir(c, A));
       expect(res.headers.get("location"), c).toBeNull();
     }

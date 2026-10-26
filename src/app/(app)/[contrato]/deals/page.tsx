@@ -676,7 +676,7 @@ function NegociosConteudo() {
   const temDia = eva && !carregando && (acontecimentosDoDia.length > 0 || atencaoDoDia.length > 0 || momentosDoFunil.length > 0);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-1 lg:px-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-5 pt-1 lg:px-8 2xl:px-10">
       {/* Barra da tela: título, funil, modo e, à direita, busca, filtros, "…" e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-heading font-semibold tracking-tight text-text-primary">Negócios</h1>
@@ -930,7 +930,7 @@ function NegociosConteudo() {
           <QuadroContexto.Provider value={acoesDoQuadro}>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="relative">
-              <div ref={quadroRef} className="flex min-h-96 snap-x gap-3 overflow-x-auto pb-3 [height:calc(100dvh-210px)]">
+              <div ref={quadroRef} className="flex min-h-96 snap-x gap-4 overflow-x-auto pb-3 [height:calc(100dvh-226px)] xl:gap-5">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}

@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* O menu de 240px não cabe num celular de 390px: ocupava a tela inteira e
             o conteúdo desaparecia. Abaixo de 1024px vira uma gaveta, aberta por
             uma barra no topo. O menu acompanha o tema do app. */}
-        <div className="relative z-10 hidden lg:flex" data-print-ocultar>
+        <div className="relative z-20 hidden lg:flex" data-print-ocultar>
           <Sidebar />
         </div>
 

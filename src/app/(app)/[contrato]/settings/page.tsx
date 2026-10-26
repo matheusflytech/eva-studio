@@ -18,6 +18,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useRouter, useSearchParams, usePathname } from "@/lib/contrato/navegacao";
+import { idCurto } from "@/lib/contrato/rotas";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { Input } from "@/components/ui/input";
@@ -166,7 +167,7 @@ function AbaContrato() {
       {session?.contratoId && (
         <LinhaDeConfig rotulo="ID do contrato" descricao="É o que aparece na URL e o que o suporte da Eva pede para achar seu contrato.">
           <div className="max-w-md">
-            <IdDoContrato id={session.contratoId} />
+            <IdDoContrato id={idCurto(session.contratoId)} />
           </div>
         </LinhaDeConfig>
       )}
