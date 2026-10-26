@@ -45,8 +45,8 @@ const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/deal
     headers: { authorization: "Bearer evs_live_abc" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-const semParams = { params: Promise.resolve({}) } as { params: Promise<Record<string, never>> };
-const p = <T extends Record<string, string>>(v: T) => ({ params: Promise.resolve(v) });
+const semParams = { params: Promise.resolve({ contract: "o1" }) } as { params: Promise<{ contract: string }> };
+const p = <T extends Record<string, string>>(v: T) => ({ params: Promise.resolve({ contract: "o1", ...v }) });
 
 const negocio = (extra: Record<string, unknown> = {}) => ({
   id: "d1",

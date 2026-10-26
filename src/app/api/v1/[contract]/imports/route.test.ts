@@ -23,7 +23,7 @@ const req = (body: unknown, idem: string | null = "imp-1", url = "https://eva.te
     headers: { authorization: "Bearer evs_live_abc", ...(idem ? { "Idempotency-Key": idem } : {}) },
     body: JSON.stringify(body),
   });
-const semParams = { params: Promise.resolve({}) } as { params: Promise<Record<string, never>> };
+const semParams = { params: Promise.resolve({ contract: "o1" }) } as { params: Promise<{ contract: string }> };
 
 const linha = (extra: Record<string, unknown> = {}) => ({
   id: "j1",
@@ -92,19 +92,19 @@ describe("POST /v1/imports", () => {
 
     db.bulkJob.findFirst.mockResolvedValue(linha({ status: "pending_upload", filePath: "o1/imports/x.csv" }));
     storage.midiaExiste.mockResolvedValueOnce({ existe: false, tamanho: 0 });
-    const semArquivo = await INICIAR(req({}, null, "https://eva.test/api/v1/imports/j1/start"), { params: Promise.resolve({ id: "j1" }) });
+    const semArquivo = await INICIAR(req({}, null, "https://eva.test/api/v1/imports/j1/start"), { params: Promise.resolve({ contract: "o1", id: "j1" }) });
     expect((await semArquivo.json()).error.code).toBe("upload_missing");
 
     storage.midiaExiste.mockResolvedValueOnce({ existe: true, tamanho: 10 });
     db.bulkJob.update.mockResolvedValue(linha({ status: "queued" }));
-    const ok = await INICIAR(req({}, null, "https://eva.test/api/v1/imports/j1/start"), { params: Promise.resolve({ id: "j1" }) });
+    const ok = await INICIAR(req({}, null, "https://eva.test/api/v1/imports/j1/start"), { params: Promise.resolve({ contract: "o1", id: "j1" }) });
     expect(ok.status).toBe(202);
     expect(db.bulkJob.update).toHaveBeenCalledWith({ where: { id: "j1" }, data: { status: "queued" } });
   });
 });
 
 describe("escopo para ler a importação", () => {
-  const umJob = { params: Promise.resolve({ id: "j1" }) };
+  const umJob = { params: Promise.resolve({ contract: "o1", id: "j1" }) };
   const ler = () => new Request("https://eva.test/api/v1/imports/j1", { headers: { authorization: "Bearer evs_live_abc" } });
 
   it("imports:read lê; imports:write (chaves antigas) continua lendo; outro recurso: 403", async () => {

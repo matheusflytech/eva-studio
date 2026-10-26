@@ -309,7 +309,7 @@ export const SECOES: Secao[] = [
         titulo: "Criar lead pela API",
         resumo: "Seu site ou landing page cria o lead direto, sem passar por conversa.",
         metodo: "POST",
-        caminho: "/api/v1/leads",
+        caminho: "/api/v1/{contrato}/leads",
         nota: "Este é o endpoint público, com chave de API. Os outros da lista são internos da sessão.",
       },
       {
@@ -338,14 +338,14 @@ export const SECOES: Secao[] = [
         titulo: "Ler leads pela API",
         resumo: "Puxa os leads e o que foi capturado em cada um.",
         metodo: "GET",
-        caminho: "/api/v1/leads",
+        caminho: "/api/v1/{contrato}/leads",
         nota: "Aceita filtro por etapa e limite. É o endpoint público, com chave de API.",
       },
       {
         titulo: "Atualizar ou apagar um lead",
         resumo: "Muda a etapa do lead ou remove.",
         metodo: "PATCH · DELETE",
-        caminho: "/api/v1/leads/{id}",
+        caminho: "/api/v1/{contrato}/leads/{id}",
       },
       {
         titulo: "Bloco Requisição HTTP",
@@ -390,11 +390,11 @@ export const SECOES: Secao[] = [
         onde: "Integrações → API",
         href: "/integrations/api",
       },
-      { titulo: "Listar leads", resumo: "Todos os leads da organização, com filtro por etapa.", metodo: "GET", caminho: "/api/v1/leads" },
-      { titulo: "Criar lead", resumo: "Cria um lead com os campos que você mandar.", metodo: "POST", caminho: "/api/v1/leads" },
-      { titulo: "Ver um lead", resumo: "Um lead específico, com tudo que foi capturado.", metodo: "GET", caminho: "/api/v1/leads/{id}" },
-      { titulo: "Mudar a etapa", resumo: "Move o lead entre novo, contatado, qualificado, ganho e perdido.", metodo: "PATCH", caminho: "/api/v1/leads/{id}" },
-      { titulo: "Apagar um lead", resumo: "Remove o lead.", metodo: "DELETE", caminho: "/api/v1/leads/{id}" },
+      { titulo: "Listar leads", resumo: "Todos os leads da organização, com filtro por etapa.", metodo: "GET", caminho: "/api/v1/{contrato}/leads" },
+      { titulo: "Criar lead", resumo: "Cria um lead com os campos que você mandar.", metodo: "POST", caminho: "/api/v1/{contrato}/leads" },
+      { titulo: "Ver um lead", resumo: "Um lead específico, com tudo que foi capturado.", metodo: "GET", caminho: "/api/v1/{contrato}/leads/{id}" },
+      { titulo: "Mudar a etapa", resumo: "Move o lead entre novo, contatado, qualificado, ganho e perdido.", metodo: "PATCH", caminho: "/api/v1/{contrato}/leads/{id}" },
+      { titulo: "Apagar um lead", resumo: "Remove o lead.", metodo: "DELETE", caminho: "/api/v1/{contrato}/leads/{id}" },
       {
         titulo: "Documentação com exemplos",
         resumo: "Corpo de cada requisição, campos e respostas, com exemplos prontos para copiar.",
@@ -511,7 +511,7 @@ export const SECOES: Secao[] = [
       {
         titulo: "A API pública cobre leads, não o CRM inteiro",
         resumo: "Contatos, negócios e tarefas têm endpoint, mas autenticado por sessão, não por chave.",
-        nota: "Para integração externa hoje o caminho é /api/v1/leads ou um bloco HTTP dentro do fluxo.",
+        nota: "Para integração externa hoje o caminho é /api/v1/{contrato}/leads ou um bloco HTTP dentro do fluxo.",
       },
       {
         titulo: "Cartão personalizado do Dashboard lê até 5 mil negócios",

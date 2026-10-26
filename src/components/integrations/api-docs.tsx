@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { idCurto } from "@/lib/contrato/rotas";
+import { useContrato } from "@/lib/contrato/navegacao";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -140,4 +142,11 @@ const noop = () => () => {};
 /** Origem do app (a URL base dos exemplos). No servidor, um marcador. */
 export function useOrigin() {
   return React.useSyncExternalStore(noop, () => window.location.origin, () => "https://SEU-DOMINIO");
+}
+
+/** URL base da API do contrato atual: https://<domínio>/api/v1/<id curto do contrato>. */
+export function useApiBase() {
+  const origin = useOrigin();
+  const contrato = useContrato();
+  return `${origin}/api/v1/${contrato ? idCurto(contrato) : "SEU-CONTRATO"}`;
 }

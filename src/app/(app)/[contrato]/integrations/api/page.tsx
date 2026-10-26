@@ -9,7 +9,7 @@ import { Notice } from "@/components/ui/notice";
 import { cn } from "@/lib/utils";
 import { toCurl, toFetch } from "@/lib/api-v1-examples";
 import { CONTACT, ME, list } from "@/lib/api-v1-openapi-examples";
-import { CodeBlock, CodeTabs, CopyButton, Eyebrow, Field, LanguageProvider, Method, json, useOrigin } from "@/components/integrations/api-docs";
+import { CodeBlock, CodeTabs, CopyButton, Eyebrow, Field, LanguageProvider, Method, json, useApiBase, useOrigin } from "@/components/integrations/api-docs";
 import { WebhooksGuide } from "./webhooks-guide";
 
 // ---------------------------------------------------------------------------
@@ -186,8 +186,8 @@ function LeadEndpoint({ method, path, title, children }: { method: string; path:
 }
 
 export default function ApiDocsPage() {
+  const base = useApiBase();
   const origin = useOrigin();
-  const base = `${origin}/api/v1`;
 
   return (
     <LanguageProvider>
@@ -224,10 +224,10 @@ export default function ApiDocsPage() {
             <div className="min-w-0">
               <p className="font-mono text-caption text-text-tertiary">OpenAPI 3.1 (sem chave)</p>
               <a href="/api/v1/openapi.json" download="eva-studio-openapi.json" className="block truncate font-mono text-small text-text-primary underline-offset-2 hover:underline">
-                {base}/openapi.json
+                {origin}/api/v1/openapi.json
               </a>
             </div>
-            <CopyButton text={`${base}/openapi.json`} label="Copiar URL do OpenAPI" />
+            <CopyButton text={`${origin}/api/v1/openapi.json`} label="Copiar URL do OpenAPI" />
           </div>
         </div>
 
@@ -262,10 +262,12 @@ body={{ data: ME }} />
 
             <Section id="auth" title="Autenticação e escopos">
               <P>
-                Toda chamada leva a chave no header <C>Authorization</C>, no formato Bearer. A chave pertence a um contrato: tudo o que
-                ela lê e escreve fica dentro dele. Guarde a chave como segredo (variável de ambiente, cofre); nunca no front-end.
+                Toda chamada vai para <C>/api/v1/{"{contrato}"}/...</C>, com o id curto do contrato (o mesmo da URL do app), e leva a
+                chave no header <C>Authorization</C>, no formato Bearer. A chave pertence a um contrato: chamada com o id de outro
+                contrato volta <C>403 contract_mismatch</C>. Guarde a chave como segredo (variável de ambiente, cofre); nunca no front-end.
               </P>
-              <CodeBlock label="Header" code="Authorization: Bearer evs_live_..." />
+              <CodeBlock label="Requisição" code={`GET ${base}/contacts
+Authorization: Bearer evs_live_...`} />
               <P>
                 Cada chave tem escopos. <C>*</C> libera tudo; <C>recurso:*</C> lê e escreve no recurso; <C>recurso:read</C> e{" "}
                 <C>recurso:write</C> separam leitura de escrita (escrever não dá direito a ler). O escopo exigido aparece em cada endpoint
@@ -315,7 +317,7 @@ body={{ data: ME }} />
                 rows={[
                   [<Badge key="b" variant="danger">400</Badge>, <C key="c">invalid_request_error</C>, "JSON inválido, campo/parâmetro desconhecido, valor fora do formato, cursor inválido."],
                   [<Badge key="b" variant="danger">401</Badge>, <C key="c">authentication_error</C>, "Chave ausente, inválida ou revogada (invalid_api_key)."],
-                  [<Badge key="b" variant="danger">403</Badge>, <C key="c">permission_error</C>, "A chave não tem o escopo (insufficient_scope)."],
+                  [<Badge key="b" variant="danger">403</Badge>, <C key="c">permission_error</C>, "A chave não tem o escopo (insufficient_scope) ou é de outro contrato (contract_mismatch)."],
                   [<Badge key="b" variant="danger">404</Badge>, <C key="c">not_found_error</C>, "Registro não existe neste contrato (not_found, invalid_reference)."],
                   [<Badge key="b" variant="danger">409</Badge>, <C key="c">conflict_error</C>, "Duplicado (duplicate), negócio fechado (deal_closed)."],
                   [<Badge key="b" variant="danger">410</Badge>, <C key="c">invalid_request_error</C>, "Item passou dos 30 dias na lixeira (trash_expired)."],
@@ -404,7 +406,7 @@ body={{ data: ME }} />
                 de 120 requisições por minuto por contrato.
               </Notice>
 
-              <LeadEndpoint method="GET" path="/api/v1/leads" title="Lista os leads, mais recentes primeiro.">
+              <LeadEndpoint method="GET" path="/api/v1/{contrato}/leads" title="Lista os leads, mais recentes primeiro.">
                 <div>
                   <Field name="limit" type="número">Padrão 50, máximo 200.</Field>
                   <Field name="stage" type="texto">novo, contatado, qualificado, ganho ou perdido (também aceita new, contacted, qualified, won, lost).</Field>
@@ -413,7 +415,7 @@ body={{ data: ME }} />
                 <Response status={200} body={{ data: [LEAD] }} />
               </LeadEndpoint>
 
-              <LeadEndpoint method="POST" path="/api/v1/leads" title="Cria um lead (ou atualiza o contato com o mesmo e-mail/telefone).">
+              <LeadEndpoint method="POST" path="/api/v1/{contrato}/leads" title="Cria um lead (ou atualiza o contato com o mesmo e-mail/telefone).">
                 <div>
                   <Field name="agentId" type="texto" required>Id do agente dono do lead (está na URL do agente).</Field>
                   <Field name="fields" type="objeto" required>
@@ -430,11 +432,11 @@ body={{ data: ME }} />
                 <Response status={404} body={{ error: "agentId não encontrado nessa organização." }} />
               </LeadEndpoint>
 
-              <LeadEndpoint method="GET" path="/api/v1/leads/{id}" title="Busca um lead pelo id (o id do contato).">
+              <LeadEndpoint method="GET" path="/api/v1/{contrato}/leads/{id}" title="Busca um lead pelo id (o id do contato).">
                 <Example method="GET" url={`${base}/leads/${LEAD.id}`} />
               </LeadEndpoint>
 
-              <LeadEndpoint method="PATCH" path="/api/v1/leads/{id}" title="Muda a etapa e/ou os dados. fields é mesclado: o que não vier fica como está.">
+              <LeadEndpoint method="PATCH" path="/api/v1/{contrato}/leads/{id}" title="Muda a etapa e/ou os dados. fields é mesclado: o que não vier fica como está.">
                 <div>
                   <Field name="stage" type="texto">Nova etapa.</Field>
                   <Field name="fields" type="objeto">Campos para atualizar.</Field>
@@ -443,7 +445,7 @@ body={{ data: ME }} />
                 <Response status={400} body={{ error: "stage precisa ser um de: novo, contatado, qualificado, ganho, perdido." }} />
               </LeadEndpoint>
 
-              <LeadEndpoint method="DELETE" path="/api/v1/leads/{id}" title="Tira o contato da lista de leads. O contato e as conversas continuam.">
+              <LeadEndpoint method="DELETE" path="/api/v1/{contrato}/leads/{id}" title="Tira o contato da lista de leads. O contato e as conversas continuam.">
                 <Example method="DELETE" url={`${base}/leads/${LEAD.id}`} />
                 <Response status={200} body={{ data: { deleted: true, removed: true } }} />
               </LeadEndpoint>

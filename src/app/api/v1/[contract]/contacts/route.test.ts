@@ -37,8 +37,8 @@ function req(method: string, body?: unknown, { url = URL_BASE, headers = {} }: {
     body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
 }
-const semParams = { params: Promise.resolve({}) } as { params: Promise<Record<string, never>> };
-const p = <T extends Record<string, string>>(v: T) => ({ params: Promise.resolve(v) });
+const semParams = { params: Promise.resolve({ contract: "o1" }) } as { params: Promise<{ contract: string }> };
+const p = <T extends Record<string, string>>(v: T) => ({ params: Promise.resolve({ contract: "o1", ...v }) });
 
 const ficha = (extra: Record<string, unknown> = {}) => ({
   id: "c1",
@@ -95,6 +95,13 @@ describe("envoltório da v1 (auth, escopo, limite, erro)", () => {
     expect(error).toMatchObject({ type: "authentication_error", code: "invalid_api_key" });
     expect(error.request_id).toMatch(/^req_/);
     expect(res.headers.get("X-Request-Id")).toBe(error.request_id);
+  });
+
+  it("contrato da URL diferente do da chave: 403 contract_mismatch dizendo o certo", async () => {
+    const res = await GET(req("GET"), { params: Promise.resolve({ contract: "8d8d3a8c" }) });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatchObject({ code: "contract_mismatch", details: { contract: "o1" } });
+    expect(db.contact.findMany).not.toHaveBeenCalled();
   });
 
   it("chave só de leitura não escreve: 403 insufficient_scope", async () => {

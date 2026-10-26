@@ -31,8 +31,8 @@ const req = (method: string, body?: unknown) =>
     headers: { authorization: "Bearer evs_live_abc" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-const semParams = { params: Promise.resolve({}) } as { params: Promise<Record<string, never>> };
-const p = (id: string) => ({ params: Promise.resolve({ id }) });
+const semParams = { params: Promise.resolve({ contract: "o1" }) } as { params: Promise<{ contract: string }> };
+const p = (id: string) => ({ params: Promise.resolve({ contract: "o1", id }) });
 
 const sequencia = (extra: Record<string, unknown> = {}) => ({
   id: "q1",

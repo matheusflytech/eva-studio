@@ -9,8 +9,10 @@ import { autenticarApiV1, respostaDeErroDoLead } from "./auth";
 // tela de Leads mostra: contatos com etapa de lead, de qualquer canal (ver
 // src/lib/server/leads.ts). Formato da resposta em serializarLeadPublico.
 
-export async function GET(request: Request) {
-  const auth = await autenticarApiV1(request);
+type Params = { params: Promise<{ contract: string }> };
+
+export async function GET(request: Request, { params }: Params) {
+  const auth = await autenticarApiV1(request, (await params).contract);
   if ("resposta" in auth) return auth.resposta;
 
   const { searchParams } = new URL(request.url);
@@ -27,8 +29,8 @@ export async function GET(request: Request) {
 // Corpo: { agentId, fields, stage? }. `variables`/`leadStage` aceitos como
 // apelido. `contactId` (formato antigo) é aceito se for texto, mas ignorado:
 // o lead é deduplicado por e-mail/telefone.
-export async function POST(request: Request) {
-  const auth = await autenticarApiV1(request);
+export async function POST(request: Request, { params }: Params) {
+  const auth = await autenticarApiV1(request, (await params).contract);
   if ("resposta" in auth) return auth.resposta;
 
   const body = await lerCorpo(request);

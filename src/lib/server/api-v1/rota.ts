@@ -6,6 +6,7 @@ import { escopoPermite, type Acao, type Recurso } from "./escopos";
 import { ErroApi, novoRequestId, paraErroApi, respostaDeErro } from "./http";
 import { comIdempotencia, validarChave } from "./idempotencia";
 import { comAtor } from "@/lib/server/eventos/barramento";
+import { idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 
 // ---------------------------------------------------------------------------
 // Envoltório de toda rota da API v1: chave → escopo → limite → idempotência
@@ -43,8 +44,16 @@ export interface OpcoesDaRota {
 
 type Handler<P> = (ctx: CtxV1, params: P) => Promise<Response>;
 
-export function rotaV1<P extends Record<string, string> = Record<string, never>>(opcoes: OpcoesDaRota, handler: Handler<P>) {
-  return async (request: Request, contexto: { params: Promise<P> }): Promise<Response> => {
+/** Contrato da URL (id curto, o mesmo da URL do app, ou o completo) = contrato da chave. */
+export function conferirContrato(orgId: string, daUrl: string | undefined): void {
+  if (mesmoContrato(orgId, daUrl)) return;
+  throw new ErroApi(403, "contract_mismatch", `Esta chave é do contrato ${idCurto(orgId)}. Use /api/v1/${idCurto(orgId)}/...`, {
+    details: { contract: idCurto(orgId) },
+  });
+}
+
+export function rotaV1<P extends Record<string, string> = Record<never, never>>(opcoes: OpcoesDaRota, handler: Handler<P>) {
+  return async (request: Request, contexto: { params: Promise<P & { contract: string }> }): Promise<Response> => {
     const requestId = novoRequestId();
     const headersDoLimite: Record<string, string> = {};
     const comHeaders = (r: Response) => {
@@ -58,6 +67,10 @@ export function rotaV1<P extends Record<string, string> = Record<string, never>>
       if (!chave) {
         throw new ErroApi(401, "invalid_api_key", "Chave de API inválida ou ausente. Envie Authorization: Bearer evs_live_...");
       }
+
+      // /api/v1/{contrato}/...: a chave tem de ser do contrato da URL.
+      const params = (await contexto?.params) ?? ({} as P & { contract: string });
+      conferirContrato(chave.orgId, params.contract);
 
       const acao: Acao = opcoes.acao ?? (request.method === "GET" ? "read" : "write");
       const recurso = opcoes.recurso;
@@ -105,7 +118,6 @@ export function rotaV1<P extends Record<string, string> = Record<string, never>>
         },
       };
 
-      const params = (await contexto?.params) ?? ({} as P);
       const executar = async () => {
         try {
           // Todo evento que a chamada gerar sai com ator "api" (e a chave).

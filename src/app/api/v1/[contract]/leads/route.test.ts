@@ -23,7 +23,8 @@ function req(body?: unknown, method = "POST", url = "https://eva.test/api/v1/lea
     body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
 }
-const p = (id: string) => ({ params: Promise.resolve({ id }) });
+const p = (id: string) => ({ params: Promise.resolve({ contract: "o1", id }) });
+const raiz = { params: Promise.resolve({ contract: "o1" }) };
 
 const contatoLead = {
   id: "c1",
@@ -54,29 +55,33 @@ beforeEach(() => {
 describe("/api/v1/leads", () => {
   it("chave inválida: 401; limite: 429", async () => {
     keys.autenticarChave.mockResolvedValueOnce(null);
-    expect((await GET(req(undefined, "GET"))).status).toBe(401);
+    expect((await GET(req(undefined, "GET"), raiz)).status).toBe(401);
     rate.checkRateLimit.mockResolvedValueOnce({ allowed: false });
-    expect((await GET(req(undefined, "GET"))).status).toBe(429);
+    expect((await GET(req(undefined, "GET"), raiz)).status).toBe(429);
   });
 
   it("escopo da chave vale: sem contacts:read não lista, sem contacts:write não cria", async () => {
     keys.autenticarChave.mockResolvedValue({ orgId: "o1", keyId: "k1", scopes: ["pipelines:read"] });
-    expect((await GET(req(undefined, "GET"))).status).toBe(403);
+    expect((await GET(req(undefined, "GET"), raiz)).status).toBe(403);
     keys.autenticarChave.mockResolvedValue({ orgId: "o1", keyId: "k1", scopes: ["contacts:read"] });
-    expect((await GET(req(undefined, "GET"))).status).toBe(200);
-    expect((await POST(req({ agentId: "a1", fields: { nome: "Ana" } }))).status).toBe(403);
+    expect((await GET(req(undefined, "GET"), raiz)).status).toBe(200);
+    expect((await POST(req({ agentId: "a1", fields: { nome: "Ana" } }), raiz)).status).toBe(403);
     expect((await DELETE(req(undefined, "DELETE"), p("c1"))).status).toBe(403);
     expect(db.contact.create).not.toHaveBeenCalled();
   });
 
+  it("chave de outro contrato: 403", async () => {
+    expect((await GET(req(undefined, "GET"), { params: Promise.resolve({ contract: "8d8d3a8c" }) })).status).toBe(403);
+  });
+
   it("stage em inglês vale como o antigo (new = novo)", async () => {
-    await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=new"));
+    await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=new"), raiz);
     expect(db.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", leadStage: "novo" } }));
   });
 
   it("GET lista no formato público (chaves antigas + novas)", async () => {
     db.contact.findMany.mockResolvedValue([contatoLead]);
-    const res = await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=novo&limit=10"));
+    const res = await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=novo&limit=10"), raiz);
     expect(db.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", leadStage: "novo" }, take: 10 }));
     const { data } = await res.json();
     expect(data[0]).toEqual({
@@ -96,29 +101,29 @@ describe("/api/v1/leads", () => {
   });
 
   it("GET com stage inválido: 400", async () => {
-    expect((await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=vip"))).status).toBe(400);
+    expect((await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=vip"), raiz)).status).toBe(400);
   });
 
   it("POST cria: 201 com data.id = id do contato", async () => {
-    const res = await POST(req({ agentId: "a1", fields: { nome: "Ana", email: "ana@x.com" }, stage: "novo" }));
+    const res = await POST(req({ agentId: "a1", fields: { nome: "Ana", email: "ana@x.com" }, stage: "novo" }), raiz);
     expect(res.status).toBe(201);
     expect((await res.json()).data.id).toBe("c1");
     expect(db.contact.create).toHaveBeenCalledWith({ data: expect.objectContaining({ source: "api", leadChannel: "api" }) });
   });
 
   it("POST: e-mail inválido 400 com fieldErrors; JSON inválido 400; contactId não-texto 400; stage inválido 400", async () => {
-    const res = await POST(req({ agentId: "a1", fields: { email: "x@" } }));
+    const res = await POST(req({ agentId: "a1", fields: { email: "x@" } }), raiz);
     expect(res.status).toBe(400);
     expect((await res.json()).fieldErrors).toEqual({ email: "E-mail inválido." });
-    expect((await POST(req("{"))).status).toBe(400);
-    expect((await POST(req({ agentId: "a1", fields: {}, contactId: 9 }))).status).toBe(400);
-    expect((await POST(req({ agentId: "a1", fields: {}, stage: "vip" }))).status).toBe(400);
-    expect((await POST(req({ agentId: "a1" }))).status).toBe(400);
+    expect((await POST(req("{"), raiz)).status).toBe(400);
+    expect((await POST(req({ agentId: "a1", fields: {}, contactId: 9 }), raiz)).status).toBe(400);
+    expect((await POST(req({ agentId: "a1", fields: {}, stage: "vip" }), raiz)).status).toBe(400);
+    expect((await POST(req({ agentId: "a1" }), raiz)).status).toBe(400);
   });
 
   it("POST com agente de outra org: 404", async () => {
     db.agent.findFirst.mockResolvedValue(null);
-    expect((await POST(req({ agentId: "x", fields: { nome: "Ana" } }))).status).toBe(404);
+    expect((await POST(req({ agentId: "x", fields: { nome: "Ana" } }), raiz)).status).toBe(404);
   });
 
   it("GET /:id com id antigo de conversa resolve para o contato", async () => {

@@ -6,13 +6,13 @@ import { autenticarApiV1, respostaDeErroDoLead } from "../auth";
 
 // `id` é o id do contato. O id antigo (de conversa, devolvido pela API antes
 // da Fase 2) continua funcionando: resolve para o contato ligado a ela.
-type Params = { params: Promise<{ id: string }> };
+type Params = { params: Promise<{ contract: string; id: string }> };
 
 export async function GET(request: Request, { params }: Params) {
-  const auth = await autenticarApiV1(request);
+  const { contract, id } = await params;
+  const auth = await autenticarApiV1(request, contract);
   if ("resposta" in auth) return auth.resposta;
 
-  const { id } = await params;
   const contactId = await resolverIdDoLead(auth.orgId, id);
   const lead = contactId ? await buscarLead(auth.orgId, contactId) : null;
   if (!lead) return erro("Lead não encontrado.", 404);
@@ -22,10 +22,10 @@ export async function GET(request: Request, { params }: Params) {
 // Corpo: { stage?, fields? } (`leadStage`/`variables` como apelido). `fields`
 // é mesclado: nome/e-mail/telefone vão para a ficha, o resto vira campo livre.
 export async function PATCH(request: Request, { params }: Params) {
-  const auth = await autenticarApiV1(request);
+  const { contract, id } = await params;
+  const auth = await autenticarApiV1(request, contract);
   if ("resposta" in auth) return auth.resposta;
 
-  const { id } = await params;
   const body = await lerCorpo(request);
   if (!body) return erro(JSON_INVALIDO);
 
@@ -48,10 +48,10 @@ export async function PATCH(request: Request, { params }: Params) {
 // Tira da lista de leads; o contato e as conversas continuam. `deleted` fica
 // por compatibilidade com quem já tratava a resposta antiga.
 export async function DELETE(request: Request, { params }: Params) {
-  const auth = await autenticarApiV1(request);
+  const { contract, id } = await params;
+  const auth = await autenticarApiV1(request, contract);
   if ("resposta" in auth) return auth.resposta;
 
-  const { id } = await params;
   const contactId = await resolverIdDoLead(auth.orgId, id);
   if (!contactId || !(await removerDosLeads(auth.orgId, contactId))) return erro("Lead não encontrado.", 404);
   return NextResponse.json({ data: { deleted: true, removed: true } });

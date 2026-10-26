@@ -767,7 +767,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   },
 };
 
-export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
+export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1/{contract}") {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const [caminho, metodos] of Object.entries(ROTAS)) {
     // Funil e etapa no caminho: o número no contrato.
@@ -787,6 +787,7 @@ export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
       title: "Eva Studio — API do CRM",
       version: "1.0.0",
       description:
+        "URL: /api/v1/{contract}/..., com o id curto do contrato (o mesmo da URL do app). A chave precisa ser desse contrato (403 contract_mismatch). " +
         "Autenticação: Authorization: Bearer evs_live_... (Integrações → API). JSON em snake_case, datas ISO-8601 em UTC, dinheiro em centavos. " +
         "Funil e etapa são identificados pelo número no contrato (inteiro; veja GET /pipelines), não por UUID. " +
         "Listas: { data, has_more, next_cursor }. Erro: { error: { type, code, message, param?, details?, request_id } }. " +
@@ -794,7 +795,14 @@ export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
         "Importação e exportação: chaves antigas com imports:write ou exports:read continuam valendo para ler e escrever o job. " +
         "Valores fixos em inglês (type da tarefa, lead_stage, source, motivos padrão default:*); a entrada ainda aceita os nomes antigos em português.",
     },
-    servers: [{ url: servidor }],
+    servers: [
+      {
+        url: servidor,
+        ...(servidor.includes("{contract}")
+          ? { variables: { contract: { default: "SEU-CONTRATO", description: "Id curto do contrato, o mesmo da URL do app (ex.: 8d8d3a8c)." } } }
+          : {}),
+      },
+    ],
     security: [{ bearer: [] }],
     components: {
       securitySchemes: { bearer: { type: "http", scheme: "bearer", bearerFormat: "evs_live_..." } },

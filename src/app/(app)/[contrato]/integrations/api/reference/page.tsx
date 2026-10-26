@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { montarOpenApi } from "@/lib/api-v1-openapi";
 import { pathExamples } from "@/lib/api-v1-openapi-examples";
 import { exampleUrl, toCurl, toFetch } from "@/lib/api-v1-examples";
-import { CodeBlock, CodeTabs, Eyebrow, Field, LanguageProvider, Method, json, useOrigin } from "@/components/integrations/api-docs";
+import { CodeBlock, CodeTabs, Eyebrow, Field, LanguageProvider, Method, json, useApiBase } from "@/components/integrations/api-docs";
 
 // Referência da API do CRM v1, montada do mesmo OpenAPI servido em
 // /api/v1/openapi.json (a fonte que quem integra usa para gerar cliente).
@@ -150,8 +150,7 @@ function EndpointCard({ entry, base }: { entry: Entry; base: string }) {
 }
 
 export default function ApiReferencePage() {
-  const origin = useOrigin();
-  const base = `${origin}/api/v1`;
+  const base = useApiBase();
   const doc = React.useMemo(() => montarOpenApi(base), [base]);
   const [tag, setTag] = React.useState("");
 

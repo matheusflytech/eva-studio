@@ -30,7 +30,7 @@ import { POST as REORDENAR } from "./reorder/route";
 
 const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/pipelines") =>
   new Request(url, { method, headers: { authorization: "Bearer evs_live_abc" }, body: body === undefined ? undefined : JSON.stringify(body) });
-const semParams = { params: Promise.resolve({}) } as { params: Promise<Record<string, never>> };
+const semParams = { params: Promise.resolve({ contract: "o1" }) } as { params: Promise<{ contract: string }> };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 describe("GET /v1/pipelines/{id}/lost-reasons", () => {
-  const umFunil = { params: Promise.resolve({ id: "1" }) };
+  const umFunil = { params: Promise.resolve({ contract: "o1", id: "1" }) };
   const url = "https://eva.test/api/v1/pipelines/1/lost-reasons";
 
   it("funil sem motivos salvos devolve os padrão; com salvos, os do funil", async () => {
@@ -91,7 +91,7 @@ describe("/v1/pipelines", () => {
     db.pipeline.findFirst.mockResolvedValue({ id: "p1", numero: 1, isDefault: false });
     db.pipeline.count.mockResolvedValue(2);
     db.tx.deal.count.mockResolvedValue(3);
-    const res = await DELETE(req("DELETE"), { params: Promise.resolve({ id: "1" }) });
+    const res = await DELETE(req("DELETE"), { params: Promise.resolve({ contract: "o1", id: "1" }) });
     expect(db.pipeline.findFirst.mock.calls[0][0].where).toEqual({ orgId: "o1", numero: 1 });
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatchObject({ code: "move_to_required", details: { deals: 3 } });
@@ -100,11 +100,11 @@ describe("/v1/pipelines", () => {
 
   it("funil no caminho: UUID é 400 invalid_parameter; número que não existe, 404", async () => {
     db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes: ["pipelines:read"] });
-    const r1 = await LER(req("GET"), { params: Promise.resolve({ id: "8d8d3a8c-2ff6-485e-a325-17384e9990cf" }) });
+    const r1 = await LER(req("GET"), { params: Promise.resolve({ contract: "o1", id: "8d8d3a8c-2ff6-485e-a325-17384e9990cf" }) });
     expect(r1.status).toBe(400);
     expect((await r1.json()).error).toMatchObject({ code: "invalid_parameter", param: "id" });
     db.pipeline.findFirst.mockResolvedValue(null);
-    const r2 = await LER(req("GET"), { params: Promise.resolve({ id: "9" }) });
+    const r2 = await LER(req("GET"), { params: Promise.resolve({ contract: "o1", id: "9" }) });
     expect(r2.status).toBe(404);
   });
 
@@ -121,7 +121,7 @@ describe("/v1/pipelines", () => {
     db.tx.deal.count.mockResolvedValue(1);
     db.tx.deal.findMany.mockResolvedValue([{ id: "d1" }]);
     const res = await APAGAR_ETAPA(req("DELETE", undefined, "https://eva.test/api/v1/pipelines/1/stages/1?move_to=2"), {
-      params: Promise.resolve({ id: "1", stageId: "1" }),
+      params: Promise.resolve({ contract: "o1", id: "1", stageId: "1" }),
     });
     expect(res.status).toBe(200);
     expect((await res.json()).data).toMatchObject({ id: 1, deleted: true, moved_deals: 1 });
@@ -134,7 +134,7 @@ describe("/v1/pipelines", () => {
     db.pipeline.findFirst.mockResolvedValue({ id: "p1", numero: 1 });
     db.pipelineStage.findFirst.mockResolvedValue({ id: "s1" });
     const res = await APAGAR_ETAPA(req("DELETE", undefined, "https://eva.test/api/v1/pipelines/1/stages/1?move_to=1"), {
-      params: Promise.resolve({ id: "1", stageId: "1" }),
+      params: Promise.resolve({ contract: "o1", id: "1", stageId: "1" }),
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatchObject({ code: "invalid_move_to", param: "move_to" });

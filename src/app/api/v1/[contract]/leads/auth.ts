@@ -4,11 +4,15 @@ import { autenticarChave } from "@/lib/server/api-keys";
 import { escopoPermite } from "@/lib/server/api-v1/escopos";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import type { ErroLead } from "@/lib/server/leads";
+import { idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 
-/** Chave de API (escopo contacts) + limite de 120 req/min por org. Devolve o orgId ou a resposta de erro. */
-export async function autenticarApiV1(request: Request): Promise<{ orgId: string } | { resposta: NextResponse }> {
+/** Chave de API (escopo contacts, do contrato da URL) + limite de 120 req/min por org. Devolve o orgId ou a resposta de erro. */
+export async function autenticarApiV1(request: Request, contrato: string): Promise<{ orgId: string } | { resposta: NextResponse }> {
   const chave = await autenticarChave(request);
   if (!chave) return { resposta: NextResponse.json({ error: "Chave de API inválida ou ausente." }, { status: 401 }) };
+  if (!mesmoContrato(chave.orgId, contrato)) {
+    return { resposta: NextResponse.json({ error: `Esta chave é do contrato ${idCurto(chave.orgId)}. Use /api/v1/${idCurto(chave.orgId)}/leads.` }, { status: 403 }) };
+  }
   // Lead é contato: mesma regra de escopo do /v1/contacts.
   const acao = request.method === "GET" ? "read" : "write";
   if (!escopoPermite(chave.scopes, "contacts", acao)) {
