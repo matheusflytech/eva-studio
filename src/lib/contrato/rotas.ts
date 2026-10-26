@@ -28,7 +28,7 @@ export const SECOES_DO_CONTRATO = [
   "library",
   "companies",
   "leads",
-  "insights",
+  "reports",
   "integrations",
   "playground",
   "settings",
@@ -63,6 +63,7 @@ const SECOES_ANTIGAS = tabela({
   configuracoes: "settings",
   comecar: "get-started",
   ajuda: "help",
+  insights: "reports",
 });
 
 /** Sub-rotas dentro das seções: /negocios/configurar → /deals/configure. */

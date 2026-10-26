@@ -34,7 +34,7 @@ export const PAGINAS: Pagina[] = [
   { caminho: "/broadcasts", rotulo: "Disparos", permissao: "disparos:ver", palavras: "campanha massa broadcast" },
   { caminho: "/approvals", rotulo: "Aprovações", permissao: "disparos:ver", palavras: "templates modelos meta" },
   { caminho: "/library", rotulo: "Biblioteca", palavras: "modelos respostas" },
-  { caminho: "/insights", rotulo: "Insights", permissao: "relatorios:ver" },
+  { caminho: "/reports", rotulo: "Relatórios", permissao: "relatorios:ver" },
   { caminho: "/integrations", rotulo: "Integrações", permissao: "integracoes:gerenciar", palavras: "api webhooks n8n" },
   { caminho: "/playground", rotulo: "Playground", permissao: "agentes:ver" },
   { caminho: "/settings", rotulo: "Configurações", palavras: "ajustes funis campos membros lixeira" },

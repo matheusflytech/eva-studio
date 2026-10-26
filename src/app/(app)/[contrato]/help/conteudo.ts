@@ -106,7 +106,7 @@ export const SECOES: Secao[] = [
         href: "/dashboard",
         nota: "Em “Editar painel” dá pra adicionar, renomear, redimensionar (1/3, 2/3 ou cheia) e reordenar. Cinco formatos: número, linha, pizza, barras e tabela. Salva sozinho, e o painel é um por organização, não por pessoa. Em “Adicionar painel” há também “Montar do meu jeito”: você escolhe o que medir (quantidade, soma ou média de um valor ou de um campo seu), como separar (etapa, responsável, mês, dia ou um campo seu), quais negócios entram (andamento, ganhos, perdidos, funil, período e filtros) e vê a prévia calculada na hora.",
       },
-      { titulo: "Insights", resumo: "Quanto o agente resolve sozinho, onde a conversa para, horário de pico e o que mais falam.", href: "/insights", nota: "“Onde a conversa para” mostra o último bloco de cada execução — é o painel que aponta a pergunta específica que faz gente desistir." },
+      { titulo: "Relatórios", resumo: "Quanto o agente resolve sozinho, onde a conversa para, horário de pico, o que mais falam e o funil de cada agente.", href: "/reports", nota: "“Onde a conversa para” mostra o último bloco de cada execução — é o painel que aponta a pergunta específica que faz gente desistir." },
       {
         titulo: "Eva Studio",
         resumo: "Lista dos agentes, com o próximo passo de cada um e sete dias de conversa em barras.",
