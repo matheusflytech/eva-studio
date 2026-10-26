@@ -152,7 +152,7 @@ export async function coletarFontes(orgId: string, filtros: number | FiltrosGlob
         },
       }),
       prisma.$queryRaw<{ hora: number; total: number }[]>`
-        SELECT EXTRACT(HOUR FROM (m."createdAt" AT TIME ZONE 'America/Sao_Paulo'))::int AS hora,
+        SELECT EXTRACT(HOUR FROM (m."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo'))::int AS hora,
                COUNT(*)::int AS total
           FROM eva_studio_messages m
           JOIN eva_studio_conversations c ON c.id = m."conversationId"
