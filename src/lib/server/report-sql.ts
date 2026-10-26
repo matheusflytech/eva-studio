@@ -78,6 +78,16 @@ const CAMPOS_DO_NEGOCIO: Record<string, Prisma.Sql> = {
   deal_closed: local(`d."closedAt"`),
 };
 
+// Uma linha por opção marcada num campo de múltipla escolha (alias mcf, mv).
+// A chave do JSON liga ao campo; a opção mostra o rótulo (ou o valor, se a
+// opção foi apagada do campo).
+const opcoesMarcadas = (json: string, entity: "deal" | "contact", org: string) => `
+  CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(${json}) = 'object' THEN ${json} ELSE '{}'::jsonb END) mkv
+  JOIN eva_studio_custom_fields mcf ON mcf."orgId" = ${org} AND mcf.entity = '${entity}' AND mcf.key = mkv.key AND mcf.type = 'multiselect'
+  CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(mkv.value) = 'array' THEN mkv.value ELSE '[]'::jsonb END) mv(v)`;
+const ROTULO_DA_OPCAO = raw(`COALESCE((SELECT o ->> 'label' FROM jsonb_array_elements(
+  CASE WHEN jsonb_typeof(mcf.options) = 'array' THEN mcf.options ELSE '[]'::jsonb END) o WHERE o ->> 'value' = mv.v LIMIT 1), NULLIF(mv.v, ''))`);
+
 interface Base {
   /** FROM ... WHERE <condição do contrato> (sem filtros da pessoa). */
   from: (orgId: string) => Prisma.Sql;
@@ -249,6 +259,24 @@ const BASES: Record<string, Base> = {
       role: texto(`dct.role`),
     },
   },
+  deals_multiselect: {
+    from: (org) => sql`FROM eva_studio_deals d ${raw(JOIN_DO_NEGOCIO)} ${raw(opcoesMarcadas(`d."customFields"`, "deal", `d."orgId"`))}
+      WHERE d."orgId" = ${org} AND d."archivedAt" IS NULL`,
+    fields: { field: raw(`mcf.label`), option: ROTULO_DA_OPCAO, ...CAMPOS_DO_NEGOCIO },
+  },
+  contacts_multiselect: {
+    from: (org) => sql`FROM eva_studio_contacts c
+      LEFT JOIN eva_studio_profiles cow ON cow.id = c."ownerId" ${raw(opcoesMarcadas(`c."customFields"`, "contact", `c."orgId"`))}
+      WHERE c."orgId" = ${org}`,
+    fields: {
+      field: raw(`mcf.label`),
+      option: ROTULO_DA_OPCAO,
+      contact_name: texto(`c.name`),
+      contact_source: texto(`c.source`),
+      contact_owner: raw(`cow.name`),
+      contact_created: local(`c."createdAt"`),
+    },
+  },
   contacts_tags: {
     from: (org) => sql`FROM eva_studio_contact_tags ct
       JOIN eva_studio_contacts c ON c.id = ct."contactId"
@@ -367,7 +395,7 @@ function exprDoPersonalizado(col: string, c: CampoPersonalizado): Prisma.Sql {
     case "checkbox":
       return sql`(CASE WHEN jsonb_typeof(${j} -> ${k}) = 'boolean' THEN (${j} ->> ${k})::boolean END)`;
     case "multiselect": {
-      // Vários valores viram um texto só ("A, B"); separar um por linha é da Fase 2.
+      // Vários valores viram um texto só ("A, B"); uma linha por opção é a base "Opções marcadas".
       const rot = rotuloDeOpcoes(sql`x`, c);
       return sql`(SELECT string_agg(${rot}, ', ') FROM jsonb_array_elements_text(
         CASE WHEN jsonb_typeof(${j} -> ${k}) = 'array' THEN ${j} -> ${k} ELSE '[]'::jsonb END) x)`;

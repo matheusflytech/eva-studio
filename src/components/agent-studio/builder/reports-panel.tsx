@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -76,14 +76,19 @@ export function ReportsPanel({ agentId }: { agentId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
       <div className="flex flex-wrap items-end gap-3 rounded-[18px] border border-border-subtle bg-panel p-4">
-        <label className="flex flex-col gap-1 text-caption text-text-tertiary">
-          De
-          <Input type="date" value={de} max={ate} onChange={(e) => e.target.value && setDe(e.target.value)} className="w-[150px]" />
-        </label>
-        <label className="flex flex-col gap-1 text-caption text-text-tertiary">
-          Até
-          <Input type="date" value={ate} min={de} onChange={(e) => e.target.value && setAte(e.target.value)} className="w-[150px]" />
-        </label>
+        <div className="flex flex-col gap-1 text-caption text-text-tertiary">
+          Período
+          <DateRangePicker
+            de={de}
+            ate={ate}
+            onChange={(d, a) => {
+              if (!d || !a) return;
+              setDe(d);
+              setAte(a);
+            }}
+            className="w-[240px]"
+          />
+        </div>
         <label className="flex flex-col gap-1 text-caption text-text-tertiary">
           Canal
           <Select value={canal} onChange={(e) => setCanal(e.target.value)} className="w-[190px]">

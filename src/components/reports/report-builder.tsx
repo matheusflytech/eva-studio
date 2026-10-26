@@ -6,13 +6,22 @@ import {
   ChartArea,
   ChartBar,
   ChartColumn,
+  ChartColumnDecreasing,
   ChartLine,
+  ChartNoAxesCombined,
   ChartPie,
+  ChartScatter,
   FileText,
+  Funnel,
+  Gauge,
+  Grid3x3,
   Hash,
   Plus,
   Table2,
+  Target,
   Trash2,
+  TrendingUp,
+  Waypoints,
   X,
 } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
@@ -38,6 +47,7 @@ import {
   OPS_POR_TIPO,
   OP_LABEL,
   QUERY_PADRAO,
+  VIZ_COM_META,
   VIZ_TYPES,
   camposDoDataset,
   colunasEfetivas,
@@ -57,6 +67,8 @@ export interface ReportCard {
   query: ReportQuery;
   viz: VizType;
   titulo: string;
+  /** Indicador e Progresso. */
+  meta?: number;
 }
 
 const ICONE_DO_VISUAL: Record<VizType, React.ComponentType<{ size?: number }>> = {
@@ -68,6 +80,30 @@ const ICONE_DO_VISUAL: Record<VizType, React.ComponentType<{ size?: number }>> =
   line: ChartLine,
   area: ChartArea,
   pie: ChartPie,
+  combo: ChartNoAxesCombined,
+  trend: TrendingUp,
+  gauge: Gauge,
+  progress: Target,
+  funnel: Funnel,
+  pivot: Grid3x3,
+  scatter: ChartScatter,
+  waterfall: ChartColumnDecreasing,
+  sankey: Waypoints,
+};
+
+/** Quando o visual não cabe: o que o resumo precisa ter. */
+const PRECISA: Partial<Record<VizType, string>> = {
+  combo: "duas medidas e uma separação",
+  scatter: "duas medidas e uma separação",
+  trend: "uma medida separada por data",
+  gauge: "uma medida, sem separação",
+  progress: "uma medida, sem separação",
+  number: "uma medida, sem separação",
+  funnel: "uma medida e uma separação",
+  waterfall: "uma medida e uma separação",
+  pie: "uma medida e uma separação",
+  pivot: "uma medida e duas separações",
+  sankey: "uma medida e duas separações (de → para)",
 };
 
 /** Título sugerido: "Soma de Valor de Negócios por Etapa". */
@@ -141,6 +177,7 @@ export function ReportBuilder({
   const [query, setQuery] = React.useState<ReportQuery | null>(inicial?.query ?? null);
   const [viz, setViz] = React.useState<VizType>(inicial?.viz ?? "bar");
   const [titulo, setTitulo] = React.useState(inicial?.titulo ?? "");
+  const [meta, setMeta] = React.useState(inicial?.meta ? String(inicial.meta) : "");
   const [tituloMexido, setTituloMexido] = React.useState(!!inicial?.titulo);
   const personalizados = usePersonalizados(query?.dataset ?? null);
   const campos = React.useMemo(() => (query ? camposDoDataset(query.dataset, personalizados) : []), [query, personalizados]);
@@ -170,6 +207,9 @@ export function ReportBuilder({
 
   const sugestao = query ? tituloSugerido(query, campos) : "";
   const tituloFinal = tituloMexido && titulo.trim() ? titulo.trim() : sugestao;
+  const comMeta = VIZ_COM_META.includes(vizEfetiva);
+  const metaNum = Number(meta.replace(/\./g, "").replace(",", "."));
+  const metaValida = comMeta && Number.isFinite(metaNum) && metaNum > 0 ? metaNum : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal aria-label="Montar cartão">
@@ -208,33 +248,55 @@ export function ReportBuilder({
               <div className="flex min-h-[420px] flex-col gap-4 p-5 md:overflow-y-auto">
                 <section data-anim>
                   <Label className="mb-2">Visual</Label>
-                  <div role="radiogroup" aria-label="Tipo de visual" className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 md:grid-cols-4 xl:grid-cols-8">
-                    {VIZ_TYPES.map((v) => {
-                      const Icone = ICONE_DO_VISUAL[v.key];
-                      const ok = permitidas.includes(v.key);
-                      const ativo = vizEfetiva === v.key;
-                      return (
-                        <button
-                          key={v.key}
-                          type="button"
-                          role="radio"
-                          aria-checked={ativo}
-                          disabled={!ok}
-                          title={ok ? v.label : `${v.label}: não cabe neste resumo`}
-                          onClick={() => setViz(v.key)}
-                          className={cn(
-                            "flex flex-col items-center gap-1 rounded-[12px] px-1 py-2 text-caption transition-colors",
-                            ativo ? "bg-accent-subtle text-accent-fg ring-1 ring-accent-solid/40" : "text-text-secondary hover:bg-hover hover:text-text-primary",
-                            !ok && "pointer-events-none opacity-35"
-                          )}
-                        >
-                          <Icone size={18} />
-                          <span className="truncate">{v.label}</span>
-                        </button>
-                      );
-                    })}
+                  {/* Em cima, os que cabem neste resumo; embaixo, os outros (desligados, com o que falta no título). */}
+                  <div role="radiogroup" aria-label="Tipo de visual">
+                    {[VIZ_TYPES.filter((v) => permitidas.includes(v.key)), VIZ_TYPES.filter((v) => !permitidas.includes(v.key))].map((grupo, g) =>
+                      grupo.length === 0 ? null : (
+                        <div key={g}>
+                          {g === 1 && <p className="mb-2 mt-4 text-caption font-medium uppercase tracking-wide text-text-tertiary">Outros gráficos</p>}
+                          <div className="grid grid-cols-4 gap-x-1 gap-y-3 sm:grid-cols-6 md:grid-cols-4 xl:grid-cols-6">
+                            {grupo.map((v) => {
+                              const Icone = ICONE_DO_VISUAL[v.key];
+                              const ok = g === 0;
+                              const ativo = vizEfetiva === v.key;
+                              return (
+                                <button
+                                  key={v.key}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={ativo}
+                                  disabled={!ok}
+                                  title={ok ? v.label : `${v.label}: precisa de ${PRECISA[v.key] ?? "outro resumo"}`}
+                                  onClick={() => setViz(v.key)}
+                                  className="group flex flex-col items-center gap-1.5 text-center text-caption leading-tight disabled:cursor-not-allowed"
+                                >
+                                  <span
+                                    className={cn(
+                                      "grid size-11 place-items-center rounded-full transition-colors duration-150",
+                                      ativo
+                                        ? "bg-accent-solid text-white"
+                                        : "bg-panel text-accent-fg ring-1 ring-border-subtle group-enabled:group-hover:bg-accent-subtle group-disabled:opacity-40"
+                                    )}
+                                  >
+                                    <Icone size={18} />
+                                  </span>
+                                  <span className={cn(ativo ? "font-medium text-accent-fg" : "text-text-secondary", !ok && "opacity-50")}>{v.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )
+                    )}
                   </div>
                 </section>
+
+                {comMeta && (
+                  <div data-anim>
+                    <Label htmlFor="rb-meta">Meta</Label>
+                    <Input id="rb-meta" inputMode="decimal" placeholder="Ex.: 50000" value={meta} onChange={(e) => setMeta(e.target.value)} className="w-40" />
+                  </div>
+                )}
 
                 <div data-anim>
                   <Label htmlFor="rb-titulo">Título do cartão</Label>
@@ -252,7 +314,7 @@ export function ReportBuilder({
                 <div data-anim className="flex min-h-[260px] flex-1 flex-col rounded-[18px] border border-border-subtle bg-panel p-4">
                   <p className="mb-3 text-small font-medium text-text-secondary">{tituloFinal || "Prévia"}</p>
                   <div className="min-h-0 flex-1">
-                    <ReportView result={result} viz={vizEfetiva} loading={loading} error={error} />
+                    <ReportView result={result} viz={vizEfetiva} meta={metaValida} loading={loading} error={error} />
                   </div>
                 </div>
               </div>
@@ -260,7 +322,7 @@ export function ReportBuilder({
 
             <footer className="flex items-center justify-end gap-2 border-t border-border-subtle px-5 py-3">
               <Button variant="ghost" onClick={aoFechar}>Cancelar</Button>
-              <Button onClick={() => aoSalvar({ query, viz: vizEfetiva, titulo: tituloFinal || "Meu cartão" })}>
+              <Button onClick={() => aoSalvar({ query, viz: vizEfetiva, titulo: tituloFinal || "Meu cartão", ...(metaValida ? { meta: metaValida } : {}) })}>
                 {inicial ? "Salvar cartão" : "Adicionar ao painel"}
               </Button>
             </footer>
