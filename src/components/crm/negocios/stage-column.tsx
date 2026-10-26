@@ -204,9 +204,9 @@ export function StageColumn({
       ref={setNodeRef}
       data-etapa={etapa.name}
       aria-label={`${etapa.name}, ${total} itens`}
-      className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200", destaque)}
+      className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200 xl:w-80", destaque)}
     >
-      <header className="group/cab flex flex-col gap-2 px-3 pb-2.5 pt-3">
+      <header className="group/cab flex flex-col gap-2.5 px-3.5 pb-3 pt-3.5">
         <div className="flex h-7 items-center gap-2">
           <h3 className="min-w-0 truncate text-body font-semibold text-text-primary">{etapa.name}</h3>
           <span
@@ -239,8 +239,8 @@ export function StageColumn({
             type="button"
             onClick={() => onNovo(etapa.id)}
             className={cn(
-              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] border border-accent-solid/35 bg-accent-subtle/40 text-small font-medium text-accent-fg",
-              "transition-colors duration-150 hover:border-accent-solid/60 hover:bg-accent-subtle",
+              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-default text-small font-medium text-text-tertiary",
+              "transition-colors duration-150 hover:border-accent-solid/50 hover:bg-accent-subtle/40 hover:text-accent-fg",
               focusRing
             )}
           >
@@ -249,7 +249,7 @@ export function StageColumn({
         )}
       </header>
 
-      <div id={corpoId} data-coluna-corpo className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
+      <div id={corpoId} data-coluna-corpo className="flex min-h-24 flex-1 flex-col gap-2.5 overflow-y-auto px-2.5 pb-2.5">
         {etapa.deals.map((deal) => (
           <CartaoArrastavel
             key={deal.id}

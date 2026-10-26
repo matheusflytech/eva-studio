@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  Send, Paperclip, X, Lock, Bot, UserRound, FileText, Clock, MessageSquareText, AlertTriangle,
+  Send, Paperclip, X, Lock, Bot, UserRound, FileText, Clock, MessageSquareText, AlertTriangle, Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal, ModalContent } from "@/components/ui/modal";
@@ -34,6 +34,18 @@ const TIPOS_ACEITOS = [
 ].join(",");
 
 const LIMITE = 16 * 1024 * 1024;
+
+// Formato da gravação: AAC (mp4) é o que a Meta aceita e o Chrome e o Safari
+// gravam; o Firefox grava ogg/opus, que o WhatsApp também aceita.
+// shortcut: navegador que só grava webm manda webm, que o WhatsApp oficial recusa; converter no servidor se aparecer.
+const FORMATOS_DE_GRAVACAO = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm;codecs=opus"];
+const MAX_GRAVACAO_MS = 5 * 60 * 1000;
+const EXTENSAO: Record<string, string> = { "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/webm": "webm" };
+
+const minutos = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 /**
  * Envia o arquivo direto ao storage por uma URL assinada.
@@ -162,6 +174,12 @@ export function Compositor({
   const campo = React.useRef<HTMLTextAreaElement>(null);
   const arquivo = React.useRef<HTMLInputElement>(null);
   const botaoEnviar = React.useRef<HTMLButtonElement>(null);
+  const [gravando, setGravando] = React.useState<number | null>(null);
+  const [agora, setAgora] = React.useState(0);
+  const gravador = React.useRef<{ mr: MediaRecorder; cancelado: boolean; limite: ReturnType<typeof setTimeout> } | null>(null);
+  // Lido depois de montar: no servidor não existe microfone, e o HTML tem de bater.
+  const [podeGravar, setPodeGravar] = React.useState(false);
+  React.useEffect(() => setPodeGravar(!!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined"), []);
 
   // Cada conversa tem o seu rascunho: trocar de conversa não pode levar o que
   // estava sendo escrito para outro cliente.
@@ -170,7 +188,63 @@ export function Compositor({
     setAnexo(null);
     setErro(null);
     setModo("responder");
+    return () => pararGravacao(true);
   }, [conversa.id]);
+
+  React.useEffect(() => {
+    if (gravando === null) return;
+    const t = setInterval(() => setAgora(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [gravando]);
+
+  /** Grava como no WhatsApp: toca no microfone, fala, toca em enviar (ou cancela). */
+  async function gravar() {
+    setErro(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      return setErro("Sem acesso ao microfone. Libere o microfone para este site no navegador.");
+    }
+    const formato = FORMATOS_DE_GRAVACAO.find((f) => MediaRecorder.isTypeSupported(f));
+    const mr = new MediaRecorder(stream, formato ? { mimeType: formato } : undefined);
+    const partes: Blob[] = [];
+    mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const atual = gravador.current;
+      gravador.current = null;
+      setGravando(null);
+      if (!atual || atual.cancelado || partes.length === 0) return;
+      const mime = (mr.mimeType || formato || "audio/webm").split(";")[0];
+      const file = new File(partes, `audio-${Date.now()}.${EXTENSAO[mime] ?? "webm"}`, { type: mime });
+      setSubindo({ nome: "Áudio", pct: 0 });
+      try {
+        const preparado = await subirArquivo(file, (pct) => setSubindo({ nome: "Áudio", pct }));
+        setSubindo(null);
+        setEnviando(true);
+        const falha = await onEnviar({ attachment: preparado });
+        setEnviando(false);
+        if (falha) setErro(falha);
+        else pulsar(botaoEnviar.current, 1.2);
+      } catch (err) {
+        setSubindo(null);
+        setErro(err instanceof Error ? err.message : "Não foi possível enviar o áudio.");
+      }
+    };
+    gravador.current = { mr, cancelado: false, limite: setTimeout(() => pararGravacao(false), MAX_GRAVACAO_MS) };
+    mr.start();
+    setAgora(Date.now());
+    setGravando(Date.now());
+  }
+
+  function pararGravacao(cancelar: boolean) {
+    const g = gravador.current;
+    if (!g) return;
+    clearTimeout(g.limite);
+    g.cancelado = cancelar;
+    if (g.mr.state !== "inactive") g.mr.stop();
+  }
 
   React.useEffect(() => {
     const el = campo.current;
@@ -359,6 +433,21 @@ export function Compositor({
         </div>
       )}
 
+      {gravando !== null ? (
+        <div className="flex items-center gap-2 rounded-[14px] border border-border-default bg-raised py-1.5 pl-3 pr-1.5">
+          <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-danger motion-reduce:animate-none" aria-hidden="true" />
+          <span className="flex-1 font-mono text-small tabular-nums text-text-primary" role="timer" aria-live="off">
+            Gravando {minutos(Math.max(0, agora - gravando))}
+          </span>
+          <Button variant="ghost" size="icon" onClick={() => pararGravacao(true)} aria-label="Cancelar gravação" className="shrink-0">
+            <X aria-hidden="true" />
+          </Button>
+          <Button ref={botaoEnviar} variant="primary" size="md" onClick={() => pararGravacao(false)} aria-label="Enviar áudio" className="shrink-0">
+            <Send size={14} aria-hidden="true" />
+            <span className="hidden sm:inline">Enviar</span>
+          </Button>
+        </div>
+      ) : (
       <div
         className={cn(
           "flex items-end gap-1.5 rounded-[14px] border py-1.5 pl-3 pr-1.5 transition-colors duration-120",
@@ -396,8 +485,7 @@ export function Compositor({
           className="max-h-40 min-h-8 flex-1 resize-none bg-transparent py-1.5 text-body-lg leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary lg:text-body"
         />
 
-        {/* No chat do site só vai texto: ele não mostra arquivo do atendente. */}
-        {modo === "responder" && conversa.channel !== "website" && (
+        {modo === "responder" && (
           <>
             <input ref={arquivo} type="file" accept={TIPOS_ACEITOS} onChange={aoEscolherArquivo} className="hidden" />
             <Button
@@ -414,6 +502,21 @@ export function Compositor({
           </>
         )}
 
+        {/* Campo vazio: o microfone ocupa o lugar do enviar, como no WhatsApp. */}
+        {modo === "responder" && podeGravar && !texto.trim() && !anexo && !enviando ? (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => void gravar()}
+            disabled={respostaBloqueada || !!subindo}
+            aria-label="Gravar áudio"
+            title="Gravar áudio"
+            className="shrink-0"
+          >
+            <Mic size={14} aria-hidden="true" />
+            <span className="hidden sm:inline">Áudio</span>
+          </Button>
+        ) : (
         <Button
           ref={botaoEnviar}
           variant="primary"
@@ -427,7 +530,9 @@ export function Compositor({
           {!enviando && <Send size={14} aria-hidden="true" />}
           <span className="hidden sm:inline">{modo === "nota" ? "Salvar" : "Enviar"}</span>
         </Button>
+        )}
       </div>
+      )}
 
       {erro && <p className="mt-2 px-1 text-caption text-danger">{erro}</p>}
 

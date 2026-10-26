@@ -279,6 +279,11 @@ export function caminhoAtual(pathname: string, search = ""): string | null {
   }
   const secao = SECOES.has(segs[i]);
   if (!secao && !(i === 1 && PAGINAS.has(segs[1]))) return null;
+  // Link com o id completo (bookmark, aba antiga): a URL fica só com o curto.
+  if (i === 2 && UUID.test(segs[1])) {
+    segs[1] = idCurto(segs[1]);
+    mudou = true;
+  }
   if (secao) {
     for (let j = i + 1; j < segs.length; j++) {
       const sub = SUBROTAS_ANTIGAS.get(segs[j]);

@@ -80,7 +80,7 @@ describe("nomes antigos (português) → atuais (inglês)", () => {
     expect(caminhoAtual(`/${a}/tarefas`, "?aba=calendario")).toBe(`/${a}/tasks?tab=calendar`);
     expect(caminhoAtual(`/${a}/contatos`, "?abrir=c1&etiqueta=t1")).toBe(`/${a}/contacts?open=c1&tag=t1`);
     expect(caminhoAtual(`/${a}/agent-studio/x1`, "?aba=canais")).toBe(`/${a}/agent-studio/x1?tab=channels`);
-    expect(caminhoAtual(`/${A}/comecar`)).toBe(`/${A}/get-started`);
+    expect(caminhoAtual(`/${A}/comecar`)).toBe(`/${a}/get-started`);
   });
 
   it("seção que não mudou de nome: só os parâmetros", () => {
@@ -125,8 +125,13 @@ describe("redirecionamento dos caminhos antigos", () => {
     expect(destinoDoCaminhoAntigo("/convite", "?t=abc", null)).toBe("/invite?t=abc");
   });
 
+  it("id completo na URL vira o curto", () => {
+    expect(destinoDoCaminhoAntigo(`/${A}/deals`, "?pipeline=2", A)).toBe(`/${a}/deals?pipeline=2`);
+    expect(destinoDoCaminhoAntigo(`/${A}/negocios/7`, "", null)).toBe(`/${a}/deals/7`);
+  });
+
   it("não mexe no que já está atual ou não é tela antiga", () => {
-    expect(destinoDoCaminhoAntigo(`/${A}/deals`, "", A)).toBeNull();
+    expect(destinoDoCaminhoAntigo(`/${a}/deals`, "", A)).toBeNull();
     expect(destinoDoCaminhoAntigo("/login", "", A)).toBeNull();
     expect(destinoDoCaminhoAntigo("/api/deals", "?busca=x", A)).toBeNull();
     expect(destinoDoCaminhoAntigo("/admin", "", A)).toBeNull();

@@ -63,7 +63,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     '.inputRow{display:flex;gap:6px;padding:10px;border-top:1px solid #eee;background:#fff;}' +
     '.inputRow input{flex:1;border:1px solid #ddd;border-radius:10px;padding:8px 10px;font-size:13px;outline:none;}' +
     '.inputRow button{background:#4f46e5;color:#fff;border:none;border-radius:10px;padding:0 14px;cursor:pointer;font-size:13px;}' +
-    '.typing{font-size:12px;color:#888;padding:0 4px;}';
+    '.typing{font-size:12px;color:#888;padding:0 4px;}' +
+    '.inputRow button.icon{background:none;color:#666;padding:0 6px;display:flex;align-items:center;}' +
+    '.inputRow button.icon:hover{color:#4f46e5;}' +
+    '.inputRow button.icon.rec{color:#dc2626;animation:evaRec 1s ease-in-out infinite alternate;}' +
+    '@keyframes evaRec{to{opacity:.4;}}' +
+    '@media (prefers-reduced-motion:reduce){.inputRow button.icon.rec{animation:none;}}' +
+    '.media.user{align-self:flex-end;}' +
+    '.transcript{max-width:82%;font-size:11px;line-height:1.4;color:#666;padding:0 4px;white-space:pre-wrap;}' +
+    '.transcript.user{align-self:flex-end;text-align:right;}' +
+    '.transcript.bot{align-self:flex-start;}';
 
   var root, panel, messagesEl, input, sendBtn, bubble, closeBtn;
 
@@ -77,7 +86,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       '<div class="panel">' +
       '<div class="header"><span>' + AGENT_NAME + '</span></div>' +
       '<div class="messages" id="evaMessages"></div>' +
-      '<div class="inputRow"><input id="evaInput" type="text" placeholder="Digite sua mensagem..." /><button id="evaSend">Enviar</button></div>' +
+      '<div class="inputRow"><input id="evaFile" type="file" accept="image/*,application/pdf,.doc,.docx,text/plain" hidden />' +
+      '<button class="icon" id="evaAttach" type="button" aria-label="Anexar imagem ou documento" title="Anexar imagem ou documento"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>' +
+      '<input id="evaInput" type="text" placeholder="Digite sua mensagem..." />' +
+      '<button class="icon" id="evaMic" type="button" aria-label="Gravar áudio" title="Gravar áudio"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>' +
+      '<button id="evaSend">Enviar</button></div>' +
       '</div>';
     root = root1;
   } else {
@@ -101,7 +114,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       '<div class="panel" id="evaPanel">' +
       '<div class="header"><span>' + AGENT_NAME + '</span><button class="close" id="evaClose">\\u2715</button></div>' +
       '<div class="messages" id="evaMessages"></div>' +
-      '<div class="inputRow"><input id="evaInput" type="text" placeholder="Digite sua mensagem..." /><button id="evaSend">Enviar</button></div>' +
+      '<div class="inputRow"><input id="evaFile" type="file" accept="image/*,application/pdf,.doc,.docx,text/plain" hidden />' +
+      '<button class="icon" id="evaAttach" type="button" aria-label="Anexar imagem ou documento" title="Anexar imagem ou documento"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>' +
+      '<input id="evaInput" type="text" placeholder="Digite sua mensagem..." />' +
+      '<button class="icon" id="evaMic" type="button" aria-label="Gravar áudio" title="Gravar áudio"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>' +
+      '<button id="evaSend">Enviar</button></div>' +
       '</div>';
     root = root2;
     bubble = root.getElementById("evaBubble");
@@ -121,22 +138,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  // Mídia do bot (URL http/https já validada no servidor): nada de innerHTML.
-  function addMedia(media) {
+  // Mídia (URL do servidor já validada, ou blob: do próprio visitante): nada de innerHTML.
+  function addMedia(media, role) {
+    var lado = role === "user" ? "user" : "bot";
     var el;
     if (media.type === "image" || media.type === "video" || media.type === "audio") {
       el = document.createElement(media.type === "image" ? "img" : media.type);
       el.src = media.url;
       if (media.type === "image") el.alt = "";
       else el.controls = true;
-      el.className = "media";
+      el.className = "media " + lado;
     } else {
       el = document.createElement("a");
       el.href = media.url;
       el.target = "_blank";
       el.rel = "noopener noreferrer";
       el.textContent = media.name || "Abrir arquivo";
-      el.className = "msg bot";
+      el.className = "msg " + lado;
     }
     messagesEl.appendChild(el);
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -160,6 +178,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // Transcrição de um áudio, em letra menor embaixo dele (como no WhatsApp).
+  function addTranscript(role, text) {
+    var t = document.createElement("div");
+    t.className = "transcript " + role;
+    t.textContent = text;
+    messagesEl.appendChild(t);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return t;
+  }
+
   function setTyping(on) {
     var existing = root.getElementById("evaTyping");
     if (existing) existing.remove();
@@ -173,8 +201,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     }
   }
 
-  function send(payload) {
+  function send(payload, aoChegar) {
     setTyping(true);
+    startPolling();
     fetch(API_ORIGIN + "/api/widget/" + AGENT_ID + "/message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -183,6 +212,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       .then(function (r) { return r.json(); })
       .then(function (data) {
         setTyping(false);
+        if (aoChegar) aoChegar(data);
         (data.messages || []).forEach(function (m) {
           if (m.media) addMedia(m.media);
           if (m.text || !m.media) addMessage("bot", m.text);
@@ -203,6 +233,94 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
   input.addEventListener("keydown", function (e) {
     if (e.key === "Enter") submit();
   });
+  // Quando alguém da equipe assume pela Caixa de entrada, a resposta não volta
+  // no POST: o chat busca as novas a cada 5 s, com a aba visível.
+  var lastSeen = null, seen = {}, pollTimer = null;
+  function poll() {
+    if (document.hidden) return;
+    var q = "?contactId=" + encodeURIComponent(contactId) + (lastSeen ? "&depois=" + encodeURIComponent(lastSeen) : "");
+    fetch(API_ORIGIN + "/api/widget/" + AGENT_ID + "/novas" + q, { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        (d.messages || []).forEach(function (m) {
+          lastSeen = m.createdAt;
+          if (seen[m.id]) return;
+          seen[m.id] = true;
+          if (m.media) addMedia(m.media, "bot");
+          if (m.media && m.media.type === "audio") { if (m.text) addTranscript("bot", "Transcrição: " + m.text); }
+          else if (m.text) addMessage("bot", m.text);
+        });
+      })
+      .catch(function () {});
+  }
+  function startPolling() {
+    if (!pollTimer) pollTimer = setInterval(poll, 5000);
+  }
+  if (isReturningVisitor) startPolling();
+
+  function toBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result).split(",")[1] || ""); };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // Anexo: imagem, PDF, Word ou texto, até 3 MB (o mesmo limite do servidor).
+  var fileInput = root.getElementById("evaFile");
+  root.getElementById("evaAttach").onclick = function () { fileInput.click(); };
+  fileInput.onchange = function () {
+    var file = fileInput.files && fileInput.files[0];
+    fileInput.value = "";
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { addMessage("bot", "Esse arquivo é grande demais. O limite é de 3 MB."); return; }
+    var legenda = input.value.trim();
+    input.value = "";
+    addMedia(file.type.indexOf("image/") === 0 ? { type: "image", url: URL.createObjectURL(file) } : { type: "document", url: URL.createObjectURL(file), name: file.name }, "user");
+    if (legenda) addMessage("user", legenda);
+    toBase64(file).then(function (b64) {
+      send({ text: legenda || undefined, attachment: { base64: b64, mime: file.type, name: file.name } });
+    });
+  };
+
+  // Áudio: toca no microfone, fala, toca de novo para enviar. O servidor
+  // transcreve e a transcrição aparece embaixo do áudio.
+  var micBtn = root.getElementById("evaMic");
+  var rec = null;
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) micBtn.hidden = true;
+  micBtn.onclick = function () {
+    if (rec) { rec.stop(); return; }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+      var partes = [];
+      rec = new MediaRecorder(stream);
+      rec.ondataavailable = function (e) { if (e.data.size) partes.push(e.data); };
+      rec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        var tipo = (rec.mimeType || "audio/webm").split(";")[0];
+        rec = null;
+        micBtn.classList.remove("rec");
+        micBtn.setAttribute("aria-label", "Gravar áudio");
+        if (!partes.length) return;
+        var blob = new Blob(partes, { type: tipo });
+        addMedia({ type: "audio", url: URL.createObjectURL(blob) }, "user");
+        var tr = addTranscript("user", "Transcrevendo…");
+        toBase64(blob).then(function (b64) {
+          send({ audio_base64: b64, audio_mime: tipo }, function (d) {
+            if (d.transcricao) tr.textContent = "Transcrição: " + d.transcricao;
+            else tr.remove();
+          });
+        });
+      };
+      rec.start();
+      micBtn.classList.add("rec");
+      micBtn.setAttribute("aria-label", "Parar e enviar o áudio");
+    }).catch(function () {
+      addMessage("bot", "Sem acesso ao microfone. Libere o microfone para este site e tente de novo.");
+    });
+  };
+
   function submit() {
     var text = input.value.trim();
     if (!text) return;

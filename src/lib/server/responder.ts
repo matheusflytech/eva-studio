@@ -4,6 +4,7 @@ import { deliverToContact, type DeliverResult } from "@/lib/server/outbound";
 import { CANAIS_POR_BUSCA, janelaDeResposta, podeResponderNoCanal, registrarMensagens } from "@/lib/server/inbox";
 import { CANAIS_DE_TESTE, INCLUDE_MENSAGEM, serializarMensagens } from "@/lib/server/conversas";
 import { caminhoDaOrg, classificarMime, MAX_MEDIA_BYTES, urlAssinada } from "@/lib/server/storage";
+import { transcreverAudioDoWhatsApp } from "@/lib/server/anexos-whatsapp";
 
 // ---------------------------------------------------------------------------
 // Resposta de um atendente.
@@ -79,11 +80,8 @@ export async function responderComoAtendente(pedido: PedidoDeResposta): Promise<
   if (erroAnexo) return { ok: false, status: 400, error: erroAnexo };
 
   const simulado = CANAIS_DE_TESTE.includes(conversa.channel);
-  // Chat do site: o site busca a mensagem; não há o que enviar daqui.
+  // Chat do site: o site busca a mensagem (com o anexo); não há o que enviar daqui.
   const porBusca = CANAIS_POR_BUSCA.has(conversa.channel);
-  if (porBusca && pedido.attachment) {
-    return { ok: false, status: 400, error: "No chat do site dá para mandar só texto." };
-  }
   if (!simulado && !podeResponderNoCanal(conversa.channel)) {
     return {
       ok: false,
@@ -192,6 +190,16 @@ export async function responderComoAtendente(pedido: PedidoDeResposta): Promise<
         ? { deliveryStatus: resultado.queued ? "queued" : "sent", externalId: resultado.id ?? null, deliveryError: null }
         : { deliveryStatus: "failed", deliveryError: (resultado.error ?? "Falha no envio.").slice(0, 500) },
     });
+  }
+
+  // Áudio gravado pelo atendente: a transcrição fica como texto da mensagem
+  // (a equipe lê, a IA entende o histórico). Depois do envio, para não sair
+  // como legenda para o cliente.
+  if (pedido.attachment?.type === "audio" && !textoFinal) {
+    const transcricao = await transcreverAudioDoWhatsApp(pedido.orgId, pedido.attachment);
+    if (transcricao && !transcricao.startsWith("[")) {
+      await prisma.message.update({ where: { id: criada.id }, data: { text: transcricao } });
+    }
   }
 
   const final = await prisma.message.findUniqueOrThrow({ where: { id: criada.id }, include: INCLUDE_MENSAGEM });

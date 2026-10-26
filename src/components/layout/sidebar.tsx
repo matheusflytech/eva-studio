@@ -15,8 +15,8 @@ import {
   Plug,
   MessageSquare,
   PlayCircle,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Pin,
+  PinOff,
   Users,
   Contact,
   Repeat,
@@ -96,6 +96,7 @@ const NAV_AVANCADO: NavGroup[] = [
 ];
 
 const CHAVE_MAIS = "eva_menu_mais";
+const CHAVE_FIXO = "eva_menu_fixo";
 
 /** Abre a busca global; mostra o atalho da plataforma (⌘K no Mac, Ctrl K no resto). */
 function BotaoBuscar({ collapsed }: { collapsed: boolean }) {
@@ -126,9 +127,42 @@ function BotaoBuscar({ collapsed }: { collapsed: boolean }) {
 }
 
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
-  const [collapsedState, setCollapsed] = React.useState(false);
+  // Fica só nos ícones; passar o mouse (ou o Tab) abre por cima da tela, sem
+  // empurrar o conteúdo. Quem prefere aberto o tempo todo fixa no alfinete.
+  const [fixo, setFixo] = React.useState(false);
+  const [aberto, setAberto] = React.useState(false);
+  const fechar = React.useRef<ReturnType<typeof setTimeout>>(undefined);
+  React.useEffect(() => {
+    try {
+      setFixo(localStorage.getItem(CHAVE_FIXO) === "1");
+    } catch {
+      /* navegação privada: segue solto */
+    }
+    return () => clearTimeout(fechar.current);
+  }, []);
   // Na gaveta do celular não existe "recolher": ela ou está aberta, ou não existe.
-  const collapsed = mobile ? false : collapsedState;
+  const collapsed = mobile ? false : !fixo && !aberto;
+  const sobreposto = !mobile && !fixo && aberto;
+
+  function alternarFixo() {
+    const novo = !fixo;
+    setFixo(novo);
+    setAberto(false);
+    try {
+      localStorage.setItem(CHAVE_FIXO, novo ? "1" : "0");
+    } catch {
+      /* ignora */
+    }
+  }
+  const abrir = () => {
+    clearTimeout(fechar.current);
+    setAberto(true);
+  };
+  // Folga ao sair: passar o mouse de raspão pela borda não pisca o menu.
+  const soltar = () => {
+    clearTimeout(fechar.current);
+    fechar.current = setTimeout(() => setAberto(false), 180);
+  };
   const [naoLidas, setNaoLidas] = React.useState(0);
   const pathname = usePathname();
 
@@ -167,26 +201,47 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   }, 20_000);
 
   return (
+    // O espaço reservado na tela é o do menu fixo (240) ou o da faixa de ícones (68).
+    <div className={cn("relative h-full shrink-0", mobile ? "w-full" : fixo ? "w-[240px]" : "w-[68px]")}>
     <aside
+      onMouseEnter={mobile || fixo ? undefined : abrir}
+      onMouseLeave={mobile || fixo ? undefined : soltar}
+      onFocus={mobile || fixo ? undefined : abrir}
+      onBlur={
+        mobile || fixo
+          ? undefined
+          : (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) soltar();
+            }
+      }
       className={cn(
-        "flex h-full shrink-0 flex-col border-r border-border-subtle bg-panel px-3 py-3.5 transition-[width] duration-[var(--dur-base)] ease-out",
-        mobile ? "w-full bg-panel" : collapsed ? "w-[68px]" : "w-[240px]"
+        "absolute inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-border-subtle bg-panel px-3 py-3.5 transition-[width,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-out)]",
+        mobile ? "w-full" : collapsed ? "w-[68px]" : "w-[240px]",
+        sobreposto && "shadow-[0_24px_64px_-12px_rgb(0_0_0/0.28)]"
       )}
     >
-      <div className="mb-1 flex items-center justify-between px-1 pb-2">
-        {!collapsed && (
+      <div className="mb-1 flex h-8 items-center justify-between px-1 pb-2">
+        {collapsed ? (
+          <Link href="/home" className="mx-auto flex items-center" aria-label="Início">
+            <MarcaEva size={20} className="text-text-primary" />
+          </Link>
+        ) : (
           <Link href="/home" className="flex items-center gap-2">
             <MarcaEva size={20} className="text-text-primary" />
             <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
           </Link>
         )}
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
-          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-        >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+        {!mobile && !collapsed && (
+          <button
+            onClick={alternarFixo}
+            className="ml-auto flex h-7 w-7 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
+            aria-label={fixo ? "Soltar o menu" : "Fixar o menu aberto"}
+            aria-pressed={fixo}
+            title={fixo ? "Soltar: o menu abre ao passar o mouse" : "Fixar o menu aberto"}
+          >
+            {fixo ? <PinOff size={15} /> : <Pin size={15} />}
+          </button>
+        )}
       </div>
 
       <BotaoBuscar collapsed={collapsed} />
@@ -252,5 +307,6 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         <ThemeToggle />
       </div>
     </aside>
+    </div>
   );
 }

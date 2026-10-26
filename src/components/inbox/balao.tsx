@@ -175,7 +175,16 @@ export function Balao({
             <Anexo m={m} doContato={doContato} />
           </div>
         )}
-        {!semTexto && <p className="whitespace-pre-wrap break-words text-body leading-relaxed">{m.text}</p>}
+        {!semTexto &&
+          (m.media?.type === "audio" ? (
+            // Áudio: o texto é a transcrição (feita ao chegar ou ao gravar), como no WhatsApp.
+            <p className="whitespace-pre-wrap break-words text-small leading-relaxed">
+              <span className={cn("mb-0.5 block text-caption font-medium", doContato ? "text-text-tertiary" : "text-text-on-accent/70")}>Transcrição</span>
+              {m.text}
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap break-words text-body leading-relaxed">{m.text}</p>
+          ))}
 
         <div className={cn("mt-0.5 flex items-center justify-end gap-1.5 text-caption", doContato ? "text-text-tertiary" : "text-text-on-accent/70")}>
           <span className="font-mono tabular-nums">{horaDaMensagem(m.createdAt)}</span>

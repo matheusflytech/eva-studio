@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { agentePausado } from "@/lib/server/inbox";
+import { urlAssinada } from "@/lib/server/storage";
 
 // ---------------------------------------------------------------------------
 // Atendimento humano no chat do site. O site (widget da Eva, chat do Drawing
@@ -22,6 +23,8 @@ export interface MensagemDoAtendente {
   text: string;
   autor: string | null;
   createdAt: string;
+  /** Anexo do atendente; o link assinado vale 1 hora (a próxima busca gera outro). */
+  media?: { type: string; url: string; name: string | null };
 }
 
 export interface NovasDoSite {
@@ -44,11 +47,22 @@ export async function mensagensDoAtendente(agentId: string, contactId: string, d
     where: { conversationId: conversa.id, role: "human", createdAt: { gt: corte } },
     orderBy: { createdAt: "asc" },
     take: MAX_POR_BUSCA,
-    select: { id: true, text: true, createdAt: true, author: { select: { name: true } } },
+    select: { id: true, text: true, createdAt: true, mediaPath: true, mediaType: true, mediaName: true, author: { select: { name: true } } },
   });
   return {
     humano: agentePausado(conversa.status),
-    messages: linhas.map((m) => ({ id: m.id, text: m.text, autor: m.author?.name ?? null, createdAt: m.createdAt.toISOString() })),
+    messages: await Promise.all(
+      linhas.map(async (m) => {
+        const url = m.mediaPath ? await urlAssinada(m.mediaPath) : null;
+        return {
+          id: m.id,
+          text: m.text,
+          autor: m.author?.name ?? null,
+          createdAt: m.createdAt.toISOString(),
+          ...(url && m.mediaType ? { media: { type: m.mediaType, url, name: m.mediaName } } : {}),
+        };
+      })
+    ),
   };
 }
 
