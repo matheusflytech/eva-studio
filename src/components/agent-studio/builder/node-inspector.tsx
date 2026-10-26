@@ -509,6 +509,44 @@ export function NodeInspector({
           </div>
         )}
 
+        {iconKey === "track-event" && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <Label htmlFor="node-event-category">Categoria</Label>
+              <Input
+                id="node-event-category"
+                placeholder="ex: vendas"
+                maxLength={100}
+                value={node.data.eventCategory ?? ""}
+                onChange={(e) => onChange({ eventCategory: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node-event-action">Ação</Label>
+              <Input
+                id="node-event-action"
+                placeholder="ex: pediu orçamento"
+                maxLength={100}
+                value={node.data.eventAction ?? ""}
+                onChange={(e) => onChange({ eventAction: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node-event-value">Valor (opcional)</Label>
+              <Input
+                id="node-event-value"
+                placeholder="ex: {plano}"
+                maxLength={500}
+                value={node.data.eventValue ?? ""}
+                onChange={(e) => onChange({ eventValue: e.target.value })}
+              />
+            </div>
+            <p className="text-caption text-text-tertiary">
+              Conta no relatório do Studio cada vez que a conversa passa por aqui. Aceita {"{variavel}"} nos três campos.
+            </p>
+          </div>
+        )}
+
         {iconKey === "webhook" && (
           <div>
             <Label htmlFor="node-webhook">URL do webhook</Label>

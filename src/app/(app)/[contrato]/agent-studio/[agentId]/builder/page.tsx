@@ -57,6 +57,7 @@ import { FlowTemplateGallery } from "@/components/agent-studio/builder/flow-temp
 import type { FlowTemplate } from "@/components/agent-studio/builder/flow-templates";
 import { FlowEdge, ToolEdge } from "@/components/agent-studio/builder/flow-edge";
 import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-panel";
+import { ReportsPanel } from "@/components/agent-studio/builder/reports-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
 import { getFlow, saveFlow } from "@/lib/data/flows";
@@ -65,7 +66,7 @@ import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { MOLA } from "@/lib/design-system/movimento";
 
 type SaveState = "idle" | "pending" | "saved" | "error";
-type BuilderTab = "editor" | "conversa" | "executions";
+type BuilderTab = "editor" | "conversa" | "executions" | "reports";
 
 interface UltimaExecucao {
   createdAt: string;
@@ -614,6 +615,7 @@ export default function AgentBuilderPage() {
             { value: "editor", label: "Editor" },
             { value: "conversa", label: "Conversa" },
             { value: "executions", label: "Execuções" },
+            { value: "reports", label: "Relatórios" },
           ]}
         />
 
@@ -804,7 +806,7 @@ export default function AgentBuilderPage() {
           )}
         </div>
       ) : (
-        <ExecutionsPanel agentId={agentId} />
+        tab === "reports" ? <ReportsPanel agentId={agentId} /> : <ExecutionsPanel agentId={agentId} />
       )}
 
       {showTemplateGallery && (

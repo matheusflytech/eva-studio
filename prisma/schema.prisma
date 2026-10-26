@@ -175,6 +175,7 @@ model Agent {
   commentAutomations  CommentAutomation[]
   triggers            AgentTrigger[]
   executions          FlowExecution[]
+  studioEvents        StudioEvent[]
   contactChannels     ContactChannel[]
   sequences           Sequence[]
   telegramConnection  TelegramConnection?
@@ -2288,4 +2289,29 @@ model Rodizio {
 
   @@index([orgId])
   @@map("eva_studio_rodizios")
+}
+
+// Eventos do Studio (S3): os automáticos do motor (entrou no bloco, saiu,
+// não respondeu, clicou no botão) e os da ação "Registrar evento". A aba
+// Relatórios lê daqui. SQL: prisma/sql/2026-10-31-studio-events.sql.
+model StudioEvent {
+  id             String   @id @default(uuid())
+  orgId          String
+  agentId        String
+  conversationId String?
+  channel        String?
+  contactId      String?
+  nodeId         String?
+  category       String
+  action         String
+  value          String?
+  extra          Json?
+  createdAt      DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt])
+  @@index([agentId, nodeId, createdAt])
+  @@index([orgId, createdAt])
+  @@map("eva_studio_studio_events")
 }

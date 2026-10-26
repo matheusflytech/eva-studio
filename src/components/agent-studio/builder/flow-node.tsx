@@ -110,6 +110,10 @@ export interface FlowNodeData {
   captureMaxRetries?: number; // novas tentativas antes de desistir (padrão 2)
   captureErrorMessage?: string; // vazio = mensagem padrão do tipo
   variableExpression?: string;
+  // Ação "Registrar evento" (relatório do Studio): categoria e ação obrigatórias, valor opcional; aceitam {variavel}.
+  eventCategory?: string;
+  eventAction?: string;
+  eventValue?: string;
   conditionExpression?: string;
   options?: MenuOption[];
   // Modelo pra usar se essa mensagem sair fora da janela de 24h da Meta

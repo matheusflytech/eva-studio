@@ -1595,6 +1595,12 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   // visitado, não a variável inteira (evita vazar dado sensível no log).
   interface FlowStep { nodeId: string; kind: string; label: string; output?: string; error?: string; ms: number }
   const steps: FlowStep[] = [];
+  // Eventos do Studio desta rodada (aba Relatórios); gravados no finish().
+  const eventos: { nodeId: string; category: string; action: string; value?: string }[] = [];
+  /** O id da ação do Bloco é "bloco:acao": o evento fica no Bloco. */
+  function registrarEvento(node: Node<FlowNodeData>, category: string, action: string, value?: string) {
+    eventos.push({ nodeId: node.id.split(":")[0], category, action, ...(value ? { value } : {}) });
+  }
   function pushStep(node: Node<FlowNodeData>, extra: { output?: string; error?: string } = {}, startedAt = Date.now()) {
     steps.push({ nodeId: node.id, kind: node.data.iconKey, label: node.data.label, ms: Date.now() - startedAt, ...extra });
   }
@@ -1663,6 +1669,23 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         },
       });
     }
+    if (eventos.length > 0) {
+      // Relatório é acessório: falhar aqui nunca derruba a resposta da conversa.
+      try {
+        await prisma.studioEvent.createMany({
+          data: eventos.map((e) => ({
+            ...e,
+            orgId: agent!.orgId,
+            agentId: input.agentId,
+            conversationId: conversation.id,
+            channel: input.channel,
+            contactId: contatoId ?? null,
+          })),
+        });
+      } catch (e) {
+        console.error("[flow-engine] falha ao gravar eventos", e);
+      }
+    }
     return { messages, status };
   }
 
@@ -1681,6 +1704,15 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
           }
         }
         pushStep(node, { output: node.data.variableName ? String(variables[node.data.variableName] ?? "") : undefined });
+        return true;
+      }
+
+      if (kind === "track-event") {
+        const category = interpolate(node.data.eventCategory ?? "", variables).trim();
+        const action = interpolate(node.data.eventAction ?? "", variables).trim();
+        const value = interpolate(node.data.eventValue ?? "", variables).trim();
+        if (category && action) registrarEvento(node, category.slice(0, 100), action.slice(0, 100), value.slice(0, 500));
+        pushStep(node, category && action ? { output: `${category} · ${action}${value ? ` · ${value}` : ""}` } : { error: "evento sem categoria ou ação" });
         return true;
       }
 
@@ -1911,6 +1943,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     const valeu = condicoes.find(
       (c) => c.expression.trim() && nextNodeId(edges, no.id, c.id) && evaluateCondition(c.expression, variables)
     );
+    const rotuloDaSaida = valeu
+      ? valeu.label.trim() || `Condição ${condicoes.indexOf(valeu) + 1}`
+      : saida === SAIDA_INVALIDA
+        ? "Não respondeu certo"
+        : saida
+          ? (no.data.options ?? []).find((o) => o.id === saida)?.label ?? saida
+          : "Padrão";
+    registrarEvento(no, "block", "exited", rotuloDaSaida);
     if (valeu) return nextNodeId(edges, no.id, valeu.id);
     const nomeadas = [...condicoes.map((c) => c.id), ...(no.data.options ?? []).map((o) => o.id)];
     if (saida === SAIDA_INVALIDA) return nextNodeId(edges, no.id, SAIDA_INVALIDA) ?? nextDefaultNodeId(edges, no.id, nomeadas);
@@ -1960,6 +2000,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     // Acordado pelo relógio (que já tirou o prazo): venceu sem resposta.
     delete variables.__capture_tries;
     pushStep(parkedNode, { output: "não respondeu no prazo" });
+    registrarEvento(parkedNode, "block", "no_reply");
     const destino = nextNodeId(edges, parkedNode.id, SAIDA_SEM_RESPOSTA);
     if (!destino) return finish(); // sem ligação: continua esperando a resposta
     currentId = destino;
@@ -2034,6 +2075,9 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       );
     }
     const handle = options.length > 0 ? resolvedOptionId : undefined;
+    if (handle && parkedNode.data.iconKey === "studio-block") {
+      registrarEvento(parkedNode, "button", "clicked", options.find((o) => o.id === handle)?.label ?? handle);
+    }
     currentId = await seguirDaPergunta(parkedNode, handle ?? null, () => nextNodeId(edges, parkedNode.id, handle));
   } else if (parkedNode?.data.iconKey === "agent") {
     const conversationId = `${input.channel}:${input.contactId}`;
@@ -2085,6 +2129,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
 
     if (kind === "studio-block") {
       const startedAt = Date.now();
+      registrarEvento(node, "block", "entered");
       for (const a of node.data.entryActions ?? []) await executarPasso(acaoComoNo(node, a));
       // "Digitando" vale para a mensagem seguinte; o último texto leva os botões.
       let digitando: number | undefined;
