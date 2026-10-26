@@ -28,6 +28,20 @@ describe("OpenAPI da v1", () => {
     expect(faltando).toEqual([]);
   });
 
+  it("todo endpoint tem exemplo de resposta de sucesso", () => {
+    const doc = montarOpenApi();
+    const semExemplo: string[] = [];
+    for (const [caminho, item] of Object.entries(doc.paths)) {
+      for (const [metodo, op] of Object.entries(item)) {
+        if (metodo === "parameters") continue;
+        const respostas = (op as { responses: Record<string, { content?: { "application/json"?: { example?: unknown } } }> }).responses;
+        const sucesso = Object.entries(respostas).find(([s]) => /^2\d\d$/.test(s));
+        if (sucesso?.[1].content?.["application/json"]?.example === undefined) semExemplo.push(`${metodo.toUpperCase()} ${caminho}`);
+      }
+    }
+    expect(semExemplo).toEqual([]);
+  });
+
   it("é OpenAPI 3.1 com segurança bearer e envelope de erro", () => {
     const doc = montarOpenApi("https://eva.test/api/v1");
     expect(doc.openapi).toBe("3.1.0");
