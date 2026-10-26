@@ -212,6 +212,29 @@ export const DATASETS: DatasetDef[] = [
     ],
   },
   {
+    key: "deals_multiselect",
+    label: "Negócios ↔ Opções marcadas",
+    description: "Cada linha é uma opção marcada num campo de múltipla escolha de um negócio.",
+    group: "Relações",
+    defaultColumns: ["deal_name", "deal_stage", "field", "option"],
+    fields: [f("field", "Campo"), f("option", "Opção"), ...CAMPOS_DO_NEGOCIO],
+  },
+  {
+    key: "contacts_multiselect",
+    label: "Contatos ↔ Opções marcadas",
+    description: "Cada linha é uma opção marcada num campo de múltipla escolha de um contato.",
+    group: "Relações",
+    defaultColumns: ["contact_name", "field", "option", "contact_created"],
+    fields: [
+      f("field", "Campo"),
+      f("option", "Opção"),
+      f("contact_name", "Contato"),
+      f("contact_source", "Origem do contato"),
+      f("contact_owner", "Responsável pelo contato"),
+      f("contact_created", "Contato criado em", "date"),
+    ],
+  },
+  {
     key: "contacts_tags",
     label: "Contatos ↔ Etiquetas",
     description: "Cada linha é uma etiqueta num contato.",
@@ -355,18 +378,32 @@ export interface ReportQuery {
   limit: number;
 }
 
-export type VizType = "table" | "detail" | "number" | "bar" | "bar_h" | "line" | "area" | "pie";
+export type VizType =
+  | "table" | "detail" | "number" | "bar" | "bar_h" | "line" | "area" | "pie"
+  | "combo" | "trend" | "gauge" | "progress" | "funnel" | "pivot" | "scatter" | "waterfall" | "sankey";
 
 export const VIZ_TYPES: { key: VizType; label: string }[] = [
   { key: "table", label: "Tabela" },
+  { key: "funnel", label: "Funil" },
   { key: "detail", label: "Detalhe" },
-  { key: "number", label: "Número" },
   { key: "bar", label: "Barra" },
-  { key: "bar_h", label: "Barra horizontal" },
   { key: "line", label: "Linha" },
-  { key: "area", label: "Área" },
   { key: "pie", label: "Pizza" },
+  { key: "number", label: "Número" },
+  { key: "bar_h", label: "Barra horizontal" },
+  { key: "area", label: "Área" },
+  { key: "combo", label: "Combo" },
+  { key: "pivot", label: "Tabela dinâmica" },
+  { key: "trend", label: "Tendência" },
+  { key: "gauge", label: "Indicador" },
+  { key: "progress", label: "Progresso" },
+  { key: "scatter", label: "Dispersão" },
+  { key: "waterfall", label: "Cascata" },
+  { key: "sankey", label: "Sankey" },
 ];
+
+/** Visuais que comparam com uma meta. */
+export const VIZ_COM_META: VizType[] = ["gauge", "progress"];
 
 export const METRIC_LABEL: Record<MetricOp, string> = {
   count: "Contagem",
@@ -520,10 +557,18 @@ export function sanearReportQuery(bruta: unknown): ReportQuery | null {
 export function vizPermitidas(q: ReportQuery): VizType[] {
   const resumo = q.metrics.length > 0 || q.groupBy.length > 0;
   if (!resumo) return ["table", "detail"];
-  if (q.groupBy.length === 0) return q.metrics.length === 1 ? ["number", "table"] : ["table", "detail"];
+  if (q.groupBy.length === 0) return q.metrics.length === 1 ? ["number", "gauge", "progress", "table"] : ["table", "detail"];
   if (q.metrics.length === 0) return ["table"];
-  const base: VizType[] = ["bar", "bar_h", "line", "area", "table"];
-  return q.groupBy.length === 1 && q.metrics.length === 1 ? [...base.slice(0, 4), "pie", "table"] : base;
+  const base: VizType[] = ["bar", "bar_h", "line", "area"];
+  const uma = q.metrics.length === 1;
+  if (q.groupBy.length === 1) {
+    // Tendência compara o último período com o anterior: só faz sentido no tempo.
+    const tempo = !!q.groupBy[0].grain;
+    return uma
+      ? [...base, "pie", "funnel", "waterfall", ...(tempo ? (["trend"] as VizType[]) : []), "table"]
+      : [...base, "combo", "scatter", "table"];
+  }
+  return uma ? [...base, "pivot", "sankey", "table"] : [...base, "table"];
 }
 
 // ── Resultado ──────────────────────────────────────────────────────────────
@@ -650,21 +695,100 @@ export function seriesDoResultado(r: ReportResult): { categorias: string[]; seri
   };
 }
 
-/** Cartão salvo no painel: consulta saneada e um visual que caiba nela. */
-export function sanearRelatorio(bruto: unknown): { query: ReportQuery; viz: VizType } | null {
-  const r = bruto && typeof bruto === "object" ? (bruto as { query?: unknown; viz?: unknown }) : null;
+/** Cartão salvo no painel: consulta saneada, um visual que caiba nela e a meta (Indicador e Progresso). */
+export function sanearRelatorio(bruto: unknown): { query: ReportQuery; viz: VizType; meta?: number } | null {
+  const r = bruto && typeof bruto === "object" ? (bruto as { query?: unknown; viz?: unknown; meta?: unknown }) : null;
   const query = sanearReportQuery(r?.query);
   if (!query) return null;
   const permitidas = vizPermitidas(query);
   const viz = permitidas.find((v) => v === r?.viz) ?? permitidas[0];
-  return { query, viz };
+  const meta = Number(r?.meta);
+  return VIZ_COM_META.includes(viz) && Number.isFinite(meta) && meta > 0 ? { query, viz, meta } : { query, viz };
 }
 
 /** Tipo do cartão antigo mais parecido (o painel usa para a largura inicial e o CSV). */
 export function tipoDoCartao(viz: VizType): "numero" | "linha" | "pizza" | "barras" | "tabela" {
-  if (viz === "number") return "numero";
+  if (viz === "number" || viz === "trend" || viz === "gauge" || viz === "progress") return "numero";
   if (viz === "pie") return "pizza";
   if (viz === "line" || viz === "area") return "linha";
-  if (viz === "table" || viz === "detail") return "tabela";
+  if (viz === "table" || viz === "detail" || viz === "pivot") return "tabela";
   return "barras";
+}
+
+// ── Formas dos visuais da Fase 2 (puras, para testar) ─────────────────────
+
+/** Tabela dinâmica: 1º agrupamento nas linhas, 2º nas colunas, 1ª métrica nas células. */
+export function tabelaDinamica(r: ReportResult): { linhas: string[]; colunas: string[]; celulas: (number | null)[][]; tipo: FieldType } {
+  const { categorias, series } = seriesDoResultado(r);
+  return {
+    linhas: categorias,
+    colunas: series.map((s) => s.nome),
+    celulas: categorias.map((_, i) => series.map((s) => s.valores[i])),
+    tipo: series[0]?.tipo ?? "number",
+  };
+}
+
+/**
+ * Ligações do Sankey (1º agrupamento → 2º, valor da métrica). Um diagrama de
+ * fluxo não aceita volta (A → B e B → A): fica a ligação de maior valor e a
+ * que fecharia um ciclo sai, contada em `descartadas`.
+ */
+export function ligacoesDoSankey(r: ReportResult): { nos: string[]; ligacoes: { source: string; target: string; value: number }[]; descartadas: number } {
+  const dims = r.columns.map((c, i) => ({ c, i })).filter((x) => x.c.role === "dimension");
+  const m = r.columns.findIndex((c) => c.role === "metric");
+  if (dims.length < 2 || m < 0) return { nos: [], ligacoes: [], descartadas: 0 };
+  const [a, b] = dims;
+  const brutas = r.rows
+    .map((l) => ({ source: formatarDimensao(l[a.i], a.c), target: formatarDimensao(l[b.i], b.c), value: typeof l[m] === "number" ? (l[m] as number) : 0 }))
+    .filter((x) => x.value > 0)
+    .sort((x, y) => y.value - x.value);
+  const saidas = new Map<string, Set<string>>();
+  const alcanca = (de: string, ate: string): boolean => {
+    const pilha = [de];
+    const visto = new Set<string>();
+    while (pilha.length) {
+      const n = pilha.pop()!;
+      if (n === ate) return true;
+      if (visto.has(n)) continue;
+      visto.add(n);
+      pilha.push(...(saidas.get(n) ?? []));
+    }
+    return false;
+  };
+  const ligacoes: { source: string; target: string; value: number }[] = [];
+  let descartadas = 0;
+  for (const l of brutas) {
+    if (l.source === l.target || alcanca(l.target, l.source)) {
+      descartadas++;
+      continue;
+    }
+    if (!saidas.has(l.source)) saidas.set(l.source, new Set());
+    saidas.get(l.source)!.add(l.target);
+    ligacoes.push(l);
+  }
+  const nos = [...new Set(ligacoes.flatMap((l) => [l.source, l.target]))];
+  return { nos, ligacoes, descartadas };
+}
+
+/** Cascata: cada grupo soma (ou tira) do anterior; a barra invisível é a base. */
+export function degrausDaCascata(valores: (number | null)[]): { base: number; valor: number; acumulado: number }[] {
+  let acumulado = 0;
+  return valores.map((v) => {
+    const n = v ?? 0;
+    const antes = acumulado;
+    acumulado += n;
+    return { base: Math.min(antes, acumulado), valor: Math.abs(n), acumulado };
+  });
+}
+
+/** Tendência: último período contra o anterior (variação em %, null se o anterior é 0 ou falta). */
+export function tendencia(r: ReportResult): { atual: number | null; anterior: number | null; variacao: number | null; rotuloAtual: string; rotuloAnterior: string; valores: (number | null)[]; tipo: FieldType } {
+  const { categorias, series } = seriesDoResultado(r);
+  const s = series[0];
+  const valores = s?.valores ?? [];
+  const n = valores.length;
+  const atual = n ? valores[n - 1] : null;
+  const anterior = n > 1 ? valores[n - 2] : null;
+  const variacao = atual !== null && anterior ? (atual - anterior) / Math.abs(anterior) : null;
+  return { atual, anterior, variacao, rotuloAtual: categorias[n - 1] ?? "", rotuloAnterior: categorias[n - 2] ?? "", valores, tipo: s?.tipo ?? "number" };
 }

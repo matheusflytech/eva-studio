@@ -37,9 +37,23 @@ describe("sanearReportQuery", () => {
 describe("vizPermitidas", () => {
   it("decide os gráficos pelo formato do resultado", () => {
     expect(vizPermitidas(q({ metrics: [] }))).toEqual(["table", "detail"]);
-    expect(vizPermitidas(q({ metrics: [{ op: "count" }] }))).toEqual(["number", "table"]);
+    expect(vizPermitidas(q({ metrics: [{ op: "count" }] }))).toEqual(["number", "gauge", "progress", "table"]);
     expect(vizPermitidas(q({ groupBy: [{ field: "stage" }] }))).toContain("pie");
     expect(vizPermitidas(q({ groupBy: [{ field: "stage" }, { field: "owner" }] }))).not.toContain("pie");
+    expect(vizPermitidas(q({ groupBy: [{ field: "stage" }, { field: "owner" }] }))).toContain("sankey");
+    expect(vizPermitidas(q({ groupBy: [{ field: "stage" }] }))).not.toContain("trend");
+    expect(vizPermitidas(q({ groupBy: [{ field: "created", grain: "month" }] }))).toContain("trend");
+    expect(vizPermitidas(q({ groupBy: [{ field: "owner" }], metrics: [{ op: "count" }, { op: "sum", field: "amount" }] }))).toEqual(
+      expect.arrayContaining(["combo", "scatter"])
+    );
+  });
+
+  it("meta só fica no Indicador e no Progresso", async () => {
+    const { sanearRelatorio } = await import("@/lib/report-query");
+    const query = { ...QUERY_PADRAO(), metrics: [{ op: "count" }] };
+    expect(sanearRelatorio({ query, viz: "gauge", meta: 50 })?.meta).toBe(50);
+    expect(sanearRelatorio({ query, viz: "gauge", meta: -1 })?.meta).toBeUndefined();
+    expect(sanearRelatorio({ query, viz: "number", meta: 50 })?.meta).toBeUndefined();
   });
 });
 
@@ -110,6 +124,16 @@ describe("montarSql", () => {
     expect(m.columns.map((c) => c.key)).toEqual(["m0"]);
   });
 
+  it("opções marcadas: uma linha por opção, só de campo de múltipla escolha do contrato", () => {
+    const m = montarSql("o", q({ dataset: "deals_multiselect", groupBy: [{ field: "option" }] }))!;
+    const s = plano(m.sql);
+    expect(s).toContain(`mcf."orgId" = d."orgId" AND mcf.entity = 'deal'`);
+    expect(s).toContain(`mcf.type = 'multiselect'`);
+    expect(s).toContain(`jsonb_array_elements_text`);
+    expect(s).toContain(`WHERE d."orgId" = $1`);
+    expect(montarSql("o", q({ dataset: "contacts_multiselect", metrics: [] }))!.columns.map((c) => c.key)).toEqual(["contact_name", "field", "option", "contact_created"]);
+  });
+
   it("conversas deixam de fora os canais de teste", () => {
     const m = montarSql("o", q({ dataset: "conversations" }))!;
     expect(plano(m.sql)).toContain(`cv.channel <> ALL($2)`);
@@ -157,5 +181,51 @@ describe("seriesDoResultado sem data", () => {
     });
     expect(r.categorias).toEqual(["out/26"]);
     expect(r.semData).toBe(1);
+  });
+});
+
+describe("visuais da Fase 2", () => {
+  const col = (key: string, role: "dimension" | "metric", type: "text" | "number" = role === "metric" ? "number" : "text") => ({ key, label: key, type, role });
+
+  it("Sankey tira a ligação que fecharia um ciclo (fica a de maior valor)", async () => {
+    const { ligacoesDoSankey } = await import("@/lib/report-query");
+    const r = ligacoesDoSankey({
+      columns: [col("de", "dimension"), col("para", "dimension"), col("m0", "metric")],
+      rows: [["A", "B", 10], ["B", "C", 5], ["C", "A", 2], ["B", "B", 1], ["A", "C", 0]],
+      truncated: false,
+    });
+    expect(r.ligacoes).toEqual([{ source: "A", target: "B", value: 10 }, { source: "B", target: "C", value: 5 }]);
+    expect(r.descartadas).toBe(2);
+    expect(r.nos).toEqual(["A", "B", "C"]);
+  });
+
+  it("Cascata acumula e desce com valor negativo", async () => {
+    const { degrausDaCascata } = await import("@/lib/report-query");
+    expect(degrausDaCascata([10, -4, null, 6])).toEqual([
+      { base: 0, valor: 10, acumulado: 10 },
+      { base: 6, valor: 4, acumulado: 6 },
+      { base: 6, valor: 0, acumulado: 6 },
+      { base: 6, valor: 6, acumulado: 12 },
+    ]);
+  });
+
+  it("Tendência compara o último período com o anterior", async () => {
+    const { tendencia } = await import("@/lib/report-query");
+    const t = tendencia({
+      columns: [{ key: "created", label: "Mês", type: "date", role: "dimension", grain: "month" }, col("m0", "metric")],
+      rows: [["2026-09-01", 80], ["2026-10-01", 100]],
+      truncated: false,
+    });
+    expect(t).toMatchObject({ atual: 100, anterior: 80, variacao: 0.25, rotuloAtual: "out/26", rotuloAnterior: "set/26" });
+  });
+
+  it("Tabela dinâmica: linhas do 1º agrupamento, colunas do 2º", async () => {
+    const { tabelaDinamica } = await import("@/lib/report-query");
+    const p = tabelaDinamica({
+      columns: [col("etapa", "dimension"), col("dono", "dimension"), col("m0", "metric")],
+      rows: [["Nova", "Ana", 2], ["Ganho", "Bia", 1]],
+      truncated: false,
+    });
+    expect(p).toEqual({ linhas: ["Nova", "Ganho"], colunas: ["Ana", "Bia"], celulas: [[2, null], [null, 1]], tipo: "number" });
   });
 });

@@ -103,7 +103,7 @@ interface Widget {
   /** Só para fonte "custom": o cartão que a pessoa montou. */
   consulta?: Consulta;
   /** Só para fonte "report": o cartão do construtor (v2). */
-  relatorio?: { query: ReportQuery; viz: VizType };
+  relatorio?: { query: ReportQuery; viz: VizType; meta?: number };
 }
 
 interface Ponto { label: string; value: number }
@@ -460,7 +460,7 @@ function Painel() {
 
   function salvarDoConstrutorV2(r: ReportCard) {
     const alvo = construtorV2?.editandoId;
-    const relatorio = { query: r.query, viz: r.viz };
+    const relatorio = { query: r.query, viz: r.viz, ...(r.meta ? { meta: r.meta } : {}) };
     const tipo = tipoDoCartao(r.viz);
     if (alvo) {
       alterar(alvo, { relatorio, tipo, titulo: r.titulo });
@@ -1091,7 +1091,7 @@ function BotaoMini({
 
 function CartaoDeRelatorio({ relatorio, globais }: { relatorio: NonNullable<Widget["relatorio"]>; globais: FiltrosGlobais }) {
   const { result, error, loading } = useReportResult(relatorio.query, globais, 0);
-  return <ReportView result={result} viz={relatorio.viz} loading={loading} error={error} className="flex-1" />;
+  return <ReportView result={result} viz={relatorio.viz} meta={relatorio.meta} loading={loading} error={error} className="flex-1" />;
 }
 
 function Conteudo({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; dados: Dados | null }) {
