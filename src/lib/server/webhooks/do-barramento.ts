@@ -29,7 +29,12 @@ export async function paraWebhooks(e: EventoPublicado): Promise<void> {
     // Import tardio pelo mesmo motivo do emitir.ts (api-v1 → crm → eventos).
     const { comNumeros } = await import("@/lib/server/api-v1/funis");
     await emitirEventoDeNegocio(e.orgId, e.objetoId, tipo, await comNumeros(previous));
-  } else if (e.objeto === "contact") await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous);
+  } else if (e.objeto === "contact") {
+    // Etiqueta adicionada/removida: diz qual (sem isso o evento não serve pra nada).
+    const tagId = (tipo === "contact.tag_added" || tipo === "contact.tag_removed") && typeof e.dados.tag_id === "string" ? e.dados.tag_id : null;
+    if (tagId) await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous, tagId);
+    else await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous);
+  }
   else if (e.objeto === "company") await emitirEventoDeEmpresa(e.orgId, e.objetoId, tipo, previous);
   else if (e.objeto === "task") await emitirEventoDeTarefa(e.orgId, e.objetoId, tipo);
 }

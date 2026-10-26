@@ -3,6 +3,7 @@ import { publicarEvento } from "@/lib/server/eventos/barramento";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { tocarAtividadeDaTarefa } from "@/lib/server/atividade-do-negocio";
 import { ErroApi } from "@/lib/server/api-v1/http";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
@@ -11,6 +12,7 @@ import { CAMPOS_DE_TAREFA, carregarTarefa, lerDadosDeTarefa, serializarTarefa } 
 type P = { id: string };
 
 export const GET = rotaV1<P>({ recurso: "tasks" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   return NextResponse.json({ data: serializarTarefa(await carregarTarefa(ctx.orgId, id)) });
 });
 

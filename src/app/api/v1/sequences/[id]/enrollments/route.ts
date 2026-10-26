@@ -23,6 +23,7 @@ export const GET = rotaV1<P>({ recurso: "sequences" }, async (ctx, { id }) => {
     campo: "updatedAt",
     buscar: ({ cursor, take, orderBy }) =>
       prisma.sequenceEnrollment.findMany({ where: cursor ? { AND: [where, cursor] } : where, take, orderBy }),
+    contar: () => prisma.sequenceEnrollment.count({ where }),
   });
   return NextResponse.json(
     corpoDeLista(

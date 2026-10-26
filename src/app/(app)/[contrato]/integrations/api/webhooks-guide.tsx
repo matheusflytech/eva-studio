@@ -77,7 +77,9 @@ export function WebhooksGuide({ base }: { base: string }) {
             contato, empresa, tarefa) no momento do evento. <code className="font-mono text-text-primary">previous</code> traz o valor
             anterior: nas mudanças de etapa, <code className="font-mono text-text-primary">{"{ stage_id }"}</code>; em{" "}
             <code className="font-mono text-text-primary">*.updated</code> e <code className="font-mono text-text-primary">deal.owner_changed</code>, os
-            campos que mudaram.
+            campos que mudaram. Em <code className="font-mono text-text-primary">contact.tag_added</code> e{" "}
+            <code className="font-mono text-text-primary">contact.tag_removed</code>, o campo{" "}
+            <code className="font-mono text-text-primary">{"tag: { id, name }"}</code> diz qual etiqueta.
           </p>
           <div className="flex flex-col gap-3">
             <CodeBlock label="Headers" code={DELIVERY_HEADERS} />

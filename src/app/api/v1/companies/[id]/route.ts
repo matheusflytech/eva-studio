@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
 import { apagarPelaApi } from "@/lib/server/api-v1/lixeira";
 import {
@@ -13,6 +14,7 @@ import {
 type P = { id: string };
 
 export const GET = rotaV1<P>({ recurso: "companies" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, id)]);
   return NextResponse.json({ data });
 });

@@ -22,6 +22,7 @@ export const GET = rotaV1<{ id: string }>({ recurso: "deals" }, async (ctx, { id
         orderBy,
         select: { id: true, pipelineId: true, fromStageId: true, toStageId: true, origem: true, at: true },
       }),
+    contar: () => prisma.dealStageEvent.count({ where }),
   });
   // Funil e etapa pelo número do contrato; apagado depois sai null.
   const funis = await numerosDeFunis(pagina.itens.map((e) => e.pipelineId));

@@ -26,6 +26,7 @@ import { POST } from "./route";
 import { DELETE, GET as LER } from "./[id]/route";
 import { DELETE as APAGAR_ETAPA } from "./[id]/stages/[stageId]/route";
 import { GET as MOTIVOS } from "./[id]/lost-reasons/route";
+import { POST as REORDENAR } from "./reorder/route";
 
 const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/pipelines") =>
   new Request(url, { method, headers: { authorization: "Bearer evs_live_abc" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -127,5 +128,22 @@ describe("/v1/pipelines", () => {
     expect(eventos.registrarMudancasEmLote).toHaveBeenCalledWith([
       { orgId: "o1", dealId: "d1", pipelineId: "p1", fromStageId: "s1", toStageId: "s2" },
     ]);
+  });
+
+  it("apagar etapa com move_to apontando para ela mesma: 400 invalid_move_to (não 409)", async () => {
+    db.pipeline.findFirst.mockResolvedValue({ id: "p1", numero: 1 });
+    db.pipelineStage.findFirst.mockResolvedValue({ id: "s1" });
+    const res = await APAGAR_ETAPA(req("DELETE", undefined, "https://eva.test/api/v1/pipelines/1/stages/1?move_to=1"), {
+      params: Promise.resolve({ id: "1", stageId: "1" }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatchObject({ code: "invalid_move_to", param: "move_to" });
+  });
+
+  it("reordenar com número que não existe: 404 invalid_reference com os que faltam", async () => {
+    db.pipeline.findMany.mockResolvedValue([{ id: "p1", numero: 1 }, { id: "p2", numero: 2 }]);
+    const res = await REORDENAR(req("POST", { ids: [2, 7] }, "https://eva.test/api/v1/pipelines/reorder"), semParams);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toMatchObject({ code: "invalid_reference", details: { missing: [7] } });
   });
 });

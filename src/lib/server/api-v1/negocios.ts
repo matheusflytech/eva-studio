@@ -231,6 +231,13 @@ interface Opcoes {
 
 export async function criarNegocio(orgId: string, d: DadosDeNegocio, op: Opcoes = {}): Promise<{ id: string }> {
   if (!d.name) throw new ErroApi(400, "invalid_parameter", "name é obrigatório.", { param: "name" });
+  // Mesmo código do PATCH e do /move para etapa fora do funil informado.
+  if (d.pipelineId && d.stageId) {
+    const s = await prisma.pipelineStage.findFirst({ where: { id: d.stageId, pipeline: { orgId } }, select: { pipelineId: true } });
+    if (s && s.pipelineId !== d.pipelineId) {
+      throw new ErroApi(422, "stage_not_in_pipeline", "A etapa não pertence ao funil informado.", { param: "stage_id" });
+    }
+  }
   const etapa = await resolverEtapaDeEntrada(orgId, d.pipelineId ?? undefined, d.stageId ?? undefined);
   const customFields = d.customFields ? await validarCampos(orgId, etapa.pipelineId, {}, d.customFields, true) : undefined;
   if (op.simular) return { id: "" };

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
 import { carregarAgente, serializarFluxo, substituirFluxo, validarFluxo } from "@/lib/server/api-v1/fluxos";
 
@@ -8,6 +9,7 @@ type P = { id: string };
 
 // GET /api/v1/agents/{id}/flow — o canvas do Builder (nodes/edges do React Flow).
 export const GET = rotaV1<P>({ recurso: "flows" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   await carregarAgente(ctx.orgId, id);
   return NextResponse.json({ data: serializarFluxo(id, await prisma.agentFlow.findUnique({ where: { agentId: id } })) });
 });

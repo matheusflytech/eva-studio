@@ -107,6 +107,7 @@ const DESC_RESTAURAR = "Restaura da lixeira (até 30 dias depois de apagar) com 
 const DESC_UPSERT = "201 quando cria, 200 quando atualiza ou não muda nada. result: created | updated | unchanged; matched_by diz por onde achou.";
 const ERROS_RESTAURAR: Erro[] = [
   [404, "not_found"],
+  [409, "trash_unavailable"],
   [410, "trash_expired"],
   [409, "already_restored"],
   [409, "conflict"],
@@ -218,7 +219,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     post: { tag: "Contatos", summary: "Restaurar da lixeira", description: DESC_RESTAURAR, scope: "contacts:write", idempotency: "none", response: restored(CONTACT_ID), errors: ERROS_RESTAURAR },
   },
   "/contacts/{id}/deals": {
-    get: { tag: "Contatos", summary: "Negócios do contato", scope: "deals:read", query: [["limit", LISTA[0][1]], ["cursor", LISTA[1][1]]], response: list(DEAL), errors: [[404, "not_found"]] },
+    get: { tag: "Contatos", summary: "Negócios do contato", scope: "deals:read", query: [...LISTA], response: list(DEAL), errors: [[404, "not_found"]] },
   },
 
   "/companies": {
@@ -309,7 +310,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       status: 201,
       body: { name: "Proposta ACME", pipeline_id: 1, amount_cents: 150000, contact_id: CONTACT_ID, external_id: "erp-d1" },
       response: one(DEAL),
-      errors: [[400, "invalid_parameter"], [404, "invalid_reference"], [422, "invalid_custom_fields"], [409, "duplicate"]],
+      errors: [[400, "invalid_parameter"], [404, "invalid_reference"], [422, "stage_not_in_pipeline"], [422, "invalid_custom_fields"], [409, "duplicate"]],
     },
   },
   "/deals/by-external-id/{externalId}": {
@@ -381,7 +382,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     },
   },
   "/deals/{id}/history": {
-    get: { tag: "Negócios", summary: "Histórico de etapas", scope: "deals:read", query: [["limit", LISTA[0][1]], ["cursor", LISTA[1][1]]], response: list(DEAL_HISTORY), errors: [[404, "not_found"]] },
+    get: { tag: "Negócios", summary: "Histórico de etapas", description: "source: usuario, fluxo, api, importacao ou backfill.", scope: "deals:read", query: [...LISTA], response: list(DEAL_HISTORY), errors: [[404, "not_found"]] },
   },
   "/deals/{id}/contacts": {
     get: { tag: "Negócios", summary: "Contatos do negócio", description: "Contato completo com role no fim. Sem paginação.", scope: "deals:read", response: list(CONTATO_DO_NEGOCIO), errors: [[404, "not_found"]] },
@@ -488,7 +489,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
         "Cria um endpoint que recebe os eventos escolhidos (\"*\", \"deal.*\" ou tipos exatos). O secret (whsec_...) só vem nesta resposta. " +
         "Entrega com Standard Webhooks: headers webhook-id, webhook-timestamp e webhook-signature (v1,<base64 HMAC-SHA256 de id.timestamp.corpo>). " +
         "Só 2xx é sucesso; rede, timeout, 408, 429 e 5xx são repetidos em 5 s, 5 min, 30 min, 2 h, 5 h, 10 h e 10 h; outro 4xx falha sem repetir. " +
-        "410 desliga o endpoint; falhar por 5 dias seguidos também.",
+        "410 desliga o endpoint; falhar por 5 dias seguidos também. contact.tag_added/tag_removed trazem tag: { id, name }.",
       scope: "webhooks:write",
       status: 201,
       body: { url: "https://seu-n8n.com/webhook/abc", events: ["deal.stage_changed", "deal.won"], description: "n8n" },
@@ -531,7 +532,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
         "Os mesmos eventos dos webhooks, montados do histórico do CRM: contact.created, lead.captured, deal.created, deal.stage_changed, " +
         "deal.won, deal.lost, deal.reopened, task.completed. Comece com since (padrão: últimas 24 h; no máximo 30 dias) e depois mande só " +
         "o next_cursor (depois que você manda um cursor, ele volta mesmo sem eventos novos). data é o objeto como está agora ({ id, deleted: true } se foi apagado). " +
-        "contact.updated e message.received só existem por webhook.",
+        "contact.updated e message.received só existem por webhook. Não tem total (include_total é ignorado).",
       scope: "webhooks:read",
       query: [["types", "Lista separada por vírgula; aceita deal.* e *"], ["since", "ISO-8601"], ["cursor", "next_cursor da resposta anterior"], ["limit", "1–200, padrão 50"]],
       response: list({ ...EVENT_DEAL_STAGE_CHANGED, id: "evt_dse_9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a_1" }, { next_cursor: "eyJ0IjoiMjAyNi0xMC0yMFQxNDozMjoxMC4wMDBaIi..." }),
@@ -540,7 +541,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
   },
   "/webhooks/{id}": {
     get: { tag: "Webhooks", summary: "Ler webhook", description: "Sem o secret.", scope: "webhooks:read", response: one(WEBHOOK), errors: [[404, "not_found"]] },
-    delete: { tag: "Webhooks", summary: "Cancelar assinatura", description: "A resposta vem sem o envelope data.", scope: "webhooks:write", response: { id: WEBHOOK.id, deleted: true }, errors: [[404, "not_found"]] },
+    delete: { tag: "Webhooks", summary: "Cancelar assinatura", scope: "webhooks:write", response: one({ id: WEBHOOK.id, deleted: true }), errors: [[404, "not_found"]] },
   },
 
   "/pipelines": {
@@ -576,7 +577,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     },
   },
   "/pipelines/reorder": {
-    post: { tag: "Funis", summary: "Reordenar funis", description: "Devolve a ordem final completa; funis não enviados vão para o fim.", scope: "pipelines:write", body: { ids: [2, 1] }, response: one({ ids: [2, 1] }), errors: [[400, "invalid_parameter"]] },
+    post: { tag: "Funis", summary: "Reordenar funis", description: "Devolve a ordem final completa; funis não enviados vão para o fim.", scope: "pipelines:write", body: { ids: [2, 1] }, response: one({ ids: [2, 1] }), errors: [[400, "invalid_parameter"], [404, "invalid_reference"]] },
   },
   "/pipelines/{id}": {
     get: { tag: "Funis", summary: "Ler funil", scope: "pipelines:read", response: one(PIPELINE), errors: [[400, "invalid_parameter"], [404, "not_found"]] },
@@ -613,7 +614,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     },
   },
   "/pipelines/{id}/stages/reorder": {
-    post: { tag: "Funis", summary: "Reordenar etapas", scope: "pipelines:write", body: { ids: [4, 3, 5] }, response: one({ ids: [1, 2, 4, 3, 5, 6] }), errors: [[400, "invalid_parameter"], [404, "not_found"]] },
+    post: { tag: "Funis", summary: "Reordenar etapas", scope: "pipelines:write", body: { ids: [4, 3, 5] }, response: one({ ids: [1, 2, 4, 3, 5, 6] }), errors: [[400, "invalid_parameter"], [404, "invalid_reference"], [404, "not_found"]] },
   },
   "/pipelines/{id}/stages/{stageId}": {
     patch: {
@@ -630,7 +631,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       scope: "pipelines:write",
       query: [["move_to", "Número da etapa de destino (mesmo funil)"]],
       response: one({ id: 4, deleted: true, moved_deals: 1 }),
-      errors: [[400, "last_stage"], [409, "move_to_required"], [404, "not_found"]],
+      errors: [[400, "last_stage"], [400, "invalid_move_to"], [409, "move_to_required"], [404, "not_found"]],
     },
   },
 
@@ -716,7 +717,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
         ...EXPORT_JOB,
         status: "completed",
         processed: 342,
-        result: { file_path: `<orgId>/exports/${EXPORT_JOB.id}.csv`, rows: 342, bytes: 48213 },
+        result: { rows: 342, bytes: 48213 },
         started_at: "2026-10-20T14:33:00.000Z",
         finished_at: "2026-10-20T14:33:04.000Z",
         download_url: "https://…/exports/…csv?token=…",
@@ -790,7 +791,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     delete: { tag: "Sequências", summary: "Apagar sequência", scope: "sequences:write", response: one({ id: SEQUENCE.id, deleted: true }), errors: [[404, "not_found"]] },
   },
   "/sequences/{id}/enrollments": {
-    get: { tag: "Sequências", summary: "Inscrições", scope: "sequences:read", query: [["limit", LISTA[0][1]], ["cursor", LISTA[1][1]], ["status", "active | done | stopped"]], response: list(ENROLLMENT), errors: [[404, "not_found"]] },
+    get: { tag: "Sequências", summary: "Inscrições", scope: "sequences:read", query: [...LISTA, ["status", "active | done | stopped"]], response: list(ENROLLMENT), errors: [[404, "not_found"]] },
     post: {
       tag: "Sequências",
       summary: "Inscrever contatos (até 100)",

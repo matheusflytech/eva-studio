@@ -36,6 +36,12 @@ describe("emitirEvento", () => {
     expect(linhas[0].payload.id).toBe(linhas[1].payload.id);
   });
 
+  it("tag montada vai no corpo (contact.tag_added)", async () => {
+    db.webhookEndpoint.findMany.mockResolvedValue([{ id: "w1", eventos: ["contact.*"] }]);
+    await emitirEvento("o1", "contact.tag_added", async () => ({ data: { id: "c1" }, tag: { id: "t9", name: "VIP" } }));
+    expect(db.webhookEntrega.createMany.mock.calls[0][0].data[0].payload).toMatchObject({ type: "contact.tag_added", tag: { id: "t9", name: "VIP" } });
+  });
+
   it("tabela ausente: não derruba quem chamou", async () => {
     db.webhookEndpoint.findMany.mockRejectedValue(new Error('relation "eva_studio_webhook_endpoints" does not exist'));
     await expect(emitirEvento("o1", "deal.won", async () => ({ data: {} }))).resolves.toBeUndefined();

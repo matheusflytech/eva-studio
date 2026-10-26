@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
 import { CAMPOS_DE_SEQUENCIA, atualizarSequencia, carregarSequencia, serializarSequencia } from "@/lib/server/api-v1/sequencias";
 
 type P = { id: string };
 
 export const GET = rotaV1<P>({ recurso: "sequences" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   const s = await carregarSequencia(ctx.orgId, id);
   const ativos = await prisma.sequenceEnrollment.count({ where: { sequenceId: id, status: "active" } });
   return NextResponse.json({ data: serializarSequencia(s, ativos) });

@@ -16,6 +16,7 @@ export const GET = rotaV1<{ id: string }>({ recurso: "deals" }, async (ctx, { id
     campo: "updatedAt",
     buscar: ({ cursor, take, orderBy }) =>
       prisma.deal.findMany({ where: cursor ? { AND: [where, cursor] } : where, include: INCLUDE_NEGOCIO, take, orderBy }),
+    contar: () => prisma.deal.count({ where }),
   });
   return NextResponse.json(corpoDeLista(await serializarNegocios(ctx.orgId, pagina.itens), pagina));
 });

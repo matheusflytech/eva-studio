@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { ErroApi } from "@/lib/server/api-v1/http";
 import { conferirCampos, idOpc, textoOpc } from "@/lib/server/api-v1/entrada";
 import { INCLUDE_CONTATO, serializarContatos } from "@/lib/server/api-v1/contatos";
@@ -10,6 +11,7 @@ type P = { id: string };
 
 // GET /api/v1/deals/{id}/contacts — contatos do negócio, com o papel de cada um.
 export const GET = rotaV1<P>({ recurso: "deals" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   await carregarNegocio(ctx.orgId, id);
   const vinculos = await prisma.dealContact.findMany({
     where: { dealId: id, contact: { orgId: ctx.orgId } },

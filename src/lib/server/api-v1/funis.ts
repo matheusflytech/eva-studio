@@ -138,6 +138,18 @@ export async function etapaDoCaminho(orgId: string, pipelineId: string, stageId:
   return s.id;
 }
 
+/** Números pedidos → uuids; número que não existe (ou é de outro funil) é 404, não some em silêncio. */
+export function uuidsPedidos(pedidos: number[], uuidPorNumero: Map<number, string>, oque: "Funil" | "Etapa"): string[] {
+  const faltando = pedidos.filter((n) => !uuidPorNumero.has(n));
+  if (faltando.length > 0) {
+    throw new ErroApi(404, "invalid_reference", `${oque} ${faltando.join(", ")} não ${oque === "Funil" ? "encontrado" : "encontrada"}.`, {
+      param: "ids",
+      details: { missing: faltando },
+    });
+  }
+  return pedidos.map((n) => uuidPorNumero.get(n)!);
+}
+
 /** Lista de números para reordenar: { ids: [1, 2, ...] }. */
 export function lerIds(corpo: Record<string, unknown>): number[] {
   const ids = corpo.ids;

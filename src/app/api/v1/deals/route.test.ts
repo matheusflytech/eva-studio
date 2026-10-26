@@ -37,7 +37,7 @@ import { POST, GET } from "./route";
 import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { POST as MOVER } from "./[id]/move/route";
 import { POST as GANHAR } from "./[id]/won/route";
-import { PATCH } from "./[id]/route";
+import { GET as LER_UM, PATCH } from "./[id]/route";
 import { PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
 
 const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/deals") =>
@@ -109,6 +109,20 @@ describe("POST /v1/deals", () => {
     const r2 = await POST(req("POST", { name: "X", contact_ids: ["c-outra-org"] }), semParams);
     expect(r2.status).toBe(404);
     expect(crm.createDeal).not.toHaveBeenCalled();
+  });
+
+  it("etapa de outro funil: 422 stage_not_in_pipeline (mesmo código do PATCH e do /move)", async () => {
+    db.pipeline.findFirst.mockResolvedValue({ id: "p1" });
+    db.pipelineStage.findFirst.mockResolvedValueOnce({ id: "s5" }).mockResolvedValueOnce({ pipelineId: "p2" });
+    const res = await POST(req("POST", { name: "X", pipeline_id: 1, stage_id: 5 }), semParams);
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatchObject({ code: "stage_not_in_pipeline", param: "stage_id" });
+    expect(crm.createDeal).not.toHaveBeenCalled();
+  });
+
+  it("GET de um negócio com parâmetro desconhecido: 400 unknown_parameter", async () => {
+    const res = await LER_UM(req("GET", undefined, "https://eva.test/api/v1/deals/d1?expand=contacts"), p({ id: "d1" }));
+    expect((await res.json()).error).toMatchObject({ code: "unknown_parameter", param: "expand" });
   });
 
   it("filtro status inválido: 400", async () => {

@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import type { EntidadeDaLixeira } from "@/lib/lixeira";
-import { apagarComLixeira, lerItemPeloRegistro, restaurarDaLixeira } from "@/lib/server/lixeira";
+import { apagarComLixeira, lerItemPeloRegistro, lixeiraDisponivel, restaurarDaLixeira } from "@/lib/server/lixeira";
 import { ErroApi, iso } from "./http";
 
 // DELETE e POST .../restore da API v1 para contatos, empresas e negócios.
@@ -26,6 +26,10 @@ export async function apagarPelaApi(orgId: string, entidade: EntidadeDaLixeira, 
 
 /** Restaura a última foto do registro na lixeira (mesmo id). */
 export async function restaurarPelaApi(orgId: string, entidade: EntidadeDaLixeira, id: string) {
+  // Sem a lixeira no banco não é "não está na lixeira": é 409 trash_unavailable, como na tela.
+  if (!(await lixeiraDisponivel())) {
+    throw new ErroApi(409, "trash_unavailable", "A lixeira ainda não está ativada neste contrato.");
+  }
   const item = await lerItemPeloRegistro(orgId, entidade, id);
   if (!item) throw new ErroApi(404, "not_found", `${NOMES[entidade]} não está na lixeira.`);
   const r = await restaurarDaLixeira(orgId, item.id);

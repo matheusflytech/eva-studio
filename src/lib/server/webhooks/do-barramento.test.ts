@@ -50,6 +50,11 @@ describe("webhooks a partir do barramento", () => {
     expect(emitir.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "lead.captured", undefined);
   });
 
+  it("etiqueta adicionada/removida: passa qual etiqueta", async () => {
+    await paraWebhooks(evento({ tipo: "contact.tag_added", objeto: "contact", objetoId: "c1", dados: { tag_id: "t9" } }));
+    expect(emitir.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "contact.tag_added", undefined, "t9");
+  });
+
   it("mensagem: o corpo já vem no evento", async () => {
     await paraWebhooks(evento({ tipo: "message.received", objeto: "conversation", objetoId: "cv1", dados: { id: "m1", text: "oi" } }));
     const montar = emitir.emitirEvento.mock.calls[0][2] as () => Promise<unknown>;

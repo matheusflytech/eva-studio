@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { apagarEtapa, atualizarEtapa } from "@/lib/server/funis-acoes";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
 import { conferirCampos } from "@/lib/server/api-v1/entrada";
+import { ErroApi } from "@/lib/server/api-v1/http";
 import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { etapaDoCaminho, funilDoCaminho, lerNumero, serializarEtapa, uuidDaEtapa } from "@/lib/server/api-v1/funis";
 
@@ -26,6 +27,10 @@ export const DELETE = rotaV1<P>({ recurso: "pipelines" }, async (ctx, { id, stag
   const funil = await funilDoCaminho(ctx.orgId, id);
   const etapaId = await etapaDoCaminho(ctx.orgId, funil.id, stageId);
   const moverPara = sp.get("move_to") ? await uuidDaEtapa(ctx.orgId, sp.get("move_to"), "move_to") : null;
+  // Destino precisa ser outra etapa do mesmo funil; senão é erro do pedido, não "falta destino".
+  if (moverPara && (moverPara === etapaId || !(await prisma.pipelineStage.findFirst({ where: { id: moverPara, pipelineId: funil.id }, select: { id: true } })))) {
+    throw new ErroApi(400, "invalid_move_to", "move_to precisa ser outra etapa do mesmo funil.", { param: "move_to" });
+  }
   const r = await apagarEtapa(ctx.orgId, funil.id, etapaId, moverPara);
   return NextResponse.json({ data: { id: lerNumero(stageId, "stageId"), deleted: true, moved_deals: r.movidos } });
 });

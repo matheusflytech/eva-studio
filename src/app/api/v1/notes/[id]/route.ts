@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { ErroApi } from "@/lib/server/api-v1/http";
 import { conferirCampos, textoOpc } from "@/lib/server/api-v1/entrada";
 import { carregarNota, serializarNota } from "@/lib/server/api-v1/tarefas-notas";
@@ -8,6 +9,7 @@ import { carregarNota, serializarNota } from "@/lib/server/api-v1/tarefas-notas"
 type P = { id: string };
 
 export const GET = rotaV1<P>({ recurso: "notes" }, async (ctx, { id }) => {
+  lerConsulta(ctx.url);
   return NextResponse.json({ data: serializarNota(await carregarNota(ctx.orgId, id)) });
 });
 

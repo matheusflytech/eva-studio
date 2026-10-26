@@ -19,7 +19,7 @@ const seq = vi.hoisted(() => ({ enrollContactByTag: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/rate-limit", () => rate);
 vi.mock("@/lib/server/sequences", () => seq);
-const lix = vi.hoisted(() => ({ apagarComLixeira: vi.fn(), lerItemPeloRegistro: vi.fn(), restaurarDaLixeira: vi.fn() }));
+const lix = vi.hoisted(() => ({ apagarComLixeira: vi.fn(), lerItemPeloRegistro: vi.fn(), restaurarDaLixeira: vi.fn(), lixeiraDisponivel: vi.fn() }));
 vi.mock("@/lib/server/lixeira", async (original) => ({ ...(await original<object>()), ...lix }));
 
 import { GET, POST } from "./route";
@@ -84,6 +84,7 @@ beforeEach(() => {
   db.idempotencyKey.create.mockResolvedValue({});
   db.idempotencyKey.update.mockResolvedValue({});
   db.idempotencyKey.deleteMany.mockResolvedValue({ count: 1 });
+  lix.lixeiraDisponivel.mockResolvedValue(true);
 });
 
 describe("envoltório da v1 (auth, escopo, limite, erro)", () => {
@@ -276,6 +277,12 @@ describe("PATCH/DELETE /v1/contacts/{id}", () => {
     lix.lerItemPeloRegistro.mockResolvedValueOnce(null);
     const nao = await RESTAURAR(req("POST"), p({ id: "c-outra" }));
     expect(nao.status).toBe(404);
+
+    // Sem a lixeira no banco: 409 trash_unavailable (não um 404 enganoso).
+    lix.lixeiraDisponivel.mockResolvedValueOnce(false);
+    const sem = await RESTAURAR(req("POST"), p({ id: "c1" }));
+    expect(sem.status).toBe(409);
+    expect((await sem.json()).error.code).toBe("trash_unavailable");
   });
 });
 

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { rotaV1 } from "@/lib/server/api-v1/rota";
+import { lerConsulta } from "@/lib/server/api-v1/paginacao";
 import { ErroApi } from "@/lib/server/api-v1/http";
+import { conferirCampos } from "@/lib/server/api-v1/entrada";
 import { criarEndpoint, ErroDeWebhook, SEM_TABELA, serializarEndpoint } from "@/lib/server/webhooks/endpoints";
 
 // /api/v1/webhooks — o gatilho do n8n assina ao ativar o workflow e cancela
@@ -14,6 +16,7 @@ function paraErroApi(e: unknown): never {
 }
 
 export const GET = rotaV1({ recurso: "webhooks" }, async (ctx) => {
+  lerConsulta(ctx.url);
   try {
     const lista = await prisma.webhookEndpoint.findMany({ where: { orgId: ctx.orgId }, orderBy: { createdAt: "asc" } });
     return NextResponse.json({ data: lista.map(serializarEndpoint), has_more: false, next_cursor: null });
@@ -24,6 +27,7 @@ export const GET = rotaV1({ recurso: "webhooks" }, async (ctx) => {
 
 export const POST = rotaV1({ recurso: "webhooks" }, async (ctx) => {
   const corpo = ctx.corpo();
+  conferirCampos(corpo, ["url", "events", "description"]);
   try {
     const { endpoint, segredo } = await criarEndpoint(ctx.orgId, {
       url: corpo.url,
