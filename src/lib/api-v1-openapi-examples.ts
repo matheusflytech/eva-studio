@@ -242,6 +242,35 @@ export const FLOW = {
   edges: [{ id: "e1", source: "n1", target: "n2" }],
   updated_at: "2026-10-20T14:32:10.000Z",
 };
+// subfluxos.ts → serializarSubfluxo
+export const SUBFLOW = {
+  id: "8a9b0c1d-2e3f-4a5b-8c6d-7e8f9a0b1c2d",
+  agent_id: AGENT_ID,
+  name: "Vendas",
+  keywords: ["orçamento", "preço"],
+  position: 0,
+  nodes: [
+    { id: "s1", type: "flowNode", position: { x: 0, y: 0 }, data: { iconKey: "start", label: "Início" } },
+    { id: "s2", type: "flowNode", position: { x: 280, y: 0 }, data: { iconKey: "message", label: "Vendas", detail: "Me conta o que você procura." } },
+  ],
+  edges: [{ id: "e1", source: "s1", target: "s2" }],
+  updated_at: "2026-10-26T14:32:10.000Z",
+};
+// subfluxos.ts → exportarPacote
+export const FLOW_BUNDLE = {
+  format: "eva.flows",
+  version: 1,
+  agent_name: "Vendedora Virtual",
+  exported_at: "2026-10-26T14:40:00.000Z",
+  main: {
+    nodes: [
+      { id: "n1", type: "flowNode", position: { x: 0, y: 0 }, data: { iconKey: "start", label: "Início" } },
+      { id: "n2", type: "flowNode", position: { x: 280, y: 0 }, data: { iconKey: "go-to-flow", label: "Ir para Vendas", targetFlowId: SUBFLOW.id } },
+    ],
+    edges: [{ id: "e1", source: "n1", target: "n2" }],
+  },
+  subflows: [{ id: SUBFLOW.id, name: SUBFLOW.name, keywords: SUBFLOW.keywords, nodes: SUBFLOW.nodes, edges: SUBFLOW.edges }],
+};
 export const FLOW_VERSION = { id: "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f7a", source: "api", blocks: 3, created_at: "2026-10-19T10:00:00.000Z" };
 
 // sequencias.ts → serializarSequencia
@@ -290,5 +319,5 @@ export function pathExamples(path: string): Record<string, string> {
     pipelines: "1",
   };
   const resource = path.split("/")[1];
-  return { id: ids[resource] ?? "{id}", stageId: "4", contactId: CONTACT_ID };
+  return { id: ids[resource] ?? "{id}", stageId: "4", contactId: CONTACT_ID, flowId: SUBFLOW.id };
 }
