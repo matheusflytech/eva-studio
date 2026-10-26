@@ -9,6 +9,7 @@ import { pulsar } from "@/lib/fundo/eventos";
 import type { Agent } from "@/lib/data/types";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { PainelDoAgente } from "./painel-do-agente";
+import { MidiaDaMensagem } from "@/components/agent-studio/builder/midia-da-mensagem";
 
 interface ChatMessage {
   id: string;
@@ -16,6 +17,7 @@ interface ChatMessage {
   text: string;
   isError?: boolean;
   options?: { id: string; label: string }[];
+  media?: MidiaDaMensagem;
 }
 
 function greeting(agent: Agent): ChatMessage {
@@ -54,7 +56,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const replies: { text: string; options?: { id: string; label: string }[] }[] = data.messages ?? [];
+      const replies: Pick<ChatMessage, "text" | "options" | "media">[] = data.messages ?? [];
       if (replies.length === 0) {
         setMessages((prev) => [
           ...prev,
@@ -68,7 +70,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
       } else {
         setMessages((prev) => [
           ...prev,
-          ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options })),
+          ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options, media: r.media })),
         ]);
       }
     } catch {
@@ -113,7 +115,9 @@ export function ChatPanel({ agent }: { agent: Agent }) {
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex w-full max-w-[720px] flex-col gap-3 px-1 py-4 sm:px-6 xl:mx-0 xl:max-w-none xl:pl-0 xl:pr-2">
             {messages.map((m, i) => (
-              <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
+              <div key={m.id} className={cn("flex flex-col gap-1.5", m.role === "user" ? "items-end" : "items-start")}>
+                {m.media && <MidiaDaMensagem media={m.media} />}
+                {(m.text || !m.media) && (
                 <div
                   className={cn(
                     "max-w-[85%] rounded-[18px] px-3.5 py-2 text-body sm:max-w-[66%] xl:max-w-[min(66%,560px)]",
@@ -127,6 +131,7 @@ export function ChatPanel({ agent }: { agent: Agent }) {
                   {m.isError && <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0" />}
                   <span className="whitespace-pre-wrap break-words">{m.text}</span>
                 </div>
+                )}
                 {m.options && m.options.length > 0 && (
                   <div className={cn("mt-2 flex max-w-[85%] flex-wrap gap-1.5 sm:max-w-[66%] xl:max-w-[min(66%,560px)]", i < ultimaDoAgente && "opacity-50")}>
                     {m.options.map((opt) => (

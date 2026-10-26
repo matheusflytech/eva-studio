@@ -168,3 +168,71 @@ describe("Bloco do Studio", () => {
     expect(textos(await advanceConversation({ ...base, text: "xx" }))).toEqual(["Tudo bem, seguimos sem."]);
   });
 });
+
+describe("Bloco do Studio: não respondeu no prazo", () => {
+  const comPrazo = (saidas: Record<string, string> = {}) =>
+    fluxo({ blockContents: [{ id: "c1", type: "text", text: "Seu e-mail?" }], waitForReply: true, captureField: "email", replyTimeoutMinutes: 30 }, saidas);
+
+  it("arma o prazo ao parar no Bloco e limpa quando o cliente responde", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comPrazo());
+    db.conversation.upsert.mockResolvedValue(parado(null));
+    const antes = Date.now();
+    await advanceConversation({ ...base, text: "oi" });
+    const prazo = new Date(gravado().variables.__wait_until).getTime();
+    expect(prazo).toBeGreaterThanOrEqual(antes + 30 * 60_000);
+
+    db.conversation.upsert.mockResolvedValue(parado("bloco", { __wait_until: new Date(prazo).toISOString() }));
+    await advanceConversation({ ...base, text: "ana@exemplo.com" });
+    expect(gravado().variables.__wait_until).toBeUndefined();
+  });
+
+  it("resposta inválida pede de novo e arma o prazo outra vez", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comPrazo());
+    db.conversation.upsert.mockResolvedValue(parado("bloco"));
+    await advanceConversation({ ...base, text: "não sei" });
+    expect(gravado().variables.__wait_until).toEqual(expect.any(String));
+  });
+
+  it("acordado sem mensagem depois do prazo: sai por \"Não respondeu\"; sem ligação, continua parado", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comPrazo({ sem_resposta: "Ainda está aí?" }));
+    db.conversation.upsert.mockResolvedValue(parado("bloco"));
+    expect(textos(await advanceConversation(base))).toEqual(["Ainda está aí?"]);
+
+    db.agentFlow.findUnique.mockResolvedValue(comPrazo());
+    expect(textos(await advanceConversation(base))).toEqual([]);
+    expect(gravado().currentNodeId).toBe("bloco");
+  });
+
+  it("chamada sem mensagem antes do prazo não sai por \"Não respondeu\"", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(comPrazo({ sem_resposta: "Ainda está aí?" }));
+    db.conversation.upsert.mockResolvedValue(parado("bloco", { __wait_until: new Date(Date.now() + 60_000).toISOString() }));
+    expect(textos(await advanceConversation(base))).not.toContain("Ainda está aí?");
+  });
+});
+
+describe("Bloco do Studio: mídia, link e localização", () => {
+  it("mídia sai com a URL (legenda no texto), link e localização viram texto, e os botões vão num texto depois da mídia", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(
+      fluxo({
+        blockContents: [
+          { id: "c1", type: "link", text: "Veja o catálogo", url: "https://exemplo.com/{plano}" },
+          { id: "c2", type: "location", text: "Loja Centro", address: "Rua A, 10", latitude: -26.9, longitude: -48.6 },
+          { id: "c3", type: "location", address: "Av. B, 20" },
+          { id: "c4", type: "media", mediaType: "document", url: "https://exemplo.com/catalogo.pdf", fileName: "catalogo.pdf", text: "Catálogo" },
+          { id: "c5", type: "media", url: "ftp://nao-serve" },
+        ],
+        waitForReply: true,
+        options: [{ id: "s", label: "Quero" }],
+      })
+    );
+    db.conversation.upsert.mockResolvedValue(parado(null, { plano: "pro" }));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages).toEqual([
+      { text: "Veja o catálogo\nhttps://exemplo.com/pro" },
+      { text: "Loja Centro\nRua A, 10\nhttps://www.google.com/maps?q=-26.9,-48.6" },
+      { text: "Av. B, 20\nhttps://www.google.com/maps/search/?api=1&query=Av.%20B%2C%2020" },
+      { text: "Catálogo", media: { type: "document", url: "https://exemplo.com/catalogo.pdf", name: "catalogo.pdf" } },
+      { text: "Escolha uma opção:", options: [{ id: "s", label: "Quero" }] },
+    ]);
+  });
+});

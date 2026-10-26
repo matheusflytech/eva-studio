@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ChevronRight, Plus, Trash2 } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Select } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,7 +118,12 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
   const mudar = (i: number, parte: Partial<BlockContent>) =>
     onChange({ blockContents: itens.map((c, j) => (j === i ? { ...c, ...parte } : c)) });
   const adicionar = (type: BlockContent["type"]) =>
-    onChange({ blockContents: [...itens, type === "text" ? { id: generateId(), type, text: "" } : { id: generateId(), type, seconds: 2 }] });
+    onChange({
+      blockContents: [
+        ...itens,
+        type === "typing" ? { id: generateId(), type, seconds: 2 } : type === "media" ? { id: generateId(), type, mediaType: "image" } : { id: generateId(), type },
+      ],
+    });
 
   return (
     <div className="flex flex-col gap-3">
@@ -126,7 +132,7 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
         <div key={c.id} className="flex flex-col gap-2 rounded-[14px] border border-border-subtle bg-raised p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-caption font-medium uppercase tracking-wide text-text-tertiary">
-              {c.type === "text" ? "Texto" : "Digitando…"}
+              {ROTULO_DO_CONTEUDO[c.type]}
             </span>
             <span className="flex items-center">
               <BotaoPequeno rotulo="Subir" onClick={() => onChange({ blockContents: mover(itens, i, -1) })} disabled={i === 0}>
@@ -140,33 +146,19 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
               </BotaoPequeno>
             </span>
           </div>
-          {c.type === "text" ? (
-            <Textarea
-              aria-label={`Texto ${i + 1}`}
-              rows={3}
-              value={c.text ?? ""}
-              onChange={(e) => mudar(i, { text: e.target.value })}
-            />
-          ) : (
-            <label className="flex items-center gap-2 text-small text-text-secondary">
-              Por
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                className="w-20"
-                value={c.seconds ?? 2}
-                onChange={(e) => mudar(i, { seconds: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })}
-              />
-              segundos, antes da próxima mensagem (WhatsApp).
-            </label>
-          )}
+          <CamposDoConteudo c={c} n={i + 1} mudar={(parte) => mudar(i, parte)} />
         </div>
       ))}
-      <div className="flex gap-2">
-        <BotaoAdicionar onClick={() => adicionar("text")}>Texto</BotaoAdicionar>
-        <BotaoAdicionar onClick={() => adicionar("typing")}>Digitando…</BotaoAdicionar>
+      <div className="grid grid-cols-2 gap-2">
+        {(["text", "media", "link", "location", "typing"] as const).map((t) => (
+          <BotaoAdicionar key={t} onClick={() => adicionar(t)}>
+            {ROTULO_DO_CONTEUDO[t]}
+          </BotaoAdicionar>
+        ))}
       </div>
+      <p className="text-caption text-text-tertiary">
+        Conteúdo vindo de uma API: chame a API numa ação de entrada, guarde numa variável e use {"{variavel}"} no texto.
+      </p>
 
       <section className="flex flex-col gap-3 border-t border-border-subtle pt-4">
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[14px] bg-raised px-3 py-2.5">
@@ -178,10 +170,108 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
           </span>
           <Switch checked={!!data.waitForReply} onCheckedChange={(v) => onChange({ waitForReply: v })} aria-label="Esperar resposta do cliente" />
         </label>
+        {data.waitForReply && (
+          <label className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small text-text-secondary">
+            <span className="whitespace-nowrap">Sem resposta em</span>
+            <Input
+              type="number"
+              min={1}
+              className="w-20"
+              aria-label="Minutos sem resposta"
+              placeholder="—"
+              value={data.replyTimeoutMinutes ?? ""}
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value));
+                onChange({ replyTimeoutMinutes: n > 0 ? n : undefined });
+              }}
+            />
+            <span>min, segue pela saída &quot;Não respondeu&quot;.</span>
+          </label>
+        )}
         {data.waitForReply && <CaptureConfig data={data} onChange={onChange} />}
       </section>
     </div>
   );
+}
+
+const ROTULO_DO_CONTEUDO: Record<BlockContent["type"], string> = {
+  text: "Texto",
+  typing: "Digitando…",
+  media: "Mídia",
+  link: "Link",
+  location: "Localização",
+};
+
+const TIPOS_DE_MIDIA: { value: NonNullable<BlockContent["mediaType"]>; label: string }[] = [
+  { value: "image", label: "Imagem" },
+  { value: "video", label: "Vídeo" },
+  { value: "audio", label: "Áudio" },
+  { value: "document", label: "Documento" },
+];
+
+/** Os campos de cada tipo de conteúdo. Texto aceita {variavel} em todos. */
+function CamposDoConteudo({ c, n, mudar }: { c: BlockContent; n: number; mudar: (parte: Partial<BlockContent>) => void }) {
+  if (c.type === "typing") {
+    return (
+      <label className="flex items-center gap-2 text-small text-text-secondary">
+        Por
+        <Input
+          type="number"
+          min={1}
+          max={10}
+          className="w-20"
+          value={c.seconds ?? 2}
+          onChange={(e) => mudar({ seconds: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })}
+        />
+        segundos, antes da próxima mensagem (WhatsApp).
+      </label>
+    );
+  }
+  if (c.type === "media") {
+    const urlRuim = !!c.url?.trim() && !/^https?:\/\//i.test(c.url.trim()) && !c.url.trim().startsWith("{");
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-2">
+          <Select aria-label={`Tipo da mídia ${n}`} className="w-[130px] shrink-0" value={c.mediaType ?? "image"} onChange={(e) => mudar({ mediaType: e.target.value as BlockContent["mediaType"] })}>
+            {TIPOS_DE_MIDIA.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </Select>
+          <Input aria-label={`Link do arquivo ${n}`} placeholder="https://… (link público)" value={c.url ?? ""} onChange={(e) => mudar({ url: e.target.value })} />
+        </div>
+        {urlRuim && <p className="text-caption text-warning">O link precisa começar com https://.</p>}
+        {c.mediaType === "document" && (
+          <Input aria-label={`Nome do arquivo ${n}`} placeholder="Nome que o cliente vê (ex: catalogo.pdf)" value={c.fileName ?? ""} onChange={(e) => mudar({ fileName: e.target.value || undefined })} />
+        )}
+        {c.mediaType !== "audio" && (
+          <Input aria-label={`Legenda ${n}`} placeholder="Legenda (opcional)" value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />
+        )}
+      </div>
+    );
+  }
+  if (c.type === "link") {
+    return (
+      <div className="flex flex-col gap-2">
+        <Input aria-label={`Texto do link ${n}`} placeholder="Texto (ex: Veja o catálogo)" value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />
+        <Input aria-label={`Endereço do link ${n}`} placeholder="https://…" value={c.url ?? ""} onChange={(e) => mudar({ url: e.target.value })} />
+      </div>
+    );
+  }
+  if (c.type === "location") {
+    const numero = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? undefined : Number(v));
+    return (
+      <div className="flex flex-col gap-2">
+        <Input aria-label={`Nome do lugar ${n}`} placeholder="Nome do lugar (ex: Loja Centro)" value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />
+        <Input aria-label={`Endereço ${n}`} placeholder="Endereço" value={c.address ?? ""} onChange={(e) => mudar({ address: e.target.value })} />
+        <div className="flex gap-2">
+          <Input aria-label={`Latitude ${n}`} inputMode="decimal" placeholder="Latitude (opcional)" value={c.latitude ?? ""} onChange={(e) => mudar({ latitude: numero(e.target.value) })} />
+          <Input aria-label={`Longitude ${n}`} inputMode="decimal" placeholder="Longitude (opcional)" value={c.longitude ?? ""} onChange={(e) => mudar({ longitude: numero(e.target.value) })} />
+        </div>
+        <p className="text-caption text-text-tertiary">Sai como texto com o link do mapa.</p>
+      </div>
+    );
+  }
+  return <Textarea aria-label={`Texto ${n}`} rows={3} value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />;
 }
 
 function CondicoesDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (patch: Partial<FlowNodeData>) => void }) {

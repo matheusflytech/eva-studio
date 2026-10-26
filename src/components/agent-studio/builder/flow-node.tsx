@@ -40,9 +40,18 @@ export interface AiExitField {
 export interface BlockContent {
   id: string;
   /** "typing" mostra "digitando…" antes da próxima mensagem (no WhatsApp). */
-  type: "text" | "typing";
+  type: "text" | "typing" | "media" | "link" | "location";
+  /** Texto; legenda na mídia; título no link; nome do lugar na localização. */
   text?: string;
   seconds?: number;
+  /** Mídia e link: endereço público (aceita {variavel}). */
+  url?: string;
+  mediaType?: "image" | "video" | "audio" | "document";
+  fileName?: string;
+  /** Localização: endereço e/ou coordenadas. */
+  address?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 /** Ação do Bloco: os mesmos dados de um bloco de ação (variável, CRM, HTTP, e-mail). */
@@ -157,6 +166,9 @@ export interface FlowNodeData {
   exitActions?: BlockAction[];
   exitConditions?: BlockCondition[];
   waitForReply?: boolean;
+  // Sem resposta nesse tempo, segue pela saída "Não respondeu" (o relógio
+  // retoma a conversa como faz com o "Esperar"). Vazio = espera para sempre.
+  replyTimeoutMinutes?: number;
   // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
   // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
   mcpServerId?: string;

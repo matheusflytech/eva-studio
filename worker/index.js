@@ -181,6 +181,7 @@ async function sendReply(sock, jid, message, citar) {
     await sock.sendPresenceUpdate("composing", jid).catch(() => {});
     await new Promise((r) => setTimeout(r, message.digitando));
   }
+  if (message.media) return enviarMidia(sock, jid, message, opcoes);
   if (!message.options || message.options.length === 0) {
     return (await sock.sendMessage(jid, { text: message.text }, opcoes))?.key?.id ?? null;
   }
@@ -196,6 +197,28 @@ async function sendReply(sock, jid, message, citar) {
   } catch {
     return (await sock.sendMessage(jid, { text: `${message.text}\n\n${numbered}` }, opcoes))?.key?.id ?? null;
   }
+}
+
+// Tipo do arquivo pela extensão da URL: documento e áudio precisam dele no Baileys.
+const MIMES = { pdf: "application/pdf", mp3: "audio/mpeg", ogg: "audio/ogg", m4a: "audio/mp4", mp4: "video/mp4", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", csv: "text/csv", txt: "text/plain" };
+function mimeDaUrl(url, padrao) {
+  const ext = String(url).split("?")[0].split(".").pop().toLowerCase();
+  return MIMES[ext] ?? padrao;
+}
+
+/** Mídia do Bloco do Studio: arquivo por URL pública; o texto vai de legenda (o áudio não aceita legenda). */
+async function enviarMidia(sock, jid, message, opcoes) {
+  const { type, url, name } = message.media;
+  const conteudo = { [type]: { url } };
+  if (message.text && type !== "audio") conteudo.caption = message.text;
+  if (type === "document") {
+    conteudo.fileName = name || String(url).split("?")[0].split("/").pop() || "arquivo";
+    conteudo.mimetype = mimeDaUrl(url, "application/octet-stream");
+  }
+  if (type === "audio") conteudo.mimetype = mimeDaUrl(url, "audio/mp4");
+  const id = (await sock.sendMessage(jid, conteudo, opcoes))?.key?.id ?? null;
+  if (message.text && type === "audio") await sock.sendMessage(jid, { text: message.text });
+  return id;
 }
 
 /** Envia a resposta do agente e anota o id dela; anotar falhar não derruba o envio. */
