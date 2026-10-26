@@ -42,11 +42,12 @@ export interface AnexoDeSaida {
 }
 
 /**
- * Mídia do bot por URL pública (Bloco do Studio) no formato dos envios acima.
- * Sem caminho no storage: a fila do WhatsApp QR não serve para ela (ver esperas.ts).
+ * Mídia do bot (Bloco do Studio) no formato dos envios acima. Só a enviada
+ * pelo Studio tem caminho no storage; a de link público não serve para a fila
+ * do WhatsApp QR (ver esperas.ts).
  */
-export function anexoDeUrl(m: { type: string; url: string; name?: string }): AnexoDeSaida {
-  return { url: m.url, path: "", type: m.type, mime: "", name: m.name };
+export function anexoDeUrl(m: { type: string; url: string; name?: string; path?: string }): AnexoDeSaida {
+  return { url: m.url, path: m.path ?? "", type: m.type, mime: "", name: m.name };
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,64 @@ export function comBotoes(text: string, opcoes?: { id: string; label: string }[]
     text,
     quick_replies: opcoes.slice(0, 13).map((o) => ({ content_type: "text", title: o.label.slice(0, 20), payload: o.id })),
   };
+}
+
+export interface CardDeSaida {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  buttons: { label: string; url: string }[];
+}
+
+/**
+ * Carrossel (modelo genérico) do Instagram e do Messenger. Limites da Meta: 10
+ * cards, 80 caracteres no título e na descrição, 3 botões com 20 no título.
+ */
+export function corpoDoCarrossel(cards: CardDeSaida[]) {
+  return {
+    attachment: {
+      type: "template",
+      payload: {
+        template_type: "generic",
+        elements: cards.slice(0, 10).map((k) => ({
+          title: k.title.slice(0, 80),
+          ...(k.subtitle ? { subtitle: k.subtitle.slice(0, 80) } : {}),
+          ...(k.imageUrl ? { image_url: k.imageUrl } : {}),
+          ...(k.buttons.length
+            ? { buttons: k.buttons.slice(0, 3).map((b) => ({ type: "web_url", url: b.url, title: b.label.slice(0, 20) })) }
+            : {}),
+        })),
+      },
+    },
+  };
+}
+
+export async function sendInstagramCards(igBusinessId: string, accessToken: string, to: string, cards: CardDeSaida[]): Promise<DeliverResult> {
+  try {
+    const res = await fetch(`${GRAPH}/${igBusinessId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient: { id: to }, message: corpoDoCarrossel(cards) }),
+    });
+    if (!res.ok) return { ok: false, error: await erroLegivel("Instagram", res) };
+    return { ok: true, id: await lerId(res, "ig") };
+  } catch (e) {
+    return falhaDeRede(e);
+  }
+}
+
+export async function sendMessengerCards(pageAccessToken: string, to: string, cards: CardDeSaida[]): Promise<DeliverResult> {
+  try {
+    const res = await fetch(`${GRAPH}/me/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${pageAccessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient: { id: to }, messaging_type: "RESPONSE", message: corpoDoCarrossel(cards) }),
+    });
+    if (!res.ok) return { ok: false, error: await erroLegivel("Messenger", res) };
+    return { ok: true, id: await lerId(res, "ig") };
+  } catch (e) {
+    return falhaDeRede(e);
+  }
 }
 
 export async function sendInstagramText(

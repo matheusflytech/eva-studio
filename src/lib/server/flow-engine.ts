@@ -52,6 +52,10 @@ import {
 import { marcarComoLead } from "@/lib/server/leads";
 import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
 import { entenderAnexosDoWhatsApp, transcreverAudioDoWhatsApp, type AnexoGuardado } from "@/lib/server/anexos-whatsapp";
+import { caminhoDaOrg, urlAssinada } from "@/lib/server/storage";
+
+/** Link assinado da mídia do Bloco: o canal baixa na hora; o site e os testes mostram por uma semana. */
+const VALIDADE_DA_MIDIA = 7 * 24 * 3600;
 
 export interface OutboundMessage {
   text: string;
@@ -66,8 +70,15 @@ export interface OutboundMessage {
   // Mostrar "digitando…" por tanto tempo (ms) antes de mandar: os balões
   // seguintes de uma resposta da IA no WhatsApp (ver respostaDaIa).
   digitando?: number;
-  // Arquivo por URL pública (Bloco do Studio); o texto vira legenda.
-  media?: { type: "image" | "video" | "audio" | "document"; url: string; name?: string };
+  // Arquivo por URL pública (Bloco do Studio); o texto vira legenda. Com
+  // `path`, o arquivo está no storage e a URL é assinada.
+  media?: { type: "image" | "video" | "audio" | "document" | "sticker"; url: string; name?: string; path?: string };
+  // Pino nativo (WhatsApp); os outros canais usam o texto, que já traz o link do mapa.
+  location?: { latitude: number; longitude: number; name?: string; address?: string };
+  // Pede a localização do cliente (pedido nativo no WhatsApp oficial; nos outros, só o texto).
+  requestLocation?: boolean;
+  // Carrossel nativo (Instagram, Messenger, site e testes); os outros canais usam o texto, que é a lista com links.
+  cards?: { title: string; subtitle?: string; imageUrl?: string; buttons: { label: string; url: string }[] }[];
 }
 
 export interface AdvanceInput {
@@ -183,15 +194,38 @@ function evaluateCondition(expression: string, variables: Variables): boolean {
 // ("10 + 5"), calcula. Continua sem eval de verdade — só esses dois casos.
 /**
  * Um item do conteúdo do Bloco como mensagem. Link e localização saem como
- * texto (todo canal mostra; o WhatsApp abre a prévia do link).
- * shortcut: localização não usa a mensagem nativa de mapa do WhatsApp; trocar se pedirem o pino.
+ * texto (todo canal mostra; o WhatsApp abre a prévia do link). Com
+ * coordenadas, a localização leva também o pino nativo; o carrossel leva os
+ * cards e, no texto, a lista com links para o canal que não tem carrossel.
  */
 export function mensagemDoConteudo(c: BlockContent, variables: Variables): OutboundMessage | null {
   const t = (s?: string) => interpolate(s ?? "", variables).trim();
   if (c.type === "media") {
     const url = t(c.url);
     if (!/^https?:\/\//i.test(url)) return null;
-    return { text: t(c.text), media: { type: c.mediaType ?? "image", url, ...(c.fileName ? { name: c.fileName } : {}) } };
+    const type = c.mediaType ?? "image";
+    // Figurinha não tem legenda em canal nenhum.
+    return {
+      text: type === "sticker" ? "" : t(c.text),
+      media: { type, url, ...(c.fileName ? { name: c.fileName } : {}), ...(c.path ? { path: c.path } : {}) },
+    };
+  }
+  if (c.type === "carousel") {
+    const cards = (c.cards ?? [])
+      .map((k) => ({
+        title: t(k.title),
+        subtitle: t(k.description) || undefined,
+        imageUrl: /^https?:\/\//i.test(t(k.imageUrl)) ? t(k.imageUrl) : undefined,
+        buttons: (k.buttons ?? [])
+          .map((b) => ({ label: t(b.label), url: t(b.url) }))
+          .filter((b) => b.label && /^https?:\/\//i.test(b.url)),
+      }))
+      .filter((k) => k.title);
+    if (cards.length === 0) return null;
+    const lista = cards
+      .map((k, i) => [`${i + 1}. ${k.title}`, k.subtitle, ...k.buttons.map((b) => `${b.label}: ${b.url}`)].filter(Boolean).join("\n"))
+      .join("\n\n");
+    return { text: lista, cards };
   }
   if (c.type === "link") {
     const url = t(c.url);
@@ -207,7 +241,10 @@ export function mensagemDoConteudo(c: BlockContent, variables: Variables): Outbo
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`
         : "";
     const text = [t(c.text), endereco, mapa].filter(Boolean).join("\n");
-    return text ? { text } : null;
+    if (!text) return null;
+    if (!temCoordenadas) return { text };
+    const pino = { latitude: c.latitude!, longitude: c.longitude!, ...(t(c.text) ? { name: t(c.text) } : {}), ...(endereco ? { address: endereco } : {}) };
+    return { text, location: pino };
   }
   const text = t(c.text);
   return text ? { text } : null;
@@ -1243,8 +1280,11 @@ async function logMessages(
       externalId: inbound?.externalId,
     });
   }
-  // Mídia do bot é URL de fora (não está no storage): fica o link junto do texto.
-  for (const m of outbound) rows.push({ role: "bot", text: m.media ? [m.text, m.media.url].filter(Boolean).join("\n") : m.text });
+  // Mídia do bot no storage vira anexo da conversa; URL de fora fica como link junto do texto.
+  for (const m of outbound) {
+    if (m.media?.path) rows.push({ role: "bot", text: m.text, mediaPath: m.media.path, mediaType: m.media.type, mediaName: m.media.name });
+    else rows.push({ role: "bot", text: m.media ? [m.text, m.media.url].filter(Boolean).join("\n") : m.text });
+  }
   await registrarMensagens(conversationId, rows);
 }
 
@@ -1856,7 +1896,8 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   function textoDaPergunta(data: FlowNodeData): string {
     if (data.iconKey !== "studio-block") return interpolate(data.detail ?? "", variables);
     const ultimo = [...(data.blockContents ?? [])].reverse().find((c) => c.type === "text" && c.text?.trim());
-    return ultimo ? interpolate(ultimo.text ?? "", variables) : "Escolha uma opção:";
+    if (ultimo) return interpolate(ultimo.text ?? "", variables);
+    return data.captureField === "location" ? "Pode me mandar a sua localização?" : "Escolha uma opção:";
   }
 
   /**
@@ -1939,11 +1980,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       if (r.ok) {
         setVar(variables, variavelDaCaptura(parkedNode.data), r.value);
         delete variables.__capture_tries;
-        virouLead = true;
+        if (campo !== "location") virouLead = true;
         currentId = await seguirDaPergunta(parkedNode, null, () => nextDefaultNodeId(edges, parkedNode.id));
       } else if (tentativas < (parkedNode.data.captureMaxRetries ?? 2)) {
         variables.__capture_tries = tentativas + 1;
-        messages.push({ text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables) });
+        messages.push({
+          text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables),
+          ...(campo === "location" ? { requestLocation: true } : {}),
+        });
         pushStep(parkedNode, { error: "resposta inválida" });
         armarPrazoDeResposta(parkedNode);
         currentId = parkedNode.id;
@@ -2050,18 +2094,27 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
           digitando = Math.min(Math.max(c.seconds ?? 2, 1), 10) * 1000;
           continue;
         }
-        const m = mensagemDoConteudo(c, variables);
+        // Arquivo enviado pelo Studio: link assinado na hora (o bucket é privado).
+        const conteudo =
+          c.type === "media" && c.path
+            ? { ...c, url: caminhoDaOrg(c.path, agent.orgId) ? (await urlAssinada(c.path, VALIDADE_DA_MIDIA)) ?? "" : "" }
+            : c;
+        const m = mensagemDoConteudo(conteudo, variables);
         if (!m) continue;
         doBloco.push(digitando ? { ...m, digitando } : m);
         digitando = undefined;
       }
+      // Botões e pedido de localização só vão num texto simples: senão saem num texto à parte.
+      const ultima = doBloco.at(-1);
+      const textoSimples = !!ultima?.text && !ultima.media && !ultima.cards && !ultima.location;
       const options = node.data.waitForReply ? node.data.options ?? [] : [];
       if (options.length > 0) {
-        // Botões só vão em mensagem de texto: com mídia no fim, saem num texto à parte.
         const botoes = options.map((o) => ({ id: o.id, label: o.label }));
-        const ultima = doBloco.at(-1);
-        if (ultima && !ultima.media && ultima.text) ultima.options = botoes;
+        if (textoSimples) ultima!.options = botoes;
         else doBloco.push({ text: textoDaPergunta(node.data), options: botoes });
+      } else if (node.data.waitForReply && node.data.captureField === "location") {
+        if (textoSimples) ultima!.requestLocation = true;
+        else doBloco.push({ text: textoDaPergunta(node.data), requestLocation: true });
       }
       messages.push(...doBloco);
       pushStep(node, { output: doBloco.map((m) => m.text).join(" · ") || undefined }, startedAt);
@@ -2080,6 +2133,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       messages.push({
         text,
         options: options.length > 0 ? options.map((o) => ({ id: o.id, label: o.label })) : undefined,
+        ...(node.data.captureField === "location" ? { requestLocation: true } : {}),
       });
       pushStep(node, { output: text });
       currentId = node.id; // fica parado aqui esperando a resposta

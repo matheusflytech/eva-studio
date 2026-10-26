@@ -40,18 +40,30 @@ export interface AiExitField {
 export interface BlockContent {
   id: string;
   /** "typing" mostra "digitando…" antes da próxima mensagem (no WhatsApp). */
-  type: "text" | "typing" | "media" | "link" | "location";
+  type: "text" | "typing" | "media" | "link" | "location" | "carousel";
   /** Texto; legenda na mídia; título no link; nome do lugar na localização. */
   text?: string;
   seconds?: number;
   /** Mídia e link: endereço público (aceita {variavel}). */
   url?: string;
-  mediaType?: "image" | "video" | "audio" | "document";
+  /** Mídia enviada pelo Studio: caminho no storage privado; sai com link assinado. */
+  path?: string;
+  mediaType?: "image" | "video" | "audio" | "document" | "sticker";
   fileName?: string;
   /** Localização: endereço e/ou coordenadas. */
   address?: string;
   latitude?: number;
   longitude?: number;
+  /** Carrossel: cards com imagem, título, descrição e botões de link. */
+  cards?: BlockCard[];
+}
+
+export interface BlockCard {
+  id: string;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  buttons?: { id: string; label: string; url: string }[];
 }
 
 /** Ação do Bloco: os mesmos dados de um bloco de ação (variável, CRM, HTTP, e-mail). */
@@ -92,7 +104,7 @@ export interface FlowNodeData {
   variableName?: string;
   // Bloco Captura: o que a resposta é. "text" (ou vazio) = comportamento
   // antigo, guarda em variableName sem validar.
-  captureField?: "text" | "name" | "email" | "phone" | "custom";
+  captureField?: "text" | "name" | "email" | "phone" | "custom" | "location";
   captureCustomKey?: string; // chave do CustomField de contato quando captureField = "custom"
   captureRequired?: boolean; // false = aceita "pular"
   captureMaxRetries?: number; // novas tentativas antes de desistir (padrão 2)

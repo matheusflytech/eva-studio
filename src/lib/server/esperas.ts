@@ -34,7 +34,7 @@ export async function retomarEsperasVencidas(limite = 10): Promise<number> {
         // Sem a rota do canal não há botões: as opções vão numeradas, e o motor aceita a resposta pelo número.
         const opcoes = m.options?.length ? `\n\n${m.options.map((o, i) => `${i + 1}. ${o.label}`).join("\n")}` : "";
         // Mídia por URL: o QR passa pela fila, que só conhece arquivo do storage; lá vai o link no texto.
-        const qr = c.channel === "whatsapp_qr";
+        const qr = c.channel === "whatsapp_qr" && !m.media?.path;
         const texto = [m.text + opcoes, m.media && qr ? m.media.url : ""].filter(Boolean).join("\n");
         const r = await deliverToContact({
           agentId: c.agentId,

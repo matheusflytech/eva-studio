@@ -226,3 +226,32 @@ export async function apagarArquivos(caminhos: string[], bucket = BUCKET): Promi
     console.error("[storage] falha ao apagar", e instanceof Error ? e.message : e);
   }
 }
+
+/**
+ * Confere um pedido de upload ({ name, mime, size }) e devolve a URL para o
+ * navegador mandar o arquivo direto ao storage. Usado pelos anexos da conversa
+ * e pela mídia do Bloco do Studio.
+ */
+export async function prepararUpload(
+  orgId: string,
+  pedido: { name?: unknown; mime?: unknown; size?: unknown }
+): Promise<{ erro: string; status: number } | { path: string; type: TipoDeMidia; mime: string; name?: string; uploadUrl: string; token: string }> {
+  const { name, mime, size } = pedido;
+  if (typeof mime !== "string" || typeof size !== "number") return { erro: "Informe o tipo e o tamanho do arquivo.", status: 400 };
+  if (size <= 0 || size > MAX_MEDIA_BYTES) return { erro: "O arquivo precisa ter até 16 MB.", status: 400 };
+  const classe = classificarMime(mime);
+  if (!classe) {
+    return { erro: "Este tipo de arquivo não é aceito. Use imagem, áudio, vídeo, PDF ou documento do Office.", status: 400 };
+  }
+  const path = novoCaminho(orgId, classe.ext);
+  const upload = await urlDeUpload(path);
+  if (!upload) return { erro: "Não foi possível preparar o envio. Tente de novo.", status: 502 };
+  return {
+    path,
+    type: classe.tipo,
+    mime,
+    name: typeof name === "string" ? name.slice(0, 200) : undefined,
+    uploadUrl: upload.url,
+    token: upload.token,
+  };
+}
