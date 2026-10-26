@@ -43,6 +43,7 @@ import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/d
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
 import { PainelDeFiltros, SeletorDePeriodo, contarFiltros, periodoCurto } from "@/components/dashboard/barra-de-filtros";
 import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
+import { VisaoGeral } from "@/components/dashboard/visao-geral";
 import { rotulosDasOpcoes, useOpcoesDoDashboard, type OpcoesDoDashboard } from "@/components/dashboard/opcoes";
 import {
   ROTULO_CANAL,
@@ -519,9 +520,21 @@ function Painel() {
         </div>
       </div>
 
-      {/* Barra da tela: título, período em cápsula; à direita Filtros, "…" e Editar painel. */}
-      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2 print:hidden">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Dashboard</h1>
+      {/* Visão geral fixa do mês; o painel montável vem logo abaixo. */}
+      {!editando && (
+        <div className="flex flex-col gap-4 print:hidden">
+          <h1 className="text-[34px] font-semibold leading-tight tracking-[-0.03em] text-text-primary">Dashboard</h1>
+          <VisaoGeral />
+        </div>
+      )}
+
+      {/* Barra do painel montável: período em cápsula; à direita Filtros, "…" e Editar painel. */}
+      <div className={cn("flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2 print:hidden", !editando && "mt-4 border-t border-border-subtle pt-6")}>
+        {editando ? (
+          <h1 className="text-heading font-semibold tracking-tight text-text-primary">Seu painel</h1>
+        ) : (
+          <h2 className="text-heading font-semibold tracking-tight text-text-primary">Seu painel</h2>
+        )}
         <span className="font-mono text-caption tabular-nums text-text-tertiary" aria-live="polite">
           {estadoSalvar === "salvando" ? "salvando…" : estadoSalvar === "salvo" ? "salvo" : !editando && atualizadoEm ? `atualizado ${atualizadoEm}` : ""}
         </span>
