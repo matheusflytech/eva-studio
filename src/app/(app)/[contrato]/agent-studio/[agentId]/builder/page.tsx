@@ -404,7 +404,7 @@ export default function AgentBuilderPage() {
     // Opção de menu apagada (ou tipo de resposta trocado): a ligação que saía
     // dela não tem mais de onde sair. Sem isto ela ficava presa num ponto que
     // não existe e o salvamento acusava "saída que não existe".
-    if ("options" in partial || "captureField" in partial || "aiExits" in partial || "exitConditions" in partial || "waitForReply" in partial) {
+    if ("options" in partial || "captureField" in partial || "aiExits" in partial || "exitConditions" in partial || "waitForReply" in partial || "replyTimeoutMinutes" in partial) {
       const atual = nodes.find((n) => n.id === id);
       if (!atual) return;
       const novo = { ...atual.data, ...partial } as FlowNodeData;

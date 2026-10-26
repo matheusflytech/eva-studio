@@ -57,6 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     '.msg.bot{align-self:flex-start;background:#fff;border:1px solid #e5e5ea;color:#111;}' +
     '.msg.user{align-self:flex-end;background:#4f46e5;color:#fff;}' +
     '.options{display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:90%;}' +
+    '.media{align-self:flex-start;max-width:80%;max-height:240px;border-radius:14px;}' +
     '.opt{border:1px solid #4f46e5;color:#4f46e5;background:#fff;border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer;}' +
     '.opt:hover{background:#eef2ff;}' +
     '.inputRow{display:flex;gap:6px;padding:10px;border-top:1px solid #eee;background:#fff;}' +
@@ -120,6 +121,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // Mídia do bot (URL http/https já validada no servidor): nada de innerHTML.
+  function addMedia(media) {
+    var el;
+    if (media.type === "image" || media.type === "video" || media.type === "audio") {
+      el = document.createElement(media.type === "image" ? "img" : media.type);
+      el.src = media.url;
+      if (media.type === "image") el.alt = "";
+      else el.controls = true;
+      el.className = "media";
+    } else {
+      el = document.createElement("a");
+      el.href = media.url;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+      el.textContent = media.name || "Abrir arquivo";
+      el.className = "msg bot";
+    }
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   function addOptions(options) {
     var wrap = document.createElement("div");
     wrap.className = "options";
@@ -162,7 +184,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       .then(function (data) {
         setTyping(false);
         (data.messages || []).forEach(function (m) {
-          addMessage("bot", m.text);
+          if (m.media) addMedia(m.media);
+          if (m.text || !m.media) addMessage("bot", m.text);
           if (m.options && m.options.length) addOptions(m.options);
         });
       })

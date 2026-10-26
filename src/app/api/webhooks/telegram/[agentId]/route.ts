@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { advanceConversation } from "@/lib/server/flow-engine";
+import { anexoDeUrl, sendTelegramMedia } from "@/lib/server/outbound";
 import { decryptSecret } from "@/lib/server/crypto";
 import { timingSafeEqualStr } from "@/lib/server/secure-compare";
 import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
@@ -157,6 +158,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   }
 
   for (const message of result.messages) {
+    if (message.media) {
+      await sendTelegramMedia(token, contactId, anexoDeUrl(message.media), message.text);
+      continue;
+    }
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

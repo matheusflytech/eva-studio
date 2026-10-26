@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { advanceConversation } from "@/lib/server/flow-engine";
-import { deliverToContact } from "@/lib/server/outbound";
+import { anexoDeUrl, deliverToContact } from "@/lib/server/outbound";
 import { CANAIS_DE_TESTE } from "@/lib/server/conversas";
 import { CANAIS_POR_BUSCA } from "@/lib/server/inbox";
 
@@ -33,7 +33,17 @@ export async function retomarEsperasVencidas(limite = 10): Promise<number> {
       for (const m of messages) {
         // Sem a rota do canal não há botões: as opções vão numeradas, e o motor aceita a resposta pelo número.
         const opcoes = m.options?.length ? `\n\n${m.options.map((o, i) => `${i + 1}. ${o.label}`).join("\n")}` : "";
-        const r = await deliverToContact({ agentId: c.agentId, channel: c.channel, to: c.contactId, text: m.text + opcoes, template: m.template });
+        // Mídia por URL: o QR passa pela fila, que só conhece arquivo do storage; lá vai o link no texto.
+        const qr = c.channel === "whatsapp_qr";
+        const texto = [m.text + opcoes, m.media && qr ? m.media.url : ""].filter(Boolean).join("\n");
+        const r = await deliverToContact({
+          agentId: c.agentId,
+          channel: c.channel,
+          to: c.contactId,
+          text: texto,
+          template: m.template,
+          media: m.media && !qr ? anexoDeUrl(m.media) : undefined,
+        });
         if (!r.ok) console.error("[esperas] envio falhou", c.id, r.error);
       }
     } catch (e) {

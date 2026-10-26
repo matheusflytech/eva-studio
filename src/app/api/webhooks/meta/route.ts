@@ -8,7 +8,15 @@ import { verifyMetaSignature } from "@/lib/server/meta-signature";
 import { decryptSecret } from "@/lib/server/crypto";
 import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
-import { sendInstagramText, sendMessengerText, type DeliverResult } from "@/lib/server/outbound";
+import {
+  anexoDeUrl,
+  sendInstagramMedia,
+  sendInstagramText,
+  sendMessengerMedia,
+  sendMessengerText,
+  sendWhatsAppMedia,
+  type DeliverResult,
+} from "@/lib/server/outbound";
 import { CAMPOS_DE_TEMPLATE, aplicarEventoDeTemplate, lerEventoDeTemplate } from "@/lib/server/meta-template-eventos";
 import { contarReciboNoDisparo } from "@/lib/server/recibos";
 import { corpoDoMenu } from "@/lib/server/meta-menu";
@@ -101,6 +109,7 @@ interface InstagramMessagingEvent {
     is_echo?: boolean;
     attachments?: AnexoSocial[];
     reply_to?: { mid?: string; story?: { id?: string; url?: string } };
+    quick_reply?: { payload?: string };
   };
 }
 
@@ -146,6 +155,10 @@ async function sendMetaMessage(
       pulado: true,
       error: "Fora da janela de 24h e sem modelo aprovado escolhido neste bloco. A mensagem não foi enviada.",
     };
+  }
+
+  if (message.media && !message.template) {
+    return sendWhatsAppMedia(phoneNumberId, accessToken, to, anexoDeUrl(message.media), message.text);
   }
 
   const body = message.template
@@ -457,7 +470,7 @@ async function handleMatchedComment(
 
 interface MessengerEvent {
   sender?: { id?: string };
-  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: AnexoSocial[] };
+  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: AnexoSocial[]; quick_reply?: { payload?: string } };
   postback?: { payload?: string };
 }
 
@@ -551,8 +564,8 @@ async function handleMessengerEntries(entries: unknown[]): Promise<number> {
       // fluxo com isso faria o bot conversar sozinho.
       if (!from || event.message?.is_echo) continue;
 
-      // Botão tocado: o payload carrega o id da opção do bloco de Captura.
-      const optionId = event.postback?.payload;
+      // Botão tocado (postback ou resposta rápida): o payload é o id da opção da pergunta.
+      const optionId = event.postback?.payload ?? event.message?.quick_reply?.payload;
       const temAnexo = (event.message?.attachments?.length ?? 0) > 0;
       if (!event.message?.text && !optionId && !temAnexo) continue;
       if (!(await isFirstDelivery(event.message?.mid))) continue;
@@ -572,7 +585,9 @@ async function handleMessengerEntries(entries: unknown[]): Promise<number> {
         });
         await registrarAnexosExtras(connection.agentId, "messenger", from, entrada.extras);
         for (const reply of result.messages) {
-          const envio = await sendMessengerText(token, from, reply.text);
+          const envio = reply.media
+            ? await sendMessengerMedia(token, from, anexoDeUrl(reply.media), reply.text)
+            : await sendMessengerText(token, from, reply.text, reply.options);
           await anotarEnvioDoBot(connection.agentId, "messenger", from, reply.text, envio);
         }
       } catch (e) {
@@ -619,13 +634,17 @@ async function handleInstagramEntries(entries: unknown[]): Promise<number> {
           channel: "instagram",
           contactId: from,
           text: entrada.text,
+          // Resposta rápida tocada: o payload é o id da opção da pergunta.
+          optionId: event.message?.quick_reply?.payload,
           media: entrada.media,
           externalId: event.message?.mid,
           event: { kind: evento.kind, storyId: evento.storyId, isReaction: evento.isReaction },
         });
         await registrarAnexosExtras(connection.agentId, "instagram", from, entrada.extras);
         for (const reply of result.messages) {
-          const envio = await sendInstagramText(igBusinessId, igAccessToken, from, reply.text);
+          const envio = reply.media
+            ? await sendInstagramMedia(igBusinessId, igAccessToken, from, anexoDeUrl(reply.media), reply.text)
+            : await sendInstagramText(igBusinessId, igAccessToken, from, reply.text, reply.options);
           await anotarEnvioDoBot(connection.agentId, "instagram", from, reply.text, envio);
         }
       } catch (e) {
