@@ -417,6 +417,11 @@ async function montarFerramentaDeCampos(
         "Registra um lead no CRM em uma única chamada: cria o negócio (ou completa o que já existe), preenche os campos, aplica a etiqueta e anota o resumo. Use quando já tiver o nome e um contato da pessoa.",
       params: [
         { name: "nome", description: "Nome da pessoa." },
+        // Viram nome/telefone/e-mail do contato (pelas variáveis da conversa, ver runAiAgent).
+        ...[
+          { name: "telefone", description: "WhatsApp ou telefone com DDD, se a pessoa informou.", required: false },
+          { name: "email", description: "E-mail, se a pessoa informou.", required: false },
+        ].filter((p) => !todas.some((d) => d.key === p.name)),
         ...todas.map((d) => ({ name: d.key, description: dica(d), required: false })),
         { name: "etiqueta", description: "Nome exato da etiqueta a aplicar, se houver.", required: false },
         { name: "resumo", description: "Resumo curto do que a pessoa quer, para a equipe.", required: false },
@@ -693,7 +698,7 @@ async function runAiAgent(
   historicoAntesDe?: Date,
   /** Hora, canal e contato (contextoDaConversa): vai no fim do prompt. */
   contexto?: string
-): Promise<{ text: string | null; error?: string; seguir: boolean; saida?: string; enviar?: boolean }> {
+): Promise<{ text: string | null; error?: string; seguir: boolean; saida?: string; enviar?: boolean; virouLead?: boolean }> {
   // De onde vem a IA: a conexão do contrato (lista com reserva automática)
   // ou a chave e o modelo escolhidos no próprio bloco (o jeito de antes).
   let passos: PassoDeIa[];
@@ -730,6 +735,7 @@ async function runAiAgent(
   const consumo: RegistroDeUso[] = [];
   const temSaida = temSaidaPrincipal(edges, node.id, saidasDaIa(node.data));
   let pediuParaSeguir = false;
+  let virouLead = false;
   // Só as saídas por intenção que têm ligação viram ferramenta: sem destino, não há para onde ir.
   const saidasLigadas = (node.data.aiExits ?? []).filter((s) => nextNodeId(edges, node.id, s.id));
   const nomesDeSaida = nomesDasSaidas(saidasLigadas);
@@ -989,7 +995,17 @@ async function runAiAgent(
           try {
             const contactId = await crmContext.resolveContactId();
             if (!contactId) return "Não consegui identificar o contato desta conversa.";
-            return await runCrmTool(call, toolNode, crmContext.orgId, contactId);
+            const resultado = await runCrmTool(call, toolNode, crmContext.orgId, contactId);
+            // O fim da rodada grava nome/telefone/e-mail no contato a partir das
+            // variáveis (syncContact), com a mesma normalização e deduplicação da Captura.
+            if (call.name === "crm_registrar_lead") {
+              for (const k of ["nome", "telefone", "email"]) {
+                const v = String(call.arguments[k] ?? "").trim();
+                if (v) setVar(variables, k, v);
+              }
+              virouLead = true;
+            }
+            return resultado;
           } catch (error) {
             return `Erro no CRM: ${error instanceof Error ? error.message : String(error)}`;
           }
@@ -1053,7 +1069,7 @@ async function runAiAgent(
     if (removidas.length) console.warn("[ia] chamada de ferramenta escrita como texto (não enviada)", { agente: agente.id, no: node.id, removidas });
     const variavel = node.data.aiResponseVariable?.trim();
     if (!enviar && variavel && texto && !UNSAFE_VAR_KEYS.has(variavel)) setVar(variables, variavel, texto);
-    return { text: texto, error, seguir, saida, enviar };
+    return { text: texto, error, seguir, saida, enviar, virouLead };
   } catch (err) {
     return { text: null, error: err instanceof Error ? err.message : String(err), seguir: false, enviar };
   }
@@ -1931,6 +1947,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     }, juntadas?.desde, await contextoDaIa());
     const seErrou = destinoDoErroDaIa(edges, parkedNode.id, reply.error);
+    if (reply.virouLead) virouLead = true;
     if (reply.text && reply.enviar !== false) messages.push(...respostaDaIa(reply.text, input.channel, parkedNode));
     else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
     pushStep(parkedNode, { output: reply.text ?? undefined, error: reply.error });
@@ -2028,6 +2045,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       resolveContactId: ensureContactId,
     }, juntadas?.desde, await contextoDaIa());
       const seErrou = destinoDoErroDaIa(edges, node.id, reply.error);
+      if (reply.virouLead) virouLead = true;
       if (reply.text && reply.enviar !== false) messages.push(...respostaDaIa(reply.text, input.channel, node));
       else if (reply.error && !seErrou && !CANAIS_DE_TESTE_DA_IA.includes(input.channel)) messages.push({ text: MSG_INDISPONIVEL });
       pushStep(node, { output: reply.text ?? undefined, error: reply.error }, startedAt);
