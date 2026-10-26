@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useParams } from "@/lib/contrato/navegacao";
 import {
-  ArrowLeft, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, Maximize, Minus, Plus,
+  ArrowLeft, Download, Ellipsis, PlayCircle, PanelRightClose, PanelRightOpen, LayoutGrid, LayoutTemplate, Maximize, Minus, Plus, Upload,
 } from "lucide-react";
 import {
   ReactFlow,
@@ -60,7 +60,7 @@ import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-pa
 import { ReportsPanel } from "@/components/agent-studio/builder/reports-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
-import { createSubflow, deleteSubflow, getFlow, getSubflow, listSubflows, saveFlow, saveSubflow, type AgentFlow, type Subfluxo } from "@/lib/data/flows";
+import { createSubflow, deleteSubflow, exportBundle, getFlow, getSubflow, importBundle, listSubflows, saveFlow, saveSubflow, type AgentFlow, type Subfluxo } from "@/lib/data/flows";
 import { BarraDeFluxos } from "@/components/agent-studio/builder/barra-de-fluxos";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
@@ -191,9 +191,9 @@ export default function AgentBuilderPage() {
     listSubflows(agentId).then(setFluxos).catch(() => {});
   }, [agentId]);
 
-  /** Salva o que está na tela (se faltava) e abre outro fluxo. */
-  async function trocarFluxo(id: string | null) {
-    if (id === fluxoAtual || trocando) return;
+  /** Salva o que está na tela (se faltava) e abre outro fluxo. `recarregar`: abre de novo o mesmo (depois de importar). */
+  async function trocarFluxo(id: string | null, recarregar = false) {
+    if ((id === fluxoAtual && !recarregar) || trocando) return;
     setTrocando(true);
     try {
       if (saveTimer.current) {
@@ -233,6 +233,61 @@ export default function AgentBuilderPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Não foi possível salvar o fluxo.");
     }
+  }
+
+  const arquivoRef = React.useRef<HTMLInputElement>(null);
+
+  async function exportar() {
+    try {
+      const pacote = await exportBundle(agentId);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(pacote, null, 2)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `fluxos-${(agent?.name ?? "agente").normalize("NFD").replace(/[^\w-]+/g, "-").toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível exportar.");
+    }
+  }
+
+  /**
+   * Pacote "eva.flows" (o que o Exportar baixa): substitui o principal e os
+   * fluxos de mesmo nome, no servidor. Só { nodes, edges }: troca o fluxo aberto.
+   */
+  async function importar(arquivo: File) {
+    let json: unknown;
+    try {
+      json = JSON.parse(await arquivo.text());
+    } catch {
+      return alert("Esse arquivo não é um JSON válido.");
+    }
+    const o = json && typeof json === "object" ? (json as Record<string, unknown>) : {};
+    if (o.format === "eva.flows") {
+      const nomes = Array.isArray(o.subflows) ? o.subflows.length : 0;
+      if (!confirm(`Importar substitui o fluxo Principal${nomes ? ` e os fluxos com o mesmo nome (${nomes} no arquivo)` : ""}. Continuar?`)) return;
+      try {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        const r = await importBundle(agentId, json);
+        const lista = await listSubflows(agentId);
+        setFluxos(lista);
+        await trocarFluxo(fluxoAtual && lista.some((f) => f.id === fluxoAtual) ? fluxoAtual : null, true);
+        const avisos = r.avisos.length ? `\n\n${r.avisos.length} aviso(s):\n${r.avisos.slice(0, 5).map((a) => "• " + a.message).join("\n")}` : "";
+        alert(`Importado: ${r.criados} fluxo(s) criado(s), ${r.atualizados} atualizado(s).${avisos}`);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Não foi possível importar.");
+      }
+      return;
+    }
+    if (Array.isArray(o.nodes) && Array.isArray(o.edges)) {
+      if (!confirm("Substituir o fluxo aberto pelo do arquivo?")) return;
+      setNodes(o.nodes as Node<FlowNodeData>[]);
+      setEdges(o.edges as Edge[]);
+      setSelectedId(null);
+      return;
+    }
+    alert('Esse arquivo não é uma exportação de fluxos da Eva (falta "format": "eva.flows" ou nodes e edges).');
   }
 
   async function apagarFluxo(id: string) {
@@ -749,6 +804,12 @@ export default function AgentBuilderPage() {
                   <DropdownMenuItem onSelect={handleAutoLayout}>
                     <LayoutGrid aria-hidden="true" /> Organizar os blocos
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void exportar()}>
+                    <Download aria-hidden="true" /> Exportar fluxos (JSON)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => arquivoRef.current?.click()}>
+                    <Upload aria-hidden="true" /> Importar JSON
+                  </DropdownMenuItem>
                   {ultimaExecucao && (
                     <DropdownMenuCheckboxItem checked={mostrarExecucao} onCheckedChange={(v) => setMostrarExecucao(v === true)}>
                       <span className="flex min-w-0 flex-1 flex-col">
@@ -899,6 +960,18 @@ export default function AgentBuilderPage() {
       ) : (
         tab === "reports" ? <ReportsPanel agentId={agentId} /> : <ExecutionsPanel agentId={agentId} />
       )}
+
+      <input
+        ref={arquivoRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) void importar(f);
+        }}
+      />
 
       {showTemplateGallery && (
         <FlowTemplateGallery onPick={handlePickTemplate} onClose={() => setShowTemplateGallery(false)} />

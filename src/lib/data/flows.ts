@@ -53,3 +53,12 @@ export const saveSubflow = (agentId: string, flowId: string, parte: Partial<Agen
 
 export const deleteSubflow = (agentId: string, flowId: string) =>
   pedir(`/api/flows/${agentId}/subflows/${flowId}`, { method: "DELETE" }).then(() => undefined);
+
+/** O bot inteiro (principal + extras) no pacote "eva.flows". */
+export const exportBundle = (agentId: string) => pedir<Record<string, unknown>>(`/api/flows/${agentId}/bundle`);
+
+export const importBundle = (agentId: string, pacote: unknown) =>
+  pedir<{ criados: number; atualizados: number; avisos: { message: string }[] }>(`/api/flows/${agentId}/bundle`, {
+    method: "POST",
+    body: JSON.stringify(pacote),
+  });
