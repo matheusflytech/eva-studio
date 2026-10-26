@@ -42,8 +42,17 @@ export function validateNode(data: FlowNodeData): string | null {
         if (campo === "text" && vazio(data.variableName)) return "Escolha em qual variável guardar a resposta.";
       }
       if ((data.exitConditions ?? []).some((c) => vazio(c.expression))) return "Escreva a condição de cada saída.";
-      if ((data.blockContents ?? []).some((c) => (c.type === "media" || c.type === "link") && vazio(c.url))) {
+      if ((data.blockContents ?? []).some((c) => (c.type === "link" || (c.type === "media" && !c.path)) && vazio(c.url))) {
         return "Informe o link de cada mídia e de cada link do conteúdo.";
+      }
+      for (const c of data.blockContents ?? []) {
+        if (c.type !== "carousel") continue;
+        const cards = c.cards ?? [];
+        if (cards.length === 0) return "Adicione pelo menos um card ao carrossel.";
+        if (cards.some((k) => vazio(k.title))) return "Dê um título a cada card do carrossel.";
+        if (cards.some((k) => (k.buttons ?? []).some((x) => vazio(x.label) || vazio(x.url)))) {
+          return "Preencha o texto e o link de cada botão do carrossel.";
+        }
       }
       // Ação incompleta aparece aqui, no Bloco que a carrega.
       for (const a of [...(data.entryActions ?? []), ...(data.exitActions ?? [])]) {

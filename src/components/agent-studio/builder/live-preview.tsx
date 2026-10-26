@@ -5,7 +5,7 @@ import { RotateCcw, Send, Smartphone } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { fieldBase } from "@/components/ui/styles";
 import { cn, generateId } from "@/lib/utils";
-import { MidiaDaMensagem } from "./midia-da-mensagem";
+import { CartoesDaMensagem, MidiaDaMensagem, type CardDaMensagem } from "./midia-da-mensagem";
 
 interface ChatMessage {
   id: string;
@@ -13,6 +13,7 @@ interface ChatMessage {
   text: string;
   options?: { id: string; label: string }[];
   media?: MidiaDaMensagem;
+  cards?: CardDaMensagem[];
 }
 
 // Prévia ao vivo do fluxo, dentro do próprio Builder — sempre reflete a
@@ -39,10 +40,10 @@ export function LivePreview({ agentId, agentName, aoResponder }: { agentId: stri
         body: JSON.stringify({ agentId, channel: "builder_preview", contactId: contactIdRef.current, ...payload }),
       });
       const data = await res.json();
-      const replies: Pick<ChatMessage, "text" | "options" | "media">[] = data.messages ?? [];
+      const replies: Pick<ChatMessage, "text" | "options" | "media" | "cards">[] = data.messages ?? [];
       setMessages((prev) => [
         ...prev,
-        ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options, media: r.media })),
+        ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options, media: r.media, cards: r.cards })),
       ]);
     } catch {
       setMessages((prev) => [...prev, { id: generateId(), role: "agent", text: "Erro ao processar essa mensagem." }]);
@@ -102,8 +103,8 @@ export function LivePreview({ agentId, agentName, aoResponder }: { agentId: stri
         <div className="flex flex-col gap-2.5">
           {messages.map((m) => (
             <div key={m.id} className={cn("flex flex-col gap-1.5", m.role === "user" ? "items-end" : "items-start")}>
-              {m.media && <MidiaDaMensagem media={m.media} />}
-              {(m.text || !m.media) && (
+              {m.cards?.length ? <CartoesDaMensagem cards={m.cards} /> : m.media && <MidiaDaMensagem media={m.media} />}
+              {!m.cards?.length && (m.text || !m.media) && (
                 <div
                   className={cn(
                     "max-w-[85%] whitespace-pre-wrap break-words rounded-[18px] px-3 py-2 text-small",

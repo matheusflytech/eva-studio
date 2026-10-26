@@ -58,6 +58,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     '.msg.user{align-self:flex-end;background:#4f46e5;color:#fff;}' +
     '.options{display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:90%;}' +
     '.media{align-self:flex-start;max-width:80%;max-height:240px;border-radius:14px;}' +
+    '.cards{display:flex;gap:8px;overflow-x:auto;align-self:stretch;flex-shrink:0;padding-bottom:4px;}' +
+    '.sticker{max-width:120px;max-height:120px;}' +
+    '.card{flex:0 0 200px;background:#fff;border:1px solid #e5e5ea;border-radius:14px;overflow:hidden;font-size:13px;color:#111;}' +
+    '.card img{width:100%;height:110px;object-fit:cover;display:block;}' +
+    '.card .ct{padding:8px 10px;}' +
+    '.card .ct b{display:block;}' +
+    '.card .ct p{margin:4px 0 0;color:#555;font-size:12px;}' +
+    '.card a{display:block;text-align:center;border-top:1px solid #eee;padding:7px;color:#4f46e5;text-decoration:none;font-size:12px;}' +
     '.opt{border:1px solid #4f46e5;color:#4f46e5;background:#fff;border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer;}' +
     '.opt:hover{background:#eef2ff;}' +
     '.inputRow{display:flex;gap:6px;padding:10px;border-top:1px solid #eee;background:#fff;}' +
@@ -142,12 +150,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
   function addMedia(media, role) {
     var lado = role === "user" ? "user" : "bot";
     var el;
-    if (media.type === "image" || media.type === "video" || media.type === "audio") {
-      el = document.createElement(media.type === "image" ? "img" : media.type);
+    var imagem = media.type === "image" || media.type === "sticker";
+    if (imagem || media.type === "video" || media.type === "audio") {
+      el = document.createElement(imagem ? "img" : media.type);
       el.src = media.url;
-      if (media.type === "image") el.alt = "";
+      if (imagem) el.alt = "";
       else el.controls = true;
-      el.className = "media " + lado;
+      el.className = "media " + lado + (media.type === "sticker" ? " sticker" : "");
     } else {
       el = document.createElement("a");
       el.href = media.url;
@@ -157,6 +166,44 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
       el.className = "msg " + lado;
     }
     messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // Carrossel do bot (URLs já validadas no servidor): textContent, nada de innerHTML.
+  function addCards(cards) {
+    var wrap = document.createElement("div");
+    wrap.className = "cards";
+    cards.forEach(function (k) {
+      var card = document.createElement("div");
+      card.className = "card";
+      if (k.imageUrl) {
+        var img = document.createElement("img");
+        img.src = k.imageUrl;
+        img.alt = "";
+        card.appendChild(img);
+      }
+      var ct = document.createElement("div");
+      ct.className = "ct";
+      var b = document.createElement("b");
+      b.textContent = k.title;
+      ct.appendChild(b);
+      if (k.subtitle) {
+        var p = document.createElement("p");
+        p.textContent = k.subtitle;
+        ct.appendChild(p);
+      }
+      card.appendChild(ct);
+      (k.buttons || []).forEach(function (bt) {
+        var a = document.createElement("a");
+        a.href = bt.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = bt.label;
+        card.appendChild(a);
+      });
+      wrap.appendChild(card);
+    });
+    messagesEl.appendChild(wrap);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
@@ -214,8 +261,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
         setTyping(false);
         if (aoChegar) aoChegar(data);
         (data.messages || []).forEach(function (m) {
-          if (m.media) addMedia(m.media);
-          if (m.text || !m.media) addMessage("bot", m.text);
+          if (m.cards && m.cards.length) addCards(m.cards);
+          else {
+            if (m.media) addMedia(m.media);
+            if (m.text || !m.media) addMessage("bot", m.text);
+          }
           if (m.options && m.options.length) addOptions(m.options);
         });
       })

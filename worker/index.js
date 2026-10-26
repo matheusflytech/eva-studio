@@ -182,6 +182,12 @@ async function sendReply(sock, jid, message, citar) {
     await new Promise((r) => setTimeout(r, message.digitando));
   }
   if (message.media) return enviarMidia(sock, jid, message, opcoes);
+  // Pino nativo (Bloco do Studio). Pedido de localização e carrossel não existem aqui: vai o texto.
+  if (message.location) {
+    const { latitude, longitude, name, address } = message.location;
+    const local = { degreesLatitude: latitude, degreesLongitude: longitude, name, address };
+    return (await sock.sendMessage(jid, { location: local }, opcoes))?.key?.id ?? null;
+  }
   if (!message.options || message.options.length === 0) {
     return (await sock.sendMessage(jid, { text: message.text }, opcoes))?.key?.id ?? null;
   }
@@ -206,18 +212,19 @@ function mimeDaUrl(url, padrao) {
   return MIMES[ext] ?? padrao;
 }
 
-/** Mídia do Bloco do Studio: arquivo por URL pública; o texto vai de legenda (o áudio não aceita legenda). */
+/** Mídia do Bloco do Studio: arquivo por URL; o texto vai de legenda (áudio e figurinha não aceitam legenda). */
 async function enviarMidia(sock, jid, message, opcoes) {
   const { type, url, name } = message.media;
   const conteudo = { [type]: { url } };
-  if (message.text && type !== "audio") conteudo.caption = message.text;
+  const semLegenda = type === "audio" || type === "sticker";
+  if (message.text && !semLegenda) conteudo.caption = message.text;
   if (type === "document") {
     conteudo.fileName = name || String(url).split("?")[0].split("/").pop() || "arquivo";
     conteudo.mimetype = mimeDaUrl(url, "application/octet-stream");
   }
   if (type === "audio") conteudo.mimetype = mimeDaUrl(url, "audio/mp4");
   const id = (await sock.sendMessage(jid, conteudo, opcoes))?.key?.id ?? null;
-  if (message.text && type === "audio") await sock.sendMessage(jid, { text: message.text });
+  if (message.text && semLegenda) await sock.sendMessage(jid, { text: message.text });
   return id;
 }
 

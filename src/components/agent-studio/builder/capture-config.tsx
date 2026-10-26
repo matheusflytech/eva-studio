@@ -92,6 +92,13 @@ export function CaptureConfig({ data, onChange }: { data: FlowNodeData; onChange
         </div>
       )}
 
+      {campo === "location" && (
+        <p className="rounded-lg bg-raised px-3 py-2 text-caption leading-relaxed text-text-tertiary">
+          Guarda em <code className="text-text-secondary">{"{localizacao}"}</code> o pino com o link do mapa ou o endereço escrito. No
+          WhatsApp oficial aparece o botão nativo de enviar localização; nos outros canais, só a pergunta.
+        </p>
+      )}
+
       {(campo === "name" || campo === "email" || campo === "phone") && (
         <p className="rounded-lg bg-raised px-3 py-2 text-caption leading-relaxed text-text-tertiary">
           Guarda em <code className="text-text-secondary">{`{${variavelDaCaptura(data)}}`}</code> e preenche a ficha do contato.

@@ -10,8 +10,10 @@ import { esquecerEntrega, isFirstDelivery } from "@/lib/server/rate-limit";
 import { registrarMensagens } from "@/lib/server/inbox";
 import {
   anexoDeUrl,
+  sendInstagramCards,
   sendInstagramMedia,
   sendInstagramText,
+  sendMessengerCards,
   sendMessengerMedia,
   sendMessengerText,
   sendWhatsAppMedia,
@@ -177,7 +179,16 @@ async function sendMetaMessage(
       }
     : message.options && message.options.length > 0
       ? corpoDoMenu(to, message.text, message.options)
-      : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text } };
+      : message.location
+        ? { messaging_product: "whatsapp", to, type: "location", location: message.location }
+        : message.requestLocation
+          ? {
+              messaging_product: "whatsapp",
+              to,
+              type: "interactive",
+              interactive: { type: "location_request_message", body: { text: message.text }, action: { name: "send_location" } },
+            }
+          : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text } };
 
   try {
     const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
@@ -585,9 +596,11 @@ async function handleMessengerEntries(entries: unknown[]): Promise<number> {
         });
         await registrarAnexosExtras(connection.agentId, "messenger", from, entrada.extras);
         for (const reply of result.messages) {
-          const envio = reply.media
-            ? await sendMessengerMedia(token, from, anexoDeUrl(reply.media), reply.text)
-            : await sendMessengerText(token, from, reply.text, reply.options);
+          const envio = reply.cards
+            ? await sendMessengerCards(token, from, reply.cards)
+            : reply.media
+              ? await sendMessengerMedia(token, from, anexoDeUrl(reply.media), reply.text)
+              : await sendMessengerText(token, from, reply.text, reply.options);
           await anotarEnvioDoBot(connection.agentId, "messenger", from, reply.text, envio);
         }
       } catch (e) {
@@ -642,9 +655,11 @@ async function handleInstagramEntries(entries: unknown[]): Promise<number> {
         });
         await registrarAnexosExtras(connection.agentId, "instagram", from, entrada.extras);
         for (const reply of result.messages) {
-          const envio = reply.media
-            ? await sendInstagramMedia(igBusinessId, igAccessToken, from, anexoDeUrl(reply.media), reply.text)
-            : await sendInstagramText(igBusinessId, igAccessToken, from, reply.text, reply.options);
+          const envio = reply.cards
+            ? await sendInstagramCards(igBusinessId, igAccessToken, from, reply.cards)
+            : reply.media
+              ? await sendInstagramMedia(igBusinessId, igAccessToken, from, anexoDeUrl(reply.media), reply.text)
+              : await sendInstagramText(igBusinessId, igAccessToken, from, reply.text, reply.options);
           await anotarEnvioDoBot(connection.agentId, "instagram", from, reply.text, envio);
         }
       } catch (e) {

@@ -21,6 +21,10 @@ vi.mock("@/lib/server/sequences", () => ({ stopEnrollmentsOnReply: vi.fn() }));
 vi.mock("@/lib/server/outbound", () => ({ registerBroadcastReply: vi.fn() }));
 vi.mock("@/lib/server/leads", () => ({ marcarComoLead: vi.fn() }));
 vi.mock("@/lib/server/custom-fields", () => ({ carregarDefinicoes: vi.fn(async () => []) }));
+vi.mock("@/lib/server/storage", () => ({
+  caminhoDaOrg: (caminho: string, orgId: string) => caminho.startsWith(`${orgId}/`),
+  urlAssinada: vi.fn(async (caminho: string) => `https://storage.test/sign/${caminho}?token=t`),
+}));
 
 import { advanceConversation } from "./flow-engine";
 
@@ -229,10 +233,94 @@ describe("Bloco do Studio: mídia, link e localização", () => {
     const r = await advanceConversation({ ...base, text: "oi" });
     expect(r.messages).toEqual([
       { text: "Veja o catálogo\nhttps://exemplo.com/pro" },
-      { text: "Loja Centro\nRua A, 10\nhttps://www.google.com/maps?q=-26.9,-48.6" },
+      {
+        text: "Loja Centro\nRua A, 10\nhttps://www.google.com/maps?q=-26.9,-48.6",
+        location: { latitude: -26.9, longitude: -48.6, name: "Loja Centro", address: "Rua A, 10" },
+      },
       { text: "Av. B, 20\nhttps://www.google.com/maps/search/?api=1&query=Av.%20B%2C%2020" },
       { text: "Catálogo", media: { type: "document", url: "https://exemplo.com/catalogo.pdf", name: "catalogo.pdf" } },
       { text: "Escolha uma opção:", options: [{ id: "s", label: "Quero" }] },
     ]);
+  });
+});
+
+describe("Bloco do Studio: carrossel, localização, figurinha e upload", () => {
+  it("carrossel leva os cards e, no texto, a lista com links; card sem título e botão sem link ficam de fora", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(
+      fluxo({
+        blockContents: [
+          {
+            id: "c1",
+            type: "carousel",
+            cards: [
+              {
+                id: "k1",
+                title: "Plano {plano}",
+                description: "Tudo incluso",
+                imageUrl: "https://exemplo.com/pro.png",
+                buttons: [
+                  { id: "b1", label: "Assinar", url: "https://exemplo.com/assinar" },
+                  { id: "b2", label: "Ruim", url: "javascript:alert(1)" },
+                ],
+              },
+              { id: "k2", title: "Básico", imageUrl: "nao-e-url", buttons: [] },
+              { id: "k3", title: "  ", buttons: [] },
+            ],
+          },
+        ],
+      })
+    );
+    db.conversation.upsert.mockResolvedValue(parado(null, { plano: "Pro" }));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages[0]).toEqual({
+      text: "1. Plano Pro\nTudo incluso\nAssinar: https://exemplo.com/assinar\n\n2. Básico",
+      cards: [
+        { title: "Plano Pro", subtitle: "Tudo incluso", imageUrl: "https://exemplo.com/pro.png", buttons: [{ label: "Assinar", url: "https://exemplo.com/assinar" }] },
+        { title: "Básico", subtitle: undefined, imageUrl: undefined, buttons: [] },
+      ],
+    });
+  });
+
+  it("pedir localização: a pergunta sai com o pedido nativo e a resposta fica em {localizacao}", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(
+      fluxo({ blockContents: [{ id: "c1", type: "text", text: "Onde você está?" }], waitForReply: true, captureField: "location" })
+    );
+    db.conversation.upsert.mockResolvedValue(parado(null));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages).toEqual([{ text: "Onde você está?", requestLocation: true }]);
+
+    db.conversation.upsert.mockResolvedValue(parado("bloco"));
+    const pino = "[Localização] https://maps.google.com/?q=-26.9,-48.6";
+    expect(textos(await advanceConversation({ ...base, text: pino }))).toEqual(["Seguiu pelo padrão."]);
+    expect(gravado().variables.localizacao).toBe(pino);
+  });
+
+  it("pedir localização sem texto no conteúdo: pergunta padrão com o pedido", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(fluxo({ blockContents: [], waitForReply: true, captureField: "location" }));
+    db.conversation.upsert.mockResolvedValue(parado(null));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages).toEqual([{ text: "Pode me mandar a sua localização?", requestLocation: true }]);
+  });
+
+  it("figurinha sai sem legenda; arquivo enviado sai com link assinado e caminho; caminho de outra org não sai", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(
+      fluxo({
+        blockContents: [
+          { id: "c1", type: "media", mediaType: "sticker", url: "https://exemplo.com/oi.webp", text: "ignorada" },
+          { id: "c2", type: "media", mediaType: "image", path: "o1/2026/10/foto.png", fileName: "foto.png", text: "Foto" },
+          { id: "c3", type: "media", mediaType: "image", path: "outra/2026/10/foto.png" },
+        ],
+      })
+    );
+    db.conversation.upsert.mockResolvedValue(parado(null));
+    const r = await advanceConversation({ ...base, text: "oi" });
+    expect(r.messages.slice(0, 2)).toEqual([
+      { text: "", media: { type: "sticker", url: "https://exemplo.com/oi.webp" } },
+      {
+        text: "Foto",
+        media: { type: "image", url: "https://storage.test/sign/o1/2026/10/foto.png?token=t", name: "foto.png", path: "o1/2026/10/foto.png" },
+      },
+    ]);
+    expect(textos(r)).toEqual(["", "Foto", "Seguiu pelo padrão."]);
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/server/permissions";
 import { checkRateLimit } from "@/lib/server/rate-limit";
-import { classificarMime, MAX_MEDIA_BYTES, novoCaminho, urlDeUpload } from "@/lib/server/storage";
+import { prepararUpload } from "@/lib/server/storage";
 
 // Autoriza um upload de anexo e devolve a URL pra enviar o arquivo direto ao
 // storage. O arquivo NÃO passa por aqui: a Vercel recusa corpo acima de 4,5 MB,
@@ -21,34 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Muitos envios seguidos. Espere um instante." }, { status: 429 });
   }
 
-  const { name, mime, size } = await request.json().catch(() => ({}));
-  if (typeof mime !== "string" || typeof size !== "number") {
-    return NextResponse.json({ error: "Informe o tipo e o tamanho do arquivo." }, { status: 400 });
-  }
-  if (size <= 0 || size > MAX_MEDIA_BYTES) {
-    return NextResponse.json({ error: "O arquivo precisa ter até 16 MB." }, { status: 400 });
-  }
-
-  const classe = classificarMime(mime);
-  if (!classe) {
-    return NextResponse.json(
-      { error: "Este tipo de arquivo não é aceito. Use imagem, áudio, vídeo, PDF ou documento do Office." },
-      { status: 400 }
-    );
-  }
-
-  const path = novoCaminho(ctx.orgId, classe.ext);
-  const upload = await urlDeUpload(path);
-  if (!upload) {
-    return NextResponse.json({ error: "Não foi possível preparar o envio. Tente de novo." }, { status: 502 });
-  }
-
-  return NextResponse.json({
-    path,
-    type: classe.tipo,
-    mime,
-    name: typeof name === "string" ? name.slice(0, 200) : undefined,
-    uploadUrl: upload.url,
-    token: upload.token,
-  });
+  const r = await prepararUpload(ctx.orgId, await request.json().catch(() => ({})));
+  if ("erro" in r) return NextResponse.json({ error: r.erro }, { status: r.status });
+  return NextResponse.json(r);
 }

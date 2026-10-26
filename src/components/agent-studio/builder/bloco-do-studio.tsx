@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowDown, ArrowUp, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Plus, Trash2, Upload } from "lucide-react";
 import type { Node } from "@xyflow/react";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { generateId } from "@/lib/utils";
-import type { BlockAction, BlockCondition, BlockContent, FlowNodeData } from "./flow-node";
+import type { BlockAction, BlockCard, BlockCondition, BlockContent, FlowNodeData } from "./flow-node";
 import { getBlockDefault } from "./block-defaults";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { IconeDoBloco } from "./icone-do-bloco";
@@ -121,7 +121,13 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
     onChange({
       blockContents: [
         ...itens,
-        type === "typing" ? { id: generateId(), type, seconds: 2 } : type === "media" ? { id: generateId(), type, mediaType: "image" } : { id: generateId(), type },
+        type === "typing"
+          ? { id: generateId(), type, seconds: 2 }
+          : type === "media"
+            ? { id: generateId(), type, mediaType: "image" }
+            : type === "carousel"
+              ? { id: generateId(), type, cards: [novoCard()] }
+              : { id: generateId(), type },
       ],
     });
 
@@ -150,7 +156,7 @@ function ConteudoDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (pa
         </div>
       ))}
       <div className="grid grid-cols-2 gap-2">
-        {(["text", "media", "link", "location", "typing"] as const).map((t) => (
+        {(["text", "media", "link", "location", "carousel", "typing"] as const).map((t) => (
           <BotaoAdicionar key={t} onClick={() => adicionar(t)}>
             {ROTULO_DO_CONTEUDO[t]}
           </BotaoAdicionar>
@@ -200,13 +206,17 @@ const ROTULO_DO_CONTEUDO: Record<BlockContent["type"], string> = {
   media: "Mídia",
   link: "Link",
   location: "Localização",
+  carousel: "Carrossel",
 };
+
+const novoCard = (): BlockCard => ({ id: generateId(), title: "", buttons: [] });
 
 const TIPOS_DE_MIDIA: { value: NonNullable<BlockContent["mediaType"]>; label: string }[] = [
   { value: "image", label: "Imagem" },
   { value: "video", label: "Vídeo" },
   { value: "audio", label: "Áudio" },
   { value: "document", label: "Documento" },
+  { value: "sticker", label: "Figurinha" },
 ];
 
 /** Os campos de cada tipo de conteúdo. Texto aceita {variavel} em todos. */
@@ -228,7 +238,7 @@ function CamposDoConteudo({ c, n, mudar }: { c: BlockContent; n: number; mudar: 
     );
   }
   if (c.type === "media") {
-    const urlRuim = !!c.url?.trim() && !/^https?:\/\//i.test(c.url.trim()) && !c.url.trim().startsWith("{");
+    const urlRuim = !c.path && !!c.url?.trim() && !/^https?:\/\//i.test(c.url.trim()) && !c.url.trim().startsWith("{");
     return (
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
@@ -237,18 +247,32 @@ function CamposDoConteudo({ c, n, mudar }: { c: BlockContent; n: number; mudar: 
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </Select>
-          <Input aria-label={`Link do arquivo ${n}`} placeholder="https://… (link público)" value={c.url ?? ""} onChange={(e) => mudar({ url: e.target.value })} />
+          {c.path ? (
+            <span className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[10px] bg-raised pl-3 text-small text-text-secondary">
+              <span className="truncate">{c.fileName || "Arquivo enviado"}</span>
+              <BotaoPequeno rotulo={`Tirar o arquivo ${n}`} perigo onClick={() => mudar({ path: undefined, fileName: undefined })}>
+                <Trash2 size={13} aria-hidden="true" />
+              </BotaoPequeno>
+            </span>
+          ) : (
+            <Input aria-label={`Link do arquivo ${n}`} placeholder="https://… (link público)" value={c.url ?? ""} onChange={(e) => mudar({ url: e.target.value })} />
+          )}
         </div>
+        {!c.path && <EnviarArquivo n={n} tipo={c.mediaType ?? "image"} mudar={mudar} />}
         {urlRuim && <p className="text-caption text-warning">O link precisa começar com https://.</p>}
+        {c.mediaType === "sticker" && (
+          <p className="text-caption text-text-tertiary">Figurinha: imagem .webp de 512×512. Onde não existe figurinha, sai como imagem.</p>
+        )}
         {c.mediaType === "document" && (
           <Input aria-label={`Nome do arquivo ${n}`} placeholder="Nome que o cliente vê (ex: catalogo.pdf)" value={c.fileName ?? ""} onChange={(e) => mudar({ fileName: e.target.value || undefined })} />
         )}
-        {c.mediaType !== "audio" && (
+        {c.mediaType !== "audio" && c.mediaType !== "sticker" && (
           <Input aria-label={`Legenda ${n}`} placeholder="Legenda (opcional)" value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />
         )}
       </div>
     );
   }
+  if (c.type === "carousel") return <CamposDoCarrossel c={c} n={n} mudar={mudar} />;
   if (c.type === "link") {
     return (
       <div className="flex flex-col gap-2">
@@ -267,11 +291,123 @@ function CamposDoConteudo({ c, n, mudar }: { c: BlockContent; n: number; mudar: 
           <Input aria-label={`Latitude ${n}`} inputMode="decimal" placeholder="Latitude (opcional)" value={c.latitude ?? ""} onChange={(e) => mudar({ latitude: numero(e.target.value) })} />
           <Input aria-label={`Longitude ${n}`} inputMode="decimal" placeholder="Longitude (opcional)" value={c.longitude ?? ""} onChange={(e) => mudar({ longitude: numero(e.target.value) })} />
         </div>
-        <p className="text-caption text-text-tertiary">Sai como texto com o link do mapa.</p>
+        <p className="text-caption text-text-tertiary">
+          Com latitude e longitude, o WhatsApp recebe o pino no mapa; nos outros canais sai como texto com o link do mapa.
+        </p>
       </div>
     );
   }
   return <Textarea aria-label={`Texto ${n}`} rows={3} value={c.text ?? ""} onChange={(e) => mudar({ text: e.target.value })} />;
+}
+
+/** Sobe o arquivo direto para o storage privado; o motor manda com link assinado. */
+function EnviarArquivo({ n, tipo, mudar }: { n: number; tipo: NonNullable<BlockContent["mediaType"]>; mudar: (parte: Partial<BlockContent>) => void }) {
+  const [estado, setEstado] = React.useState<{ enviando: boolean; erro?: string }>({ enviando: false });
+  const aceita = tipo === "sticker" ? "image/webp" : tipo === "document" ? ".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx" : `${tipo}/*`;
+
+  async function enviar(file: File) {
+    setEstado({ enviando: true });
+    try {
+      const res = await fetch("/api/flows/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, mime: file.type, size: file.size }),
+      });
+      const auth = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(auth.error ?? "Não foi possível enviar o arquivo.");
+      const form = new FormData();
+      form.append("cacheControl", "3600");
+      form.append("", file);
+      const up = await fetch(auth.uploadUrl, { method: "PUT", body: form });
+      if (!up.ok) throw new Error("O envio do arquivo falhou.");
+      // Figurinha é .webp, que o storage classifica como imagem: o tipo escolhido manda.
+      const mediaType = tipo === "sticker" ? "sticker" : (auth.type as BlockContent["mediaType"]);
+      mudar({ path: auth.path, url: undefined, fileName: file.name, mediaType });
+      setEstado({ enviando: false });
+    } catch (e) {
+      setEstado({ enviando: false, erro: e instanceof Error ? e.message : "Não foi possível enviar o arquivo." });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-border-default text-small font-medium text-text-secondary transition-colors focus-within:border-accent-solid hover:border-accent-solid hover:text-text-primary">
+        <Upload size={14} aria-hidden="true" />
+        {estado.enviando ? "Enviando…" : "Ou envie um arquivo (até 16 MB)"}
+        <input
+          type="file"
+          className="sr-only"
+          accept={aceita}
+          aria-label={`Enviar arquivo ${n}`}
+          disabled={estado.enviando}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void enviar(f);
+          }}
+        />
+      </label>
+      {estado.erro && <p role="alert" className="text-caption text-danger">{estado.erro}</p>}
+    </div>
+  );
+}
+
+/** Cards do carrossel: imagem, título, descrição e até 3 botões de link. */
+function CamposDoCarrossel({ c, n, mudar }: { c: BlockContent; n: number; mudar: (parte: Partial<BlockContent>) => void }) {
+  const cards = c.cards ?? [];
+  const mudarCard = (i: number, parte: Partial<BlockCard>) => mudar({ cards: cards.map((k, j) => (j === i ? { ...k, ...parte } : k)) });
+  return (
+    <div className="flex flex-col gap-2">
+      {cards.map((k, i) => {
+        const botoes = k.buttons ?? [];
+        const mudarBotao = (b: number, parte: Partial<{ label: string; url: string }>) =>
+          mudarCard(i, { buttons: botoes.map((x, j) => (j === b ? { ...x, ...parte } : x)) });
+        return (
+          <div key={k.id} className="flex flex-col gap-2 rounded-[12px] border border-border-subtle p-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-caption font-medium text-text-tertiary">Card {i + 1}</span>
+              <span className="flex items-center">
+                <BotaoPequeno rotulo={`Subir o card ${i + 1}`} onClick={() => mudar({ cards: mover(cards, i, -1) })} disabled={i === 0}>
+                  <ArrowUp size={13} aria-hidden="true" />
+                </BotaoPequeno>
+                <BotaoPequeno rotulo={`Descer o card ${i + 1}`} onClick={() => mudar({ cards: mover(cards, i, 1) })} disabled={i === cards.length - 1}>
+                  <ArrowDown size={13} aria-hidden="true" />
+                </BotaoPequeno>
+                <BotaoPequeno rotulo={`Apagar o card ${i + 1}`} perigo onClick={() => mudar({ cards: cards.filter((_, j) => j !== i) })}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </BotaoPequeno>
+              </span>
+            </div>
+            <Input aria-label={`Imagem do card ${i + 1} do carrossel ${n}`} placeholder="Link da imagem (https://…)" value={k.imageUrl ?? ""} onChange={(e) => mudarCard(i, { imageUrl: e.target.value || undefined })} />
+            <Input aria-label={`Título do card ${i + 1} do carrossel ${n}`} placeholder="Título" maxLength={80} value={k.title} onChange={(e) => mudarCard(i, { title: e.target.value })} />
+            <Input aria-label={`Descrição do card ${i + 1} do carrossel ${n}`} placeholder="Descrição (opcional)" maxLength={80} value={k.description ?? ""} onChange={(e) => mudarCard(i, { description: e.target.value || undefined })} />
+            {botoes.map((b, j) => (
+              <div key={b.id} className="flex gap-1.5">
+                <Input aria-label={`Texto do botão ${j + 1} do card ${i + 1}`} placeholder="Botão" maxLength={20} className="w-[110px] shrink-0" value={b.label} onChange={(e) => mudarBotao(j, { label: e.target.value })} />
+                <Input aria-label={`Link do botão ${j + 1} do card ${i + 1}`} placeholder="https://…" value={b.url} onChange={(e) => mudarBotao(j, { url: e.target.value })} />
+                <BotaoPequeno rotulo={`Apagar o botão ${j + 1} do card ${i + 1}`} perigo onClick={() => mudarCard(i, { buttons: botoes.filter((_, x) => x !== j) })}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </BotaoPequeno>
+              </div>
+            ))}
+            {botoes.length < 3 && (
+              <button
+                type="button"
+                onClick={() => mudarCard(i, { buttons: [...botoes, { id: generateId(), label: "", url: "" }] })}
+                className="flex items-center gap-1 self-start text-caption font-medium text-accent-fg"
+              >
+                <Plus size={12} aria-hidden="true" /> Botão com link
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {cards.length < 10 && <BotaoAdicionar onClick={() => mudar({ cards: [...cards, novoCard()] })}>Card</BotaoAdicionar>}
+      <p className="text-caption text-text-tertiary">
+        Instagram, Messenger e o chat do site mostram os cards. WhatsApp e Telegram recebem uma lista com os links.
+      </p>
+    </div>
+  );
 }
 
 function CondicoesDoBloco({ data, onChange }: { data: FlowNodeData; onChange: (patch: Partial<FlowNodeData>) => void }) {

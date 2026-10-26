@@ -2,7 +2,7 @@
 // "server-only": o motor, a API de leads e a tela usam exatamente a mesma regra.
 import { normalizarValor, type DefinicaoDeCampo } from "@/lib/custom-fields";
 
-export type CaptureField = "text" | "name" | "email" | "phone" | "custom";
+export type CaptureField = "text" | "name" | "email" | "phone" | "custom" | "location";
 
 /** Id da porta "não respondeu certo" do bloco Captura. Mora aqui (e não em
  * flow-node.tsx, que é "use client") porque o motor no servidor também usa. */
@@ -14,6 +14,7 @@ export const CAPTURE_FIELDS: { value: CaptureField; label: string }[] = [
   { value: "email", label: "E-mail" },
   { value: "phone", label: "Telefone / WhatsApp" },
   { value: "custom", label: "Campo do contato" },
+  { value: "location", label: "Localização" },
 ];
 
 export const MENSAGEM_DE_ERRO: Record<CaptureField, string> = {
@@ -22,6 +23,7 @@ export const MENSAGEM_DE_ERRO: Record<CaptureField, string> = {
   email: "Esse e-mail não parece certo. Pode conferir e mandar de novo? Ex.: nome@empresa.com",
   phone: "Esse telefone não parece certo. Manda com DDD, por favor. Ex.: (11) 98765-4321",
   custom: "Não consegui entender essa resposta. Pode mandar de novo?",
+  location: "Pode mandar a sua localização ou o endereço?",
 };
 
 /** Onde a resposta fica guardada. nome/email/telefone são os nomes que viram coluna do Contact. */
@@ -35,6 +37,8 @@ export function variavelDaCaptura(data: { captureField?: string; captureCustomKe
       return "telefone";
     case "custom":
       return data.captureCustomKey ?? "";
+    case "location":
+      return "localizacao";
     default:
       return data.variableName ?? "";
   }
