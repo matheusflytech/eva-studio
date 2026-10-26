@@ -164,7 +164,7 @@ describe("exportação", () => {
     expect(caminho).toBe("o1/exports/j1.csv");
     expect(mime).toBe("text/csv");
     const texto = corpo.toString("utf8");
-    expect(texto.startsWith("﻿id;external_id;name")).toBe(true);
+    expect(texto.startsWith("﻿id;name")).toBe(true);
     expect(texto.trim().split("\r\n")).toHaveLength(1501);
     expect(texto).toContain(";vip;");
     expect(estado.job).toMatchObject({ status: "completed", processed: 1500, buffer: "", result: { file_path: "o1/exports/j1.csv", rows: 1500 } });

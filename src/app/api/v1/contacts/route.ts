@@ -28,17 +28,16 @@ export const GET = rotaV1({ recurso: "contacts" }, async (ctx) => {
       prisma.contact.findMany({ where: cursor ? { AND: [where, cursor] } : where, include: INCLUDE_CONTATO, take, orderBy }),
     contar: () => prisma.contact.count({ where }),
   });
-  return NextResponse.json(corpoDeLista(await serializarContatos(ctx.orgId, pagina.itens, sp.get("external_source") || undefined), pagina));
+  return NextResponse.json(corpoDeLista(await serializarContatos(ctx.orgId, pagina.itens), pagina));
 });
 
-// POST /api/v1/contacts — cria. Já existe (mesmo external_id, e-mail ou
-// telefone)? 409 `duplicate` com o id existente; para atualizar, use
-// PUT /contacts/upsert ou PUT /contacts/by-external-id/{id}.
+// POST /api/v1/contacts — cria. Já existe (mesmo e-mail ou telefone)? 409
+// `duplicate` com o id existente; para atualizar, use PUT /contacts/upsert.
 export const POST = rotaV1({ recurso: "contacts" }, async (ctx) => {
   const corpo = ctx.corpo();
   conferirCampos(corpo, CAMPOS_DE_CONTATO);
   const dados = await lerDadosDeContato(ctx.orgId, corpo);
   const r = await upsertContato(ctx.orgId, dados, { modo: "create" });
   const contato = await carregarContato(ctx.orgId, r.id);
-  return NextResponse.json({ data: serializarContato(contato, dados.externalId ?? null) }, { status: 201 });
+  return NextResponse.json({ data: serializarContato(contato) }, { status: 201 });
 });

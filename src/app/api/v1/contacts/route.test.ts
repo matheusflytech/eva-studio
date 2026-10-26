@@ -24,7 +24,6 @@ vi.mock("@/lib/server/lixeira", async (original) => ({ ...(await original<object
 
 import { GET, POST } from "./route";
 import { PUT as UPSERT } from "./upsert/route";
-import { GET as LER_EXTERNO, PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
 import { PATCH, DELETE } from "./[id]/route";
 import { POST as LOTE } from "./batch/route";
 import { POST as RESTAURAR } from "./[id]/restore/route";
@@ -127,18 +126,20 @@ describe("envoltório da v1 (auth, escopo, limite, erro)", () => {
 });
 
 describe("POST /v1/contacts", () => {
-  it("cria com external_id e devolve telefone em +55", async () => {
+  it("cria e devolve telefone em +55; id de outro sistema não entra nem sai", async () => {
     db.contact.findFirst.mockResolvedValue(ficha());
-    const res = await POST(req("POST", { name: "Ana", email: "ANA@x.com", phone: "(11) 99999-8888", external_id: "erp-1" }), semParams);
+    const res = await POST(req("POST", { name: "Ana", email: "ANA@x.com", phone: "(11) 99999-8888" }), semParams);
     expect(res.status).toBe(201);
     expect(db.contact.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ email: "ana@x.com", phone: "5511999998888", source: "api", orgId: "o1" }) })
     );
-    expect(db.externalRef.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ create: expect.objectContaining({ entity: "contact", externalId: "erp-1", entityId: "c1", source: "api" }) })
-    );
     const { data } = await res.json();
-    expect(data).toMatchObject({ id: "c1", external_id: "erp-1", phone: "+5511999998888" });
+    expect(data).toMatchObject({ id: "c1", phone: "+5511999998888" });
+    expect(data).not.toHaveProperty("external_id");
+
+    const comExterno = await POST(req("POST", { name: "Ana", external_id: "erp-1" }), semParams);
+    expect((await comExterno.json()).error).toMatchObject({ code: "unknown_field", param: "external_id" });
+    expect(db.externalRef.upsert).not.toHaveBeenCalled();
   });
 
   it("e-mail que já existe: 409 duplicate com o id existente (não cria)", async () => {
@@ -202,34 +203,6 @@ describe("upsert", () => {
     const res = await UPSERT(req("PUT", { email: "ana@x.com" }), semParams);
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatchObject({ code: "ambiguous_match", details: { ids: ["c1", "c2"] } });
-  });
-
-  it("by-external-id: id externo conhecido atualiza; desconhecido cria e liga", async () => {
-    db.externalRef.findUnique.mockResolvedValueOnce({ entityId: "c1" });
-    db.externalRef.findMany.mockResolvedValue([{ entityId: "c1", externalId: "erp-9" }]);
-    const r1 = await POR_EXTERNO(req("PUT", { name: "Ana Paula" }), p({ externalId: "erp-9" }));
-    expect((await r1.json()).matched_by).toBe("external_id");
-    expect(db.contact.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { name: "Ana Paula" } });
-
-    db.externalRef.findMany.mockResolvedValue([]);
-    const r2 = await POR_EXTERNO(req("PUT", { name: "Novo" }), p({ externalId: "erp-10" }));
-    expect(r2.status).toBe(201);
-    expect(db.externalRef.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ externalId: "erp-10" }) }));
-  });
-
-  it("external_id da resposta é o da origem pedida (external_source)", async () => {
-    db.externalRef.findUnique.mockResolvedValueOnce({ entityId: "c1" });
-    db.externalRef.findMany.mockResolvedValueOnce([{ entityId: "c1", externalId: "hs-1" }]);
-    const res = await LER_EXTERNO(req("GET", undefined, { url: `${URL_BASE}/by-external-id/hs-1?external_source=hubspot` }), p({ externalId: "hs-1" }));
-    expect((await res.json()).data.external_id).toBe("hs-1");
-    expect(db.externalRef.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ source: "hubspot" }) }));
-  });
-
-  it("e-mail de uma ficha ligada a OUTRO external_id: 409 external_id_mismatch", async () => {
-    db.contact.findMany.mockResolvedValueOnce([{ id: "c1" }]);
-    db.externalRef.findMany.mockResolvedValueOnce([{ entityId: "c1", externalId: "erp-1" }]);
-    const res = await UPSERT(req("PUT", { email: "ana@x.com", external_id: "erp-2" }), semParams);
-    expect((await res.json()).error.code).toBe("external_id_mismatch");
   });
 });
 

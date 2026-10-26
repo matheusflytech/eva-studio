@@ -20,7 +20,6 @@ export const one = (item: unknown, extra: Record<string, unknown> = {}) => ({ da
 // contatos.ts → serializarContatos
 export const CONTACT = {
   id: CONTACT_ID,
-  external_id: "erp-123",
   name: "Ana Souza",
   email: "ana.souza@acme.com.br",
   phone: "+5511999998888",
@@ -47,7 +46,6 @@ export const CONTACT = {
 // empresas.ts → serializarEmpresas
 export const COMPANY = {
   id: COMPANY_ID,
-  external_id: "erp-c1",
   name: "ACME Ltda",
   cnpj: "11222333000181",
   sector: "Indústria",
@@ -69,7 +67,6 @@ export const COMPANY = {
 // negocios.ts → serializarNegocios
 export const DEAL = {
   id: DEAL_ID,
-  external_id: "erp-d77",
   name: "Contrato anual ACME",
   description: "Renovação com upgrade de plano.",
   category: "renovacao",
@@ -96,7 +93,7 @@ export const DEAL = {
 // lixeira.ts → apagarPelaApi / restaurar
 export const deleted = (id: string) => one({ id, deleted: true, trash: { expires_at: "2026-11-19T14:32:10.000Z" } });
 export const restored = (id: string, warnings: string[] = []) => one({ id, restored: true, warnings });
-export const tombstone = (id: string, external_id: string) => list({ id, external_id, deleted_at: "2026-10-20T14:32:10.000Z" });
+export const tombstone = (id: string) => list({ id, deleted_at: "2026-10-20T14:32:10.000Z" });
 
 // funis.ts → serializarEtapa / serializarFunil (deal_count só nas respostas de funil)
 const stage = (id: number, name: string, position: number, probability: number, type: string, deal_count: number) => ({
@@ -293,5 +290,5 @@ export function pathExamples(path: string): Record<string, string> {
     pipelines: "1",
   };
   const resource = path.split("/")[1];
-  return { id: ids[resource] ?? "{id}", stageId: "4", contactId: CONTACT_ID, externalId: resource === "companies" ? "erp-c1" : resource === "deals" ? "erp-d77" : "erp-123" };
+  return { id: ids[resource] ?? "{id}", stageId: "4", contactId: CONTACT_ID };
 }

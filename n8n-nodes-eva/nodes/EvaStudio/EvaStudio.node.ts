@@ -73,8 +73,6 @@ const camposDeContato: INodeProperties[] = [
 	noCorpo('E-Mail', 'email', { placeholder: 'ana@empresa.com' }),
 	noCorpo('Telefone', 'phone', { placeholder: '5511999998888' }),
 	noCorpo('Cargo', 'job_title'),
-	noCorpo('ID Externo', 'external_id', { description: 'Seu ID no outro sistema (ERP, e-commerce). O upsert acha o contato por ele primeiro.' }),
-	noCorpo('Origem Do ID Externo', 'external_source', { placeholder: 'omie' }),
 	noCorpo('ID Da Empresa', 'company_id'),
 	noCorpo('ID Do Responsável', 'owner_id'),
 	noCorpo('Observações', 'notes', { typeOptions: { rows: 3 } }),
@@ -114,7 +112,6 @@ const camposDeNegocio: INodeProperties[] = [
 	noCorpo('ID Da Empresa', 'company_id'),
 	noCorpo('ID Do Responsável', 'owner_id'),
 	noCorpo('Previsão De Fechamento', 'expected_closing_at', { type: 'dateTime' }),
-	noCorpo('ID Externo', 'external_id'),
 	noCorpo('Descrição', 'description', { typeOptions: { rows: 3 } }),
 	{
 		displayName: 'Campos Personalizados (JSON)',
@@ -160,7 +157,7 @@ const propriedades: INodeProperties[] = [
 		default: 'upsert',
 		options: [
 			{ name: 'Create', value: 'create', action: 'Create a contact', routing: { request: { method: 'POST', url: '/contacts' }, output: { postReceive: [{ type: 'rootProperty', properties: { property: 'data' } }] } } },
-			{ name: 'Create or Update', value: 'upsert', action: 'Create or update a contact', description: 'Acha por ID externo, e-mail ou telefone; cria se não achar', routing: { request: { method: 'PUT', url: '/contacts/upsert' } } },
+			{ name: 'Create or Update', value: 'upsert', action: 'Create or update a contact', description: 'Acha por e-mail ou telefone; cria se não achar', routing: { request: { method: 'PUT', url: '/contacts/upsert' } } },
 			{ name: 'Get', value: 'get', action: 'Get a contact', routing: { request: { method: 'GET', url: '=/contacts/{{$parameter.id}}' }, output: { postReceive: [{ type: 'rootProperty', properties: { property: 'data' } }] } } },
 			{ name: 'Get Many', value: 'getAll', action: 'Get many contacts', routing: { request: { method: 'GET', url: '/contacts' }, output: { postReceive: [{ type: 'rootProperty', properties: { property: 'data' } }] } } },
 			{ name: 'Update', value: 'update', action: 'Update a contact', routing: { request: { method: 'PATCH', url: '=/contacts/{{$parameter.id}}' }, output: { postReceive: [{ type: 'rootProperty', properties: { property: 'data' } }] } } },

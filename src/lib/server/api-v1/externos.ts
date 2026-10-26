@@ -73,7 +73,7 @@ export async function externosDe(
 }
 
 export function serializarExclusao(r: { entityId: string; externalId: string; deletedAt: Date; id: string }) {
-  return { id: r.entityId, external_id: r.externalId || null, deleted_at: r.deletedAt.toISOString() };
+  return { id: r.entityId, deleted_at: r.deletedAt.toISOString() };
 }
 
 /** GET /v1/<entidade>/deleted?since= — o que sumiu, para a sincronização apagar do outro lado. */

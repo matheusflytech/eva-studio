@@ -38,7 +38,6 @@ import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { POST as MOVER } from "./[id]/move/route";
 import { POST as GANHAR } from "./[id]/won/route";
 import { GET as LER_UM, PATCH } from "./[id]/route";
-import { PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
 
 const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/deals") =>
   new Request(url, {
@@ -93,18 +92,16 @@ beforeEach(() => {
 describe("POST /v1/deals", () => {
   it("cria por createDeal com origem api e amount em centavos; amount em reais é apelido", async () => {
     db.contact.count.mockResolvedValue(1);
-    const res = await POST(req("POST", { name: "Proposta", amount: "1.500,50", contact_id: "c1", external_id: "erp-d1" }), semParams);
+    const res = await POST(req("POST", { name: "Proposta", amount: "1.500,50", contact_id: "c1" }), semParams);
     expect(res.status).toBe(201);
     expect(crm.createDeal).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: "o1", amountCents: 150050, contactId: "c1", origem: "api", pipelineId: "p1", stageId: "s1" })
     );
-    expect(db.externalRef.upsert).toHaveBeenCalled();
   });
 
-  it("external_id já usado: 409 duplicate; contato de outra org: 404", async () => {
-    db.externalRef.findUnique.mockResolvedValueOnce({ entityId: "d9" });
+  it("external_id não é aceito: 400 unknown_field; contato de outra org: 404", async () => {
     const r1 = await POST(req("POST", { name: "X", external_id: "erp-d1" }), semParams);
-    expect((await r1.json()).error).toMatchObject({ code: "duplicate", details: { existing_id: "d9" } });
+    expect((await r1.json()).error).toMatchObject({ code: "unknown_field", param: "external_id" });
     db.contact.count.mockResolvedValue(0);
     const r2 = await POST(req("POST", { name: "X", contact_ids: ["c-outra-org"] }), semParams);
     expect(r2.status).toBe(404);
@@ -226,21 +223,6 @@ describe("mover etapa", () => {
     const res = await PATCH(req("PATCH", { stage_id: "2", custom_fields: { kwh: "muito" } }), p({ id: "d1" }));
     expect(res.status).toBe(422);
     expect(crm.moveDealStage).not.toHaveBeenCalled();
-    expect(db.deal.update).not.toHaveBeenCalled();
-  });
-});
-
-describe("PUT /v1/deals/by-external-id", () => {
-  it("existente: atualiza; nada mudou: unchanged", async () => {
-    db.externalRef.findUnique.mockResolvedValue({ entityId: "d1" });
-    db.externalRef.findMany.mockResolvedValue([{ entityId: "d1", externalId: "erp-d1" }]);
-    const r1 = await POR_EXTERNO(req("PUT", { amount_cents: 5000 }), p({ externalId: "erp-d1" }));
-    expect((await r1.json()).result).toBe("updated");
-    expect(db.deal.update).toHaveBeenCalledWith({ where: { id: "d1" }, data: { amountCents: 5000 } });
-
-    db.deal.update.mockClear();
-    const r2 = await POR_EXTERNO(req("PUT", { amount_cents: 1000 }), p({ externalId: "erp-d1" }));
-    expect((await r2.json()).result).toBe("unchanged");
     expect(db.deal.update).not.toHaveBeenCalled();
   });
 });

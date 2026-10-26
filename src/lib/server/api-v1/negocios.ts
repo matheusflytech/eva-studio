@@ -13,7 +13,6 @@ import { ErroApi, iso } from "./http";
 import {
   boolOpc,
   dataOpc,
-  externalIdOpc,
   idOpc,
   inteiroOpc,
   listaDeIdsOpc,
@@ -43,10 +42,9 @@ export const INCLUDE_NEGOCIO = {
 
 export type LinhaDeNegocio = Prisma.DealGetPayload<{ include: typeof INCLUDE_NEGOCIO }>;
 
-export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null = null) {
+export function serializarNegocio(d: LinhaDeNegocio) {
   return {
     id: d.id,
-    external_id: externalId,
     name: d.name,
     description: d.description,
     category: d.category,
@@ -71,9 +69,9 @@ export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null =
   };
 }
 
-export async function serializarNegocios(orgId: string, linhas: LinhaDeNegocio[], source?: string) {
-  const externos = await externosDe(orgId, "deal", linhas.map((d) => d.id), source);
-  return linhas.map((d) => serializarNegocio(d, externos.get(d.id) ?? null));
+// Assíncrono por compatibilidade com quem chama (antes buscava o id externo).
+export async function serializarNegocios(_orgId: string, linhas: LinhaDeNegocio[]) {
+  return linhas.map(serializarNegocio);
 }
 
 export async function carregarNegocio(orgId: string, id: string) {
@@ -97,8 +95,6 @@ export const CAMPOS_DE_NEGOCIO = [
   "contact_id",
   "contact_ids",
   "custom_fields",
-  "external_id",
-  "external_source",
 ] as const;
 
 export const CAMPOS_DE_PATCH_DE_NEGOCIO = [
@@ -118,8 +114,6 @@ export const CAMPOS_DE_PATCH_DE_NEGOCIO = [
   "company_id",
   "owner_id",
   "custom_fields",
-  "external_id",
-  "external_source",
   // Regras de etapa: motivo estruturado da perda e "Reabrir".
   "lost_reason_id",
   "lost_note",
@@ -185,7 +179,6 @@ export async function lerDadosDeNegocio(orgId: string, corpo: Corpo): Promise<Da
   const varios = listaDeIdsOpc(corpo, "contact_ids", 50);
   if (um || varios) d.contactIds = [...new Set([...(um ? [um] : []), ...(varios ?? [])])];
   d.customFields = objetoOpc(corpo, "custom_fields");
-  d.externalId = externalIdOpc(corpo);
 
   const erroRef = await conferirReferencias(orgId, { companyId: d.companyId, ownerId: d.ownerId });
   if (erroRef) {
@@ -496,8 +489,6 @@ export const FILTROS_DE_NEGOCIO = [
   "company",
   "contact",
   "status",
-  "external_id",
-  "external_source",
   "archived",
 ] as const;
 
@@ -520,10 +511,5 @@ export async function whereDeNegocios(orgId: string, sp: URLSearchParams): Promi
   const arquivado = lerBooleano(sp, "archived");
   if (arquivado === true) and.push({ archivedAt: { not: null } });
   if (arquivado === false) and.push({ archivedAt: null });
-  const externo = sp.get("external_id");
-  if (externo) {
-    const id = await idPorExterno(orgId, "deal", externo, sp.get("external_source") || "api");
-    and.push({ id: id ?? "__nenhum__" });
-  }
   return { AND: and };
 }

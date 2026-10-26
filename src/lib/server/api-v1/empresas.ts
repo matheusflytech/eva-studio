@@ -4,7 +4,7 @@ import type { Company, Prisma } from "@/generated/prisma/client";
 import { conferirReferencias, type Corpo } from "@/lib/server/api-validacao";
 import { cnpjValido, tamanhoDaEmpresa } from "@/lib/server/cnpj";
 import { ErroApi, iso } from "./http";
-import { externalIdOpc, idOpc, sourceOpc, textoOpc } from "./entrada";
+import { idOpc, sourceOpc, textoOpc } from "./entrada";
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerDataDaConsulta } from "./paginacao";
 import { publicarEvento } from "@/lib/server/eventos/barramento";
@@ -16,10 +16,9 @@ import { fotoDoRegistro, publicarAlteracao } from "@/lib/server/eventos/alteraco
 // no Brasil), número de funcionários inteiro, responsável da própria org.
 // ---------------------------------------------------------------------------
 
-export function serializarEmpresa(c: Company, externalId: string | null = null) {
+export function serializarEmpresa(c: Company) {
   return {
     id: c.id,
-    external_id: externalId,
     name: c.name,
     cnpj: c.cnpj,
     sector: c.sector,
@@ -39,9 +38,9 @@ export function serializarEmpresa(c: Company, externalId: string | null = null) 
   };
 }
 
-export async function serializarEmpresas(orgId: string, linhas: Company[], source?: string) {
-  const externos = await externosDe(orgId, "company", linhas.map((c) => c.id), source);
-  return linhas.map((c) => serializarEmpresa(c, externos.get(c.id) ?? null));
+// Assíncrono por compatibilidade com quem chama (antes buscava o id externo).
+export async function serializarEmpresas(_orgId: string, linhas: Company[]) {
+  return linhas.map(serializarEmpresa);
 }
 
 export async function carregarEmpresa(orgId: string, id: string) {
@@ -68,8 +67,6 @@ export const CAMPOS_DE_EMPRESA = [
   "size",
   "uf",
   "owner_id",
-  "external_id",
-  "external_source",
   ...Object.values(TEXTOS).map(([c]) => c),
 ] as const;
 
@@ -98,7 +95,6 @@ export async function lerDadosDeEmpresa(orgId: string, corpo: Corpo): Promise<Da
   if (size === "invalido") throw new ErroApi(400, "invalid_parameter", "size precisa ser um inteiro (funcionários).", { param: "size" });
   d.size = size;
   d.ownerId = idOpc(corpo, "owner_id");
-  d.externalId = externalIdOpc(corpo);
   const erroRef = await conferirReferencias(orgId, { ownerId: d.ownerId });
   if (erroRef) throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, { param: "owner_id" });
   return d;
@@ -173,21 +169,11 @@ export async function upsertEmpresa(orgId: string, d: DadosDeEmpresa) {
     const c = await criarEmpresa(orgId, d);
     return { id: c.id, result: "created" as const, matchedBy };
   }
-  // Achou pelo CNPJ uma empresa já ligada a OUTRO id externo: trocar o vínculo
-  // em silêncio misturaria dois registros do outro lado (mesma regra do contato).
-  if (d.externalId && matchedBy === "cnpj") {
-    const atual = (await externosDe(orgId, "company", [id], d.source)).get(id);
-    if (atual && atual !== d.externalId) {
-      throw new ErroApi(409, "external_id_mismatch", "A empresa com esse CNPJ já está ligada a outro external_id.", {
-        details: { existing_id: id, existing_external_id: atual, matched_by: "cnpj" },
-      });
-    }
-  }
   const { mudou } = await atualizarEmpresa(orgId, id, d);
   return { id, result: mudou ? ("updated" as const) : ("unchanged" as const), matchedBy };
 }
 
-export const FILTROS_DE_EMPRESA = ["updated_since", "cnpj", "owner", "external_id", "external_source", "name"] as const;
+export const FILTROS_DE_EMPRESA = ["updated_since", "cnpj", "owner", "name"] as const;
 
 export async function whereDeEmpresas(orgId: string, sp: URLSearchParams): Promise<Prisma.CompanyWhereInput> {
   const and: Prisma.CompanyWhereInput[] = [{ orgId }];
@@ -196,10 +182,5 @@ export async function whereDeEmpresas(orgId: string, sp: URLSearchParams): Promi
   if (sp.get("cnpj")) and.push({ cnpj: sp.get("cnpj")!.replace(/\D/g, "") });
   if (sp.get("owner")) and.push({ ownerId: sp.get("owner")! });
   if (sp.get("name")) and.push({ name: { contains: sp.get("name")!, mode: "insensitive" } });
-  const externo = sp.get("external_id");
-  if (externo) {
-    const id = await idPorExterno(orgId, "company", externo, sp.get("external_source") || "api");
-    and.push({ id: id ?? "__nenhum__" });
-  }
   return { AND: and };
 }

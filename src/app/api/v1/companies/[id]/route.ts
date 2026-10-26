@@ -25,7 +25,7 @@ export const PATCH = rotaV1<P>({ recurso: "companies" }, async (ctx, { id }) => 
   await carregarEmpresa(ctx.orgId, id);
   const dados = await lerDadosDeEmpresa(ctx.orgId, corpo);
   await atualizarEmpresa(ctx.orgId, id, dados);
-  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, id)], dados.source);
+  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, id)]);
   return NextResponse.json({ data });
 });
 
