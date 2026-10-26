@@ -29,8 +29,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
   const from = de ? inicioDoDia(de) : new Date(to.getTime() - 7 * 86_400_000);
   if (from >= to) return NextResponse.json({ error: "O início precisa ser antes do fim." }, { status: 400 });
 
-  const flow = await prisma.agentFlow.findUnique({ where: { agentId }, select: { nodes: true } });
-  const nos = (Array.isArray(flow?.nodes) ? flow.nodes : []) as { id: string; data?: { label?: string } }[];
+  // Blocos do principal e dos fluxos extras: o funil conta a conversa em qualquer um.
+  const [flow, subfluxos] = await Promise.all([
+    prisma.agentFlow.findUnique({ where: { agentId }, select: { nodes: true } }),
+    prisma.agentSubflow.findMany({ where: { agentId }, select: { nodes: true }, orderBy: { position: "asc" } }),
+  ]);
+  const nos = [flow?.nodes, ...subfluxos.map((s) => s.nodes)].flatMap((n) => (Array.isArray(n) ? n : [])) as { id: string; data?: { label?: string } }[];
 
   const relatorio = await gerarRelatorio(
     { agentId, from, to, channel: (q.get("channel") ?? "").slice(0, 50) },

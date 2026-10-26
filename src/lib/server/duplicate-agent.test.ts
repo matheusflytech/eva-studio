@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const tx = vi.hoisted(() => ({
   agent: { create: vi.fn() },
   agentFlow: { create: vi.fn() },
+  agentSubflow: { createMany: vi.fn() },
   agentVariable: { createMany: vi.fn() },
   agentTrigger: { createMany: vi.fn() },
   knowledgeDoc: { create: vi.fn() },
@@ -34,7 +35,8 @@ const origem = {
   embeddingProvider: "openai",
   embeddingCredentialId: "cred1",
   embeddingModel: "text-embedding-3-small",
-  flow: { agentId: "a1", nodes: [{ id: "n1" }], edges: [] },
+  flow: { agentId: "a1", nodes: [{ id: "n1" }, { id: "ir", data: { iconKey: "go-to-flow", targetFlowId: "f1" } }], edges: [] },
+  subflows: [{ id: "f1", agentId: "a1", name: "Vendas", keywords: ["preço"], position: 0, nodes: [{ id: "s1" }], edges: [] }],
   variables: [{ id: "v1", agentId: "a1", name: "cpf", unit: "" }],
   triggers: [
     {
@@ -67,7 +69,7 @@ describe("duplicateAgent", () => {
 
     const dados = tx.agent.create.mock.calls[0][0].data;
     expect(dados).toMatchObject({ orgId: "o1", name: "Vendedor Virtual (cópia)", status: "paused", widgetEnabled: false, instructions: "Atenda." });
-    expect(tx.agentFlow.create).toHaveBeenCalledWith({ data: { agentId: "a2", nodes: [{ id: "n1" }], edges: [] } });
+    expect(tx.agentFlow.create).toHaveBeenCalledWith({ data: { agentId: "a2", nodes: [{ id: "n1" }, expect.objectContaining({ id: "ir" })], edges: [] } });
     expect(tx.agentVariable.createMany).toHaveBeenCalledWith({ data: [{ agentId: "a2", name: "cpf", unit: "" }] });
 
     const gatilho = tx.agentTrigger.createMany.mock.calls[0][0].data[0];
@@ -78,5 +80,15 @@ describe("duplicateAgent", () => {
     expect(tx.knowledgeDoc.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ agentId: "a2", fileName: "faq.pdf" }) }));
     // chunks: novo agente, novo doc, lidos do doc antigo
     expect(tx.$executeRaw.mock.calls[0].slice(1)).toEqual(["a2", "d2", "d1"]);
+  });
+
+  it("fluxos extras ganham id novo e o Ir para fluxo aponta para a cópia", async () => {
+    db.agent.findFirst.mockResolvedValue(origem);
+    await duplicateAgent("o1", "a1");
+    const copia = tx.agentSubflow.createMany.mock.calls[0][0].data[0];
+    expect(copia).toMatchObject({ agentId: "a2", name: "Vendas", keywords: ["preço"] });
+    expect(copia.id).not.toBe("f1");
+    const ir = tx.agentFlow.create.mock.calls[0][0].data.nodes.find((n: { id: string }) => n.id === "ir");
+    expect(ir.data.targetFlowId).toBe(copia.id);
   });
 });

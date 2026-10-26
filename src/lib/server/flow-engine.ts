@@ -53,6 +53,7 @@ import { marcarComoLead } from "@/lib/server/leads";
 import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "@/lib/formato-whatsapp";
 import { entenderAnexosDoWhatsApp, transcreverAudioDoWhatsApp, type AnexoGuardado } from "@/lib/server/anexos-whatsapp";
 import { caminhoDaOrg, urlAssinada } from "@/lib/server/storage";
+import { FLUXO_PRINCIPAL, fluxoDaPalavra } from "@/lib/subfluxos";
 
 /** Link assinado da mídia do Bloco: o canal baixa na hora; o site e os testes mostram por uma semana. */
 const VALIDADE_DA_MIDIA = 7 * 24 * 3600;
@@ -1491,14 +1492,40 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return { messages, status: "active" };
   }
 
-  const nodes = flow.nodes as unknown as Node<FlowNodeData>[];
-  const edges = flow.edges as unknown as Edge[];
+  // Vários fluxos (S4): o principal é o AgentFlow; os extras vêm junto para
+  // a palavra-chave e o "Ir para fluxo" trocarem de fluxo na mesma rodada.
+  const principal = { nodes: flow.nodes as unknown as Node<FlowNodeData>[], edges: flow.edges as unknown as Edge[] };
+  const subfluxos = await prisma.agentSubflow.findMany({
+    where: { agentId: input.agentId },
+    select: { id: true, name: true, nodes: true, edges: true, keywords: true },
+  });
+  let nodes = principal.nodes;
+  let edges = principal.edges;
+  let fluxoAtual: string | null = null;
+  /** Troca o fluxo em uso (null = principal). Fluxo que não existe mais: false, e nada muda. */
+  function usarFluxo(id: string | null): boolean {
+    if (!id) {
+      nodes = principal.nodes;
+      edges = principal.edges;
+      fluxoAtual = null;
+      return true;
+    }
+    const sub = subfluxos.find((s) => s.id === id);
+    if (!sub) return false;
+    nodes = sub.nodes as unknown as Node<FlowNodeData>[];
+    edges = sub.edges as unknown as Edge[];
+    fluxoAtual = sub.id;
+    return true;
+  }
 
   const conversation = await prisma.conversation.upsert({
     where: { agentId_channel_contactId: { agentId: input.agentId, channel: input.channel, contactId: input.contactId } },
     create: { agentId: input.agentId, channel: input.channel, contactId: input.contactId, variables: {} },
     update: {},
   });
+  // Fluxo apagado com a conversa dentro: o bloco em que ela parou não existe
+  // mais em lugar nenhum, então ela recomeça pelo principal.
+  if (!usarFluxo(conversation.currentFlowId)) usarFluxo(null);
 
   // Conversa com humano: o agente fica mudo, mas a mensagem do cliente TEM que
   // ser registrada. Antes isto retornava aqui sem gravar nada — então enquanto
@@ -1627,6 +1654,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         },
         data: {
           currentNodeId: currentId,
+          currentFlowId: fluxoAtual,
           variables: variables as Prisma.InputJsonValue,
           status,
           updatedAt: new Date(),
@@ -1973,6 +2001,14 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   // andando pelo fluxo.
   const parkedNode = findNode(nodes, currentId);
   if (isGenuineInbound && parkedNode?.data.iconKey === "studio-block") delete variables.__wait_until;
+
+  /** Começo de um fluxo ("main" ou vazio no id = o principal). Fluxo que não existe: false. */
+  function entrarNoFluxo(id: string | null): boolean {
+    if (!usarFluxo(id === FLUXO_PRINCIPAL ? null : id)) return false;
+    const start = nodes.find((n) => n.data.iconKey === "start");
+    currentId = start ? nextNodeId(edges, start.id) : null;
+    return true;
+  }
   const inboundKind: InboundKind = input.event?.kind ?? "dm";
   const gatilho =
     isGenuineInbound && podeAvaliarGatilho(parkedNode?.data.iconKey ?? null, inboundKind)
@@ -1983,13 +2019,23 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     await contarDisparo(gatilho.id);
     steps.push({ nodeId: `trigger:${gatilho.id}`, kind: "trigger", label: gatilho.name, ms: 0 });
     if (gatilho.replyText) messages.push({ text: interpolate(gatilho.replyText, variables) });
-    const alvo = gatilho.targetNodeId ? findNode(nodes, gatilho.targetNodeId) : null;
+    // O gatilho aponta para um bloco do fluxo principal.
+    const alvo = gatilho.targetNodeId ? findNode(principal.nodes, gatilho.targetNodeId) : null;
     if (!alvo) return finish(); // só resposta: a conversa fica onde estava
     delete variables.__wait_until;
+    usarFluxo(null);
     currentId = alvo.id; // o laço abaixo executa o bloco de destino
   } else if (inboundKind === "story_mention") {
     // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
     return finish();
+  } else if (isGenuineInbound && input.optionId === undefined && fluxoDaPalavra(input.text, subfluxos)) {
+    // Palavra-chave de um fluxo: vale de qualquer ponto (menos com atendente,
+    // que já parou lá em cima) e leva a conversa ao começo dele.
+    const destino = fluxoDaPalavra(input.text, subfluxos)!;
+    delete variables.__wait_until;
+    delete variables.__capture_tries;
+    steps.push({ nodeId: `flow:${destino}`, kind: "go-to-flow", label: subfluxos.find((s) => s.id === destino)?.name ?? "", output: "palavra-chave", ms: 0 });
+    entrarNoFluxo(destino);
   } else if (
     parkedNode?.data.iconKey === "studio-block" &&
     parkedNode.data.waitForReply &&
@@ -2107,9 +2153,8 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     delete variables.__wait_until;
     currentId = nextNodeId(edges, parkedNode.id);
   } else if (!parkedNode) {
-    // Conversa nova (ou já tinha encerrado) — recomeça do início.
-    const start = nodes.find((n) => n.data.iconKey === "start");
-    currentId = start ? nextNodeId(edges, start.id) : null;
+    // Conversa nova (ou já tinha encerrado) — recomeça do início do principal.
+    entrarNoFluxo(null);
   }
 
   for (let hops = 0; hops < MAX_HOPS && currentId; hops += 1) {
@@ -2260,7 +2305,23 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       pushStep(node);
       status = "ended";
       currentId = null;
+      usarFluxo(null);
       break;
+    }
+
+    if (kind === "go-to-flow") {
+      const alvo = node.data.targetFlowId?.trim() ?? "";
+      const nome = alvo === FLUXO_PRINCIPAL ? "Principal" : subfluxos.find((s) => s.id === alvo)?.name;
+      // Sem destino (ou destino apagado) a conversa para aqui em vez de cair
+      // num lugar que a pessoa não escolheu.
+      if (!alvo || !nome) {
+        pushStep(node, { error: alvo ? "o fluxo de destino não existe mais" : "sem fluxo de destino" });
+        currentId = null;
+        break;
+      }
+      pushStep(node, { output: nome });
+      entrarNoFluxo(alvo);
+      continue;
     }
 
     // Tipo desconhecido (ex: "start" alcançado de novo) — só segue em frente.

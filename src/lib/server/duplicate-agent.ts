@@ -10,7 +10,7 @@ import type { Prisma } from "@/generated/prisma/client";
 export async function duplicateAgent(orgId: string, agentId: string): Promise<{ id: string } | null> {
   const origem = await prisma.agent.findFirst({
     where: { id: agentId, orgId },
-    include: { flow: true, variables: true, triggers: true, knowledgeBase: true },
+    include: { flow: true, subflows: true, variables: true, triggers: true, knowledgeBase: true },
   });
   if (!origem) return null;
 
@@ -37,9 +37,30 @@ export async function duplicateAgent(orgId: string, agentId: string): Promise<{ 
       select: { id: true },
     });
 
+    // Fluxos extras ganham id novo; o "Ir para fluxo" de todos passa a apontar para as cópias.
+    const novoId = new Map(origem.subflows.map((s) => [s.id, crypto.randomUUID()]));
+    const remapear = (nodes: unknown) =>
+      (Array.isArray(nodes) ? nodes : []).map((n: { data?: { iconKey?: string; targetFlowId?: string } }) =>
+        n?.data?.iconKey === "go-to-flow" && n.data.targetFlowId && novoId.has(n.data.targetFlowId)
+          ? { ...n, data: { ...n.data, targetFlowId: novoId.get(n.data.targetFlowId) } }
+          : n
+      ) as Prisma.InputJsonValue;
     if (origem.flow) {
       await tx.agentFlow.create({
-        data: { agentId: novo.id, nodes: origem.flow.nodes as Prisma.InputJsonValue, edges: origem.flow.edges as Prisma.InputJsonValue },
+        data: { agentId: novo.id, nodes: remapear(origem.flow.nodes), edges: origem.flow.edges as Prisma.InputJsonValue },
+      });
+    }
+    if (origem.subflows.length) {
+      await tx.agentSubflow.createMany({
+        data: origem.subflows.map((s) => ({
+          id: novoId.get(s.id)!,
+          agentId: novo.id,
+          name: s.name,
+          keywords: s.keywords,
+          position: s.position,
+          nodes: remapear(s.nodes),
+          edges: s.edges as Prisma.InputJsonValue,
+        })),
       });
     }
     if (origem.variables.length) {

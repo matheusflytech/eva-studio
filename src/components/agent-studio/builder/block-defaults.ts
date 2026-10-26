@@ -238,6 +238,11 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     data: { label: "Esperar", kind: "Pausa", detail: "Quanto tempo esperar antes de continuar o fluxo.", waitDuration: 1, waitUnit: "minutos" },
   },
   {
+    key: "go-to-flow",
+    paletteLabel: "Ir para fluxo",
+    data: { label: "Ir para fluxo", kind: "Outro fluxo", detail: "Leva a conversa para o começo de outro fluxo do bot.", targetFlowId: "", hasSource: false },
+  },
+  {
     key: "end",
     paletteLabel: "Encerrar",
     data: { label: "Encerramento", kind: "Fim da conversa", hasSource: false },

@@ -46,6 +46,7 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
       { key: "capture", label: "Perguntar", hint: "Faz uma pergunta e guarda a resposta." },
       { key: "wait", label: "Esperar", hint: "Pausa antes de continuar o fluxo." },
       { key: "human", label: "Falar com atendente", hint: "Para o bot e chama uma pessoa." },
+      { key: "go-to-flow", label: "Ir para fluxo", hint: "Leva a conversa para outro fluxo do bot." },
       { key: "end", label: "Encerrar", hint: "Fecha a conversa." },
     ],
   },

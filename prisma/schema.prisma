@@ -165,6 +165,7 @@ model Agent {
   variables         AgentVariable[]
   knowledgeBase     KnowledgeDoc[]
   flow              AgentFlow?
+  subflows          AgentSubflow[]
   whatsappConnection WhatsAppConnection?
   metaConnection     MetaConnection?
   instagramConnection InstagramConnection?
@@ -281,6 +282,28 @@ model AgentFlow {
   @@map("eva_studio_agent_flows")
 }
 
+// Fluxos extras do bot ("Vendas", "Suporte"...). O fluxo de cima (AgentFlow)
+// continua sendo o principal. "Ir para fluxo" e a palavra-chave levam a
+// conversa para um destes; Conversation.currentFlowId guarda em qual ela está.
+// SQL: prisma/sql/2026-11-01-agent-subflows.sql.
+model AgentSubflow {
+  id        String   @id @default(uuid())
+  agentId   String
+  name      String
+  nodes     Json     @default("[]")
+  edges     Json     @default("[]")
+  // Mensagem igual a uma destas (sem acento, maiúscula ou espaço) abre o fluxo.
+  keywords  String[] @default([])
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, name])
+  @@map("eva_studio_agent_subflows")
+}
+
 // Conexão de WhatsApp via QR code (Baileys, não a API oficial da Meta) — o
 // worker (processo separado, rodando fora da Vercel) lê/escreve essa linha
 // pra gerenciar a sessão. creds/keys são o estado de autenticação do Baileys
@@ -332,6 +355,8 @@ model Conversation {
   channel              String // playground | whatsapp_qr | whatsapp_meta | instagram | website
   contactId            String // telefone/jid, id de sessão do Playground, ou id gerado no navegador do visitante (website)
   currentNodeId        String?
+  // Fluxo extra em que a conversa está (AgentSubflow.id); null = o principal.
+  currentFlowId        String?
   variables            Json      @default("{}")
   // active        = o agente responde
   // waiting_human = o agente passou e ninguem assumiu ainda (precisa de gente)
