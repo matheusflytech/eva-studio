@@ -24,7 +24,7 @@ export const GET = rotaV1({ recurso: "companies" }, async (ctx) => {
     buscar: ({ cursor, take, orderBy }) => prisma.company.findMany({ where: cursor ? { AND: [where, cursor] } : where, take, orderBy }),
     contar: () => prisma.company.count({ where }),
   });
-  return NextResponse.json(corpoDeLista(await serializarEmpresas(ctx.orgId, pagina.itens), pagina));
+  return NextResponse.json(corpoDeLista(await serializarEmpresas(ctx.orgId, pagina.itens, sp.get("external_source") || undefined), pagina));
 });
 
 // POST /api/v1/companies — CNPJ ou external_id já usados: 409 `duplicate`.

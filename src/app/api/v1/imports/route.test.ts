@@ -15,6 +15,7 @@ vi.mock("@/lib/server/storage", () => storage);
 
 import { POST } from "./route";
 import { POST as INICIAR } from "./[id]/start/route";
+import { GET as LER } from "./[id]/route";
 
 const req = (body: unknown, idem: string | null = "imp-1", url = "https://eva.test/api/v1/imports") =>
   new Request(url, {
@@ -99,5 +100,20 @@ describe("POST /v1/imports", () => {
     const ok = await INICIAR(req({}, null, "https://eva.test/api/v1/imports/j1/start"), { params: Promise.resolve({ id: "j1" }) });
     expect(ok.status).toBe(202);
     expect(db.bulkJob.update).toHaveBeenCalledWith({ where: { id: "j1" }, data: { status: "queued" } });
+  });
+});
+
+describe("escopo para ler a importação", () => {
+  const umJob = { params: Promise.resolve({ id: "j1" }) };
+  const ler = () => new Request("https://eva.test/api/v1/imports/j1", { headers: { authorization: "Bearer evs_live_abc" } });
+
+  it("imports:read lê; imports:write (chaves antigas) continua lendo; outro recurso: 403", async () => {
+    db.bulkJob.findFirst.mockResolvedValue(linha());
+    for (const scopes of [["imports:read"], ["imports:write"]]) {
+      db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes });
+      expect((await LER(ler(), umJob)).status).toBe(200);
+    }
+    db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes: ["exports:*"] });
+    expect((await LER(ler(), umJob)).status).toBe(403);
   });
 });

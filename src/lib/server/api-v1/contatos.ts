@@ -72,8 +72,8 @@ export function serializarContato(c: LinhaDeContato, externalId: string | null =
   };
 }
 
-export async function serializarContatos(orgId: string, linhas: LinhaDeContato[]) {
-  const externos = await externosDe(orgId, "contact", linhas.map((c) => c.id));
+export async function serializarContatos(orgId: string, linhas: LinhaDeContato[], source?: string) {
+  const externos = await externosDe(orgId, "contact", linhas.map((c) => c.id), source);
   return linhas.map((c) => serializarContato(c, externos.get(c.id) ?? null));
 }
 

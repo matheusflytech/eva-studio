@@ -26,7 +26,7 @@ export const PATCH = rotaV1<P>({ recurso: "contacts" }, async (ctx, { id }) => {
   await carregarContato(ctx.orgId, id);
   const dados = await lerDadosDeContato(ctx.orgId, corpo);
   await atualizarContato(ctx.orgId, id, dados);
-  const [data] = await serializarContatos(ctx.orgId, [await carregarContato(ctx.orgId, id)]);
+  const [data] = await serializarContatos(ctx.orgId, [await carregarContato(ctx.orgId, id)], dados.source);
   return NextResponse.json({ data });
 });
 

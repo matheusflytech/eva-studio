@@ -27,7 +27,7 @@ export const GET = rotaV1({ recurso: "deals" }, async (ctx) => {
       prisma.deal.findMany({ where: cursor ? { AND: [where, cursor] } : where, include: INCLUDE_NEGOCIO, take, orderBy }),
     contar: () => prisma.deal.count({ where }),
   });
-  return NextResponse.json(corpoDeLista(await serializarNegocios(ctx.orgId, pagina.itens), pagina));
+  return NextResponse.json(corpoDeLista(await serializarNegocios(ctx.orgId, pagina.itens, sp.get("external_source") || undefined), pagina));
 });
 
 // POST /api/v1/deals — cria. Com external_id já usado: 409 `duplicate`
@@ -37,6 +37,6 @@ export const POST = rotaV1({ recurso: "deals" }, async (ctx) => {
   conferirCampos(corpo, CAMPOS_DE_NEGOCIO);
   const dados = await lerDadosDeNegocio(ctx.orgId, corpo);
   const r = await upsertNegocio(ctx.orgId, dados, { modo: "create" });
-  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, r.id)]);
+  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, r.id)], dados.source);
   return NextResponse.json({ data }, { status: 201 });
 });

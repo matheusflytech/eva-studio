@@ -295,7 +295,7 @@ body={{ data: ME }} />
                   ["Dinheiro", <C key="c">amount_cents: 150000</C>, "Inteiro em centavos (R$ 1.500,00), com currency ao lado."],
                   ["Funil e etapa", <C key="c">pipeline_id: 1, stage_id: 3</C>, "Número no contrato, não UUID. Veja GET /pipelines."],
                   ["Outros ids", <C key="c">uuid</C>, "Contato, empresa, negócio, tarefa, nota, agente, etiqueta."],
-                  ["Seu id", <C key="c">external_id</C>, "Guarde o id do seu sistema e busque/atualize por ele em /by-external-id/{id}."],
+                  ["Seu id", <C key="c">external_id</C>, "Guarde o id do seu sistema e busque/atualize por ele em /by-external-id/{id}. Mais de um sistema? Use external_source; a resposta mostra o external_id dessa origem (padrão api)."],
                   ["PATCH", "Parcial", "Campo ausente não muda; null limpa."],
                   ["Campos e filtros", "Estritos", "Campo ou parâmetro desconhecido é erro 400 (unknown_field / unknown_parameter), nunca ignorado."],
                   ["Resposta", <C key="c">{"{ data }"}</C>, "Objeto em data; listas em { data, has_more, next_cursor }."],

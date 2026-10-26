@@ -35,6 +35,8 @@ export interface OpcoesDaRota {
   recurso: Recurso | null;
   /** Padrão: GET = read, o resto = write. */
   acao?: Acao;
+  /** Escopos extras que também liberam a rota (compatibilidade com chaves antigas). */
+  aceitaTambem?: readonly Acao[];
   /** "obrigatoria" em lote e importação. Padrão: opcional em POST/PATCH/PUT. */
   idempotencia?: "opcional" | "obrigatoria" | "nao";
 }
@@ -58,7 +60,8 @@ export function rotaV1<P extends Record<string, string> = Record<string, never>>
       }
 
       const acao: Acao = opcoes.acao ?? (request.method === "GET" ? "read" : "write");
-      if (opcoes.recurso && !escopoPermite(chave.scopes, opcoes.recurso, acao)) {
+      const recurso = opcoes.recurso;
+      if (recurso && ![acao, ...(opcoes.aceitaTambem ?? [])].some((a) => escopoPermite(chave.scopes, recurso, a))) {
         throw new ErroApi(403, "insufficient_scope", `Esta chave não tem o escopo ${opcoes.recurso}:${acao}.`, {
           details: { required: `${opcoes.recurso}:${acao}`, granted: chave.scopes },
         });

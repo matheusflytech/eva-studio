@@ -28,7 +28,7 @@ export const GET = rotaV1({ recurso: "contacts" }, async (ctx) => {
       prisma.contact.findMany({ where: cursor ? { AND: [where, cursor] } : where, include: INCLUDE_CONTATO, take, orderBy }),
     contar: () => prisma.contact.count({ where }),
   });
-  return NextResponse.json(corpoDeLista(await serializarContatos(ctx.orgId, pagina.itens), pagina));
+  return NextResponse.json(corpoDeLista(await serializarContatos(ctx.orgId, pagina.itens, sp.get("external_source") || undefined), pagina));
 });
 
 // POST /api/v1/contacts — cria. Já existe (mesmo external_id, e-mail ou

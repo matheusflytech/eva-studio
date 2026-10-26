@@ -24,7 +24,7 @@ vi.mock("@/lib/server/lixeira", async (original) => ({ ...(await original<object
 
 import { GET, POST } from "./route";
 import { PUT as UPSERT } from "./upsert/route";
-import { PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
+import { GET as LER_EXTERNO, PUT as POR_EXTERNO } from "./by-external-id/[externalId]/route";
 import { PATCH, DELETE } from "./[id]/route";
 import { POST as LOTE } from "./batch/route";
 import { POST as RESTAURAR } from "./[id]/restore/route";
@@ -214,6 +214,14 @@ describe("upsert", () => {
     const r2 = await POR_EXTERNO(req("PUT", { name: "Novo" }), p({ externalId: "erp-10" }));
     expect(r2.status).toBe(201);
     expect(db.externalRef.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ externalId: "erp-10" }) }));
+  });
+
+  it("external_id da resposta é o da origem pedida (external_source)", async () => {
+    db.externalRef.findUnique.mockResolvedValueOnce({ entityId: "c1" });
+    db.externalRef.findMany.mockResolvedValueOnce([{ entityId: "c1", externalId: "hs-1" }]);
+    const res = await LER_EXTERNO(req("GET", undefined, { url: `${URL_BASE}/by-external-id/hs-1?external_source=hubspot` }), p({ externalId: "hs-1" }));
+    expect((await res.json()).data.external_id).toBe("hs-1");
+    expect(db.externalRef.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ source: "hubspot" }) }));
   });
 
   it("e-mail de uma ficha ligada a OUTRO external_id: 409 external_id_mismatch", async () => {

@@ -10,9 +10,10 @@ type P = { externalId: string };
 
 export const GET = rotaV1<P>({ recurso: "companies" }, async (ctx, { externalId }) => {
   const sp = lerConsulta(ctx.url, ["external_source"]);
-  const id = await idPorExterno(ctx.orgId, "company", segmento(externalId), sp.get("external_source") || "api");
+  const source = sp.get("external_source") || "api";
+  const id = await idPorExterno(ctx.orgId, "company", segmento(externalId), source);
   if (!id) throw new ErroApi(404, "not_found", "Nenhuma empresa com esse external_id.");
-  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, id)]);
+  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, id)], source);
   return NextResponse.json({ data });
 });
 
@@ -28,6 +29,6 @@ export const PUT = rotaV1<P>({ recurso: "companies" }, async (ctx, { externalId 
   const dados = await lerDadosDeEmpresa(ctx.orgId, corpo);
   dados.externalId = id;
   const r = await upsertEmpresa(ctx.orgId, dados);
-  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, r.id)]);
+  const [data] = await serializarEmpresas(ctx.orgId, [await carregarEmpresa(ctx.orgId, r.id)], dados.source);
   return NextResponse.json({ data, result: r.result, matched_by: r.matchedBy }, { status: r.result === "created" ? 201 : 200 });
 });

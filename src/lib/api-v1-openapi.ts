@@ -249,7 +249,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       scope: "companies:write",
       body: { name: "ACME Ltda" },
       response: one(COMPANY, { result: "updated", matched_by: "cnpj" }),
-      errors: [[400, "invalid_parameter"], [400, "invalid_cnpj"], [409, "duplicate"], [409, "external_id_taken"]],
+      errors: [[400, "invalid_parameter"], [400, "invalid_cnpj"], [409, "external_id_mismatch"], [409, "duplicate"], [409, "external_id_taken"]],
     },
   },
   "/companies/deleted": {
@@ -373,8 +373,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       tag: "Negócios",
       summary: "Marcar como perdido",
       description:
-        "Motivo obrigatório: lost_reason_id (motivos do funil; sem motivos salvos, valem padrao:preco, padrao:concorrente, padrao:sem-resposta, " +
-        "padrao:sem-orcamento, padrao:timing e padrao:outro) ou lost_reason em texto; motivo que pede nota exige lost_note.",
+        "Motivo obrigatório: lost_reason_id (ids em GET /pipelines/{id}/lost-reasons) ou lost_reason em texto; motivo com requires_note exige lost_note.",
       scope: "deals:write",
       body: { lost_reason_id: "padrao:preco", lost_note: "" },
       response: one({ ...DEAL, stage_id: 6, status: "lost", probability: 0, lost_reason: "Preço", closed_at: "2026-10-21T10:00:00.000Z" }, { moved: true }),
@@ -591,6 +590,16 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       errors: [[400, "last_pipeline"], [400, "invalid_move_to"], [409, "move_to_required"], [404, "not_found"]],
     },
   },
+  "/pipelines/{id}/lost-reasons": {
+    get: {
+      tag: "Funis",
+      summary: "Motivos de perda do funil",
+      description: "O id vai em lost_reason_id (POST /deals/{id}/lost e /move). Funil sem motivos salvos usa os padrão (ids padrao:...).",
+      scope: "pipelines:read",
+      response: list({ id: "padrao:preco", label: "Preço", requires_note: false }),
+      errors: [[400, "invalid_parameter"], [404, "not_found"]],
+    },
+  },
   "/pipelines/{id}/stages": {
     post: {
       tag: "Funis",
@@ -646,7 +655,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     get: {
       tag: "Importação e exportação",
       summary: "Estado da importação",
-      scope: "imports:write",
+      scope: "imports:read",
       response: one({ ...IMPORT_JOB, status: "completed_with_errors", total: 157, processed: 157, created: 120, updated: 30, unchanged: 5, failed: 2, errors_stored: 2, started_at: "2026-10-20T14:32:11.000Z", finished_at: "2026-10-20T14:32:19.000Z" }),
       errors: [[404, "not_found"]],
     },
@@ -656,7 +665,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       tag: "Importação e exportação",
       summary: "Erros por linha",
       description: "row começa em 1 (JSON) ou 2 (CSV, a linha 1 é o cabeçalho). Até mil erros guardados.",
-      scope: "imports:write",
+      scope: "imports:read",
       query: [["limit", "1–200"], ["cursor", "next_cursor"]],
       response: list({ row: 3, code: "invalid_parameter", message: "email inválido.", param: "email", record: { name: "João Pereira", email: "joao@@exemplo" } }, { total: 1 }),
       errors: [[400, "invalid_cursor"], [404, "not_found"]],
@@ -691,7 +700,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       tag: "Importação e exportação",
       summary: "Exportar (CSV ou JSONL)",
       description: "Filtros de contatos: updated_since, tag, owner, company. De negócios: updated_since, pipeline, stage, owner, company, contact, status, archived. Até 15 MB.",
-      scope: "exports:read",
+      scope: "exports:write",
       status: 202,
       body: { entity: "deals", format: "csv", filters: { pipeline: 1, updated_since: "2026-10-01T00:00:00Z" } },
       response: one(EXPORT_JOB),
@@ -717,7 +726,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     },
   },
   "/exports/{id}/cancel": {
-    post: { tag: "Importação e exportação", summary: "Cancelar exportação", scope: "exports:read", response: one({ ...EXPORT_JOB, status: "canceled", finished_at: "2026-10-20T14:33:00.000Z" }), errors: [[409, "invalid_state"], [404, "not_found"]] },
+    post: { tag: "Importação e exportação", summary: "Cancelar exportação", scope: "exports:write", response: one({ ...EXPORT_JOB, status: "canceled", finished_at: "2026-10-20T14:33:00.000Z" }), errors: [[409, "invalid_state"], [404, "not_found"]] },
   },
 
   "/agents": { get: { tag: "Fluxos", summary: "Agentes", scope: "flows:read", response: list(AGENT) } },
@@ -820,7 +829,9 @@ export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
         "Autenticação: Authorization: Bearer evs_live_... (Integrações → API). JSON em snake_case, datas ISO-8601 em UTC, dinheiro em centavos. " +
         "Funil e etapa são identificados pelo número no contrato (inteiro; veja GET /pipelines), não por UUID. " +
         "Listas: { data, has_more, next_cursor }. Erro: { error: { type, code, message, param?, details?, request_id } }. " +
-        "Limite por chave: 600 leituras e 300 escritas por minuto (headers RateLimit-*). Escopo exigido em x-scope; erros próprios do endpoint em x-errors.",
+        "Limite por chave: 600 leituras e 300 escritas por minuto (headers RateLimit-*). Escopo exigido em x-scope; erros próprios do endpoint em x-errors. " +
+        "external_id na resposta é o da origem pedida (external_source da query ou do corpo; padrão api). " +
+        "Importação e exportação: chaves antigas com imports:write ou exports:read continuam valendo para ler e escrever o job.",
     },
     servers: [{ url: servidor }],
     security: [{ bearer: [] }],

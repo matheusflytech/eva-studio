@@ -70,8 +70,8 @@ export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null =
   };
 }
 
-export async function serializarNegocios(orgId: string, linhas: LinhaDeNegocio[]) {
-  const externos = await externosDe(orgId, "deal", linhas.map((d) => d.id));
+export async function serializarNegocios(orgId: string, linhas: LinhaDeNegocio[], source?: string) {
+  const externos = await externosDe(orgId, "deal", linhas.map((d) => d.id), source);
   return linhas.map((d) => serializarNegocio(d, externos.get(d.id) ?? null));
 }
 

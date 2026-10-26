@@ -6,7 +6,7 @@ import { lerConsulta, lerLimite } from "@/lib/server/api-v1/paginacao";
 
 // GET /api/v1/imports/{id}/errors — erro por linha (row, code, message, param, record).
 // Até 1000 erros guardados por importação; o contador `failed` é sempre exato.
-export const GET = rotaV1<{ id: string }>({ recurso: "imports", acao: "write" }, async (ctx, { id }) => {
+export const GET = rotaV1<{ id: string }>({ recurso: "imports", aceitaTambem: ["write"] }, async (ctx, { id }) => {
   const sp = lerConsulta(ctx.url);
   const limite = lerLimite(sp);
   const job = await carregarJob(ctx.orgId, id, "import");

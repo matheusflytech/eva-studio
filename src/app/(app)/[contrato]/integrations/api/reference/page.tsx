@@ -169,11 +169,16 @@ export default function ApiReferencePage() {
 
   // Link direto (#post-deals-id-move) abre o endpoint.
   React.useEffect(() => {
-    const el = window.location.hash ? document.getElementById(decodeURIComponent(window.location.hash.slice(1))) : null;
-    if (el instanceof HTMLDetailsElement) {
-      el.open = true;
-      el.scrollIntoView();
-    }
+    const abrir = () => {
+      const el = window.location.hash ? document.getElementById(decodeURIComponent(window.location.hash.slice(1))) : null;
+      if (el instanceof HTMLDetailsElement) {
+        el.open = true;
+        el.scrollIntoView();
+      }
+    };
+    abrir();
+    window.addEventListener("hashchange", abrir);
+    return () => window.removeEventListener("hashchange", abrir);
   }, []);
 
   return (

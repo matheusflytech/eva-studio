@@ -39,8 +39,8 @@ export function serializarEmpresa(c: Company, externalId: string | null = null) 
   };
 }
 
-export async function serializarEmpresas(orgId: string, linhas: Company[]) {
-  const externos = await externosDe(orgId, "company", linhas.map((c) => c.id));
+export async function serializarEmpresas(orgId: string, linhas: Company[], source?: string) {
+  const externos = await externosDe(orgId, "company", linhas.map((c) => c.id), source);
   return linhas.map((c) => serializarEmpresa(c, externos.get(c.id) ?? null));
 }
 
@@ -172,6 +172,16 @@ export async function upsertEmpresa(orgId: string, d: DadosDeEmpresa) {
   if (!id) {
     const c = await criarEmpresa(orgId, d);
     return { id: c.id, result: "created" as const, matchedBy };
+  }
+  // Achou pelo CNPJ uma empresa já ligada a OUTRO id externo: trocar o vínculo
+  // em silêncio misturaria dois registros do outro lado (mesma regra do contato).
+  if (d.externalId && matchedBy === "cnpj") {
+    const atual = (await externosDe(orgId, "company", [id], d.source)).get(id);
+    if (atual && atual !== d.externalId) {
+      throw new ErroApi(409, "external_id_mismatch", "A empresa com esse CNPJ já está ligada a outro external_id.", {
+        details: { existing_id: id, existing_external_id: atual, matched_by: "cnpj" },
+      });
+    }
   }
   const { mudou } = await atualizarEmpresa(orgId, id, d);
   return { id, result: mudou ? ("updated" as const) : ("unchanged" as const), matchedBy };

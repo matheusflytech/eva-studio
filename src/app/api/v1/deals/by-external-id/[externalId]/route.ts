@@ -17,9 +17,10 @@ type P = { externalId: string };
 
 export const GET = rotaV1<P>({ recurso: "deals" }, async (ctx, { externalId }) => {
   const sp = lerConsulta(ctx.url, ["external_source"]);
-  const id = await idPorExterno(ctx.orgId, "deal", segmento(externalId), sp.get("external_source") || "api");
+  const source = sp.get("external_source") || "api";
+  const id = await idPorExterno(ctx.orgId, "deal", segmento(externalId), source);
   if (!id) throw new ErroApi(404, "not_found", "Nenhum negócio com esse external_id.");
-  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, id)]);
+  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, id)], source);
   return NextResponse.json({ data });
 });
 
@@ -37,6 +38,6 @@ export const PUT = rotaV1<P>({ recurso: "deals" }, async (ctx, { externalId }) =
   const dados = await lerDadosDeNegocio(ctx.orgId, corpo);
   dados.externalId = id;
   const r = await upsertNegocio(ctx.orgId, dados);
-  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, r.id)]);
+  const [data] = await serializarNegocios(ctx.orgId, [await carregarNegocio(ctx.orgId, r.id)], dados.source);
   return NextResponse.json({ data, result: r.result, matched_by: r.matchedBy }, { status: r.result === "created" ? 201 : 200 });
 });

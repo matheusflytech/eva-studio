@@ -10,6 +10,6 @@ export const PUT = rotaV1({ recurso: "contacts" }, async (ctx) => {
   conferirCampos(corpo, CAMPOS_DE_CONTATO);
   const dados = await lerDadosDeContato(ctx.orgId, corpo);
   const r = await upsertContato(ctx.orgId, dados);
-  const [data] = await serializarContatos(ctx.orgId, [await carregarContato(ctx.orgId, r.id)]);
+  const [data] = await serializarContatos(ctx.orgId, [await carregarContato(ctx.orgId, r.id)], dados.source);
   return NextResponse.json({ data, result: r.result, matched_by: r.matchedBy }, { status: r.result === "created" ? 201 : 200 });
 });

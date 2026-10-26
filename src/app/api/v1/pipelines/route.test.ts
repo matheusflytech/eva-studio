@@ -11,6 +11,7 @@ const db = vi.hoisted(() => {
     apiKey: { findFirst: vi.fn(), update: vi.fn() },
     pipeline: { count: vi.fn(), create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
     pipelineStage: { findFirst: vi.fn(), findMany: vi.fn() },
+    pipelineLostReason: { findMany: vi.fn() },
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
 });
@@ -24,6 +25,7 @@ vi.mock("@/lib/server/stage-events", () => eventos);
 import { POST } from "./route";
 import { DELETE, GET as LER } from "./[id]/route";
 import { DELETE as APAGAR_ETAPA } from "./[id]/stages/[stageId]/route";
+import { GET as MOTIVOS } from "./[id]/lost-reasons/route";
 
 const req = (method: string, body?: unknown, url = "https://eva.test/api/v1/pipelines") =>
   new Request(url, { method, headers: { authorization: "Bearer evs_live_abc" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -34,6 +36,31 @@ beforeEach(() => {
   db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes: ["pipelines:write"] });
   db.apiKey.update.mockResolvedValue({});
   rate.checkRateLimit.mockResolvedValue({ allowed: true, count: 1, limit: 300, resetSec: 60 });
+});
+
+describe("GET /v1/pipelines/{id}/lost-reasons", () => {
+  const umFunil = { params: Promise.resolve({ id: "1" }) };
+  const url = "https://eva.test/api/v1/pipelines/1/lost-reasons";
+
+  it("funil sem motivos salvos devolve os padrão; com salvos, os do funil", async () => {
+    db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes: ["pipelines:read"] });
+    db.pipeline.findFirst.mockResolvedValue({ id: "p1", numero: 1 });
+    db.pipelineLostReason.findMany.mockResolvedValueOnce([]);
+    const r1 = await (await MOTIVOS(req("GET", undefined, url), umFunil)).json();
+    expect(r1.data[0]).toEqual({ id: "padrao:preco", label: "Preço", requires_note: false });
+    expect(r1).toMatchObject({ has_more: false, next_cursor: null });
+
+    db.pipelineLostReason.findMany.mockResolvedValueOnce([{ id: "m1", label: "Fechou com outro", requiresNote: true }]);
+    const r2 = await (await MOTIVOS(req("GET", undefined, url), umFunil)).json();
+    expect(r2.data).toEqual([{ id: "m1", label: "Fechou com outro", requires_note: true }]);
+    expect(db.pipeline.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", numero: 1 } }));
+  });
+
+  it("funil de outra org (ou inexistente): 404", async () => {
+    db.apiKey.findFirst.mockResolvedValue({ id: "k1", orgId: "o1", scopes: ["pipelines:read"] });
+    db.pipeline.findFirst.mockResolvedValue(null);
+    expect((await MOTIVOS(req("GET", undefined, url), umFunil)).status).toBe(404);
+  });
 });
 
 describe("/v1/pipelines", () => {
