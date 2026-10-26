@@ -42,6 +42,9 @@ export function validateNode(data: FlowNodeData): string | null {
         if (campo === "text" && vazio(data.variableName)) return "Escolha em qual variável guardar a resposta.";
       }
       if ((data.exitConditions ?? []).some((c) => vazio(c.expression))) return "Escreva a condição de cada saída.";
+      if ((data.blockContents ?? []).some((c) => (c.type === "media" || c.type === "link") && vazio(c.url))) {
+        return "Informe o link de cada mídia e de cada link do conteúdo.";
+      }
       // Ação incompleta aparece aqui, no Bloco que a carrega.
       for (const a of [...(data.entryActions ?? []), ...(data.exitActions ?? [])]) {
         const problema = validateNode(a.data);

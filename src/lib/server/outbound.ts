@@ -41,6 +41,14 @@ export interface AnexoDeSaida {
   name?: string;
 }
 
+/**
+ * Mídia do bot por URL pública (Bloco do Studio) no formato dos envios acima.
+ * Sem caminho no storage: a fila do WhatsApp QR não serve para ela (ver esperas.ts).
+ */
+export function anexoDeUrl(m: { type: string; url: string; name?: string }): AnexoDeSaida {
+  return { url: m.url, path: "", type: m.type, mime: "", name: m.name };
+}
+
 // ---------------------------------------------------------------------------
 // Erros em português
 //
@@ -198,17 +206,31 @@ export async function sendWhatsAppMedia(
 // Instagram e Messenger
 // ---------------------------------------------------------------------------
 
+/**
+ * Texto com botões de resposta rápida (Instagram e Messenger). O toque volta no
+ * webhook como message.quick_reply.payload = id da opção. Limites da Meta: 13
+ * botões, 20 caracteres no título.
+ */
+export function comBotoes(text: string, opcoes?: { id: string; label: string }[]) {
+  if (!opcoes?.length) return { text };
+  return {
+    text,
+    quick_replies: opcoes.slice(0, 13).map((o) => ({ content_type: "text", title: o.label.slice(0, 20), payload: o.id })),
+  };
+}
+
 export async function sendInstagramText(
   igBusinessId: string,
   accessToken: string,
   to: string,
-  text: string
+  text: string,
+  opcoes?: { id: string; label: string }[]
 ): Promise<DeliverResult> {
   try {
     const res = await fetch(`${GRAPH}/${igBusinessId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient: { id: to }, message: { text } }),
+      body: JSON.stringify({ recipient: { id: to }, message: comBotoes(text, opcoes) }),
     });
     if (!res.ok) return { ok: false, error: await erroLegivel("Instagram", res) };
     return { ok: true, id: await lerId(res, "ig") };
@@ -250,13 +272,18 @@ export async function sendInstagramMedia(
   }
 }
 
-export async function sendMessengerText(pageAccessToken: string, to: string, text: string): Promise<DeliverResult> {
+export async function sendMessengerText(
+  pageAccessToken: string,
+  to: string,
+  text: string,
+  opcoes?: { id: string; label: string }[]
+): Promise<DeliverResult> {
   try {
     const res = await fetch(`${GRAPH}/me/messages`, {
       method: "POST",
       // Token no cabeçalho, não na URL: URL vai parar em log de proxy.
       headers: { Authorization: `Bearer ${pageAccessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient: { id: to }, messaging_type: "RESPONSE", message: { text } }),
+      body: JSON.stringify({ recipient: { id: to }, messaging_type: "RESPONSE", message: comBotoes(text, opcoes) }),
     });
     if (!res.ok) return { ok: false, error: await erroLegivel("Messenger", res) };
     return { ok: true, id: await lerId(res, "ig") };

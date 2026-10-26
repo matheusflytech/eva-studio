@@ -22,6 +22,9 @@ export type TipoDeSaida = "padrao" | "sim" | "nao" | "opcao" | "respondeu" | "in
  */
 export const SAIDA_ERRO = "erro";
 
+/** Saída do Bloco quando o cliente não responde no prazo (replyTimeoutMinutes). */
+export const SAIDA_SEM_RESPOSTA = "sem_resposta";
+
 export interface Saida {
   id: string | null;
   rotulo: string | null;
@@ -65,9 +68,17 @@ export function saidasDoBloco(data: FlowNodeData): Saida[] {
     data.iconKey === "studio-block"
       ? (data.exitConditions ?? []).map((c, i) => ({ id: c.id, rotulo: c.label.trim() || `Condição ${i + 1}`, tipo: "opcao" }))
       : [];
+  const semResposta: Saida[] =
+    data.iconKey === "studio-block" && data.waitForReply && (data.replyTimeoutMinutes ?? 0) > 0
+      ? [{ id: SAIDA_SEM_RESPOSTA, rotulo: "Não respondeu", tipo: "invalida" }]
+      : [];
   const opcoes = esperaResposta(data) ? data.options ?? [] : [];
   if (opcoes.length > 0) {
-    return [...condicoes, ...opcoes.map((o, i) => ({ id: o.id, rotulo: o.label?.trim() || `Opção ${i + 1}`, tipo: "opcao" as const }))];
+    return [
+      ...condicoes,
+      ...opcoes.map((o, i) => ({ id: o.id, rotulo: o.label?.trim() || `Opção ${i + 1}`, tipo: "opcao" as const })),
+      ...semResposta,
+    ];
   }
   if (capturaComValidacao(data)) {
     // "Respondeu" fica sem id de propósito: ligações antigas desse bloco
@@ -76,9 +87,10 @@ export function saidasDoBloco(data: FlowNodeData): Saida[] {
       ...condicoes,
       { id: null, rotulo: "Respondeu", tipo: "respondeu" },
       { id: SAIDA_INVALIDA, rotulo: "Não respondeu certo", tipo: "invalida" },
+      ...semResposta,
     ];
   }
-  return [...condicoes, { id: null, rotulo: condicoes.length ? "Nenhuma das condições" : null, tipo: "padrao" }];
+  return [...condicoes, { id: null, rotulo: condicoes.length || semResposta.length ? "Nenhuma das condições" : null, tipo: "padrao" }, ...semResposta];
 }
 
 /** O bloco tem mais de uma saída, cada uma com nome (o motor exige o id certo na ligação). */

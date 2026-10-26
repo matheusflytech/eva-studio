@@ -2,14 +2,14 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import type { Node, Edge } from "@xyflow/react";
-import type { AiExit, BlockAction, FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
+import type { AiExit, BlockAction, BlockContent, FlowNodeData, KeyValueRow } from "@/components/agent-studio/builder/flow-node";
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { contextoDaConversa } from "@/lib/server/ia/prompt-do-agente";
 import { semChamadaEmTexto } from "@/lib/server/ia/chamada-em-texto";
-import { SAIDA_ERRO, esperaResposta } from "@/components/agent-studio/builder/saidas";
+import { SAIDA_ERRO, SAIDA_SEM_RESPOSTA, esperaResposta } from "@/components/agent-studio/builder/saidas";
 import { fonteDaIa } from "@/components/agent-studio/builder/fonte-da-ia";
 import { fonteDoEmail } from "@/components/agent-studio/builder/fonte-do-email";
 import { enviarEmailDoContrato } from "@/lib/server/email/envio";
@@ -66,6 +66,8 @@ export interface OutboundMessage {
   // Mostrar "digitando…" por tanto tempo (ms) antes de mandar: os balões
   // seguintes de uma resposta da IA no WhatsApp (ver respostaDaIa).
   digitando?: number;
+  // Arquivo por URL pública (Bloco do Studio); o texto vira legenda.
+  media?: { type: "image" | "video" | "audio" | "document"; url: string; name?: string };
 }
 
 export interface AdvanceInput {
@@ -179,6 +181,38 @@ function evaluateCondition(expression: string, variables: Variables): boolean {
 // todo {var} primeiro (isso já cobre concatenação, ex: "{nome} {sobrenome}"),
 // e se o resultado virar uma soma/subtração simples de dois números
 // ("10 + 5"), calcula. Continua sem eval de verdade — só esses dois casos.
+/**
+ * Um item do conteúdo do Bloco como mensagem. Link e localização saem como
+ * texto (todo canal mostra; o WhatsApp abre a prévia do link).
+ * shortcut: localização não usa a mensagem nativa de mapa do WhatsApp; trocar se pedirem o pino.
+ */
+export function mensagemDoConteudo(c: BlockContent, variables: Variables): OutboundMessage | null {
+  const t = (s?: string) => interpolate(s ?? "", variables).trim();
+  if (c.type === "media") {
+    const url = t(c.url);
+    if (!/^https?:\/\//i.test(url)) return null;
+    return { text: t(c.text), media: { type: c.mediaType ?? "image", url, ...(c.fileName ? { name: c.fileName } : {}) } };
+  }
+  if (c.type === "link") {
+    const url = t(c.url);
+    const text = [t(c.text), url].filter(Boolean).join("\n");
+    return text ? { text } : null;
+  }
+  if (c.type === "location") {
+    const temCoordenadas = Number.isFinite(c.latitude) && Number.isFinite(c.longitude);
+    const endereco = t(c.address);
+    const mapa = temCoordenadas
+      ? `https://www.google.com/maps?q=${c.latitude},${c.longitude}`
+      : endereco
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`
+        : "";
+    const text = [t(c.text), endereco, mapa].filter(Boolean).join("\n");
+    return text ? { text } : null;
+  }
+  const text = t(c.text);
+  return text ? { text } : null;
+}
+
 function resolveVariableExpression(expression: string, variables: Variables): string {
   const interpolated = interpolate(expression, variables);
   const arithmetic = interpolated.match(/^(-?\d+(?:\.\d+)?)\s*([+-])\s*(-?\d+(?:\.\d+)?)$/);
@@ -1209,7 +1243,8 @@ async function logMessages(
       externalId: inbound?.externalId,
     });
   }
-  for (const m of outbound) rows.push({ role: "bot", text: m.text });
+  // Mídia do bot é URL de fora (não está no storage): fica o link junto do texto.
+  for (const m of outbound) rows.push({ role: "bot", text: m.media ? [m.text, m.media.url].filter(Boolean).join("\n") : m.text });
   await registrarMensagens(conversationId, rows);
 }
 
@@ -1842,6 +1877,12 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
     return nextDefaultNodeId(edges, no.id, nomeadas);
   }
 
+  /** Bloco com prazo de resposta: o relógio (esperas.ts / worker) acorda a conversa sem mensagem quando vence. */
+  function armarPrazoDeResposta(no: Node<FlowNodeData>) {
+    const minutos = no.data.iconKey === "studio-block" ? no.data.replyTimeoutMinutes ?? 0 : 0;
+    if (minutos > 0) variables.__wait_until = new Date(Date.now() + minutos * 60_000).toISOString();
+  }
+
   /** Depois da resposta: o Bloco passa pelas ações e condições; a Captura segue como sempre. */
   const seguirDaPergunta = (no: Node<FlowNodeData>, saida: string | null, daCaptura: () => string | null) =>
     no.data.iconKey === "studio-block" ? sairDoBloco(no, saida) : Promise.resolve(daCaptura());
@@ -1850,6 +1891,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   // Esperar) usando a mensagem que acabou de chegar, antes de continuar
   // andando pelo fluxo.
   const parkedNode = findNode(nodes, currentId);
+  if (isGenuineInbound && parkedNode?.data.iconKey === "studio-block") delete variables.__wait_until;
   const inboundKind: InboundKind = input.event?.kind ?? "dm";
   const gatilho =
     isGenuineInbound && podeAvaliarGatilho(parkedNode?.data.iconKey ?? null, inboundKind)
@@ -1867,6 +1909,19 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   } else if (inboundKind === "story_mention") {
     // Menção sem gatilho configurado: entra na caixa de entrada e mais nada.
     return finish();
+  } else if (
+    parkedNode?.data.iconKey === "studio-block" &&
+    parkedNode.data.waitForReply &&
+    !isGenuineInbound &&
+    (parkedNode.data.replyTimeoutMinutes ?? 0) > 0 &&
+    !(typeof variables.__wait_until === "string" && new Date(variables.__wait_until) > new Date())
+  ) {
+    // Acordado pelo relógio (que já tirou o prazo): venceu sem resposta.
+    delete variables.__capture_tries;
+    pushStep(parkedNode, { output: "não respondeu no prazo" });
+    const destino = nextNodeId(edges, parkedNode.id, SAIDA_SEM_RESPOSTA);
+    if (!destino) return finish(); // sem ligação: continua esperando a resposta
+    currentId = destino;
   } else if (parkedNode && esperaResposta(parkedNode.data) && capturaValida(parkedNode.data)) {
     // Captura com tipo (nome/e-mail/telefone/campo do contato): valida, pede de
     // novo até captureMaxRetries e, se não der, sai por "não respondeu certo".
@@ -1890,6 +1945,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         variables.__capture_tries = tentativas + 1;
         messages.push({ text: interpolate(parkedNode.data.captureErrorMessage || MENSAGEM_DE_ERRO[campo], variables) });
         pushStep(parkedNode, { error: "resposta inválida" });
+        armarPrazoDeResposta(parkedNode);
         currentId = parkedNode.id;
         return finish();
       } else {
@@ -1921,6 +1977,7 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
         text: textoDaPergunta(parkedNode.data),
         options: options.map((o) => ({ id: o.id, label: o.label })),
       });
+      armarPrazoDeResposta(parkedNode);
       currentId = parkedNode.id;
       return finish();
     }
@@ -1993,20 +2050,23 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
           digitando = Math.min(Math.max(c.seconds ?? 2, 1), 10) * 1000;
           continue;
         }
-        const text = interpolate(c.text ?? "", variables).trim();
-        if (!text) continue;
-        doBloco.push(digitando ? { text, digitando } : { text });
+        const m = mensagemDoConteudo(c, variables);
+        if (!m) continue;
+        doBloco.push(digitando ? { ...m, digitando } : m);
         digitando = undefined;
       }
       const options = node.data.waitForReply ? node.data.options ?? [] : [];
       if (options.length > 0) {
+        // Botões só vão em mensagem de texto: com mídia no fim, saem num texto à parte.
         const botoes = options.map((o) => ({ id: o.id, label: o.label }));
-        if (doBloco.length > 0) doBloco[doBloco.length - 1].options = botoes;
+        const ultima = doBloco.at(-1);
+        if (ultima && !ultima.media && ultima.text) ultima.options = botoes;
         else doBloco.push({ text: textoDaPergunta(node.data), options: botoes });
       }
       messages.push(...doBloco);
       pushStep(node, { output: doBloco.map((m) => m.text).join(" · ") || undefined }, startedAt);
       if (node.data.waitForReply) {
+        armarPrazoDeResposta(node);
         currentId = node.id; // fica parado esperando a resposta
         break;
       }

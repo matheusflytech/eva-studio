@@ -5,12 +5,14 @@ import { RotateCcw, Send, Smartphone } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { fieldBase } from "@/components/ui/styles";
 import { cn, generateId } from "@/lib/utils";
+import { MidiaDaMensagem } from "./midia-da-mensagem";
 
 interface ChatMessage {
   id: string;
   role: "user" | "agent";
   text: string;
   options?: { id: string; label: string }[];
+  media?: MidiaDaMensagem;
 }
 
 // Prévia ao vivo do fluxo, dentro do próprio Builder — sempre reflete a
@@ -37,10 +39,10 @@ export function LivePreview({ agentId, agentName, aoResponder }: { agentId: stri
         body: JSON.stringify({ agentId, channel: "builder_preview", contactId: contactIdRef.current, ...payload }),
       });
       const data = await res.json();
-      const replies: { text: string; options?: { id: string; label: string }[] }[] = data.messages ?? [];
+      const replies: Pick<ChatMessage, "text" | "options" | "media">[] = data.messages ?? [];
       setMessages((prev) => [
         ...prev,
-        ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options })),
+        ...replies.map((r) => ({ id: generateId(), role: "agent" as const, text: r.text, options: r.options, media: r.media })),
       ]);
     } catch {
       setMessages((prev) => [...prev, { id: generateId(), role: "agent", text: "Erro ao processar essa mensagem." }]);
@@ -99,15 +101,18 @@ export function LivePreview({ agentId, agentName, aoResponder }: { agentId: stri
         )}
         <div className="flex flex-col gap-2.5">
           {messages.map((m) => (
-            <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
-              <div
-                className={cn(
-                  "max-w-[85%] whitespace-pre-wrap break-words rounded-[18px] px-3 py-2 text-small",
-                  m.role === "user" ? "rounded-br-md bg-accent-solid text-text-on-accent" : "rounded-bl-md border border-border-subtle bg-raised text-text-primary"
-                )}
-              >
-                {m.text}
-              </div>
+            <div key={m.id} className={cn("flex flex-col gap-1.5", m.role === "user" ? "items-end" : "items-start")}>
+              {m.media && <MidiaDaMensagem media={m.media} />}
+              {(m.text || !m.media) && (
+                <div
+                  className={cn(
+                    "max-w-[85%] whitespace-pre-wrap break-words rounded-[18px] px-3 py-2 text-small",
+                    m.role === "user" ? "rounded-br-md bg-accent-solid text-text-on-accent" : "rounded-bl-md border border-border-subtle bg-raised text-text-primary"
+                  )}
+                >
+                  {m.text}
+                </div>
+              )}
               {m.options && m.options.length > 0 && (
                 <div className="mt-1.5 flex max-w-[85%] flex-wrap gap-1">
                   {m.options.map((opt) => (
