@@ -185,6 +185,8 @@ export interface FlowNodeData {
   // Sem resposta nesse tempo, segue pela saída "Não respondeu" (o relógio
   // retoma a conversa como faz com o "Esperar"). Vazio = espera para sempre.
   replyTimeoutMinutes?: number;
+  /** "Ir para fluxo": id do fluxo extra (AgentSubflow) ou "main" para o principal. */
+  targetFlowId?: string;
   // Bloco Ferramenta: MCP — aponta pra um servidor cadastrado na org e, se
   // mcpTools tiver itens, expõe só essas ferramentas ao agente (vazio = todas).
   mcpServerId?: string;

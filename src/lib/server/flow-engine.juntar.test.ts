@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const db = vi.hoisted(() => ({
   agent: { findUnique: vi.fn() },
   agentFlow: { findUnique: vi.fn() },
+  agentSubflow: { findMany: vi.fn(async () => []) },
   agentTrigger: { findMany: vi.fn(async () => []), update: vi.fn() },
   conversation: { upsert: vi.fn(), update: vi.fn() },
   flowExecution: { create: vi.fn() },

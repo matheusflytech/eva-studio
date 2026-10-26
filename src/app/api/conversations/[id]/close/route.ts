@@ -17,7 +17,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     where: { id },
     // currentNodeId volta a null: sem isso a conversa "encerrada" ainda
     // lembraria da pergunta que estava no ar.
-    data: { status: "ended", assignedToId: null, currentNodeId: null, readAt: new Date() },
+    data: { status: "ended", assignedToId: null, currentNodeId: null, currentFlowId: null, readAt: new Date() },
   });
   return NextResponse.json({ ok: true });
 }

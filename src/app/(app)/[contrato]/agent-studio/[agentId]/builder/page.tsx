@@ -60,7 +60,8 @@ import { ExecutionsPanel } from "@/components/agent-studio/builder/executions-pa
 import { ReportsPanel } from "@/components/agent-studio/builder/reports-panel";
 import { ConversationMode } from "@/components/agent-studio/builder/conversation-mode";
 import { MontarComIa } from "@/components/agent-studio/builder/montar-com-ia";
-import { getFlow, saveFlow } from "@/lib/data/flows";
+import { createSubflow, deleteSubflow, getFlow, getSubflow, listSubflows, saveFlow, saveSubflow, type AgentFlow, type Subfluxo } from "@/lib/data/flows";
+import { BarraDeFluxos } from "@/components/agent-studio/builder/barra-de-fluxos";
 import { generateId } from "@/lib/utils";
 import type { IconKey } from "@/components/agent-studio/builder/icon-registry";
 import { MOLA } from "@/lib/design-system/movimento";
@@ -147,6 +148,16 @@ export default function AgentBuilderPage() {
   const [ultimaExecucao, setUltimaExecucao] = React.useState<UltimaExecucao | null>(null);
   const [mostrarExecucao, setMostrarExecucao] = React.useState(true);
   const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Vários fluxos (S4): o canvas mostra um por vez. alvoDoSalvamento diz para
+  // onde o autosave manda o que está na tela (null = Principal).
+  const [fluxos, setFluxos] = React.useState<Subfluxo[]>([]);
+  const [fluxoAtual, setFluxoAtual] = React.useState<string | null>(null);
+  const [trocando, setTrocando] = React.useState(false);
+  const alvoDoSalvamento = React.useRef<string | null>(null);
+  const salvarEm = React.useCallback(
+    (alvo: string | null, flow: AgentFlow) => (alvo ? saveSubflow(agentId, alvo, flow) : saveFlow(agentId, flow)),
+    [agentId]
+  );
   // Cascata de entrada dos blocos só nos primeiros instantes do canvas.
   const [abrindo, setAbrindo] = React.useState(true);
   React.useEffect(() => {
@@ -174,6 +185,68 @@ export default function AgentBuilderPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, flowLoaded]);
+
+  React.useEffect(() => {
+    if (!agentId) return;
+    listSubflows(agentId).then(setFluxos).catch(() => {});
+  }, [agentId]);
+
+  /** Salva o que está na tela (se faltava) e abre outro fluxo. */
+  async function trocarFluxo(id: string | null) {
+    if (id === fluxoAtual || trocando) return;
+    setTrocando(true);
+    try {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        await salvarEm(alvoDoSalvamento.current, { nodes, edges });
+      }
+      const flow = id ? await getSubflow(agentId, id) : await getFlow(agentId);
+      alvoDoSalvamento.current = id;
+      setNodes(flow?.nodes ?? SAMPLE_NODES);
+      setEdges(flow?.edges ?? SAMPLE_EDGES);
+      setSelectedId(null);
+      setFluxoAtual(id);
+      setErroAoSalvar(null);
+    } catch (err) {
+      setErroAoSalvar(err instanceof Error ? err.message : null);
+      setSaveState("error");
+    } finally {
+      setTrocando(false);
+    }
+  }
+
+  async function criarFluxo(nome: string) {
+    try {
+      const novo = await createSubflow(agentId, nome);
+      setFluxos((fs) => [...fs, novo]);
+      await trocarFluxo(novo.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível criar o fluxo.");
+    }
+  }
+
+  async function mudarFluxo(id: string, parte: { name?: string; keywords?: string[] }) {
+    try {
+      await saveSubflow(agentId, id, parte);
+      setFluxos(await listSubflows(agentId));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível salvar o fluxo.");
+    }
+  }
+
+  async function apagarFluxo(id: string) {
+    try {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      await deleteSubflow(agentId, id);
+      setFluxos((fs) => fs.filter((f) => f.id !== id));
+      alvoDoSalvamento.current = null; // não salva o canvas do fluxo apagado
+      await trocarFluxo(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Não foi possível apagar o fluxo.");
+    }
+  }
 
   // Última execução, pra pintar o canvas. Recarrega junto com a aba Editor
   // em vez de ficar em polling: quem quer acompanhar ao vivo usa o Playground.
@@ -240,9 +313,11 @@ export default function AgentBuilderPage() {
     if (!flowLoaded) return;
     setSaveState("pending");
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    const alvo = alvoDoSalvamento.current;
     saveTimer.current = setTimeout(async () => {
+      saveTimer.current = null;
       try {
-        await saveFlow(agentId, { nodes, edges });
+        await salvarEm(alvo, { nodes, edges });
         setErroAoSalvar(null);
         setSaveState("saved");
         setTimeout(() => setSaveState((s) => (s === "saved" ? "idle" : s)), 2000);
@@ -571,10 +646,10 @@ export default function AgentBuilderPage() {
       y: -inicio.position.y * ZOOM + 150,
       zoom: ZOOM,
     };
-    // Só na carga: recalcular a cada mexida no nó faria o canvas pular
-    // debaixo da mão de quem está arrastando.
+    // Só na carga (e ao trocar de fluxo): recalcular a cada mexida no nó
+    // faria o canvas pular debaixo da mão de quem está arrastando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flowLoaded]);
+  }, [flowLoaded, fluxoAtual]);
 
   if (!isLoaded || !flowLoaded) return <div className="flex-1" />;
 
@@ -698,6 +773,19 @@ export default function AgentBuilderPage() {
         </div>
       </div>
 
+      {(tab === "editor" || tab === "conversa") && (
+        <BarraDeFluxos
+          fluxos={fluxos}
+          atual={fluxoAtual}
+          ocupado={trocando}
+          onTrocar={(id) => void trocarFluxo(id)}
+          onCriar={(nome) => void criarFluxo(nome)}
+          onRenomear={(id, name) => void mudarFluxo(id, { name })}
+          onPalavras={(id, keywords) => void mudarFluxo(id, { keywords })}
+          onApagar={(id) => void apagarFluxo(id)}
+        />
+      )}
+
       {tab === "editor" ? (
         <div className="relative flex min-h-0 flex-1 gap-3 overflow-hidden">
           <BlockPalette
@@ -716,6 +804,7 @@ export default function AgentBuilderPage() {
             <style>{CSS_DO_FLUXO_DO_AGENTE + CSS_DO_MINIMAPA}</style>
             <CanvasDoAgenteContext.Provider value={contextoDoCanvas}>
             <ReactFlow
+              key={fluxoAtual ?? "main"}
               colorMode={temaDoCanvas}
               isValidConnection={ligacaoValida}
               nodes={nodes}
@@ -775,6 +864,7 @@ export default function AgentBuilderPage() {
               aoAdicionarFerramenta={(iconKey) => adicionarFerramenta(selectedNode.id, iconKey)}
               aoAbrirBloco={setSelectedId}
               documentos={agent.knowledgeBase}
+              fluxos={fluxos}
             />
           )}
 
@@ -802,6 +892,7 @@ export default function AgentBuilderPage() {
               aoAdicionarFerramenta={(iconKey) => adicionarFerramenta(selectedNode.id, iconKey)}
               aoAbrirBloco={setSelectedId}
               documentos={agent.knowledgeBase}
+              fluxos={fluxos}
             />
           )}
         </div>

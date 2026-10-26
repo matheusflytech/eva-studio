@@ -5,6 +5,7 @@ import type { LlmToolCall } from "@/lib/server/llm";
 const db = vi.hoisted(() => ({
   agent: { findUnique: vi.fn() },
   agentFlow: { findUnique: vi.fn() },
+  agentSubflow: { findMany: vi.fn(async () => []) },
   agentTrigger: { findMany: vi.fn(async () => []), update: vi.fn() },
   conversation: { upsert: vi.fn(), update: vi.fn() },
   flowExecution: { create: vi.fn() },

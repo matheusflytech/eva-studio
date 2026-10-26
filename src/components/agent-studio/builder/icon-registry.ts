@@ -24,6 +24,7 @@ import {
   PencilLine,
   LayoutList,
   Activity,
+  Route,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -54,6 +55,7 @@ export const ICON_REGISTRY = {
   "tool-crm": Building2,
   "studio-block": LayoutList,
   "track-event": Activity,
+  "go-to-flow": Route,
 } satisfies Record<string, LucideIcon>;
 
 export type IconKey = keyof typeof ICON_REGISTRY;

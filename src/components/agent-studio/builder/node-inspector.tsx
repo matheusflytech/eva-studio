@@ -33,6 +33,7 @@ import { IconeDoBloco, seloDoBloco } from "./icone-do-bloco";
 import { PALETTE_GROUPS } from "./palette-groups";
 import { validateNode } from "./block-validation";
 import { cn } from "@/lib/utils";
+import { FLUXO_PRINCIPAL } from "@/lib/subfluxos";
 
 // Acima disso a IA começa a esquecer partes do prompt (plano v7, A6).
 const LIMITE_DO_PROMPT = 3000;
@@ -178,6 +179,7 @@ export function NodeInspector({
   aoAbrirBloco,
   documentos = [],
   embutido = false,
+  fluxos = [],
 }: {
   node: Node<FlowNodeData>;
   agentId: string;
@@ -193,6 +195,8 @@ export function NodeInspector({
   documentos?: KnowledgeDoc[];
   /** Dentro do painel de outro bloco (ação do Bloco): cartão, sem coluna própria. */
   embutido?: boolean;
+  /** Fluxos extras do bot (bloco "Ir para fluxo"). */
+  fluxos?: { id: string; name: string }[];
 }) {
   const { iconKey } = node.data;
   const detailRef = React.useRef<HTMLTextAreaElement>(null);
@@ -922,6 +926,24 @@ export function NodeInspector({
             escolhidos={node.data.knowledgeDocIds ?? []}
             onChange={(ids) => onChange({ knowledgeDocIds: ids.length ? ids : undefined })}
           />
+        )}
+
+        {iconKey === "go-to-flow" && (
+          <div>
+            <Label htmlFor="node-target-flow">Fluxo de destino</Label>
+            <Select id="node-target-flow" value={node.data.targetFlowId ?? ""} onChange={(e) => onChange({ targetFlowId: e.target.value })}>
+              <option value="">Escolha...</option>
+              <option value={FLUXO_PRINCIPAL}>Principal</option>
+              {fluxos.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1.5 text-caption text-text-tertiary">
+              A conversa vai para o começo desse fluxo e continua de lá. Crie fluxos nas abas acima do canvas.
+            </p>
+          </div>
         )}
 
         {iconKey === "wait" && (

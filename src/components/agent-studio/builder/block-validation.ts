@@ -124,6 +124,9 @@ export function validateNode(data: FlowNodeData): string | null {
     case "crm-note":
       return vazio(data.crmNoteText) ? "Escreva o texto da nota." : null;
 
+    case "go-to-flow":
+      return vazio(data.targetFlowId) ? "Escolha para qual fluxo a conversa vai." : null;
+
     case "track-event":
       return vazio(data.eventCategory) || vazio(data.eventAction) ? "Informe a categoria e a ação do evento." : null;
 
@@ -160,7 +163,7 @@ export interface ContextoDoFluxo {
  * a conversa até o fim se não houver ligação (com ligação, seguem por ela
  * quando terminam o trabalho — ver flow-engine.ts).
  */
-const SAIDA_OPCIONAL = new Set(["end", "human", "agent", "ai-agent"]);
+const SAIDA_OPCIONAL = new Set(["end", "human", "agent", "ai-agent", "go-to-flow"]);
 
 /**
  * Todos os problemas do fluxo: campo faltando em cada bloco e os problemas

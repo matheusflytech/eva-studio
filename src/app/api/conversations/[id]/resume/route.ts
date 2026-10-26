@@ -16,7 +16,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const conversation = await prisma.conversation.findFirst({ where: { id, agent: { orgId: ctx.orgId } } });
   if (!conversation) return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
 
-  const flow = await prisma.agentFlow.findUnique({ where: { agentId: conversation.agentId } });
+  // A conversa pode estar parada num fluxo extra: segue pelas ligações dele.
+  const flow = conversation.currentFlowId
+    ? await prisma.agentSubflow.findFirst({ where: { id: conversation.currentFlowId, agentId: conversation.agentId } })
+    : await prisma.agentFlow.findUnique({ where: { agentId: conversation.agentId } });
   const edges = (flow?.edges as unknown as Edge[]) ?? [];
   const next = conversation.currentNodeId ? nextNodeId(edges, conversation.currentNodeId) : null;
 
