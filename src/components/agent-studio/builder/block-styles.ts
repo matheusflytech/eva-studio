@@ -44,6 +44,7 @@ export const BLOCK_CATEGORY: Record<IconKey, CategoryColor> = {
   "crm-note": "teal",
   "crm-lookup": "teal",
   "studio-block": "green",
+  "track-event": "violet",
 };
 
 export const BLOCK_STYLES: Record<IconKey, BlockStyle> = Object.fromEntries(

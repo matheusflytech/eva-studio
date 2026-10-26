@@ -195,6 +195,17 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     },
   },
   {
+    key: "track-event",
+    paletteLabel: "Registrar evento",
+    data: {
+      label: "Registrar evento",
+      kind: "Relatório",
+      detail: "Conta um evento no relatório do Studio.",
+      eventCategory: "",
+      eventAction: "",
+    },
+  },
+  {
     key: "crm-lookup",
     paletteLabel: "CRM: Buscar dados",
     data: {

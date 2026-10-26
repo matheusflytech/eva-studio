@@ -124,6 +124,9 @@ export function validateNode(data: FlowNodeData): string | null {
     case "crm-note":
       return vazio(data.crmNoteText) ? "Escreva o texto da nota." : null;
 
+    case "track-event":
+      return vazio(data.eventCategory) || vazio(data.eventAction) ? "Informe a categoria e a ação do evento." : null;
+
     default:
       return null;
   }

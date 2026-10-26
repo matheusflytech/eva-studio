@@ -41,8 +41,10 @@ const ACOES: IconKey[] = [
   "crm-update",
   "crm-note",
   "crm-lookup",
+  "track-event",
 ];
-const ROTULO = new Map(PALETTE_GROUPS.flatMap((g) => g.items.map((i) => [i.key, i.label])));
+// "Registrar evento" só existe dentro do Bloco, por isso não vem da paleta.
+const ROTULO = new Map<string, string>([...PALETTE_GROUPS.flatMap((g) => g.items.map((i) => [i.key, i.label] as const)), ["track-event", "Registrar evento"]]);
 
 /** Desenha o inspetor de uma ação (o NodeInspector, vindo de fora para não haver import circular). */
 export type InspetorDeAcao = (props: {

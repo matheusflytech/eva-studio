@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
   flowExecution: { create: vi.fn() },
   message: { findMany: vi.fn(async () => []) },
   knowledgeDoc: { findMany: vi.fn(async () => []) },
+  studioEvent: { createMany: vi.fn() },
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -322,5 +323,50 @@ describe("Bloco do Studio: carrossel, localização, figurinha e upload", () => 
       },
     ]);
     expect(textos(r)).toEqual(["", "Foto", "Seguiu pelo padrão."]);
+  });
+});
+
+describe("Bloco do Studio: eventos do relatório", () => {
+  const eventos = () => db.studioEvent.createMany.mock.calls.flatMap((c) => c[0].data);
+
+  it("grava entrou, botão tocado, saída e o evento da ação, com conversa, canal e contato", async () => {
+    const f = fluxo(
+      {
+        blockContents: [{ id: "c1", type: "text", text: "Quer falar com quem?" }],
+        waitForReply: true,
+        options: [{ id: "vendas", label: "Vendas" }],
+        exitActions: [
+          { id: "ev", data: { iconKey: "track-event", label: "Evento", eventCategory: "vendas", eventAction: "quer {plano}", eventValue: "{plano}" } },
+          { id: "ev2", data: { iconKey: "track-event", label: "Incompleto", eventCategory: "sem ação" } },
+        ],
+      },
+      { vendas: "Chamando vendas." }
+    );
+    db.agentFlow.findUnique.mockResolvedValue(f);
+    db.conversation.upsert.mockResolvedValue(parado(null));
+    await advanceConversation({ ...base, text: "oi" });
+    expect(eventos()).toEqual([
+      { nodeId: "bloco", category: "block", action: "entered", orgId: "o1", agentId: "a1", conversationId: "c1", channel: "instagram", contactId: "contato-1" },
+    ]);
+
+    db.studioEvent.createMany.mockClear();
+    db.conversation.upsert.mockResolvedValue(parado("bloco", { plano: "pro" }));
+    await advanceConversation({ ...base, text: "1" });
+    expect(eventos().map((e) => [e.nodeId, e.category, e.action, e.value])).toEqual([
+      ["bloco", "button", "clicked", "Vendas"],
+      ["bloco", "vendas", "quer pro", "pro"],
+      ["bloco", "block", "exited", "Vendas"],
+    ]);
+  });
+
+  it("prazo vencido grava não respondeu; falha ao gravar não derruba a resposta", async () => {
+    db.agentFlow.findUnique.mockResolvedValue(
+      fluxo({ blockContents: [{ id: "c1", type: "text", text: "E-mail?" }], waitForReply: true, captureField: "email", replyTimeoutMinutes: 30 }, { sem_resposta: "Ainda está aí?" })
+    );
+    db.conversation.upsert.mockResolvedValue(parado("bloco"));
+    db.studioEvent.createMany.mockRejectedValueOnce(new Error("banco fora"));
+    const r = await advanceConversation(base);
+    expect(textos(r)).toEqual(["Ainda está aí?"]);
+    expect(eventos()[0]).toMatchObject({ category: "block", action: "no_reply" });
   });
 });

@@ -45,6 +45,7 @@ function resumoDeAcao(data: FlowNodeData): string {
   if (crm) return crm(data);
   if (data.iconKey === "http") return `${data.httpMethod ?? "POST"} ${data.httpUrl || "(sem URL)"}`;
   if (data.iconKey === "email") return `E-mail para ${data.emailTo || "(sem destinatário)"}`;
+  if (data.iconKey === "track-event") return `Registra evento ${data.eventCategory || "(sem categoria)"} · ${data.eventAction || "(sem ação)"}`;
   if (data.iconKey === "variable") return `Guarda {${data.variableName || "variavel"}}`;
   if (data.iconKey === "webhook") return `Chama ${data.webhookUrl || "(sem URL)"}`;
   if (data.iconKey === "wait") return `Espera ${data.waitDuration ?? 0} ${data.waitUnit ?? "minutos"}`;
