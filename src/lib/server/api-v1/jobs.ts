@@ -36,6 +36,12 @@ export interface ErroDeLinha {
   record?: Corpo;
 }
 
+/** O caminho do arquivo no storage é interno: quem integra baixa por download_url. */
+function resultadoPublico(result: BulkJob["result"]) {
+  if (!result || typeof result !== "object" || Array.isArray(result) || !("file_path" in result)) return result;
+  return Object.fromEntries(Object.entries(result).filter(([k]) => k !== "file_path"));
+}
+
 export function serializarJob(j: BulkJob, extra: Record<string, unknown> = {}) {
   const erros = Array.isArray(j.errors) ? (j.errors as unknown[]).length : 0;
   return {
@@ -51,7 +57,7 @@ export function serializarJob(j: BulkJob, extra: Record<string, unknown> = {}) {
     ...(j.kind === "import"
       ? { created: j.created, updated: j.updated, unchanged: j.unchanged, failed: j.failed, errors_stored: erros }
       : {}),
-    result: j.result,
+    result: resultadoPublico(j.result),
     created_at: iso(j.createdAt),
     started_at: iso(j.startedAt),
     finished_at: iso(j.finishedAt),

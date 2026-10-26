@@ -6,6 +6,7 @@ import { ArrowLeft, Check, Copy } from "lucide-react";
 import { LogoDaMarca } from "@/components/ui/marca";
 import { IconButton } from "@/components/ui/icon-button";
 import { WebhooksPanel } from "@/components/integrations/webhooks-panel";
+import { useApiBase } from "@/components/integrations/api-docs";
 
 // ---------------------------------------------------------------------------
 // Integrações → n8n e webhooks. Os dois sentidos num lugar:
@@ -75,12 +76,8 @@ if (!ok || !recente) throw new Error('Assinatura inválida');
 return [{ json: JSON.parse(corpo) }];`;
 
 export default function N8nPage() {
-  const [base, setBase] = React.useState("https://evapp.vercel.app/api/v1");
-  React.useEffect(() => {
-    // Endereço real deste ambiente (local, preview ou produção).
-    const t = setTimeout(() => setBase(`${window.location.origin}/api/v1`), 0);
-    return () => clearTimeout(t);
-  }, []);
+  // Endereço real deste ambiente (local, preview ou produção), já com o contrato.
+  const base = useApiBase();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 lg:px-6">

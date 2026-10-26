@@ -113,6 +113,7 @@ const NOMES: Record<keyof Referencias, string> = {
   stageId: "Etapa",
   pipelineId: "Funil",
 };
+const FEMININOS = new Set<keyof Referencias>(["companyId", "stageId"]);
 
 /**
  * Confere que cada id informado (string não vazia) existe na organização.
@@ -123,7 +124,7 @@ export async function conferirReferencias(orgId: string, refs: Referencias): Pro
   const checagens: Array<[keyof Referencias, Promise<unknown>]> = [];
   for (const [campo, valor] of Object.entries(refs) as Array<[keyof Referencias, unknown]>) {
     if (valor === undefined || valor === null || valor === "") continue;
-    if (typeof valor !== "string") return `${NOMES[campo]} inválido.`;
+    if (typeof valor !== "string") return `${NOMES[campo]} ${FEMININOS.has(campo) ? "inválida" : "inválido"}.`;
     const id = valor;
     const select = { select: { id: true } } as const;
     let q: Promise<unknown>;
@@ -156,7 +157,9 @@ export async function conferirReferencias(orgId: string, refs: Referencias): Pro
   }
   const resultados = await Promise.all(checagens.map(([, q]) => q));
   const falhou = checagens.findIndex((_, i) => !resultados[i]);
-  return falhou === -1 ? null : `${NOMES[checagens[falhou][0]]} não encontrado nesta organização.`;
+  if (falhou === -1) return null;
+  const campo = checagens[falhou][0];
+  return `${NOMES[campo]} ${FEMININOS.has(campo) ? "não encontrada" : "não encontrado"} nesta organização.`;
 }
 
 /** Traduz erros conhecidos do Prisma em resposta HTTP; relança o resto. */

@@ -15,6 +15,7 @@ import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { CabecalhoDaSecao, EsqueletoDeLista, ItemDeConfig, ListaDeConfig, RotuloDeGrupo, VazioDeConfig } from "@/components/configuracoes/secao";
 import { formatRelativeDate } from "@/lib/utils";
 import { RECURSOS } from "@/lib/server/api-v1/escopos";
+import { useApiBase } from "@/components/integrations/api-docs";
 import { ESCOPO_DA_CHAVE_EXIGE } from "@/lib/permissoes/catalogo";
 
 interface ApiKeyRow {
@@ -62,11 +63,10 @@ export function ApiKeysPanel({ nivelDoTitulo = 1 }: { nivelDoTitulo?: 1 | 2 } = 
   const [error, setError] = React.useState<string | null>(null);
   const [revealedKey, setRevealedKey] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
-  const [origin, setOrigin] = React.useState("");
+  const base = useApiBase();
   // Momento em que a tela abriu: basta para marcar "vencida" (não precisa de relógio).
   const [agora] = React.useState(() => Date.now());
 
-  React.useEffect(() => setOrigin(window.location.origin), []);
 
   const load = React.useCallback(() => {
     fetch("/api/api-keys")
@@ -224,11 +224,11 @@ export function ApiKeysPanel({ nivelDoTitulo = 1 }: { nivelDoTitulo?: 1 | 2 } = 
         </ListaDeConfig>
       )}
 
-      {origin && (
+      {base && (
         <div className="mt-6">
           <RotuloDeGrupo>Exemplo</RotuloDeGrupo>
           <pre className="overflow-x-auto rounded-[14px] bg-raised p-3.5 font-mono text-caption leading-relaxed text-text-secondary">
-{`curl ${origin}/api/v1/contacts \\
+{`curl ${base}/contacts \\
   -H "Authorization: Bearer evs_live_..."`}
           </pre>
         </div>

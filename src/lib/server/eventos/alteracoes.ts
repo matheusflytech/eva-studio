@@ -28,8 +28,11 @@ export async function fotoDoRegistro(orgId: string, objeto: ObjetoComFoto, id: s
     }
     if (objeto === "contact") {
       const { carregarContato, serializarContatos } = await import("@/lib/server/api-v1/contatos");
-      const [c] = await serializarContatos(orgId, [await carregarContato(orgId, id)]);
-      return c as Foto;
+      const linha = await carregarContato(orgId, id);
+      const [c] = await serializarContatos(orgId, [linha]);
+      // A API mostra etapa de lead e origem em inglês; automações e regras
+      // salvas comparam pelo valor gravado, então a foto fica com ele.
+      return { ...c, lead_stage: linha.leadStage, source: linha.source } as Foto;
     }
     const { carregarEmpresa, serializarEmpresas } = await import("@/lib/server/api-v1/empresas");
     const [e] = await serializarEmpresas(orgId, [await carregarEmpresa(orgId, id)]);

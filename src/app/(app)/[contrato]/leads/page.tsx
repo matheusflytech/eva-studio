@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
+import { useApiBase } from "@/components/integrations/api-docs";
 import {
   Download, X, Plus, Trash2, Code2, MessageCircle, MoreHorizontal, Zap, ChevronDown, ChevronRight,
   ListFilter, SquareKanban,
@@ -619,11 +620,10 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
 // O exemplo de cada etapa (que antes ficava no ícone </> de cada coluna)
 // agora é escolhido aqui dentro: o quadro fica sem ícone por coluna.
 function ApiInfoModal({ stage, onClose }: { stage?: (typeof STAGES)[number]; onClose: () => void }) {
-  const [origin, setOrigin] = React.useState("");
+  const base = useApiBase();
   const [effectiveStage, setEffectiveStage] = React.useState<(typeof STAGES)[number]>(stage ?? "novo");
-  React.useEffect(() => setOrigin(window.location.origin), []);
 
-  const snippet = `curl -X POST ${origin}/api/v1/leads \\
+  const snippet = `curl -X POST ${base}/leads \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer SUA_CHAVE_evs_live" \\
   -d '{

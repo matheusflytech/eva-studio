@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     ownerId: body.ownerId,
     agentId: externalId ? agentId : undefined,
   });
-  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
+  if (refErro) return erro(refErro, /inválid[oa]\.$/.test(refErro) ? 400 : 404);
 
   // Não cria duplicata na cara do usuário: se já existe alguém com esse
   // e-mail ou telefone na org, devolve conflito em vez de sujar a base.

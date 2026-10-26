@@ -91,7 +91,7 @@ export class ErroDeCrm extends Error {
 
 /** Status da mensagem de conferirReferencias: id malformado é 400, inexistente na org é 404. */
 export function statusDaReferencia(mensagem: string): 400 | 404 {
-  return mensagem.endsWith("inválido.") ? 400 : 404;
+  return /inválid[oa]\.$/.test(mensagem) ? 400 : 404;
 }
 
 /**

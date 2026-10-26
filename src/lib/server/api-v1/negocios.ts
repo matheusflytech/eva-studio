@@ -13,7 +13,6 @@ import { ErroApi, iso } from "./http";
 import {
   boolOpc,
   dataOpc,
-  externalIdOpc,
   idOpc,
   inteiroOpc,
   listaDeIdsOpc,
@@ -24,6 +23,7 @@ import {
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerBooleano, lerDataDaConsulta } from "./paginacao";
 import { lerNumero, numerosDeEtapas, numerosDeFunis, refOpc, uuidDaEtapa, uuidDoFunil } from "./funis";
+import { lostReasonIdFromPublic } from "./public-values";
 
 // ---------------------------------------------------------------------------
 // Negócios na API v1. Criação passa por createDeal e todo movimento de etapa
@@ -42,10 +42,9 @@ export const INCLUDE_NEGOCIO = {
 
 export type LinhaDeNegocio = Prisma.DealGetPayload<{ include: typeof INCLUDE_NEGOCIO }>;
 
-export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null = null) {
+export function serializarNegocio(d: LinhaDeNegocio) {
   return {
     id: d.id,
-    external_id: externalId,
     name: d.name,
     description: d.description,
     category: d.category,
@@ -70,9 +69,9 @@ export function serializarNegocio(d: LinhaDeNegocio, externalId: string | null =
   };
 }
 
-export async function serializarNegocios(orgId: string, linhas: LinhaDeNegocio[]) {
-  const externos = await externosDe(orgId, "deal", linhas.map((d) => d.id));
-  return linhas.map((d) => serializarNegocio(d, externos.get(d.id) ?? null));
+// Assíncrono por compatibilidade com quem chama (antes buscava o id externo).
+export async function serializarNegocios(_orgId: string, linhas: LinhaDeNegocio[]) {
+  return linhas.map(serializarNegocio);
 }
 
 export async function carregarNegocio(orgId: string, id: string) {
@@ -96,8 +95,6 @@ export const CAMPOS_DE_NEGOCIO = [
   "contact_id",
   "contact_ids",
   "custom_fields",
-  "external_id",
-  "external_source",
 ] as const;
 
 export const CAMPOS_DE_PATCH_DE_NEGOCIO = [
@@ -117,8 +114,6 @@ export const CAMPOS_DE_PATCH_DE_NEGOCIO = [
   "company_id",
   "owner_id",
   "custom_fields",
-  "external_id",
-  "external_source",
   // Regras de etapa: motivo estruturado da perda e "Reabrir".
   "lost_reason_id",
   "lost_note",
@@ -184,11 +179,10 @@ export async function lerDadosDeNegocio(orgId: string, corpo: Corpo): Promise<Da
   const varios = listaDeIdsOpc(corpo, "contact_ids", 50);
   if (um || varios) d.contactIds = [...new Set([...(um ? [um] : []), ...(varios ?? [])])];
   d.customFields = objetoOpc(corpo, "custom_fields");
-  d.externalId = externalIdOpc(corpo);
 
   const erroRef = await conferirReferencias(orgId, { companyId: d.companyId, ownerId: d.ownerId });
   if (erroRef) {
-    throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, {
+    throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, {
       param: erroRef.startsWith("Empresa") ? "company_id" : "owner_id",
     });
   }
@@ -231,6 +225,13 @@ interface Opcoes {
 
 export async function criarNegocio(orgId: string, d: DadosDeNegocio, op: Opcoes = {}): Promise<{ id: string }> {
   if (!d.name) throw new ErroApi(400, "invalid_parameter", "name é obrigatório.", { param: "name" });
+  // Mesmo código do PATCH e do /move para etapa fora do funil informado.
+  if (d.pipelineId && d.stageId) {
+    const s = await prisma.pipelineStage.findFirst({ where: { id: d.stageId, pipeline: { orgId } }, select: { pipelineId: true } });
+    if (s && s.pipelineId !== d.pipelineId) {
+      throw new ErroApi(422, "stage_not_in_pipeline", "A etapa não pertence ao funil informado.", { param: "stage_id" });
+    }
+  }
   const etapa = await resolverEtapaDeEntrada(orgId, d.pipelineId ?? undefined, d.stageId ?? undefined);
   const customFields = d.customFields ? await validarCampos(orgId, etapa.pipelineId, {}, d.customFields, true) : undefined;
   if (op.simular) return { id: "" };
@@ -283,6 +284,8 @@ export async function moverNegocio(
   alvo: AlvoDoMovimento,
   op: Opcoes & { pendente?: OpcoesDaMudanca["pendente"] } = {}
 ): Promise<{ mudou: boolean; pipelineId: string }> {
+  // Motivo padrão em inglês (default:price) vira o id que o motor conhece (padrao:preco).
+  if (alvo.lostReasonId) alvo = { ...alvo, lostReasonId: lostReasonIdFromPublic(alvo.lostReasonId) };
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { id: true, stageId: true, pipelineId: true, lostReason: true } });
   if (!deal) throw new ErroApi(404, "not_found", "Negócio não encontrado.");
   const etapa = await prisma.pipelineStage.findFirst({
@@ -486,8 +489,6 @@ export const FILTROS_DE_NEGOCIO = [
   "company",
   "contact",
   "status",
-  "external_id",
-  "external_source",
   "archived",
 ] as const;
 
@@ -510,10 +511,5 @@ export async function whereDeNegocios(orgId: string, sp: URLSearchParams): Promi
   const arquivado = lerBooleano(sp, "archived");
   if (arquivado === true) and.push({ archivedAt: { not: null } });
   if (arquivado === false) and.push({ archivedAt: null });
-  const externo = sp.get("external_id");
-  if (externo) {
-    const id = await idPorExterno(orgId, "deal", externo, sp.get("external_source") || "api");
-    and.push({ id: id ?? "__nenhum__" });
-  }
   return { AND: and };
 }

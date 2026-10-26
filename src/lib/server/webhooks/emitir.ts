@@ -23,9 +23,11 @@ export interface CorpoDoEvento {
   timestamp: string;
   data: Record<string, unknown>;
   previous?: Record<string, unknown>;
+  /** Só em contact.tag_added / contact.tag_removed. */
+  tag?: { id: string; name: string | null };
 }
 
-type Montar = () => Promise<{ data: Record<string, unknown>; previous?: Record<string, unknown> } | null>;
+type Montar = () => Promise<Pick<CorpoDoEvento, "data" | "previous" | "tag"> | null>;
 
 /** Grava uma entrega por endpoint assinado e tenta já, depois da resposta. */
 export async function emitirEvento(orgId: string, tipo: TipoDeEvento, montar: Montar): Promise<void> {
@@ -47,6 +49,7 @@ export async function emitirEvento(orgId: string, tipo: TipoDeEvento, montar: Mo
       timestamp: new Date().toISOString(),
       data: montado.data,
       ...(montado.previous ? { previous: montado.previous } : {}),
+      ...(montado.tag ? { tag: montado.tag } : {}),
     };
     const linhas = alvo.map((e) => ({
       id: randomUUID(),
@@ -121,13 +124,18 @@ export async function emitirEventoDeContato(
   orgId: string,
   contactId: string,
   tipo: TipoDeEvento,
-  previous?: Record<string, unknown>
+  previous?: Record<string, unknown>,
+  tagId?: string
 ): Promise<void> {
   await emitirEvento(orgId, tipo, async () => {
     const { carregarContato, serializarContatos } = await import("@/lib/server/api-v1/contatos");
     const linha = await carregarContato(orgId, contactId).catch(() => null);
     if (!linha) return null;
     const [data] = await serializarContatos(orgId, [linha]);
-    return { data: data as Record<string, unknown>, previous };
+    // Etiqueta apagada logo depois de removida: o id ainda vem, o nome sai null.
+    const tag = tagId
+      ? { id: tagId, name: (await prisma.tag.findFirst({ where: { id: tagId, orgId }, select: { name: true } }))?.name ?? null }
+      : undefined;
+    return { data: data as Record<string, unknown>, previous, ...(tag ? { tag } : {}) };
   });
 }

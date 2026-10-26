@@ -22,7 +22,7 @@ Sem dependências de runtime. Licença MIT.
    de `webhooks:*`; mandar mensagem precisa de `messages:write`.
    As listas de funil/etapa precisam de `pipelines:read`, e a de agente precisa de `flows:read`.
 2. No n8n: credencial **Eva Studio API** com a chave e o endereço da API (está em Integrações → n8n e webhooks, termina
-   em `/api/v1`). O botão de teste chama `GET /me`.
+   em `/api/v1/<id do contrato>`, ex.: `/api/v1/8d8d3a8c`). O botão de teste chama `GET /me`.
 
 ## Eventos do gatilho
 

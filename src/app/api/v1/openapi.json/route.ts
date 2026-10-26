@@ -5,7 +5,7 @@ import { montarOpenApi } from "@/lib/api-v1-openapi";
 // dos endpoints, nenhum dado de organização.
 export async function GET(request: Request) {
   const origem = new URL(request.url).origin;
-  return NextResponse.json(montarOpenApi(`${origem}/api/v1`), {
+  return NextResponse.json(montarOpenApi(`${origem}/api/v1/{contract}`), {
     headers: { "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" },
   });
 }

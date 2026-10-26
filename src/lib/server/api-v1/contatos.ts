@@ -11,7 +11,6 @@ import type { DefinicaoDeCampo } from "@/lib/custom-fields";
 import { ErroApi, iso } from "./http";
 import {
   boolOpc,
-  externalIdOpc,
   idOpc,
   listaDeIdsOpc,
   objetoOpc,
@@ -20,6 +19,7 @@ import {
 } from "./entrada";
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerDataDaConsulta } from "./paginacao";
+import { CONTACT_SOURCE, LEAD_STAGE, toPublic } from "./public-values";
 
 // ---------------------------------------------------------------------------
 // Contatos na API v1: validação, deduplicação/upsert e formato público.
@@ -44,10 +44,9 @@ export function telefonePublico(phone: string): string {
   return /^\d{10,15}$/.test(phone) ? `+${phone}` : phone;
 }
 
-export function serializarContato(c: LinhaDeContato, externalId: string | null = null) {
+export function serializarContato(c: LinhaDeContato) {
   return {
     id: c.id,
-    external_id: externalId,
     name: c.name,
     email: c.email,
     phone: telefonePublico(c.phone),
@@ -58,10 +57,10 @@ export function serializarContato(c: LinhaDeContato, externalId: string | null =
     background: c.background,
     notes: c.notes,
     custom_fields: c.customFields,
-    source: c.source,
+    source: toPublic(CONTACT_SOURCE, c.source),
     opt_in: c.optIn,
     opted_out_at: iso(c.optOutAt),
-    lead_stage: c.leadStage,
+    lead_stage: toPublic(LEAD_STAGE, c.leadStage),
     company_id: c.companyId,
     owner_id: c.ownerId,
     tags: c.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
@@ -72,9 +71,9 @@ export function serializarContato(c: LinhaDeContato, externalId: string | null =
   };
 }
 
-export async function serializarContatos(orgId: string, linhas: LinhaDeContato[]) {
-  const externos = await externosDe(orgId, "contact", linhas.map((c) => c.id));
-  return linhas.map((c) => serializarContato(c, externos.get(c.id) ?? null));
+// Assíncrono por compatibilidade com quem chama (antes buscava o id externo).
+export async function serializarContatos(_orgId: string, linhas: LinhaDeContato[]) {
+  return linhas.map(serializarContato);
 }
 
 export const CAMPOS_DE_CONTATO = [
@@ -90,8 +89,6 @@ export const CAMPOS_DE_CONTATO = [
   "custom_fields",
   "opt_in",
   "tag_ids",
-  "external_id",
-  "external_source",
 ] as const;
 
 export const CAMPOS_DE_PATCH_DE_CONTATO = [
@@ -144,7 +141,6 @@ export async function lerDadosDeContato(orgId: string, corpo: Corpo): Promise<Da
   d.optIn = boolOpc(corpo, "opt_in");
   d.addTagIds = listaDeIdsOpc(corpo, "tag_ids") ?? listaDeIdsOpc(corpo, "add_tag_ids");
   d.removeTagIds = listaDeIdsOpc(corpo, "remove_tag_ids");
-  d.externalId = externalIdOpc(corpo);
 
   await conferirVinculos(orgId, d);
   return d;
@@ -154,7 +150,7 @@ export async function conferirVinculos(orgId: string, d: { companyId?: string | 
   const erroRef = await conferirReferencias(orgId, { companyId: d.companyId, ownerId: d.ownerId });
   if (erroRef) {
     const param = erroRef.startsWith("Empresa") ? "company_id" : "owner_id";
-    throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, { param });
+    throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, { param });
   }
   if (d.addTagIds?.length) {
     const achadas = await prisma.tag.count({ where: { orgId, id: { in: d.addTagIds } } });
@@ -375,7 +371,7 @@ export async function carregarContato(orgId: string, id: string) {
   return c;
 }
 
-export const FILTROS_DE_CONTATO = ["updated_since", "email", "phone", "external_id", "external_source", "tag", "owner", "company"] as const;
+export const FILTROS_DE_CONTATO = ["updated_since", "email", "phone", "tag", "owner", "company"] as const;
 
 /** Filtros simples da listagem. Telefone e e-mail normalizados como a ficha grava. */
 export async function whereDeContatos(orgId: string, sp: URLSearchParams): Promise<Prisma.ContactWhereInput> {
@@ -390,11 +386,6 @@ export async function whereDeContatos(orgId: string, sp: URLSearchParams): Promi
     const filtro = p ? filtroDeTelefone(p) : null;
     if (!filtro) throw new ErroApi(400, "invalid_parameter", "phone inválido.", { param: "phone" });
     and.push(filtro);
-  }
-  const externo = sp.get("external_id");
-  if (externo) {
-    const id = await idPorExterno(orgId, "contact", externo, sp.get("external_source") || "api");
-    and.push({ id: id ?? "__nenhum__" });
   }
   if (sp.get("tag")) and.push({ tags: { some: { tagId: sp.get("tag")! } } });
   if (sp.get("owner")) and.push({ ownerId: sp.get("owner")! });

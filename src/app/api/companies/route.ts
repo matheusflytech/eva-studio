@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   if (size === "invalido") return erro("Número de funcionários inválido.");
 
   const refErro = await conferirReferencias(ctx.orgId, { ownerId: body.ownerId });
-  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
+  if (refErro) return erro(refErro, /inválid[oa]\.$/.test(refErro) ? 400 : 404);
 
   // CNPJ é o identificador natural de empresa no Brasil. Quando vem
   // preenchido, vale como chave de deduplicação — nome repete, CNPJ não.

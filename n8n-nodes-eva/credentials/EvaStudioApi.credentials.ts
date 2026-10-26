@@ -27,9 +27,9 @@ export class EvaStudioApi implements ICredentialType {
 			displayName: 'Endereço da API',
 			name: 'baseUrl',
 			type: 'string',
-			default: 'https://evapp.vercel.app/api/v1',
+			default: 'https://evapp.vercel.app/api/v1/SEU-CONTRATO',
 			required: true,
-			description: 'Termina em /api/v1. Está na tela Integrações → n8n e webhooks.',
+			description: 'Termina em /api/v1/<id do contrato> (o mesmo da URL do app, ex.: 8d8d3a8c). Está na tela Integrações → n8n e webhooks.',
 		},
 	];
 

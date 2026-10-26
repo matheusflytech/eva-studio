@@ -27,8 +27,6 @@ const APELIDOS: Record<EntidadeDeLote, Record<string, string>> = {
   contacts: {
     cargo: "job_title",
     jobtitle: "job_title",
-    idexterno: "external_id",
-    externalid: "external_id",
     empresa_id: "company_id",
     companyid: "company_id",
     responsavel_id: "owner_id",
@@ -41,8 +39,6 @@ const APELIDOS: Record<EntidadeDeLote, Record<string, string>> = {
     nome: "name",
     negocio: "name",
     titulo: "name",
-    idexterno: "external_id",
-    externalid: "external_id",
     valor: "amount",
     descricao: "description",
     funil_id: "pipeline_id",
@@ -55,12 +51,14 @@ const APELIDOS: Record<EntidadeDeLote, Record<string, string>> = {
     contato_email: "contact_email",
     contato_telefone: "contact_phone",
     contato_nome: "contact_name",
-    contato_id_externo: "contact_external_id",
   },
 };
 
 /** Campos extras que a linha de negócio aceita para achar (ou criar) o contato. */
-export const CAMPOS_DE_CONTATO_NO_NEGOCIO = ["contact_email", "contact_phone", "contact_name", "contact_external_id"] as const;
+export const CAMPOS_DE_CONTATO_NO_NEGOCIO = ["contact_email", "contact_phone", "contact_name"] as const;
+
+/** Id de outro sistema não entra pela API: a coluna é recusada (senão viraria campo personalizado). */
+const COLUNAS_RECUSADAS = new Set(["external_id", "externalid", "idexterno", "id_externo", "external_source", "contact_external_id", "contato_id_externo"]);
 
 function camposConhecidos(entity: EntidadeDeLote): Set<string> {
   return new Set<string>(entity === "contacts" ? CAMPOS_DE_CONTATO : [...CAMPOS_DE_NEGOCIO, ...CAMPOS_DE_CONTATO_NO_NEGOCIO]);
@@ -70,6 +68,9 @@ function camposConhecidos(entity: EntidadeDeLote): Set<string> {
 function destinoDaColuna(entity: EntidadeDeLote, coluna: string, defs: DefinicaoDeCampo[]): { campo: string } | { custom: string } {
   const bruto = coluna.trim();
   const slug = slugificar(bruto);
+  if (COLUNAS_RECUSADAS.has(slug)) {
+    throw new ErroApi(400, "invalid_csv", `A coluna "${bruto}" não é aceita: a API não guarda id de outro sistema.`, { details: { column: bruto } });
+  }
   const conhecidos = camposConhecidos(entity);
   if (conhecidos.has(bruto)) return { campo: bruto };
   if (conhecidos.has(slug)) return { campo: slug };
@@ -140,23 +141,21 @@ export async function processarLinha(orgId: string, entity: EntidadeDeLote, linh
     email: record.contact_email,
     phone: record.contact_phone,
     name: record.contact_name,
-    external_id: record.contact_external_id,
   };
   for (const c of CAMPOS_DE_CONTATO_NO_NEGOCIO) delete record[c];
   if (op.pipelineId && record.pipeline_id === undefined && record.stage_id === undefined) record.pipeline_id = op.pipelineId;
   if (op.stageId && record.stage_id === undefined) record.stage_id = op.stageId;
 
   const dados = await lerDadosDeNegocio(orgId, record);
-  // Contato do negócio pela identidade (id externo → e-mail → telefone); se
-  // não existir, nasce junto — é o caso "planilha de negócios do ERP".
-  if (contato.email !== undefined || contato.phone !== undefined || contato.external_id !== undefined) {
+  // Contato do negócio pela identidade (e-mail → telefone); se não existir,
+  // nasce junto — é o caso "planilha de negócios do ERP".
+  if (contato.email !== undefined || contato.phone !== undefined) {
     const dc = await lerDadosDeContato(orgId, {
       ...(contato.email !== undefined ? { email: contato.email } : {}),
       ...(contato.phone !== undefined ? { phone: contato.phone } : {}),
       ...(contato.name !== undefined ? { name: contato.name } : {}),
-      ...(contato.external_id !== undefined ? { external_id: contato.external_id } : {}),
     });
-    const achado = await acharContatoExistente(orgId, { externalId: dc.externalId, source: dc.source, email: dc.email, phone: dc.phone });
+    const achado = await acharContatoExistente(orgId, { source: dc.source, email: dc.email, phone: dc.phone });
     const contactId = achado ? achado.id : op.simular ? "" : (await criarContato(orgId, dc, { origem: "importacao" })).id;
     if (contactId) dados.contactIds = [...new Set([...(dados.contactIds ?? []), contactId])];
   }

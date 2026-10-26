@@ -28,7 +28,7 @@ async function fotoDoEvento(e: EventoPublicado): Promise<Registro> {
     const t = await prisma.task.findFirst({ where: { id: e.objetoId, orgId: e.orgId } });
     if (!t) return null;
     const { serializarTarefa } = await import("@/lib/server/api-v1/tarefas-notas");
-    return serializarTarefa(t) as Record<string, unknown>;
+    return { ...serializarTarefa(t), type: t.type } as Record<string, unknown>; // tipo gravado: é o que as regras comparam
   }
   return null;
 }

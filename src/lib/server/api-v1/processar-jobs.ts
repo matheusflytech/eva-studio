@@ -179,10 +179,10 @@ async function processarImportacao(job: BulkJob, temTempo: () => boolean): Promi
 }
 
 const COLUNAS_CONTATO = [
-  "id", "external_id", "name", "email", "phone", "job_title", "company_id", "owner_id", "opt_in", "source", "tags", "custom_fields", "created_at", "updated_at",
+  "id", "name", "email", "phone", "job_title", "company_id", "owner_id", "opt_in", "source", "tags", "custom_fields", "created_at", "updated_at",
 ] as const;
 const COLUNAS_NEGOCIO = [
-  "id", "external_id", "name", "pipeline_id", "stage_id", "status", "amount_cents", "currency", "probability", "lost_reason",
+  "id", "name", "pipeline_id", "stage_id", "status", "amount_cents", "currency", "probability", "lost_reason",
   "expected_closing_at", "closed_at", "archived_at", "company_id", "owner_id", "contact_ids", "custom_fields", "created_at", "updated_at",
 ] as const;
 
