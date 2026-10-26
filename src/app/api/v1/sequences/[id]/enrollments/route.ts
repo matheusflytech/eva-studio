@@ -6,6 +6,7 @@ import { ErroApi, corpoDeLista, iso } from "@/lib/server/api-v1/http";
 import { conferirCampos, listaDeIdsOpc } from "@/lib/server/api-v1/entrada";
 import { lerConsulta, paginar } from "@/lib/server/api-v1/paginacao";
 import { carregarSequencia } from "@/lib/server/api-v1/sequencias";
+import { enrollmentStop } from "@/lib/server/api-v1/public-values";
 
 type P = { id: string };
 
@@ -32,7 +33,7 @@ export const GET = rotaV1<P>({ recurso: "sequences" }, async (ctx, { id }) => {
         contact_id: e.contactId,
         status: e.status,
         current_step: e.currentStep,
-        stopped_reason: e.stoppedReason,
+        ...enrollmentStop(e.stoppedReason),
         next_run_at: iso(e.nextRunAt),
         created_at: iso(e.createdAt),
         updated_at: iso(e.updatedAt),

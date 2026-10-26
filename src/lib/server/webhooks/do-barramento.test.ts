@@ -50,6 +50,17 @@ describe("webhooks a partir do barramento", () => {
     expect(emitir.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "lead.captured", undefined);
   });
 
+  it("contato alterado: etapa de lead do previous sai em inglês", async () => {
+    await paraWebhooks(evento({ tipo: "contact.updated", objeto: "contact", objetoId: "c1", diff: { lead_stage: { de: "novo", para: "qualificado" } } }));
+    expect(emitir.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "contact.updated", { lead_stage: "new" });
+  });
+
+  it("mensagem: first (nome público) junto do antigo primeira", async () => {
+    await paraWebhooks(evento({ tipo: "message.received", objeto: "conversation", objetoId: "cv1", dados: { id: "m1", primeira: true } }));
+    const montar = emitir.emitirEvento.mock.calls[0][2] as () => Promise<unknown>;
+    expect(await montar()).toEqual({ data: { id: "m1", primeira: true, first: true } });
+  });
+
   it("etiqueta adicionada/removida: passa qual etiqueta", async () => {
     await paraWebhooks(evento({ tipo: "contact.tag_added", objeto: "contact", objetoId: "c1", dados: { tag_id: "t9" } }));
     expect(emitir.emitirEventoDeContato).toHaveBeenCalledWith("o1", "c1", "contact.tag_added", undefined, "t9");

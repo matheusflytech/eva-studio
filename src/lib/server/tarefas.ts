@@ -335,7 +335,7 @@ export async function aplicarEmMassa(ctx: CtxDeTarefas, ids: string[], acao: Aca
 
   if (acao.acao === "reatribuir") {
     const erroRef = await conferirReferencias(ctx.orgId, { assignedToId: acao.responsavelId });
-    if (erroRef) throw new ErroDeTarefa(erroRef, erroRef.endsWith("inválido.") ? 400 : 404);
+    if (erroRef) throw new ErroDeTarefa(erroRef, /inválid[oa]\.$/.test(erroRef) ? 400 : 404);
     // Escopo "só os meus"/"equipe": não dá para passar tarefa para fora do teto.
     if (escopo && escopo !== "todos" && !tarefaNoEscopo(acao.responsavelId, escopo, ctx.userId, colegas)) {
       throw new ErroDeTarefa("Você só pode atribuir tarefas a quem está no seu escopo.", 403, "fora_do_escopo");
@@ -391,7 +391,7 @@ export async function quickAdd(
 
   if (vinculo.contactId || vinculo.dealId) {
     const erroRef = await conferirReferencias(ctx.orgId, { contactId: vinculo.contactId, dealId: vinculo.dealId });
-    if (erroRef) throw new ErroDeTarefa(erroRef, erroRef.endsWith("inválido.") ? 400 : 404);
+    if (erroRef) throw new ErroDeTarefa(erroRef, /inválid[oa]\.$/.test(erroRef) ? 400 : 404);
     if (vinculo.contactId) {
       const c = await prisma.contact.findFirst({ where: { id: vinculo.contactId, orgId: ctx.orgId }, select: { id: true, name: true } });
       contato = c ? { id: c.id, nome: c.name } : null;

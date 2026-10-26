@@ -152,7 +152,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   }
 
   const refErro = await conferirReferencias(ctx.orgId, { companyId: body.companyId, ownerId: body.ownerId });
-  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
+  if (refErro) return erro(refErro, /inválid[oa]\.$/.test(refErro) ? 400 : 404);
 
   if (body.customFields && typeof body.customFields === "object") {
     const r = await mesclarCamposDeContato(

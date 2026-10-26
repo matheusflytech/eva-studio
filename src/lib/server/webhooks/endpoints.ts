@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/server/crypto";
 import { assertSafeUrl } from "@/lib/server/ssrf";
 import { normalizarFiltros } from "@/lib/webhooks/eventos";
+import { WEBHOOK_SOURCE, toPublic } from "@/lib/server/api-v1/public-values";
 import { novoSegredo } from "./assinatura";
 import { tentarEntrega } from "./entrega";
 import type { WebhookEndpoint } from "@/generated/prisma/client";
@@ -34,7 +35,7 @@ export function serializarEndpoint(e: WebhookEndpoint) {
     description: e.descricao,
     events: e.eventos,
     active: e.ativo,
-    source: e.origem,
+    source: toPublic(WEBHOOK_SOURCE, e.origem),
     disabled_reason: e.desativadoPor,
     failing_since: e.falhandoDesde?.toISOString() ?? null,
     last_success_at: e.ultimoSucesso?.toISOString() ?? null,

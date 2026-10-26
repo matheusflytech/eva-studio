@@ -6,6 +6,7 @@ import { ErroDeCrm } from "@/lib/server/crm";
 import { ErroDaMudanca } from "@/lib/server/regras-de-etapa";
 import { ErroDeFunil } from "@/lib/server/funis-acoes";
 import { ErroDaLixeira } from "@/lib/server/lixeira";
+import { requiredFieldToPublic } from "./public-values";
 
 /** Código estável (inglês) dos erros da lixeira na v1. */
 const CODIGO_DA_LIXEIRA: Record<string, string> = {
@@ -84,7 +85,7 @@ export function paraErroApi(e: unknown): ErroApi {
     if (e.codigo === "negocio_fechado") return new ErroApi(409, "deal_closed", e.message, { details: { hint: "Envie reopen: true para reabrir e mover." } });
     if (e.codigo === "motivo_obrigatorio") return new ErroApi(422, "lost_reason_required", e.message, { param: "lost_reason_id" });
     return new ErroApi(422, "stage_requirements_missing", e.message, {
-      details: { missing_fields: e.faltando.map((f) => ({ field: f.campo, label: f.rotulo, stage_id: f.etapaNumero ?? null, stage_name: f.etapa })) },
+      details: { missing_fields: e.faltando.map((f) => ({ field: requiredFieldToPublic(f.campo), label: f.rotulo, stage_id: f.etapaNumero ?? null, stage_name: f.etapa })) },
     });
   }
   if (e instanceof ErroDaLixeira) {

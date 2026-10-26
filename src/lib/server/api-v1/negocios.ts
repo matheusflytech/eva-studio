@@ -24,6 +24,7 @@ import {
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerBooleano, lerDataDaConsulta } from "./paginacao";
 import { lerNumero, numerosDeEtapas, numerosDeFunis, refOpc, uuidDaEtapa, uuidDoFunil } from "./funis";
+import { lostReasonIdFromPublic } from "./public-values";
 
 // ---------------------------------------------------------------------------
 // Negócios na API v1. Criação passa por createDeal e todo movimento de etapa
@@ -188,7 +189,7 @@ export async function lerDadosDeNegocio(orgId: string, corpo: Corpo): Promise<Da
 
   const erroRef = await conferirReferencias(orgId, { companyId: d.companyId, ownerId: d.ownerId });
   if (erroRef) {
-    throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, {
+    throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, {
       param: erroRef.startsWith("Empresa") ? "company_id" : "owner_id",
     });
   }
@@ -290,6 +291,8 @@ export async function moverNegocio(
   alvo: AlvoDoMovimento,
   op: Opcoes & { pendente?: OpcoesDaMudanca["pendente"] } = {}
 ): Promise<{ mudou: boolean; pipelineId: string }> {
+  // Motivo padrão em inglês (default:price) vira o id que o motor conhece (padrao:preco).
+  if (alvo.lostReasonId) alvo = { ...alvo, lostReasonId: lostReasonIdFromPublic(alvo.lostReasonId) };
   const deal = await prisma.deal.findFirst({ where: { id: dealId, orgId }, select: { id: true, stageId: true, pipelineId: true, lostReason: true } });
   if (!deal) throw new ErroApi(404, "not_found", "Negócio não encontrado.");
   const etapa = await prisma.pipelineStage.findFirst({

@@ -143,7 +143,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   if (size !== undefined) data.size = size;
 
   const refErro = await conferirReferencias(ctx.orgId, { ownerId: body.ownerId });
-  if (refErro) return erro(refErro, refErro.endsWith("inválido.") ? 400 : 404);
+  if (refErro) return erro(refErro, /inválid[oa]\.$/.test(refErro) ? 400 : 404);
 
   if (typeof body.cnpj === "string") {
     const cnpj = body.cnpj.replace(/\D/g, "");

@@ -100,7 +100,7 @@ export async function lerDadosDeEmpresa(orgId: string, corpo: Corpo): Promise<Da
   d.ownerId = idOpc(corpo, "owner_id");
   d.externalId = externalIdOpc(corpo);
   const erroRef = await conferirReferencias(orgId, { ownerId: d.ownerId });
-  if (erroRef) throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, { param: "owner_id" });
+  if (erroRef) throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, { param: "owner_id" });
   return d;
 }
 

@@ -34,7 +34,7 @@ export const CONTACT = {
   source: "api",
   opt_in: true,
   opted_out_at: null,
-  lead_stage: "qualificado",
+  lead_stage: "qualified",
   company_id: COMPANY_ID,
   owner_id: OWNER_ID,
   tags: [{ id: TAG_ID, name: "Cliente VIP" }],
@@ -153,7 +153,7 @@ export const ME = {
 // tarefas-notas.ts → serializarTarefa / serializarNota
 export const TASK = {
   id: "7c1e4b2a-93d5-4f6e-8a10-2b3c4d5e6f70",
-  type: "ligar",
+  type: "call",
   text: "Ligar para confirmar a proposta",
   due_at: "2026-10-22T14:00:00.000Z",
   done: false,
@@ -271,6 +271,7 @@ export const ENROLLMENT = {
   status: "active",
   current_step: 1,
   stopped_reason: null,
+  stopped_detail: null,
   next_run_at: "2026-10-21T15:32:10.000Z",
   created_at: "2026-10-20T14:32:10.000Z",
   updated_at: "2026-10-20T15:32:12.000Z",

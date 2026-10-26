@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import type { Note, Prisma, Task } from "@/generated/prisma/client";
 import { conferirReferencias, type Corpo } from "@/lib/server/api-validacao";
-import { TIPOS_DE_TAREFA, parseRelativeDue } from "@/lib/server/crm";
+import { parseRelativeDue } from "@/lib/server/crm";
+import { TASK_TYPE, toPublic } from "./public-values";
 import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
 import { ErroApi, iso } from "./http";
 import { boolOpc, dataOpc, enumOpc, idOpc, textoOpc } from "./entrada";
@@ -14,7 +15,7 @@ import { lerDataDaConsulta } from "./paginacao";
 export function serializarTarefa(t: Task) {
   return {
     id: t.id,
-    type: t.type,
+    type: toPublic(TASK_TYPE, t.type),
     text: t.text,
     due_at: iso(t.dueAt),
     done: !!t.doneAt,
@@ -45,7 +46,7 @@ async function conferir(orgId: string, refs: { contactId?: string | null; dealId
   const erroRef = await conferirReferencias(orgId, refs);
   if (erroRef) {
     const param = erroRef.startsWith("Contato") ? "contact_id" : erroRef.startsWith("Negócio") ? "deal_id" : "assigned_to_id";
-    throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, { param });
+    throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, { param });
   }
 }
 
@@ -62,8 +63,8 @@ export interface DadosDeTarefa {
 export async function lerDadosDeTarefa(orgId: string, corpo: Corpo): Promise<DadosDeTarefa> {
   const d: DadosDeTarefa = {};
   d.text = textoOpc(corpo, "text", 5000);
-  // ligar | whatsapp | email | reuniao | visita | afazer (o antigo "outro" é gravado como afazer).
-  const tipo = enumOpc(corpo, "type", TIPOS_DE_TAREFA);
+  // call | whatsapp | email | meeting | visit | todo; os ids antigos (ligar, reuniao, visita, afazer, outro) seguem aceitos.
+  const tipo = enumOpc(corpo, "type", [...new Set([...Object.values(TASK_TYPE), ...Object.keys(TASK_TYPE)])]);
   d.type = tipo === undefined ? undefined : normalizarTipoDeTarefa(tipo) ?? tipo;
   d.dueAt = dataOpc(corpo, "due_at");
   const relativo = textoOpc(corpo, "due", 40);

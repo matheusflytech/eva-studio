@@ -79,7 +79,9 @@ export function WebhooksGuide({ base }: { base: string }) {
             <code className="font-mono text-text-primary">*.updated</code> e <code className="font-mono text-text-primary">deal.owner_changed</code>, os
             campos que mudaram. Em <code className="font-mono text-text-primary">contact.tag_added</code> e{" "}
             <code className="font-mono text-text-primary">contact.tag_removed</code>, o campo{" "}
-            <code className="font-mono text-text-primary">{"tag: { id, name }"}</code> diz qual etiqueta.
+            <code className="font-mono text-text-primary">{"tag: { id, name }"}</code> diz qual etiqueta. Em{" "}
+            <code className="font-mono text-text-primary">message.received</code>,{" "}
+            <code className="font-mono text-text-primary">first</code> diz se é a primeira mensagem da conversa.
           </p>
           <div className="flex flex-col gap-3">
             <CodeBlock label="Headers" code={DELIVERY_HEADERS} />

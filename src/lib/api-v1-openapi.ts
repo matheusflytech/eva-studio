@@ -374,15 +374,15 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
       tag: "Negócios",
       summary: "Marcar como perdido",
       description:
-        "Motivo obrigatório: lost_reason_id (ids em GET /pipelines/{id}/lost-reasons) ou lost_reason em texto; motivo com requires_note exige lost_note.",
+        "Motivo obrigatório: lost_reason_id (ids em GET /pipelines/{id}/lost-reasons; os padrão são default:price, default:competitor, default:no_response, default:no_budget, default:timing e default:other) ou lost_reason em texto; motivo com requires_note exige lost_note.",
       scope: "deals:write",
-      body: { lost_reason_id: "padrao:preco", lost_note: "" },
+      body: { lost_reason_id: "default:price", lost_note: "" },
       response: one({ ...DEAL, stage_id: 6, status: "lost", probability: 0, lost_reason: "Preço", closed_at: "2026-10-21T10:00:00.000Z" }, { moved: true }),
       errors: [[404, "not_found"], [422, "no_lost_stage"], [422, "lost_reason_required"], [409, "deal_closed"], [422, "stage_requirements_missing"]],
     },
   },
   "/deals/{id}/history": {
-    get: { tag: "Negócios", summary: "Histórico de etapas", description: "source: usuario, fluxo, api, importacao ou backfill.", scope: "deals:read", query: [...LISTA], response: list(DEAL_HISTORY), errors: [[404, "not_found"]] },
+    get: { tag: "Negócios", summary: "Histórico de etapas", description: "source: user, flow, api, import, automation ou backfill.", scope: "deals:read", query: [...LISTA], response: list(DEAL_HISTORY), errors: [[404, "not_found"]] },
   },
   "/deals/{id}/contacts": {
     get: { tag: "Negócios", summary: "Contatos do negócio", description: "Contato completo com role no fim. Sem paginação.", scope: "deals:read", response: list(CONTATO_DO_NEGOCIO), errors: [[404, "not_found"]] },
@@ -413,10 +413,10 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     post: {
       tag: "Tarefas e notas",
       summary: "Criar tarefa",
-      description: "type: ligar, whatsapp, email, reuniao, visita ou afazer. Prazo em due_at (ISO-8601) ou due relativo (\"2d\", \"3h\").",
+      description: "type: call, whatsapp, email, meeting, visit ou todo. Prazo em due_at (ISO-8601) ou due relativo (\"2d\", \"3h\").",
       scope: "tasks:write",
       status: 201,
-      body: { text: "Ligar para confirmar", type: "ligar", due: "2d", deal_id: DEAL_ID },
+      body: { text: "Ligar para confirmar", type: "call", due: "2d", deal_id: DEAL_ID },
       response: one(TASK),
       errors: [[400, "invalid_parameter"], [404, "invalid_reference"]],
     },
@@ -595,9 +595,9 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     get: {
       tag: "Funis",
       summary: "Motivos de perda do funil",
-      description: "O id vai em lost_reason_id (POST /deals/{id}/lost e /move). Funil sem motivos salvos usa os padrão (ids padrao:...).",
+      description: "O id vai em lost_reason_id (POST /deals/{id}/lost e /move). Funil sem motivos salvos usa os padrão (ids default:...).",
       scope: "pipelines:read",
-      response: list({ id: "padrao:preco", label: "Preço", requires_note: false }),
+      response: list({ id: "default:price", label: "Preço", requires_note: false }),
       errors: [[400, "invalid_parameter"], [404, "not_found"]],
     },
   },
@@ -791,7 +791,7 @@ const ROTAS: Record<string, Partial<Record<Metodo, Op>>> = {
     delete: { tag: "Sequências", summary: "Apagar sequência", scope: "sequences:write", response: one({ id: SEQUENCE.id, deleted: true }), errors: [[404, "not_found"]] },
   },
   "/sequences/{id}/enrollments": {
-    get: { tag: "Sequências", summary: "Inscrições", scope: "sequences:read", query: [...LISTA, ["status", "active | done | stopped"]], response: list(ENROLLMENT), errors: [[404, "not_found"]] },
+    get: { tag: "Sequências", summary: "Inscrições", description: "stopped_reason: replied, opted_out, manual, automation ou send_failed (com o motivo em stopped_detail).", scope: "sequences:read", query: [...LISTA, ["status", "active | done | stopped"]], response: list(ENROLLMENT), errors: [[404, "not_found"]] },
     post: {
       tag: "Sequências",
       summary: "Inscrever contatos (até 100)",
@@ -832,7 +832,8 @@ export function montarOpenApi(servidor = "https://SEU-DOMINIO/api/v1") {
         "Listas: { data, has_more, next_cursor }. Erro: { error: { type, code, message, param?, details?, request_id } }. " +
         "Limite por chave: 600 leituras e 300 escritas por minuto (headers RateLimit-*). Escopo exigido em x-scope; erros próprios do endpoint em x-errors. " +
         "external_id na resposta é o da origem pedida (external_source da query ou do corpo; padrão api). " +
-        "Importação e exportação: chaves antigas com imports:write ou exports:read continuam valendo para ler e escrever o job.",
+        "Importação e exportação: chaves antigas com imports:write ou exports:read continuam valendo para ler e escrever o job. " +
+        "Valores fixos em inglês (type da tarefa, lead_stage, source, motivos padrão default:*); a entrada ainda aceita os nomes antigos em português.",
     },
     servers: [{ url: servidor }],
     security: [{ bearer: [] }],

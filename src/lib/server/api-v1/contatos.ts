@@ -20,6 +20,7 @@ import {
 } from "./entrada";
 import { externosDe, idPorExterno, vincularExterno } from "./externos";
 import { lerDataDaConsulta } from "./paginacao";
+import { CONTACT_SOURCE, LEAD_STAGE, toPublic } from "./public-values";
 
 // ---------------------------------------------------------------------------
 // Contatos na API v1: validação, deduplicação/upsert e formato público.
@@ -58,10 +59,10 @@ export function serializarContato(c: LinhaDeContato, externalId: string | null =
     background: c.background,
     notes: c.notes,
     custom_fields: c.customFields,
-    source: c.source,
+    source: toPublic(CONTACT_SOURCE, c.source),
     opt_in: c.optIn,
     opted_out_at: iso(c.optOutAt),
-    lead_stage: c.leadStage,
+    lead_stage: toPublic(LEAD_STAGE, c.leadStage),
     company_id: c.companyId,
     owner_id: c.ownerId,
     tags: c.tags.map((t) => ({ id: t.tag.id, name: t.tag.name })),
@@ -154,7 +155,7 @@ export async function conferirVinculos(orgId: string, d: { companyId?: string | 
   const erroRef = await conferirReferencias(orgId, { companyId: d.companyId, ownerId: d.ownerId });
   if (erroRef) {
     const param = erroRef.startsWith("Empresa") ? "company_id" : "owner_id";
-    throw new ErroApi(erroRef.endsWith("inválido.") ? 400 : 404, "invalid_reference", erroRef, { param });
+    throw new ErroApi(/inválid[oa]\.$/.test(erroRef) ? 400 : 404, "invalid_reference", erroRef, { param });
   }
   if (d.addTagIds?.length) {
     const achadas = await prisma.tag.count({ where: { orgId, id: { in: d.addTagIds } } });

@@ -5,6 +5,7 @@ import { corpoDeLista } from "@/lib/server/api-v1/http";
 import { lerConsulta, paginar } from "@/lib/server/api-v1/paginacao";
 import { carregarNegocio } from "@/lib/server/api-v1/negocios";
 import { numerosDeEtapas, numerosDeFunis } from "@/lib/server/api-v1/funis";
+import { STAGE_HISTORY_SOURCE, toPublic } from "@/lib/server/api-v1/public-values";
 
 // GET /api/v1/deals/{id}/history — cada entrada em etapa (DealStageEvent), da mais antiga para a mais nova.
 export const GET = rotaV1<{ id: string }>({ recurso: "deals" }, async (ctx, { id }) => {
@@ -34,7 +35,7 @@ export const GET = rotaV1<{ id: string }>({ recurso: "deals" }, async (ctx, { id
         pipeline_id: funis.get(e.pipelineId) ?? null,
         from_stage_id: e.fromStageId ? etapas.get(e.fromStageId) ?? null : null,
         to_stage_id: etapas.get(e.toStageId) ?? null,
-        source: e.origem,
+        source: toPublic(STAGE_HISTORY_SOURCE, e.origem),
         at: e.at.toISOString(),
       })),
       pagina

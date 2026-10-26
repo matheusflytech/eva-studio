@@ -123,7 +123,7 @@ const ERROR_422 = {
     type: "invalid_request_error",
     code: "stage_requirements_missing",
     message: "Para mover para Proposta, preencha: Valor.",
-    details: { missing_fields: [{ field: "valor", label: "Valor", stage_id: 3, stage_name: "Proposta" }] },
+    details: { missing_fields: [{ field: "amount_cents", label: "Valor", stage_id: 3, stage_name: "Proposta" }] },
     request_id: "req_0c1d2e3f4a5b6c7d8e9f0a1b",
   },
 };
@@ -296,6 +296,7 @@ body={{ data: ME }} />
                   ["Funil e etapa", <C key="c">pipeline_id: 1, stage_id: 3</C>, "Número no contrato, não UUID. Veja GET /pipelines."],
                   ["Outros ids", <C key="c">uuid</C>, "Contato, empresa, negócio, tarefa, nota, agente, etiqueta."],
                   ["Seu id", <C key="c">external_id</C>, "Guarde o id do seu sistema e busque/atualize por ele em /by-external-id/{id}. Mais de um sistema? Use external_source; a resposta mostra o external_id dessa origem (padrão api)."],
+                  ["Valores fixos", <C key="c">type: &quot;call&quot;</C>, "Em inglês (tipo de tarefa, lead_stage, source, motivos default:*). Na entrada, os nomes antigos em português ainda valem."],
                   ["PATCH", "Parcial", "Campo ausente não muda; null limpa."],
                   ["Campos e filtros", "Estritos", "Campo ou parâmetro desconhecido é erro 400 (unknown_field / unknown_parameter), nunca ignorado."],
                   ["Resposta", <C key="c">{"{ data }"}</C>, "Objeto em data; listas em { data, has_more, next_cursor }."],
@@ -407,7 +408,7 @@ body={{ data: ME }} />
               <LeadEndpoint method="GET" path="/api/v1/leads" title="Lista os leads, mais recentes primeiro.">
                 <div>
                   <Field name="limit" type="número">Padrão 50, máximo 200.</Field>
-                  <Field name="stage" type="texto">novo, contatado, qualificado, ganho ou perdido.</Field>
+                  <Field name="stage" type="texto">novo, contatado, qualificado, ganho ou perdido (também aceita new, contacted, qualified, won, lost).</Field>
                 </div>
                 <Example method="GET" url={`${base}/leads?stage=novo&limit=50`} />
                 <Response status={200} body={{ data: [LEAD] }} />

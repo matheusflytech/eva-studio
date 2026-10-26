@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LEAD_STAGE, fromPublic } from "@/lib/server/api-v1/public-values";
 import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
 import { atualizarLead, buscarLead, removerDosLeads, resolverIdDoLead, serializarLeadPublico } from "@/lib/server/leads";
 import { autenticarApiV1, respostaDeErroDoLead } from "../auth";
@@ -31,8 +32,10 @@ export async function PATCH(request: Request, { params }: Params) {
   const contactId = await resolverIdDoLead(auth.orgId, id);
   if (!contactId) return erro("Lead não encontrado.", 404);
 
+  // Aceita o nome em inglês (new, contacted...) além do antigo.
+  const stageBruto = body.stage ?? body.leadStage;
   const r = await atualizarLead(auth.orgId, contactId, {
-    stage: body.stage ?? body.leadStage,
+    stage: typeof stageBruto === "string" ? (fromPublic(LEAD_STAGE, stageBruto) ?? stageBruto) : stageBruto,
     fields: body.fields ?? body.variables,
   });
   if ("error" in r) return respostaDeErroDoLead(r);

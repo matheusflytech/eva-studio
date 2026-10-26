@@ -69,6 +69,11 @@ describe("/api/v1/leads", () => {
     expect(db.contact.create).not.toHaveBeenCalled();
   });
 
+  it("stage em inglês vale como o antigo (new = novo)", async () => {
+    await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=new"));
+    expect(db.contact.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { orgId: "o1", leadStage: "novo" } }));
+  });
+
   it("GET lista no formato público (chaves antigas + novas)", async () => {
     db.contact.findMany.mockResolvedValue([contatoLead]);
     const res = await GET(req(undefined, "GET", "https://eva.test/api/v1/leads?stage=novo&limit=10"));

@@ -188,7 +188,7 @@ describe("mover etapa", () => {
     expect(res.status).toBe(422);
     const corpo = await res.json();
     expect(corpo.error.code).toBe("stage_requirements_missing");
-    expect(corpo.error.details.missing_fields).toEqual([{ field: "valor", label: "Valor", stage_id: 2, stage_name: "Proposta" }]);
+    expect(corpo.error.details.missing_fields).toEqual([{ field: "amount_cents", label: "Valor", stage_id: 2, stage_name: "Proposta" }]);
   });
 
   it("negócio fechado sem reopen → 409 deal_closed; reopen e motivo estruturado seguem para moveDealStage", async () => {

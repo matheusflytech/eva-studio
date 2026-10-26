@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { LEAD_STAGE, fromPublic } from "@/lib/server/api-v1/public-values";
 import { erro, lerCorpo, JSON_INVALIDO } from "@/lib/server/api-validacao";
 import { buscarLead, isLeadStage, LEAD_STAGES, listarLeads, salvarLeadExterno, serializarLeadPublico } from "@/lib/server/leads";
 import { autenticarApiV1, respostaDeErroDoLead } from "./auth";
@@ -14,7 +15,9 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 200);
-  const stage = searchParams.get("stage");
+  // Aceita o nome em inglês (new, contacted...) além do antigo.
+  const bruto = searchParams.get("stage");
+  const stage = bruto ? (fromPublic(LEAD_STAGE, bruto) ?? bruto) : bruto;
   if (stage && !isLeadStage(stage)) return erro(`stage precisa ser um de: ${LEAD_STAGES.join(", ")}.`);
 
   const leads = await listarLeads(auth.orgId, { stage, limit });
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
     return erro("agentId e fields são obrigatórios.");
   }
   const stageBruto = body.stage ?? body.leadStage;
-  const stage = stageBruto === "" || stageBruto === null ? undefined : stageBruto;
+  const stage = stageBruto === "" || stageBruto === null ? undefined : typeof stageBruto === "string" ? (fromPublic(LEAD_STAGE, stageBruto) ?? stageBruto) : stageBruto;
 
   const r = await salvarLeadExterno(auth.orgId, { agentId: body.agentId, fields, stage }, "api");
   if ("error" in r) return respostaDeErroDoLead(r);

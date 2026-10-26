@@ -1,6 +1,7 @@
 import "server-only";
 import { EVENTOS, type TipoDeEvento } from "@/lib/webhooks/eventos";
 import type { EventoPublicado } from "@/lib/server/eventos/barramento";
+import { CONTACT_SOURCE, LEAD_STAGE, toPublic } from "@/lib/server/api-v1/public-values";
 import { emitirEvento, emitirEventoDeContato, emitirEventoDeEmpresa, emitirEventoDeNegocio, emitirEventoDeTarefa } from "./emitir";
 
 // Consumidor do barramento: evento de domínio que está no catálogo dos
@@ -20,8 +21,9 @@ export async function paraWebhooks(e: EventoPublicado): Promise<void> {
   const tipo = e.tipo as TipoDeEvento;
   const previous = anterior(e);
   if (e.tipo === "message.received") {
-    // A mensagem já vem inteira no evento (não é um objeto da API).
-    await emitirEvento(e.orgId, tipo, async () => ({ data: e.dados }));
+    // A mensagem já vem inteira no evento (não é um objeto da API). `first` é o
+    // nome público; `primeira` fica por compatibilidade com quem já lê.
+    await emitirEvento(e.orgId, tipo, async () => ({ data: "primeira" in e.dados ? { ...e.dados, first: e.dados.primeira } : e.dados }));
     return;
   }
   if (e.objeto === "deal") {
@@ -30,6 +32,9 @@ export async function paraWebhooks(e: EventoPublicado): Promise<void> {
     const { comNumeros } = await import("@/lib/server/api-v1/funis");
     await emitirEventoDeNegocio(e.orgId, e.objetoId, tipo, await comNumeros(previous));
   } else if (e.objeto === "contact") {
+    // O diff vem das fotos internas (valor gravado): no webhook sai em inglês, como o `data`.
+    if (previous && typeof previous.lead_stage === "string") previous.lead_stage = toPublic(LEAD_STAGE, previous.lead_stage);
+    if (previous && typeof previous.source === "string") previous.source = toPublic(CONTACT_SOURCE, previous.source);
     // Etiqueta adicionada/removida: diz qual (sem isso o evento não serve pra nada).
     const tagId = (tipo === "contact.tag_added" || tipo === "contact.tag_removed") && typeof e.dados.tag_id === "string" ? e.dados.tag_id : null;
     if (tagId) await emitirEventoDeContato(e.orgId, e.objetoId, tipo, previous, tagId);

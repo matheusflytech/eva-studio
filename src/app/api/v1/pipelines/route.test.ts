@@ -48,7 +48,7 @@ describe("GET /v1/pipelines/{id}/lost-reasons", () => {
     db.pipeline.findFirst.mockResolvedValue({ id: "p1", numero: 1 });
     db.pipelineLostReason.findMany.mockResolvedValueOnce([]);
     const r1 = await (await MOTIVOS(req("GET", undefined, url), umFunil)).json();
-    expect(r1.data[0]).toEqual({ id: "padrao:preco", label: "Preço", requires_note: false });
+    expect(r1.data[0]).toEqual({ id: "default:price", label: "Preço", requires_note: false });
     expect(r1).toMatchObject({ has_more: false, next_cursor: null });
 
     db.pipelineLostReason.findMany.mockResolvedValueOnce([{ id: "m1", label: "Fechou com outro", requiresNote: true }]);

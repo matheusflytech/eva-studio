@@ -86,7 +86,7 @@ export async function montarContexto(
     const t = await prisma.task.findFirst({ where: { id: objetoId, orgId } });
     if (!t) return null;
     const { serializarTarefa } = await import("@/lib/server/api-v1/tarefas-notas");
-    registro = serializarTarefa(t) as Foto;
+    registro = { ...serializarTarefa(t), type: t.type } as Foto; // tipo gravado: é o que as regras comparam
     ({ contato, empresa } = await contatoEmpresa(orgId, t.contactId, null));
     ids.negocio = t.dealId;
   } else {
