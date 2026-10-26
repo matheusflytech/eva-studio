@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { horaDaMensagem, tamanhoLegivel, type Mensagem } from "./tipos";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
+import { PlayerDeAudio } from "./player-de-audio";
 
 /** Os tiques que todo mundo já conhece do WhatsApp. Ficam dentro do balão azul. */
 function Entrega({ m, onReenviar }: { m: Mensagem; onReenviar: () => void }) {
@@ -74,9 +75,7 @@ function Anexo({ m, doContato }: { m: Mensagem; doContato: boolean }) {
     );
   }
 
-  if (md.type === "audio") {
-    return <audio controls preload="none" src={md.url} className="h-10 w-[240px] max-w-full" />;
-  }
+  if (md.type === "audio") return <PlayerDeAudio url={md.url} semente={m.id} claro={!doContato} />;
 
   if (md.type === "video") {
     return <video controls preload="metadata" src={md.url} className="max-h-[260px] max-w-full rounded-xl" />;
@@ -178,8 +177,13 @@ export function Balao({
         {!semTexto &&
           (m.media?.type === "audio" ? (
             // Áudio: o texto é a transcrição (feita ao chegar ou ao gravar), como no WhatsApp.
-            <p className="whitespace-pre-wrap break-words text-small leading-relaxed">
-              <span className={cn("mb-0.5 block text-caption font-medium", doContato ? "text-text-tertiary" : "text-text-on-accent/70")}>Transcrição</span>
+            <p
+              className={cn(
+                "whitespace-pre-wrap break-words border-t pt-1.5 text-small leading-snug",
+                doContato ? "border-border-subtle text-text-secondary" : "border-text-on-accent/20 text-text-on-accent/90"
+              )}
+            >
+              <span className="sr-only">Transcrição: </span>
               {m.text}
             </p>
           ) : (
