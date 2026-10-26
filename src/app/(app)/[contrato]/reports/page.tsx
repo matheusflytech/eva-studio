@@ -10,9 +10,11 @@ import { MarcaEva } from "@/components/layout/marca-eva";
 import { IconeDoBloco } from "@/components/agent-studio/builder/icone-do-bloco";
 import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
+import { ReportsPanel } from "@/components/agent-studio/builder/reports-panel";
 
 // ---------------------------------------------------------------------------
-// Insights.
+// Relatórios (antes "Insights").
 //
 // A versão anterior tinha três painéis e dois eram inventados, com um selo de
 // "Simulado" e um parágrafo explicando por quê. Painel que pede desculpa não é
@@ -43,10 +45,11 @@ const BLOCOS_DE_IA = new Set(["ai-agent"]);
 /** Quantas linhas aparecem antes do "Ver os N". */
 const PRIMEIROS = 4;
 
-type Aba = "ondePara" | "horarios" | "termos" | "canais";
+type Aba = "ondePara" | "funil" | "horarios" | "termos" | "canais";
 
 const ABAS: { valor: Aba; rotulo: string }[] = [
   { valor: "ondePara", rotulo: "Onde a conversa para" },
+  { valor: "funil", rotulo: "Funil dos agentes" },
   { valor: "horarios", rotulo: "Horários" },
   { valor: "termos", rotulo: "O que mais falam" },
   { valor: "canais", rotulo: "Por canal" },
@@ -66,7 +69,7 @@ interface Payload {
   porHora: { label: string; value: number }[];
 }
 
-export default function InsightsPage() {
+export default function ReportsPage() {
   const [dias, setDias] = React.useState(30);
   const [dados, setDados] = React.useState<Payload | null>(null);
   const [carregando, setCarregando] = React.useState(true);
@@ -88,8 +91,8 @@ export default function InsightsPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
       {/* Barra da tela: título e, à direita, o período em cápsula. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Insights</h1>
-        <span className="font-mono text-caption text-text-tertiary">conversas dos agentes</span>
+        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Relatórios</h1>
+        <span className="font-mono text-caption text-text-tertiary">conversas e funis dos agentes</span>
         <div className="ml-auto">
           <SegmentedControl
             label="Período"
@@ -187,12 +190,48 @@ export default function InsightsPage() {
 
           <div id="painel-de-insights" role="tabpanel" aria-labelledby={`aba-${aba}`}>
             {aba === "ondePara" && <OndePara itens={dados?.ondePara ?? []} />}
+            {aba === "funil" && <FunilDosAgentes />}
             {aba === "horarios" && <Horarios porHora={dados?.porHora ?? []} mensagens={v?.mensagensDeContato ?? 0} />}
             {aba === "termos" && <Termos termos={dados?.termos ?? []} />}
             {aba === "canais" && <Canais canais={dados?.porCanal ?? []} />}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Funil por Bloco de um agente (o mesmo da aba Relatórios do builder), com período e canal próprios. */
+function FunilDosAgentes() {
+  const [agentes, setAgentes] = React.useState<{ id: string; name: string }[] | null>(null);
+  const [agente, setAgente] = React.useState("");
+
+  React.useEffect(() => {
+    fetch("/api/agents")
+      .then((r) => (r.ok ? r.json() : { agents: [] }))
+      .then((d: { agents?: { id: string; name: string }[] }) => {
+        const lista = d.agents ?? [];
+        setAgentes(lista);
+        setAgente((atual) => atual || lista[0]?.id || "");
+      })
+      .catch(() => setAgentes([]));
+  }, []);
+
+  if (agentes === null) return <div className="h-11 animate-pulse rounded-[14px] bg-raised motion-reduce:animate-none" />;
+  if (agentes.length === 0) return <Vazio texto="Nenhum agente criado ainda." />;
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex max-w-sm flex-col gap-1 text-caption text-text-tertiary">
+        Agente
+        <Select value={agente} onChange={(e) => setAgente(e.target.value)}>
+          {agentes.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </Select>
+      </label>
+      {agente && <ReportsPanel key={agente} agentId={agente} />}
     </div>
   );
 }

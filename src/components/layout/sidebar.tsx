@@ -6,7 +6,7 @@ import { usePathname } from "@/lib/contrato/navegacao";
 import {
   Home,
   LayoutDashboard,
-  Zap,
+  ChartColumn,
   Aperture,
   CheckCheck,
   Send,
@@ -83,7 +83,7 @@ const NAV_AVANCADO: NavGroup[] = [
     items: [
       { href: "/companies", label: "Empresas", icon: Building2 },
       { href: "/leads", label: "Leads", icon: Users },
-      { href: "/insights", label: "Insights", icon: Zap },
+      { href: "/reports", label: "Relatórios", icon: ChartColumn },
     ],
   },
   {
