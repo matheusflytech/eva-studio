@@ -12,6 +12,8 @@ export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
+  /** Sigla de UF: dá para pintar no mapa do Brasil. */
+  geo?: "uf";
 }
 
 export interface DatasetDef {
@@ -76,6 +78,8 @@ export const DATASETS: DatasetDef[] = [
       f("name", "Nome"),
       f("email", "E-mail"),
       f("phone", "Telefone"),
+      f("ddd", "DDD"),
+      { ...f("ddd_uf", "UF (pelo DDD)"), geo: "uf" },
       f("job_title", "Cargo"),
       f("company", "Empresa"),
       f("owner", "Responsável"),
@@ -99,7 +103,7 @@ export const DATASETS: DatasetDef[] = [
       f("sector", "Setor"),
       f("size", "Funcionários", "number"),
       f("city", "Cidade"),
-      f("uf", "UF"),
+      { ...f("uf", "UF"), geo: "uf" },
       f("owner", "Responsável"),
       f("created", "Criada em", "date"),
     ],
@@ -207,6 +211,8 @@ export const DATASETS: DatasetDef[] = [
       f("contact_name", "Contato"),
       f("contact_email", "E-mail do contato"),
       f("contact_phone", "Telefone do contato"),
+      f("contact_ddd", "DDD do contato"),
+      { ...f("contact_ddd_uf", "UF do contato (pelo DDD)"), geo: "uf" },
       f("contact_source", "Origem do contato"),
       f("role", "Papel no negócio"),
     ],
@@ -327,6 +333,17 @@ export const DATASETS: DatasetDef[] = [
 
 export const DATASET_BY_KEY = new Map(DATASETS.map((d) => [d.key, d]));
 
+/** Bases de negócio: os filtros de funil e responsável da barra do painel valem nelas. */
+export const BASES_COM_FILTROS_DO_PAINEL = new Set([
+  "deals",
+  "deal_stage_events",
+  "deal_losses",
+  "deals_tasks",
+  "deals_products",
+  "deals_contacts",
+  "deals_multiselect",
+]);
+
 // ── Consulta ───────────────────────────────────────────────────────────────
 
 export type FilterOp =
@@ -380,7 +397,7 @@ export interface ReportQuery {
 
 export type VizType =
   | "table" | "detail" | "number" | "bar" | "bar_h" | "line" | "area" | "pie"
-  | "combo" | "trend" | "gauge" | "progress" | "funnel" | "pivot" | "scatter" | "waterfall" | "sankey";
+  | "combo" | "trend" | "gauge" | "progress" | "funnel" | "pivot" | "scatter" | "waterfall" | "sankey" | "map";
 
 export const VIZ_TYPES: { key: VizType; label: string }[] = [
   { key: "table", label: "Tabela" },
@@ -400,6 +417,7 @@ export const VIZ_TYPES: { key: VizType; label: string }[] = [
   { key: "scatter", label: "Dispersão" },
   { key: "waterfall", label: "Cascata" },
   { key: "sankey", label: "Sankey" },
+  { key: "map", label: "Mapa" },
 ];
 
 /** Visuais que comparam com uma meta. */
@@ -564,8 +582,9 @@ export function vizPermitidas(q: ReportQuery): VizType[] {
   if (q.groupBy.length === 1) {
     // Tendência compara o último período com o anterior: só faz sentido no tempo.
     const tempo = !!q.groupBy[0].grain;
+    const noMapa = !!DATASET_BY_KEY.get(q.dataset)?.fields.find((c) => c.key === q.groupBy[0].field)?.geo;
     return uma
-      ? [...base, "pie", "funnel", "waterfall", ...(tempo ? (["trend"] as VizType[]) : []), "table"]
+      ? [...base, "pie", "funnel", "waterfall", ...(tempo ? (["trend"] as VizType[]) : []), ...(noMapa ? (["map"] as VizType[]) : []), "table"]
       : [...base, "combo", "scatter", "table"];
   }
   return uma ? [...base, "pivot", "sankey", "table"] : [...base, "table"];

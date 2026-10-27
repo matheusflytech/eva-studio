@@ -22,6 +22,7 @@ import {
   Trash2,
   TrendingUp,
   Waypoints,
+  Map as MapIcon,
   X,
 } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { CURVA, gsap, reduzMovimento, useGSAP } from "@/components/crm/negocios/animacao/gsap";
 import { ReportView, useReportResult } from "@/components/reports/report-view";
+import { CampoDePedido, EntendiAssim } from "@/components/dashboard/ia-pergunte-a-eva";
 import { cn } from "@/lib/utils";
 import type { FiltrosGlobais } from "@/lib/consulta";
 import {
@@ -89,6 +91,7 @@ const ICONE_DO_VISUAL: Record<VizType, React.ComponentType<{ size?: number }>> =
   scatter: ChartScatter,
   waterfall: ChartColumnDecreasing,
   sankey: Waypoints,
+  map: MapIcon,
 };
 
 /** Quando o visual não cabe: o que o resumo precisa ter. */
@@ -96,6 +99,7 @@ const PRECISA: Partial<Record<VizType, string>> = {
   combo: "duas medidas e uma separação",
   scatter: "duas medidas e uma separação",
   trend: "uma medida separada por data",
+  map: "uma medida separada por UF (pelo DDD ou da empresa)",
   gauge: "uma medida, sem separação",
   progress: "uma medida, sem separação",
   number: "uma medida, sem separação",
@@ -112,7 +116,9 @@ export function tituloSugerido(q: ReportQuery, campos: FieldDef[]): string {
   const por = q.groupBy.map((g) => campos.find((c) => c.key === g.field)?.label ?? g.field);
   if (q.metrics.length === 0 && por.length === 0) return base;
   const medida = q.metrics.length ? rotuloDaMetrica(q.metrics[0], campos) : "Valores";
-  return `${medida} de ${base}${por.length ? ` por ${por.join(" e ").toLowerCase()}` : ""}`;
+  // Minúscula só na palavra que não é sigla ("Etapa" → "etapa"; "UF", "DDD" ficam).
+  const minusculo = (t: string) => t.replace(/\p{L}+/gu, (p) => (p.length > 1 && p === p.toUpperCase() ? p : p.toLowerCase()));
+  return `${medida} de ${base}${por.length ? ` por ${minusculo(por.join(" e "))}` : ""}`;
 }
 
 /** Campos personalizados da entidade da base (negócio ou contato). */
@@ -205,6 +211,14 @@ export function ReportBuilder({
     setQuery((q) => (q ? { ...q, ...p } : q));
   }
 
+  function aplicarDaEva(r: RespostaDaEvaV2) {
+    setQuery(r.relatorio.query);
+    setViz(r.relatorio.viz);
+    setMeta(r.relatorio.meta ? String(r.relatorio.meta) : "");
+    setTitulo(r.titulo);
+    setTituloMexido(!!r.titulo);
+  }
+
   const sugestao = query ? tituloSugerido(query, campos) : "";
   const tituloFinal = tituloMexido && titulo.trim() ? titulo.trim() : sugestao;
   const comMeta = VIZ_COM_META.includes(vizEfetiva);
@@ -235,11 +249,17 @@ export function ReportBuilder({
         </header>
 
         {!query ? (
-          <EscolherBase aoEscolher={(d) => setQuery(QUERY_PADRAO(d))} />
+          <>
+            <div className="border-b border-border-subtle px-5 py-4">
+              <PedirParaEva atual={null} aoReceber={aplicarDaEva} />
+            </div>
+            <EscolherBase aoEscolher={(d) => setQuery(QUERY_PADRAO(d))} />
+          </>
         ) : (
           <>
             <div className="grid min-h-0 flex-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:overflow-hidden">
               <div className="flex flex-col gap-6 border-border-subtle p-5 md:overflow-y-auto md:border-r">
+                <PedirParaEva atual={{ query, viz: vizEfetiva }} aoReceber={aplicarDaEva} />
                 <Filtros query={query} campos={campos} mudar={mudar} />
                 <Resumo query={query} campos={campos} mudar={mudar} />
                 <OrdemELimite query={query} campos={campos} mudar={mudar} />
@@ -330,6 +350,55 @@ export function ReportBuilder({
         )}
       </div>
     </div>
+  );
+}
+
+interface RespostaDaEvaV2 {
+  relatorio: { query: ReportQuery; viz: VizType; meta?: number };
+  titulo: string;
+  explicacao: string;
+}
+
+/** Pedido em português → cartão pronto (base, filtros, resumo e visual), já saneado no servidor. */
+function PedirParaEva({ atual, aoReceber }: { atual: { query: ReportQuery; viz: VizType } | null; aoReceber: (r: RespostaDaEvaV2) => void }) {
+  const [carregando, setCarregando] = React.useState(false);
+  const [erro, setErro] = React.useState("");
+  const [explicacao, setExplicacao] = React.useState("");
+
+  async function enviar(pedido: string) {
+    setCarregando(true);
+    setErro("");
+    try {
+      const res = await fetch("/api/analytics/ia/consulta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedido, modo: "relatorio", ...(atual ? { relatorioAtual: atual } : {}) }),
+      });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErro(d?.error ?? "Não deu certo agora. Tenta de novo em instantes.");
+        return;
+      }
+      setExplicacao((d as RespostaDaEvaV2).explicacao);
+      aoReceber(d as RespostaDaEvaV2);
+    } catch {
+      setErro("Sem conexão com o servidor. Confere a internet e tenta de novo.");
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <section data-anim className="flex flex-col gap-2">
+      <CampoDePedido
+        id={atual ? "rb-eva-ajuste" : "rb-eva"}
+        placeholder={atual ? "Ajuste com a Eva: agora só os ganhos, separe por mês..." : "Peça para a Eva: quanto vendi por mês este ano?"}
+        exemplos={atual ? [] : ["Quanto vendi por mês este ano?", "Negócios em aberto por etapa", "Tarefas atrasadas por responsável"]}
+        carregando={carregando}
+        aoEnviar={enviar}
+      />
+      {erro ? <p role="alert" className="text-small text-danger">{erro}</p> : explicacao && <EntendiAssim explicacao={explicacao} />}
+    </section>
   );
 }
 

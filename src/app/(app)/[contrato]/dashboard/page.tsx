@@ -7,7 +7,7 @@ import { nomeDoParametro, parametrosDaTela } from "@/lib/contrato/rotas";
 import {
   RefreshCw, Plus, X, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Ellipsis, ListFilter,
   Hash, LineChart, PieChart, BarChart3, Table2, RotateCcw, Funnel, FilterX,
-  Download, FileSpreadsheet, FileText, MoreHorizontal,
+  Download, FileSpreadsheet, FileText, MoreHorizontal, GripHorizontal, MoveHorizontal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,7 +43,8 @@ import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/d
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
 import { ReportBuilder, type ReportCard } from "@/components/reports/report-builder";
 import { ReportView, useReportResult } from "@/components/reports/report-view";
-import { DATASET_BY_KEY, formatarDimensao, formatarValor, tipoDoCartao, type ReportQuery, type ReportResult, type VizType } from "@/lib/report-query";
+import { BASES_COM_FILTROS_DO_PAINEL, DATASET_BY_KEY, formatarDimensao, formatarValor, tipoDoCartao, type ReportQuery, type ReportResult, type VizType } from "@/lib/report-query";
+import { useArrastarCartoes } from "@/components/dashboard/arrastar-cartoes";
 import { PainelDeFiltros, SeletorDePeriodo, contarFiltros, periodoCurto } from "@/components/dashboard/barra-de-filtros";
 import { PainelFiltrarComIa } from "@/components/dashboard/ia-filtrar";
 import { VisaoGeral } from "@/components/dashboard/visao-geral";
@@ -315,6 +316,8 @@ function Painel() {
 
   const [dados, setDados] = React.useState<Dados | null>(null);
   const [widgets, setWidgets] = React.useState<Widget[] | null>(null);
+  const grade = React.useRef<HTMLDivElement>(null);
+  const { arrastando, arrastar, redimensionar } = useArrastarCartoes(grade, widgets, setWidgets);
   const [editando, setEditando] = React.useState(false);
   const [selecionado, setSelecionado] = React.useState<string | null>(null);
   const [adicionando, setAdicionando] = React.useState(false);
@@ -700,7 +703,7 @@ function Painel() {
         <>
           <p className="font-mono text-caption text-text-tertiary print:hidden">Clique num cartão para editar; use o + para adicionar. Salva sozinho.</p>
           <div className={cn("flex gap-4", widgetSelecionado && "items-start")}>
-            <div className="dash-grade grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div ref={grade} className="dash-grade grid min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {(widgets ?? []).map((w, i) => (
                 <Cartao
                   key={w.id}
@@ -718,6 +721,9 @@ function Painel() {
                   onRemover={() => remover(w.id)}
                   onMover={(d) => mover(w.id, d)}
                   onBaixarCsv={() => exportarCartao(w)}
+                  arrastando={arrastando === w.id}
+                  onArrastar={(e) => arrastar(w.id, e)}
+                  onRedimensionar={(e) => redimensionar(w.id, e)}
                 />
               ))}
               <button
@@ -966,7 +972,7 @@ function LeituraCurta({ widget, fonte, dados }: { widget: Widget; fonte: Fonte; 
 
 function Cartao({
   widget, fonte, dados, globais, opcoes, rotulos, editando, selecionado, primeiro, ultimo,
-  onSelecionar, onRemover, onMover, onBaixarCsv,
+  onSelecionar, onRemover, onMover, onBaixarCsv, arrastando, onArrastar, onRedimensionar,
 }: {
   widget: Widget;
   fonte: Fonte | undefined;
@@ -982,6 +988,10 @@ function Cartao({
   onRemover: () => void;
   onMover: (d: -1 | 1) => void;
   onBaixarCsv: () => void;
+  /** Só no modo de edição: pegar pela alça e soltar em outro cartão; puxar o canto muda a largura. */
+  arrastando?: boolean;
+  onArrastar?: (e: React.PointerEvent) => void;
+  onRedimensionar?: (e: React.PointerEvent) => void;
 }) {
   const span =
     widget.largura === 3 ? "md:col-span-2 xl:col-span-3" : widget.largura === 2 ? "md:col-span-2" : "";
@@ -990,19 +1000,50 @@ function Cartao({
     widget.fonte === "report" && widget.relatorio
       ? DATASET_BY_KEY.get(widget.relatorio.query.dataset)?.description
       : widget.fonte === "custom" && widget.consulta ? descreverConsulta(widget.consulta, rotulos) : fonte?.explicacao;
-  const selo = fonte && !editando ? seloDeFiltro(fonte, globais, dados, opcoes.funis.length) : null;
+  const selo = editando
+    ? null
+    : widget.fonte === "report" && widget.relatorio
+      ? !BASES_COM_FILTROS_DO_PAINEL.has(widget.relatorio.query.dataset) && (globais.funis.length > 0 || globais.donos.length > 0)
+        ? "Não usa os filtros de funil e responsável"
+        : null
+      : fonte ? seloDeFiltro(fonte, globais, dados, opcoes.funis.length) : null;
 
   return (
     <div
+      data-cartao={widget.id}
       onClick={editando ? onSelecionar : undefined}
       className={cn(
         "relative flex flex-col rounded-[18px] border border-border-subtle bg-panel p-5",
         span,
         widget.largura >= 2 ? "dash-largo" : "dash-estreito",
         editando && "cursor-pointer hover:border-border-default",
-        selecionado && "ring-2 ring-accent-solid/60"
+        selecionado && "ring-2 ring-accent-solid/60",
+        arrastando && "z-20 opacity-70 shadow-overlay"
       )}
     >
+      {editando && onArrastar && (
+        <button
+          type="button"
+          aria-label={`Arrastar o cartão ${widget.titulo}`}
+          title="Arraste para mudar a ordem"
+          onPointerDown={onArrastar}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-1/2 top-1.5 z-10 grid h-4 w-10 -translate-x-1/2 cursor-grab touch-none place-items-center rounded-full text-text-tertiary hover:bg-hover hover:text-text-primary active:cursor-grabbing print:hidden"
+        >
+          <GripHorizontal size={14} aria-hidden="true" />
+        </button>
+      )}
+      {editando && onRedimensionar && (
+        <span
+          aria-hidden="true"
+          title="Puxe para mudar a largura"
+          onPointerDown={onRedimensionar}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-1 right-1 z-10 hidden size-5 cursor-ew-resize touch-none place-items-center rounded-md text-text-tertiary hover:bg-hover hover:text-text-primary md:grid print:hidden"
+        >
+          <MoveHorizontal size={12} />
+        </span>
+      )}
       {editando && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-0.5 rounded-full border border-border-subtle bg-overlay p-0.5 print:hidden">
           <BotaoMini onClick={(e) => { e.stopPropagation(); onMover(-1); }} disabled={primeiro} titulo="Mover pra trás">

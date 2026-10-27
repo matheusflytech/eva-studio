@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import * as echarts from "echarts/core";
-import { BarChart, FunnelChart, GaugeChart, LineChart, PieChart, SankeyChart, ScatterChart } from "echarts/charts";
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { BarChart, FunnelChart, GaugeChart, LineChart, MapChart, PieChart, SankeyChart, ScatterChart } from "echarts/charts";
+import { GridComponent, LegendComponent, TooltipComponent, VisualMapComponent } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
 import type { EChartsCoreOption } from "echarts/core";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight } from "lucide-react";
@@ -25,7 +25,19 @@ import {
   type VizType,
 } from "@/lib/report-query";
 
-echarts.use([BarChart, FunnelChart, GaugeChart, LineChart, PieChart, SankeyChart, ScatterChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer]);
+echarts.use([
+  BarChart, FunnelChart, GaugeChart, LineChart, MapChart, PieChart, SankeyChart, ScatterChart,
+  GridComponent, LegendComponent, TooltipComponent, VisualMapComponent, SVGRenderer,
+]);
+
+/** Malha das UFs (IBGE, qualidade mínima): só baixa quando um mapa aparece. */
+let malhaDoBrasil: Promise<void> | null = null;
+function carregarMalha(): Promise<void> {
+  malhaDoBrasil ??= import("./br-uf.json").then((m) => {
+    echarts.registerMap("BR", (m.default ?? m) as unknown as Parameters<typeof echarts.registerMap>[1]);
+  });
+  return malhaDoBrasil;
+}
 
 // Busca e desenha o resultado de um cartão do construtor (v2).
 
@@ -305,6 +317,7 @@ function coresDoTema(el: HTMLElement) {
     painel: v("--color-overlay") || v("--color-panel"),
     borda: v("--color-border-default"),
     primario: v("--color-text-primary"),
+    fundo: v("--color-raised"),
   };
 }
 
@@ -318,11 +331,13 @@ const DESCRICAO_DO_GRAFICO: Partial<Record<VizType, string>> = {
   scatter: "gráfico de dispersão",
   waterfall: "gráfico de cascata",
   sankey: "diagrama de fluxo",
+  map: "mapa do Brasil por UF",
 };
 
 function Grafico({ result, viz, meta }: { result: ReportResult; viz: VizType; meta?: number }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const grafico = React.useRef<echarts.ECharts | null>(null);
+  const pendente = React.useRef<(() => void) | null>(null);
   const [tema, setTema] = React.useState(0);
 
   // Troca de tema claro/escuro: redesenha com as cores novas.
@@ -337,7 +352,12 @@ function Grafico({ result, viz, meta }: { result: ReportResult; viz: VizType; me
     if (!el) return;
     const g = echarts.init(el, undefined, { renderer: "svg" });
     grafico.current = g;
-    const ro = new ResizeObserver(() => g.resize());
+    // Cartão escondido (0 px) não desenha: o mapa quebra sem tamanho. Desenha quando aparecer.
+    const ro = new ResizeObserver(() => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      if (pendente.current) pendente.current();
+      else g.resize();
+    });
     ro.observe(el);
     return () => {
       ro.disconnect();
@@ -349,12 +369,23 @@ function Grafico({ result, viz, meta }: { result: ReportResult; viz: VizType; me
   React.useEffect(() => {
     const el = ref.current;
     if (!el || !grafico.current) return;
-    grafico.current.setOption(montarOpcao(result, viz, coresDoTema(el), meta), true);
+    const desenhar = () => {
+      if (!el.clientWidth || !el.clientHeight) {
+        pendente.current = desenhar;
+        return;
+      }
+      pendente.current = null;
+      grafico.current?.resize();
+      grafico.current?.setOption(montarOpcao(result, viz, coresDoTema(el), meta), true);
+    };
+    if (viz === "map") carregarMalha().then(desenhar);
+    else desenhar();
   }, [result, viz, tema, meta]);
 
   const { series, semData, cortadas: cortou } = seriesDoResultado(result);
   const cortadas = cortou && viz !== "sankey";
   const descartadas = viz === "sankey" ? ligacoesDoSankey(result).descartadas : 0;
+  const semUf = viz === "map" ? result.rows.filter((l) => l[0] === null).length : 0;
   return (
     <div className="flex h-full flex-col">
       <div
@@ -363,11 +394,12 @@ function Grafico({ result, viz, meta }: { result: ReportResult; viz: VizType; me
         aria-label={`${series.map((s) => s.nome).join(", ")}: ${DESCRICAO_DO_GRAFICO[viz] ?? "gráfico de barras"}`}
         className="min-h-48 w-full flex-1"
       />
-      {(semData > 0 || cortadas || descartadas > 0) && (
+      {(semData > 0 || cortadas || descartadas > 0 || semUf > 0) && (
         <p className="mt-1 text-caption text-text-tertiary">
           {semData > 0 && `${semData.toLocaleString("pt-BR")} ${semData === 1 ? "grupo sem data ficou" : "grupos sem data ficaram"} fora do gráfico (estão na tabela). `}
           {cortadas && "Só as 12 primeiras séries aparecem. "}
           {descartadas > 0 && `${descartadas.toLocaleString("pt-BR")} ${descartadas === 1 ? "ligação de volta ficou" : "ligações de volta ficaram"} fora do fluxo (estão na tabela).`}
+          {semUf > 0 && "Quem não tem telefone do Brasil com DDD ficou fora do mapa (está na tabela)."}
         </p>
       )}
     </div>
@@ -428,6 +460,50 @@ export function montarOpcao(result: ReportResult, viz: VizType, cores: Cores, me
           title: { offsetCenter: [0, "38%"], color: cores.texto, fontSize: 12 },
           detail: { valueAnimation: animar, offsetCenter: [0, "4%"], color: cores.primario, fontSize: 28, fontWeight: 600, formatter: (n: number) => formatarValor(n, col.type) },
           data: [{ value: valor, name: meta ? `meta ${formatarValor(meta, col.type)}` : col.label }],
+        },
+      ],
+    };
+  }
+
+  if (viz === "map") {
+    const s = series[0];
+    const dados = categorias
+      .map((name, i) => ({ name, value: s.valores[i] }))
+      .filter((d): d is { name: string; value: number } => typeof d.value === "number" && d.name.length === 2);
+    const max = Math.max(1, ...dados.map((d) => d.value));
+    return {
+      ...comum,
+      tooltip: {
+        ...tooltip,
+        trigger: "item",
+        formatter: (p: { name: string; value: number }) => `${p.name}: ${Number.isFinite(p.value) ? formatarValor(p.value, s.tipo) : "—"}`,
+      },
+      visualMap: {
+        min: 0,
+        max,
+        left: 0,
+        bottom: 0,
+        itemWidth: 8,
+        itemHeight: 80,
+        calculable: false,
+        text: [formatarValor(max, s.tipo, true), "0"],
+        textGap: 6,
+        inRange: { color: [cores.linha, cores.series[0]] },
+        textStyle: { color: cores.texto, fontSize: 10 },
+      },
+      series: [
+        {
+          type: "map",
+          map: "BR",
+          roam: false,
+          aspectScale: 1,
+          layoutCenter: ["55%", "50%"],
+          layoutSize: "95%",
+          label: { show: false },
+          itemStyle: { areaColor: cores.fundo, borderColor: cores.borda, borderWidth: 0.6 },
+          emphasis: { label: { show: true, color: cores.primario, fontSize: 11 }, itemStyle: { areaColor: cores.series[0] } },
+          select: { disabled: true },
+          data: dados,
         },
       ],
     };
