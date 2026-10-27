@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { CANAIS_DE_TESTE } from "@/lib/server/conversas";
-import { ROTULO_CANAL, type FiltrosGlobais } from "@/lib/consulta";
+import { ROTULO_CANAL, SEM_VALOR, type FiltrosGlobais } from "@/lib/consulta";
+import { DDDS_DA_UF, UFS } from "@/lib/ddd";
 import { dataExiste } from "@/lib/custom-fields";
 import { INFO_DO_TIPO } from "@/lib/tarefas/tipos";
 import {
@@ -59,6 +60,18 @@ const ROTULO_RECORRENCIA = { unico: "Único", mensal: "Mensal", trimestral: "Tri
 const ROTULO_PAPEL = { owner: "Dono", admin: "Administrador", agent: "Atendente", viewer: "Leitor" };
 const ROTULO_MEMBRO = { ativo: "Ativo", convidado: "Convidado" };
 
+/** DDD do telefone: só dígitos, sem o 55 do país; o que não parece telefone do Brasil fica vazio. */
+function dddDo(col: string): Prisma.Sql {
+  const d = `regexp_replace(COALESCE(${col}, ''), '[^0-9]', '', 'g')`;
+  return raw(`(CASE WHEN length(${d}) IN (12, 13) AND left(${d}, 2) = '55' THEN substr(${d}, 3, 2)
+    WHEN length(${d}) IN (10, 11) THEN left(${d}, 2) END)`);
+}
+/** UF pelo DDD (tabela da Anatel em src/lib/ddd.ts). */
+function ufPeloDdd(col: string): Prisma.Sql {
+  const casos = UFS.flatMap((uf) => DDDS_DA_UF(uf).map((d) => `WHEN '${d}' THEN '${uf}'`)).join(" ");
+  return sql`(CASE ${dddDo(col)} ${raw(casos)} END)`;
+}
+
 const SITUACAO_DO_NEGOCIO = raw(`(CASE ds.type WHEN 'won' THEN 'Ganho' WHEN 'lost' THEN 'Perdido' ELSE 'Em aberto' END)`);
 
 // Negócio (alias d) com funil, etapa e responsável: base de várias junções.
@@ -94,10 +107,15 @@ interface Base {
   fields: Record<string, Prisma.Sql>;
   /** Coluna JSON dos campos personalizados. */
   cf?: string;
+  /** Colunas de id para os filtros de funil e responsável da barra do painel. */
+  escopo?: { funil: string; dono: string };
 }
+
+const ESCOPO_DO_NEGOCIO = { funil: `d."pipelineId"`, dono: `d."ownerId"` };
 
 const BASES: Record<string, Base> = {
   deals: {
+    escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_deals d ${raw(JOIN_DO_NEGOCIO)}
       LEFT JOIN eva_studio_companies dco ON dco.id = d."companyId"
       WHERE d."orgId" = ${org} AND d."archivedAt" IS NULL`,
@@ -130,6 +148,8 @@ const BASES: Record<string, Base> = {
       name: texto(`c.name`),
       email: texto(`c.email`),
       phone: texto(`c.phone`),
+      ddd: dddDo(`c.phone`),
+      ddd_uf: ufPeloDdd(`c.phone`),
       job_title: texto(`c."jobTitle"`),
       company: raw(`cco.name`),
       owner: raw(`cow.name`),
@@ -185,6 +205,7 @@ const BASES: Record<string, Base> = {
     },
   },
   deal_stage_events: {
+    escopo: { funil: `e."pipelineId"`, dono: `d."ownerId"` },
     from: (org) => sql`FROM eva_studio_deal_stage_events e
       JOIN eva_studio_deals d ON d.id = e."dealId"
       JOIN eva_studio_pipelines ep ON ep.id = e."pipelineId"
@@ -201,6 +222,7 @@ const BASES: Record<string, Base> = {
     },
   },
   deal_losses: {
+    escopo: { funil: `l."pipelineId"`, dono: `d."ownerId"` },
     from: (org) => sql`FROM eva_studio_deal_losses l
       JOIN eva_studio_deals d ON d.id = l."dealId"
       JOIN eva_studio_pipelines lp ON lp.id = l."pipelineId"
@@ -217,6 +239,7 @@ const BASES: Record<string, Base> = {
     },
   },
   deals_tasks: {
+    escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_tasks t
       JOIN eva_studio_deals d ON d.id = t."dealId" ${raw(JOIN_DO_NEGOCIO)}
       LEFT JOIN eva_studio_profiles tas ON tas.id = t."assignedToId"
@@ -232,6 +255,7 @@ const BASES: Record<string, Base> = {
     },
   },
   deals_products: {
+    escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_deal_items i
       JOIN eva_studio_deals d ON d.id = i."dealId" ${raw(JOIN_DO_NEGOCIO)}
       WHERE d."orgId" = ${org} AND d."archivedAt" IS NULL`,
@@ -246,6 +270,7 @@ const BASES: Record<string, Base> = {
     },
   },
   deals_contacts: {
+    escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_deal_contacts dct
       JOIN eva_studio_deals d ON d.id = dct."dealId" ${raw(JOIN_DO_NEGOCIO)}
       JOIN eva_studio_contacts c ON c.id = dct."contactId"
@@ -255,11 +280,14 @@ const BASES: Record<string, Base> = {
       contact_name: texto(`c.name`),
       contact_email: texto(`c.email`),
       contact_phone: texto(`c.phone`),
+      contact_ddd: dddDo(`c.phone`),
+      contact_ddd_uf: ufPeloDdd(`c.phone`),
       contact_source: texto(`c.source`),
       role: texto(`dct.role`),
     },
   },
   deals_multiselect: {
+    escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_deals d ${raw(JOIN_DO_NEGOCIO)} ${raw(opcoesMarcadas(`d."customFields"`, "deal", `d."orgId"`))}
       WHERE d."orgId" = ${org} AND d."archivedAt" IS NULL`,
     fields: { field: raw(`mcf.label`), option: ROTULO_DA_OPCAO, ...CAMPOS_DO_NEGOCIO },
@@ -519,6 +547,22 @@ function condicao(f: ReportFilter, c: Campo, globais?: FiltrosGlobais): Prisma.S
   return null;
 }
 
+/** Funis e responsáveis escolhidos na barra do painel (só nas bases de negócio). */
+function condicoesDoPainel(base: Base, globais?: FiltrosGlobais): Prisma.Sql {
+  if (!base.escopo || !globais) return Prisma.empty;
+  const partes: Prisma.Sql[] = [];
+  if (globais.funis.length) partes.push(sql` AND ${raw(base.escopo.funil)} = ANY(${globais.funis}::text[])`);
+  if (globais.donos.length) {
+    const dono = raw(base.escopo.dono);
+    const ids = globais.donos.filter((d) => d !== SEM_VALOR);
+    const ou: Prisma.Sql[] = [];
+    if (ids.length) ou.push(sql`${dono} = ANY(${ids}::text[])`);
+    if (globais.donos.includes(SEM_VALOR)) ou.push(sql`${dono} IS NULL`);
+    partes.push(sql` AND (${Prisma.join(ou, " OR ")})`);
+  }
+  return partes.length ? Prisma.join(partes, "") : Prisma.empty;
+}
+
 const FORMATO_DATA_HORA = `'YYYY-MM-DD HH24:MI'`;
 const FORMATO_DIA = `'YYYY-MM-DD'`;
 
@@ -546,7 +590,8 @@ export function montarSql(orgId: string, q: ReportQuery, ctx: ContextoDoRelatori
       return c ? condicao(f, c, ctx.globais) : null;
     })
     .filter((x): x is Prisma.Sql => x !== null);
-  const filtro = conds.length ? sql` AND (${Prisma.join(conds, q.filters.logic === "or" ? " OR " : " AND ")})` : Prisma.empty;
+  const doPainel = condicoesDoPainel(base, ctx.globais);
+  const filtro = sql`${conds.length ? sql` AND (${Prisma.join(conds, q.filters.logic === "or" ? " OR " : " AND ")})` : Prisma.empty}${doPainel}`;
 
   const groupBy = q.groupBy.filter((g) => campos.has(g.field));
   const metrics = q.metrics.filter((m) => m.op === "count" || campos.has(m.field ?? ""));

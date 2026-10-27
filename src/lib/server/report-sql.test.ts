@@ -4,7 +4,7 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/server/conversas", () => ({ CANAIS_DE_TESTE: ["playground", "builder_preview"] }));
 
 import { montarSql } from "./report-sql";
-import { sanearReportQuery, vizPermitidas, QUERY_PADRAO, type ReportQuery } from "@/lib/report-query";
+import { sanearReportQuery, vizPermitidas, QUERY_PADRAO, DATASETS, BASES_COM_FILTROS_DO_PAINEL, type ReportQuery } from "@/lib/report-query";
 
 const q = (parcial: Partial<ReportQuery>): ReportQuery => sanearReportQuery({ ...QUERY_PADRAO(), ...parcial })!;
 const plano = (s: { text: string }) => s.text.replace(/\s+/g, " ");
@@ -108,6 +108,36 @@ describe("montarSql", () => {
     })!;
     expect(plano(painel.sql)).toContain(`(now() AT TIME ZONE 'America/Sao_Paulo')::date - $2::int`);
     expect(painel.sql.values[1]).toBe(6);
+  });
+
+  it("funis e responsáveis da barra valem nas bases de negócio, e só nelas", () => {
+    const globais = { dias: 30, funis: ["p1"], donos: ["u1", "__nenhum"] };
+    const m = montarSql("o", q({ metrics: [{ op: "count" }] }), { globais })!;
+    expect(plano(m.sql)).toContain(`AND d."pipelineId" = ANY($2::text[]) AND (d."ownerId" = ANY($3::text[]) OR d."ownerId" IS NULL)`);
+    expect(m.sql.values.slice(1, 3)).toEqual([["p1"], ["u1"]]);
+    const perdas = montarSql("o", q({ dataset: "deal_losses", metrics: [{ op: "count" }] }), { globais })!;
+    expect(plano(perdas.sql)).toContain(`l."pipelineId" = ANY(`);
+    const contatos = montarSql("o", q({ dataset: "contacts", metrics: [{ op: "count" }] }), { globais })!;
+    expect(plano(contatos.sql)).not.toContain("ANY(");
+  });
+
+  it("UF pelo DDD: tira o 55, aceita 10 a 13 dígitos e vai para o mapa", () => {
+    const m = montarSql("o", q({ dataset: "contacts", metrics: [{ op: "count" }], groupBy: [{ field: "ddd_uf" }] }))!;
+    const s = plano(m.sql);
+    expect(s).toContain(`WHEN length(regexp_replace(COALESCE(c.phone, ''), '[^0-9]', '', 'g')) IN (12, 13)`);
+    expect(s).toContain(`WHEN '47' THEN 'SC'`);
+    expect(s).toContain(`WHEN '11' THEN 'SP'`);
+    expect(vizPermitidas(q({ dataset: "contacts", metrics: [{ op: "count" }], groupBy: [{ field: "ddd_uf" }] }))).toContain("map");
+    expect(vizPermitidas(q({ dataset: "contacts", metrics: [{ op: "count" }], groupBy: [{ field: "ddd" }] }))).not.toContain("map");
+    expect(vizPermitidas(q({ dataset: "companies", metrics: [{ op: "count" }], groupBy: [{ field: "uf" }] }))).toContain("map");
+  });
+
+  it("toda base marcada para os filtros do painel tem as colunas no motor", () => {
+    const globais = { dias: 30, funis: ["p1"], donos: [] };
+    for (const d of DATASETS) {
+      const m = montarSql("o", q({ dataset: d.key, metrics: [{ op: "count" }] }), { globais })!;
+      expect(plano(m.sql).includes("ANY("), d.key).toBe(BASES_COM_FILTROS_DO_PAINEL.has(d.key));
+    }
   });
 
   it("campo personalizado de lista mostra o rótulo da opção; chave vai como parâmetro", () => {

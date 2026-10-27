@@ -5,6 +5,7 @@ import { callLlmWithTools } from "@/lib/server/llm";
 import { escolherProvedorDeIa } from "@/lib/server/ia/provedor";
 import { registrarUso } from "@/lib/server/ia/uso";
 import { carregarCatalogo } from "@/lib/server/ia/catalogo";
+import { sanearRelatorio } from "@/lib/report-query";
 import {
   LIMITE_DO_PEDIDO,
   derivarFiltrosGlobais,
@@ -13,16 +14,20 @@ import {
   validarRespostaDaIa,
   type ModoDaIa,
 } from "@/lib/server/ia/consulta-ia";
+import { montarPromptDeRelatorio, validarRelatorioDaIa } from "@/lib/server/ia/relatorio-ia";
 import { diaLocal, sanearConsulta, sanearFiltrosGlobais } from "@/lib/consulta";
 
 // ---------------------------------------------------------------------------
 // "Pergunte à Eva" do dashboard: frase em português → consulta de cartão
-// (modo "cartao") ou filtros da barra do painel (modo "globais").
+// (modo "cartao"), filtros da barra do painel (modo "globais") ou cartão do
+// construtor v2 (modo "relatorio").
 //
 // Corpo: { pedido: string (≤ 500), modo?: "cartao" | "globais",
 //          consultaAtual?: Consulta, globaisAtuais?: FiltrosGlobais }
 //
 // Resposta (cartao):  { modo, consulta, tipo, titulo, explicacao, avisos }
+// Resposta (relatorio): { modo, relatorio: { query, viz, meta? }, titulo, explicacao }
+//   (corpo pode trazer relatorioAtual: { query, viz } para ajustes)
 // Resposta (globais): { modo, globais: { dias, de?, ate?, funis, donos },
 //                       sobras, cartao: { consulta, tipo, titulo } | null,
 //                       explicacao, avisos }
@@ -49,7 +54,7 @@ export async function POST(request: Request) {
   if (pedido.length > LIMITE_DO_PEDIDO) {
     return NextResponse.json({ error: `Pedido longo demais: tenta resumir em até ${LIMITE_DO_PEDIDO} caracteres.` }, { status: 400 });
   }
-  const modo: ModoDaIa = body?.modo === "globais" ? "globais" : "cartao";
+  const modo: ModoDaIa | "relatorio" = body?.modo === "globais" ? "globais" : body?.modo === "relatorio" ? "relatorio" : "cartao";
 
   const provedor = await escolherProvedorDeIa(orgId);
   if (!provedor) {
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
   const hoje = diaLocal(new Date());
   const catalogo = await carregarCatalogo(orgId);
   const consultaAtual = modo === "cartao" ? sanearConsulta(body?.consultaAtual) : null;
+  const relatorioAtual = modo === "relatorio" ? sanearRelatorio(body?.relatorioAtual) : null;
   const globaisAtuais = sanearFiltrosGlobais(
     body?.globaisAtuais && typeof body.globaisAtuais === "object" ? (body.globaisAtuais as Record<string, unknown>) : {}
   );
@@ -78,7 +84,10 @@ export async function POST(request: Request) {
     provider: provedor.provider,
     apiKey: provedor.apiKey,
     model: provedor.model,
-    systemPrompt: montarPromptDeConsulta(catalogo, { hoje, modo, consultaAtual }),
+    systemPrompt:
+      modo === "relatorio"
+        ? montarPromptDeRelatorio(catalogo, { hoje, atual: relatorioAtual })
+        : montarPromptDeConsulta(catalogo, { hoje, modo, consultaAtual }),
     userMessage: pedido,
     tools: [],
     executeTool: async () => "",
@@ -104,6 +113,17 @@ export async function POST(request: Request) {
   }
 
   const json = extrairJson(resultado.text);
+  if (modo === "relatorio") {
+    const r = json ? validarRelatorioDaIa(json) : null;
+    if (!r) {
+      return NextResponse.json(
+        { error: "Não consegui transformar esse pedido num cartão. Tenta dizer o que medir, de qual base e como separar." },
+        { status: 422 }
+      );
+    }
+    const { titulo, explicacao, ...relatorio } = r;
+    return NextResponse.json({ modo, relatorio, titulo, explicacao });
+  }
   const lido = json ? validarRespostaDaIa(json, catalogo, hoje) : null;
   if (!lido) {
     return NextResponse.json(
