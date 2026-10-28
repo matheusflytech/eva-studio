@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
   $transaction: vi.fn(async (ops: unknown[]) => ops),
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
-const admin = vi.hoisted(() => ({ inviteUserByEmail: vi.fn(), deleteUser: vi.fn(async () => ({})) }));
+const admin = vi.hoisted(() => ({ createUser: vi.fn(), deleteUser: vi.fn(async () => ({})) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ auth: { admin } }) }));
 const hist = vi.hoisted(() => ({ registrarHistorico: vi.fn() }));
 vi.mock("@/lib/server/historico", () => hist);
@@ -117,7 +117,7 @@ describe("convite", () => {
       expect.objectContaining({ create: expect.objectContaining({ orgId: "o1", userId: "u-bia", status: "pendente" }) })
     );
     expect(convite.enviarLinkDoConvite).toHaveBeenCalledWith("bia@x.com", "o1", "u-bia", "https://app");
-    expect(admin.inviteUserByEmail).not.toHaveBeenCalled();
+    expect(admin.createUser).not.toHaveBeenCalled();
     expect(hist.registrarHistorico).toHaveBeenCalledWith({
       orgId: "o1",
       acao: "membro.convidou",
@@ -133,13 +133,22 @@ describe("convite", () => {
     await expect(convidarMembro(dono, { email: "ana@x.com" }, "https://app")).rejects.toMatchObject({ status: 409 });
   });
 
-  it("conta nova: convite do Supabase + perfil com este contrato como padrão", async () => {
+  it("conta nova: nasce sem senha, vínculo pendente e o mesmo link de /invite de quem já tem conta", async () => {
     db.profile.findFirst.mockResolvedValue(null);
-    admin.inviteUserByEmail.mockResolvedValue({ data: { user: { id: "u-novo" } }, error: null });
+    admin.createUser.mockResolvedValue({ data: { user: { id: "u-novo" } }, error: null });
     const r = await convidarMembro(dono, { email: "novo@x.com", role: "viewer" }, "https://app");
     expect(r.novo).toBe(true);
-    expect(admin.inviteUserByEmail).toHaveBeenCalledWith("novo@x.com", { redirectTo: "https://app/login" });
+    expect(admin.createUser).toHaveBeenCalledWith({ email: "novo@x.com", email_confirm: true });
     expect(db.profile.create).toHaveBeenCalledWith({ data: { id: "u-novo", orgId: "o1", name: "novo", email: "novo@x.com", role: "viewer" } });
+    expect(db.membership.create).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: "u-novo", status: "pendente" }) });
+    expect(convite.enviarLinkDoConvite).toHaveBeenCalledWith("novo@x.com", "o1", "u-novo", "https://app");
+  });
+
+  it("conta nova: e-mail que não sai vira erro 502 para convidar de novo", async () => {
+    db.profile.findFirst.mockResolvedValue(null);
+    admin.createUser.mockResolvedValue({ data: { user: { id: "u-novo" } }, error: null });
+    convite.enviarLinkDoConvite.mockResolvedValueOnce("limite de envio");
+    await expect(convidarMembro(dono, { email: "novo@x.com" }, "https://app")).rejects.toMatchObject({ status: 502 });
   });
 
   it("só dono convida dono", async () => {
