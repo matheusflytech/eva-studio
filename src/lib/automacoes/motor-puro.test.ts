@@ -62,6 +62,12 @@ describe("casamento do gatilho", () => {
     expect(casa("deal.lost", { funil: "p2" }, ev({ tipo: "deal.lost", dados: { pipeline_id: "p1" } }), { pipeline_id: "p1" })).toBe(false);
   });
 
+  it("venda da Hotmart casa pelo tipo e filtra pelo funil do negócio", () => {
+    expect(casa("sale.approved", {}, ev({ tipo: "sale.approved" }))).toBe(true);
+    expect(casa("sale.approved", {}, ev({ tipo: "sale.refunded" }))).toBe(false);
+    expect(casa("sale.refunded", { funil: "p2" }, ev({ tipo: "sale.refunded" }), { pipeline_id: "p1" })).toBe(false);
+  });
+
   it("campo alterado: casa pelo diff, filtra o valor novo e ignora a própria automação", () => {
     const e = ev({ tipo: "deal.updated", diff: { amount_cents: { de: 1, para: 500 } } });
     expect(casa("deal.field_changed", { campo: "registro.amount_cents" }, e)).toBe(true);

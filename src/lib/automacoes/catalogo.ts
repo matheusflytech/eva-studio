@@ -254,6 +254,26 @@ export const GATILHOS: ItemDoGatilho[] = [
     campos: [funilOpcional, { chave: "motivo", rotulo: "Motivo contém (opcional)", tipo: "texto" }],
     frase: (c, n) => `Quando um negócio for perdido${noFunil(c, n)}${c.motivo ? ` por ${aspas(c.motivo)}` : ""}`,
   },
+  // Venda da Hotmart (Integrações › Hotmart): o objeto é o negócio do produto.
+  ...(
+    [
+      ["sale.approved", "Venda aprovada", "Pagamento aprovado na Hotmart (compra ou mensalidade).", "uma venda for aprovada"],
+      ["sale.refunded", "Venda reembolsada", "A Hotmart devolveu o dinheiro da compra.", "uma venda for reembolsada"],
+      ["sale.chargeback", "Chargeback", "O comprador contestou a compra no cartão.", "houver chargeback"],
+      ["sale.canceled", "Compra cancelada", "Compra ou assinatura cancelada na Hotmart.", "uma compra for cancelada"],
+    ] as const
+  ).map(
+    ([tipo, nome, descricao, quando]): ItemDoGatilho => ({
+      tipo,
+      objeto: "deal",
+      nome,
+      descricao,
+      modo: "evento",
+      eventos: [tipo],
+      campos: [funilOpcional],
+      frase: (c, n) => `Quando ${quando}${noFunil(c, n)}`,
+    })
+  ),
   {
     tipo: "deal.reopened",
     objeto: "deal",

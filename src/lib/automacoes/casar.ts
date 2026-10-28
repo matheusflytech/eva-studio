@@ -56,6 +56,10 @@ export function gatilhoCasa(
     case "deal.created":
     case "deal.won":
     case "deal.reopened":
+    case "sale.approved":
+    case "sale.refunded":
+    case "sale.chargeback":
+    case "sale.canceled":
       return funilOk;
     case "deal.lost":
       return funilOk && (vazio(c.motivo) || normal(registro.lost_reason).includes(normal(c.motivo)));
