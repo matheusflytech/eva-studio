@@ -255,6 +255,8 @@ MODELOS.push({
 
 /** Modelo que só funciona com a URL do n8n preenchida no agente. */
 export const MODELOS_COM_N8N = new Set(["atendimento-n8n"]);
+/** Modelos com bloco de IA: o bot sem IA não oferece estes na criação. */
+export const MODELOS_COM_IA = new Set(["atendimento-menu", "faq-ia"]);
 
 export const FLOW_TEMPLATES: FlowTemplate[] = MODELOS.map((m) => ({
   ...m,
