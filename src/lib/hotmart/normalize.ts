@@ -71,7 +71,6 @@ export function normalizeEvent(h: any, product: ProductConfig): NormalizedEvent 
   else if (sub.phone?.cell) phone = String(sub.phone.dddCell || "") + String(sub.phone.cell);
   phone = phone.replace(/\D/g, "");
   if (phone && phone.length <= 11) phone = `55${phone}`;
-  if (phone) phone = `+${phone}`;
 
   const doc = buyer.document ? String(buyer.document).replace(/\D/g, "") : null;
   const addr = buyer.address ?? {};

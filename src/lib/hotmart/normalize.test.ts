@@ -22,10 +22,10 @@ const approved = {
 };
 
 describe("normalizeEvent", () => {
-  it("contato: e-mail minúsculo, telefone com 55 e +, CPF só dígitos", () => {
+  it("contato: e-mail minúsculo, telefone só dígitos com 55, CPF só dígitos", () => {
     const n = normalizeEvent(approved, club);
     expect(n.email).toBe("ana@x.com");
-    expect(n.contact.phone).toBe("+5521968523557");
+    expect(n.contact.phone).toBe("5521968523557");
     expect(n.contact.customFields.cpf_cnpj).toBe("12345678901");
     expect(n.contact.name).toBe("Ana Souza");
   });
