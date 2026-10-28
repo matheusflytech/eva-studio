@@ -76,7 +76,7 @@ function whereGlobal(g: FiltrosGlobais): Prisma.DealWhereInput[] {
 }
 
 /** O mesmo, em SQL, pra consulta crua de canais. Valores vão como parâmetro, nunca no texto. */
-function sqlGlobal(g: FiltrosGlobais): Prisma.Sql {
+export function sqlGlobal(g: FiltrosGlobais): Prisma.Sql {
   const partes: Prisma.Sql[] = [];
   if (g.funis.length) partes.push(Prisma.sql`AND d."pipelineId" IN (${Prisma.join(g.funis)})`);
   if (g.donos.length) {
