@@ -81,7 +81,15 @@ export function SecaoGoogleAgenda() {
             <LogoOficial marca="google-agenda" tamanho={16} /> Google Agenda
           </span>
         }
-        descricao="Suas reuniões do Google aparecem junto das tarefas, e um agente de IA pode marcar reuniões na sua agenda. Vale só neste contrato."
+        descricao={
+          <>
+            Suas reuniões do Google aparecem junto das tarefas, e um agente de IA pode marcar reuniões na sua agenda. Vale só neste
+            contrato.{" "}
+            <a href="/privacy#google" target="_blank" className="text-accent-fg hover:underline">
+              Como usamos seus dados
+            </a>
+          </>
+        }
       />
       {volta && MENSAGEM_DA_VOLTA[volta] && <Notice tone={volta === "ok" ? "info" : "warning"}>{MENSAGEM_DA_VOLTA[volta]}</Notice>}
       {volta && !MENSAGEM_DA_VOLTA[volta] && <Notice tone="warning">Não deu para conectar ({volta}). Tente de novo.</Notice>}
