@@ -140,7 +140,10 @@ export function HotmartPanel() {
         descricao="As vendas da Hotmart entram direto no CRM: contato, negócio no funil do produto, etapa pela situação da compra e uma linha por venda."
       />
 
-      <div className="flex flex-col gap-2 empty:hidden [&:not(:empty)]:pb-4">{msg && <Notice tone={msg.tom}>{msg.texto}</Notice>}</div>
+      <div className="flex flex-col gap-2 empty:hidden [&:not(:empty)]:pb-4">
+        {c && !c.hasHottok && <Notice tone="warning">Sem hottok salvo, a URL recusa todas as chamadas. Salve o hottok antes de cadastrar a URL na Hotmart.</Notice>}
+        {msg && <Notice tone={msg.tom}>{msg.texto}</Notice>}
+      </div>
 
       {c && (
         <LinhaDeConfig rotulo="URL do webhook" descricao="Cadastre esta URL na Hotmart em Ferramentas › Webhook, versão 2.0, com todos os eventos.">
@@ -178,85 +181,85 @@ export function HotmartPanel() {
         </LinhaDeConfig>
       )}
 
+      <CabecalhoDaSecao nivel={2} titulo="Produtos" descricao="Cada produto da Hotmart aponta para um funil. Produto sem funil é ignorado (aparece nos eventos)." />
+      <div className="flex flex-col gap-4">
+        {linhas.map((l, i) => {
+          const p = funil(l.pipelineId);
+          const papeis = ROLES[l.model];
+          const faltando = p ? papeis.filter((r) => !l.stages[r]) : [];
+          return (
+            <div key={i} className="flex flex-col gap-3 rounded-[14px] border border-border-subtle p-3">
+              <div className="grid gap-2 sm:grid-cols-[140px_1fr_160px_1fr_auto]">
+                <Input aria-label="Id do produto na Hotmart" inputMode="numeric" placeholder="Id na Hotmart" value={l.hotmartId} onChange={(e) => mudar(i, { hotmartId: e.target.value.replace(/\D/g, "") })} />
+                <Input aria-label="Nome do produto" placeholder="Nome" value={l.name} onChange={(e) => mudar(i, { name: e.target.value })} />
+                <Select aria-label="Modelo" value={l.model} onChange={(e) => mudar(i, { model: e.target.value as Linha["model"] })}>
+                  <option value="one_time">Compra única</option>
+                  <option value="subscription">Assinatura</option>
+                </Select>
+                <Select
+                  aria-label="Funil"
+                  value={l.pipelineId}
+                  onChange={(e) => mudar(i, { pipelineId: e.target.value, stages: { ...(funil(e.target.value)?.suggestion ?? {}) } })}
+                >
+                  <option value="">Escolha o funil</option>
+                  {estado.pipelines.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </Select>
+                <IconButton aria-label="Remover produto" tooltip variant="ghost" onClick={() => setLinhas((ls) => ls.filter((_, j) => j !== i))}>
+                  <Trash2 size={14} />
+                </IconButton>
+              </div>
+              {p && (
+                <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {papeis.map((r) => (
+                    <label key={r} className="flex flex-col gap-1 text-caption text-text-secondary">
+                      {ROLE_LABELS[r]}
+                      <Select value={l.stages[r] ?? ""} onChange={(e) => mudar(i, { stages: { ...l.stages, [r]: e.target.value || undefined } })}>
+                        <option value="">Sem etapa</option>
+                        {p.stages.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {faltando.length > 0 && (
+                <Notice tone="warning">Sem etapa para: {faltando.map((r) => ROLE_LABELS[r]).join(", ")}. Evento que pede essa etapa não move o negócio.</Notice>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <RodapeDaSecao>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setLinhas((ls) => [...ls, { hotmartId: "", name: "", slug: "", model: "one_time", pipelineId: "", stages: {} }])}
+        >
+          <Plus size={14} aria-hidden="true" /> Adicionar produto
+        </Button>
+        <Button
+          type="button"
+          disabled={ocupado || linhas.some((l) => !l.hotmartId || !l.pipelineId)}
+          onClick={() =>
+            void salvar(
+              { products: Object.fromEntries(linhas.map(({ hotmartId, ...l }) => [hotmartId, { ...l, slug: l.slug || l.name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") }])) },
+              "Produtos salvos."
+            )
+          }
+        >
+          Salvar produtos
+        </Button>
+      </RodapeDaSecao>
+
       {c && (
         <>
-          <CabecalhoDaSecao nivel={2} titulo="Produtos" descricao="Cada produto da Hotmart aponta para um funil. Produto sem funil é ignorado (aparece nos eventos)." />
-          <div className="flex flex-col gap-4">
-            {linhas.map((l, i) => {
-              const p = funil(l.pipelineId);
-              const papeis = ROLES[l.model];
-              const faltando = p ? papeis.filter((r) => !l.stages[r]) : [];
-              return (
-                <div key={i} className="flex flex-col gap-3 rounded-[14px] border border-border-subtle p-3">
-                  <div className="grid gap-2 sm:grid-cols-[140px_1fr_160px_1fr_auto]">
-                    <Input aria-label="Id do produto na Hotmart" inputMode="numeric" placeholder="Id na Hotmart" value={l.hotmartId} onChange={(e) => mudar(i, { hotmartId: e.target.value.replace(/\D/g, "") })} />
-                    <Input aria-label="Nome do produto" placeholder="Nome" value={l.name} onChange={(e) => mudar(i, { name: e.target.value })} />
-                    <Select aria-label="Modelo" value={l.model} onChange={(e) => mudar(i, { model: e.target.value as Linha["model"] })}>
-                      <option value="one_time">Compra única</option>
-                      <option value="subscription">Assinatura</option>
-                    </Select>
-                    <Select
-                      aria-label="Funil"
-                      value={l.pipelineId}
-                      onChange={(e) => mudar(i, { pipelineId: e.target.value, stages: { ...(funil(e.target.value)?.suggestion ?? {}) } })}
-                    >
-                      <option value="">Escolha o funil</option>
-                      {estado.pipelines.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <IconButton aria-label="Remover produto" tooltip variant="ghost" onClick={() => setLinhas((ls) => ls.filter((_, j) => j !== i))}>
-                      <Trash2 size={14} />
-                    </IconButton>
-                  </div>
-                  {p && (
-                    <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-                      {papeis.map((r) => (
-                        <label key={r} className="flex flex-col gap-1 text-caption text-text-secondary">
-                          {ROLE_LABELS[r]}
-                          <Select value={l.stages[r] ?? ""} onChange={(e) => mudar(i, { stages: { ...l.stages, [r]: e.target.value || undefined } })}>
-                            <option value="">Sem etapa</option>
-                            {p.stages.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </Select>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {faltando.length > 0 && (
-                    <Notice tone="warning">Sem etapa para: {faltando.map((r) => ROLE_LABELS[r]).join(", ")}. Evento que pede essa etapa não move o negócio.</Notice>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <RodapeDaSecao>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setLinhas((ls) => [...ls, { hotmartId: "", name: "", slug: "", model: "one_time", pipelineId: "", stages: {} }])}
-            >
-              <Plus size={14} aria-hidden="true" /> Adicionar produto
-            </Button>
-            <Button
-              type="button"
-              disabled={ocupado || linhas.some((l) => !l.hotmartId || !l.pipelineId)}
-              onClick={() =>
-                void salvar(
-                  { products: Object.fromEntries(linhas.map(({ hotmartId, ...l }) => [hotmartId, { ...l, slug: l.slug || l.name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") }])) },
-                  "Produtos salvos."
-                )
-              }
-            >
-              Salvar produtos
-            </Button>
-          </RodapeDaSecao>
-
           <CabecalhoDaSecao nivel={2} titulo="Últimos eventos" descricao="Os 50 mais recentes. Reprocessar aplica de novo com o mapeamento atual." />
           {eventos.length === 0 ? (
             <p className="text-small text-text-tertiary">Nenhum evento recebido ainda.</p>
