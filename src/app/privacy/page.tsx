@@ -10,10 +10,10 @@ export const metadata: Metadata = {
   description: "Como o Eva Studio coleta, usa, guarda e protege dados pessoais.",
 };
 
-// Dados de quem responde pela plataforma. Razão social e CNPJ: preencher quando definidos.
+// Quem responde pela plataforma (controladora dos dados de quem usa o Eva).
 const EMPRESA = {
-  nome: "Eva Holding",
-  documento: "",
+  nome: "Eva Ai LTDA",
+  documento: "CNPJ 69.700.282/0001-36",
   email: "lucasalfredotech@gmail.com",
 };
 const VIGENCIA = "28 de outubro de 2026";
