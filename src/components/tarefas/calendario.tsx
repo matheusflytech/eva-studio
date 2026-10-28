@@ -238,6 +238,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
       AVISADOS_NA_ILHA.add(e.id);
       const min = Math.max(1, Math.round((e.inicio.getTime() - agora.getTime()) / 60_000));
       avisarNaIlha({
+        alerta: "agenda",
         titulo: `${e.titulo} em ${min} min`,
         detalhe: [faixaDeHorario(e), e.tarefa?.contact?.name ?? e.tarefa?.deal?.name].filter(Boolean).join(" · "),
         duracao: 8000,

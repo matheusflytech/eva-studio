@@ -9,58 +9,13 @@ import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { focusRing } from "@/components/ui/styles";
 import Link from "@/components/contrato/link";
-import type { AcaoDaAtencao, AcaoDoRecado, Acontecimento, ItemDeAtencao, Recado } from "./eva-voz";
+import type { AcaoDaAtencao, Acontecimento, ItemDeAtencao } from "./eva-voz";
 
 /**
- * Blocos da "voz da Eva" na tela de Negócios (estilos Eva · 1/2/3): recado
- * do dia, momentos, "desde ontem / pede sua atenção" e a comemoração quando
+ * Blocos da "voz da Eva" na tela de Negócios (estilos Eva · 1/2/3): momentos, "desde ontem / pede sua atenção" e a comemoração quando
  * um negócio fecha. Tudo no design system: painel neutro, sem borda colorida,
  * sem brilho, cor só em ícone de status.
  */
-
-export function RecadoDaEva({
-  recado,
-  carimbo,
-  onAcao,
-  onDispensar,
-}: {
-  recado: Recado;
-  carimbo: string;
-  onAcao: (id: AcaoDoRecado) => void;
-  onDispensar: () => void;
-}) {
-  return (
-    <section aria-label="Recado da Eva" className="flex shrink-0 items-start gap-4 rounded-lg border border-border-subtle bg-panel px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="eyebrow">Eva · {carimbo}</p>
-        <h2 className="text-body font-semibold text-text-primary">{recado.titulo}</h2>
-        <p className="max-w-3xl text-body text-text-secondary">
-          {recado.partes.map((p, i) =>
-            p.forte ? (
-              <strong key={i} className="font-medium text-text-primary">
-                {p.texto}
-              </strong>
-            ) : (
-              <React.Fragment key={i}>{p.texto}</React.Fragment>
-            )
-          )}
-        </p>
-        {recado.acoes.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1.5">
-            {recado.acoes.map((a, i) => (
-              <Button key={a.id} variant={i === 0 ? "secondary" : "ghost"} size="sm" onClick={() => onAcao(a.id)}>
-                {a.rotulo}
-              </Button>
-            ))}
-          </div>
-        )}
-      </div>
-      <IconButton aria-label="Esconder o recado de hoje" tooltip="Esconder até amanhã" size="sm" onClick={onDispensar}>
-        <X />
-      </IconButton>
-    </section>
-  );
-}
 
 /** Momentos que valem comemorar: uma linha de texto, sem pílulas. */
 export function Momentos({ itens }: { itens: string[] }) {
