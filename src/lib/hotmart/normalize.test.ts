@@ -48,7 +48,7 @@ describe("normalizeEvent", () => {
     expect(n.deal.customFields.data_de_aprovacao).toBe("2026-10-28T11:15");
     expect(n.deal.customFields.proxima_cobranca).toBe("2026-11-28");
     expect(n.deal.customFields.valor_cheio).toBe(3500);
-    expect(n.deal.customFields.canal_de_origem).toBe("site-renata");
+    expect(n.deal.customFields.canal_de_origem).toBe("site");
     expect(n.deal.amountCents).toBe(3500);
     expect(n.deal.closeDate).toBe("2026-10-28");
     expect(n.amountBrlCents).toBe(3500);
@@ -68,5 +68,6 @@ describe("normalizeEvent", () => {
     expect(channel({})).toBe("direto");
     expect(channel({ sck: "HOTMART_PRODUCT_PAGE" })).toBe("pagina-hotmart");
     expect(channel({ src: "site" }, { affiliates: [{ name: "Fulano", affiliate_code: "A1" }], producer: { name: "Renata Estefan" } })).toBe("afiliado");
+    expect(channel({ src: "site" }, { affiliates: [{ name: "Renata Estefan Studio", affiliate_code: "A2" }], producer: { name: "Renata Estefan" } })).toBe("site");
   });
 });

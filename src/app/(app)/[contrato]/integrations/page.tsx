@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio, ShoppingBag } from "lucide-react";
+import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -50,7 +50,7 @@ type Aba = "ai" | "email" | "hotmart" | "mcp" | "api";
 const ABAS: { value: Aba; label: string; icon: React.ReactNode }[] = [
   { value: "ai", label: "IA", icon: <MarcaEva size={14} /> },
   { value: "email", label: "E-mail", icon: <Mail aria-hidden="true" /> },
-  { value: "hotmart", label: "Hotmart", icon: <ShoppingBag aria-hidden="true" /> },
+  { value: "hotmart", label: "Hotmart", icon: <LogoOficial marca="hotmart" tamanho={14} /> },
   { value: "mcp", label: "Servidores MCP", icon: <Plug aria-hidden="true" /> },
   { value: "api", label: "API do contrato", icon: <KeyRound aria-hidden="true" /> },
 ];
@@ -124,7 +124,7 @@ function Integracoes() {
         </div>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 lg:-mx-6 lg:px-6">
+      <div className="-mx-4 shrink-0 overflow-x-auto px-4 lg:-mx-6 lg:px-6">
         <SegmentedControl label="Integrações" value={aba} onChange={(v) => router.replace(`${pathname}?tab=${v}`)} options={ABAS} />
       </div>
 

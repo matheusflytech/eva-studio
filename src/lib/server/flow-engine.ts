@@ -460,7 +460,8 @@ function destinoDoErroDaIa(edges: Edge[], nodeId: string, erro: string | undefin
  */
 async function montarFerramentaDeCampos(
   orgId: string,
-  resolveContactId: () => Promise<string | null>
+  resolveContactId: () => Promise<string | null>,
+  pode: (key: string) => boolean
 ): Promise<{ action: string; tool: LlmTool }[]> {
   const contactId = await resolveContactId().catch(() => null);
   const deal = contactId ? await findOpenDealForContact(contactId).catch(() => null) : null;
@@ -469,7 +470,8 @@ async function montarFerramentaDeCampos(
   // da ferramenta é montada antes, quando o negócio ainda não existe.
   const defsNegocio = await carregarDefinicoes(orgId, "deal", deal?.pipelineId ?? null);
   const defsContato = await carregarDefinicoes(orgId, "contact");
-  const todas = [...defsNegocio, ...defsContato];
+  // Só os campos marcados no bloco: cada campo é um parâmetro em toda mensagem.
+  const todas = [...defsNegocio, ...defsContato].filter((d) => pode(d.key));
 
   const dica = (d: (typeof todas)[number]): string => {
     const base = d.label;
@@ -546,6 +548,15 @@ function entradaDeCampos(
 }
 
 /**
+ * Campos que a IA lê e preenche, marcados no bloco. Bloco antigo (sem a
+ * lista) segue com todos, para não parar de salvar dados de quem já usa.
+ */
+function camposDaIa(data: FlowNodeData): (key: string) => boolean {
+  const lista = data.crmToolFields;
+  return (key) => lista === undefined || lista.includes(key);
+}
+
+/**
  * Executa uma ferramenta de CRM pedida pelo modelo, aplicando as travas
  * configuradas no bloco.
  *
@@ -559,10 +570,24 @@ async function runCrmTool(
   orgId: string,
   contactId: string
 ): Promise<string> {
-  const args = call.arguments ?? {};
+  const pode = camposDaIa(node.data);
+  // O modelo só mexe nos campos liberados, mesmo que mande outros.
+  const args = Object.fromEntries(
+    Object.entries(call.arguments ?? {}).filter(([k]) => call.name !== "crm_atualizar_campos" || pode(k))
+  );
 
   if (call.name === "crm_buscar") {
     const crm = await lookupCrmForContact(contactId);
+    // Valores dos campos liberados, pelo rótulo (o que o modelo entende).
+    const campos: Record<string, unknown> = {};
+    const ler = async (entity: "deal" | "contact", valores: unknown, pipelineId: string | null) => {
+      const v = (valores ?? {}) as Record<string, unknown>;
+      for (const d of await carregarDefinicoes(orgId, entity, pipelineId)) {
+        if (pode(d.key) && v[d.key] !== undefined && v[d.key] !== null && v[d.key] !== "") campos[d.label] = v[d.key];
+      }
+    };
+    if (crm.contact) await ler("contact", crm.contact.customFields, null);
+    if (crm.deal) await ler("deal", crm.deal.customFields, crm.deal.pipelineId);
     return JSON.stringify({
       empresa: crm.contact?.company?.name ?? null,
       etiquetas: (crm.contact?.tags ?? []).map((t) => t.tag.name),
@@ -570,6 +595,7 @@ async function runCrmTool(
         ? { nome: crm.deal.name, etapa: crm.deal.stage.name, valor: crm.deal.amountCents / 100 }
         : null,
       tarefas_abertas: crm.openTasks,
+      ...(Object.keys(campos).length ? { campos } : {}),
     });
   }
 
@@ -670,7 +696,7 @@ async function runCrmTool(
 
     const dados: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(args)) {
-      if (["nome", "etiqueta", "resumo"].includes(k)) continue;
+      if (["nome", "etiqueta", "resumo"].includes(k) || !pode(k)) continue;
       if (texto(v)) dados[k] = v;
     }
     const noNegocio = await preencherCamposDoNegocio(orgId, dealId, dados);
@@ -911,7 +937,7 @@ async function runAiAgent(
             params: [{ name: "etapa", description: "Nome exato da etapa de destino." }],
           },
         },
-        ...(await montarFerramentaDeCampos(crmContext.orgId, crmContext.resolveContactId)),
+        ...(await montarFerramentaDeCampos(crmContext.orgId, crmContext.resolveContactId, camposDaIa(tn.data))),
         {
           action: "criar_tarefa",
           tool: {

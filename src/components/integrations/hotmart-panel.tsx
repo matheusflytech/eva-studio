@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { CabecalhoDaSecao, EsqueletoDeLista, LinhaDeConfig, RodapeDaSecao } from "@/components/configuracoes/secao";
+import { CabecalhoDaSecao, EsqueletoDeLista, LinhaDeConfig, RodapeDaSecao, RotuloDeGrupo } from "@/components/configuracoes/secao";
 import { dataHoraBR } from "@/lib/exportar/csv";
 import { ROLES, ROLE_LABELS, type ProductConfig, type StageRole } from "@/lib/hotmart/types";
+import { compatible, hotmartFields, type FieldMap, type HotmartField } from "@/lib/hotmart/fields";
 
 interface Pipeline {
   id: string;
@@ -20,9 +21,16 @@ interface Pipeline {
   stages: { id: string; name: string }[];
   suggestion: Partial<Record<StageRole, string>>;
 }
+interface CampoDoContrato {
+  entity: string;
+  key: string;
+  label: string;
+  type: string;
+}
 interface Estado {
-  connection: { url: string; hasHottok: boolean; products: Record<string, ProductConfig>; status: string; lastEventAt: string | null } | null;
+  connection: { url: string; hasHottok: boolean; products: Record<string, ProductConfig>; fields: FieldMap; status: string; lastEventAt: string | null } | null;
   pipelines: Pipeline[];
+  customFields: CampoDoContrato[];
 }
 interface Evento {
   id: string;
@@ -260,6 +268,17 @@ export function HotmartPanel() {
         </Button>
       </RodapeDaSecao>
 
+      {c && Object.keys(c.products).length > 0 && (
+        <SecaoDeCampos
+          key={JSON.stringify([c.fields, c.products, estado.customFields])}
+          products={c.products}
+          salvo={c.fields ?? {}}
+          campos={estado.customFields}
+          ocupado={ocupado}
+          onSalvar={(fields) => void salvar({ fields }, "Campos salvos.")}
+        />
+      )}
+
       {c && (
         <>
           <CabecalhoDaSecao nivel={2} titulo="Últimos eventos" descricao="Os 50 mais recentes. Reprocessar aplica de novo com o mapeamento atual." />
@@ -313,5 +332,97 @@ export function HotmartPanel() {
         </>
       )}
     </div>
+  );
+}
+
+const CRIAR = "+new";
+
+/** Escolha inicial: o que está salvo; senão o campo de mesma chave; senão criar (essenciais) ou não gravar. */
+function escolhaInicial(f: HotmartField, salvo: FieldMap, campos: CampoDoContrato[]): string {
+  const existe = (key: string | null) => !!key && campos.some((x) => x.entity === f.entity && x.key === key && compatible(f.type, x.type));
+  if (f.id in salvo) return salvo[f.id] === null ? "" : existe(salvo[f.id]) ? salvo[f.id]! : f.essential ? CRIAR : "";
+  if (existe(f.id)) return f.id;
+  return f.essential ? CRIAR : "";
+}
+
+// Para onde vai cada dado da Hotmart: o campo padrão (criado na hora), um
+// campo que o contrato já tem ou nenhum. Os obrigatórios da regra não
+// aparecem: são criados sozinhos.
+function SecaoDeCampos({
+  products,
+  salvo,
+  campos,
+  ocupado,
+  onSalvar,
+}: {
+  products: Record<string, ProductConfig>;
+  salvo: FieldMap;
+  campos: CampoDoContrato[];
+  ocupado: boolean;
+  onSalvar: (escolhas: Record<string, string>) => void;
+}) {
+  const catalogo = React.useMemo(() => hotmartFields(products).filter((f) => !f.required), [products]);
+  // Campos que a regra lê de volta (evento repetido) não podem receber outro dado.
+  const reservados = React.useMemo(
+    () => new Set(hotmartFields(products).filter((f) => f.required).map((f) => (salvo[f.id] ?? f.id) as string)),
+    [products, salvo]
+  );
+  const [escolhas, setEscolhas] = React.useState<Record<string, string>>(() => Object.fromEntries(catalogo.map((f) => [f.id, escolhaInicial(f, salvo, campos)])));
+  const [todos, setTodos] = React.useState(false);
+  const visiveis = catalogo.filter((f) => todos || f.essential);
+  const escondidos = catalogo.length - visiveis.length;
+  const gravandoEscondidos = catalogo.filter((f) => !f.essential && escolhas[f.id] !== "").length;
+  const novos = catalogo.filter((f) => escolhas[f.id] === CRIAR).length;
+
+  return (
+    <>
+      <CabecalhoDaSecao
+        nivel={2}
+        titulo="Campos"
+        descricao="Para onde vai cada dado da Hotmart. Crie o campo sugerido, escolha um campo seu ou deixe sem gravar."
+      />
+      {(["contact", "deal"] as const).map((entity) => {
+        const lista = visiveis.filter((f) => f.entity === entity);
+        if (!lista.length) return null;
+        const doTipo = campos.filter((x) => x.entity === entity);
+        return (
+          <div key={entity} className="pb-2">
+            <RotuloDeGrupo>{entity === "contact" ? "Contato" : "Negócio"}</RotuloDeGrupo>
+            {lista.map((f) => {
+              const existentes = doTipo.filter((x) => compatible(f.type, x.type) && !reservados.has(x.key));
+              const temPadrao = existentes.some((x) => x.key === f.id);
+              return (
+                <LinhaDeConfig key={f.id} rotulo={f.label} descricao={f.hint} htmlFor={`hotmart-campo-${f.id}`}>
+                  <Select
+                    id={`hotmart-campo-${f.id}`}
+                    className="max-w-xs"
+                    value={escolhas[f.id]}
+                    onChange={(e) => setEscolhas((v) => ({ ...v, [f.id]: e.target.value }))}
+                  >
+                    {!temPadrao && <option value={CRIAR}>Criar campo &quot;{f.label}&quot;</option>}
+                    {existentes.map((x) => (
+                      <option key={x.key} value={x.key}>
+                        {x.label}
+                      </option>
+                    ))}
+                    <option value="">Não gravar</option>
+                  </Select>
+                </LinhaDeConfig>
+              );
+            })}
+          </div>
+        );
+      })}
+      <RodapeDaSecao mensagem={novos > 0 ? `${novos} ${novos === 1 ? "campo novo será criado" : "campos novos serão criados"} ao salvar.` : undefined}>
+        {(escondidos > 0 || todos) && (
+          <Button type="button" variant="ghost" onClick={() => setTodos((t) => !t)}>
+            {todos ? "Mostrar só os principais" : `Mostrar mais ${escondidos} dados${gravandoEscondidos ? ` (${gravandoEscondidos} já gravando)` : ""}`}
+          </Button>
+        )}
+        <Button type="button" disabled={ocupado} onClick={() => onSalvar(escolhas)}>
+          Salvar campos
+        </Button>
+      </RodapeDaSecao>
+    </>
   );
 }

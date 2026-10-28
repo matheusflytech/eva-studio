@@ -79,6 +79,17 @@ describe("applyEvent", () => {
     expect(bus.publicarEvento).toHaveBeenCalledWith(expect.objectContaining({ tipo: "sale.refunded" }));
   });
 
+  it("mapa de campos: grava e lê pelo campo escolhido; dado sem destino não grava", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", name: "Ana", phone: "55", customFields: { valor_total: 1000 } });
+    ext.idPorExterno.mockResolvedValue("d1");
+    db.deal.findFirst.mockResolvedValue({ id: "d1", name: "Drawing Club | Ana | Founders", stageId: "s-active", customFields: {} });
+    await applyEvent("o1", products, payload("PURCHASE_APPROVED"), { ltv_hotmart: "valor_total", canal_de_origem: null });
+    expect(crm.preencherCamposDoContato).toHaveBeenCalledWith("o1", "c1", expect.objectContaining({ valor_total: 4500 }));
+    const dealFields = (crm.preencherCamposDoNegocio.mock.calls[0] as unknown[])[2] as Record<string, unknown>;
+    expect(dealFields).not.toHaveProperty("canal_de_origem");
+    expect(dealFields).toHaveProperty("transacao_hotmart", "HP1");
+  });
+
   it("erro do CRM vira resultado de erro, sem exceção", async () => {
     db.contact.findFirst.mockRejectedValue(new Error("banco fora"));
     expect(await applyEvent("o1", products, payload("PURCHASE_APPROVED"))).toMatchObject({ result: "error", detail: "banco fora" });

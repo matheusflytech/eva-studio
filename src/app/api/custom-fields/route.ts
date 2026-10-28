@@ -10,8 +10,6 @@ import { TIPO_POR_ID, type OpcaoDeCampo } from "@/lib/custom-fields";
 //        ?todos=1                              todos da organização (tela de configuração)
 //   POST cria um campo novo
 
-const LIMITE_POR_ENTIDADE = 40;
-
 export async function GET(request: Request) {
   const ctx = await requirePermission("read");
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -51,9 +49,6 @@ export async function POST(request: Request) {
   }
 
   const total = await prisma.customField.count({ where: { orgId: ctx.orgId, entity } });
-  if (total >= LIMITE_POR_ENTIDADE) {
-    return NextResponse.json({ error: `O limite é de ${LIMITE_POR_ENTIDADE} campos. Apague algum que não usa mais.` }, { status: 400 });
-  }
 
   // Campo de funil específico: confere que o funil é da organização.
   let pipelineId: string | null = null;

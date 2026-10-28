@@ -1,4 +1,5 @@
 import { STAGE_ORDER, type ProductModel, type StageRole } from "./types";
+import { statusFieldId } from "./fields";
 
 // Porta do nó "Decidir" dos workflows do n8n: que etapa o evento pede, se pode
 // mover (nunca volta; no Club, ativo <-> pendente e novo -> pendente podem;
@@ -128,9 +129,10 @@ export function decide(state: CurrentState, n: DecisionInput): Decision {
   if (isClub) {
     // Diferença intencional do n8n: card criado agora também grava o status (lá ficava vazio).
     const final = move ? target : action === "create" ? target : current;
-    if (final === "new" || final === "active") c.status_drawing_club = "ativo";
-    if (final === "overdue") c.status_drawing_club = "pagamento-pendente";
-    if (final === "former") c.status_drawing_club = "ex-membro";
+    const status = statusFieldId(n.productSlug);
+    if (final === "new" || final === "active") c[status] = "ativo";
+    if (final === "overdue") c[status] = "pagamento-pendente";
+    if (final === "former") c[status] = "ex-membro";
   }
 
   return {

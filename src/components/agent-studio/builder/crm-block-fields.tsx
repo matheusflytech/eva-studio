@@ -209,6 +209,91 @@ function MapaDeCampos({
   );
 }
 
+/**
+ * Campos que a ferramenta de CRM entrega ao Agente de IA, para ler (Consultar
+ * CRM) e preencher (Salvar dados / Registrar lead). Cada campo marcado vira um
+ * parâmetro em toda mensagem: só o que importa deixa a IA mais certeira e
+ * barata. Bloco antigo, sem lista, mostra todos marcados (é o que ele usa).
+ */
+function CamposDaIa({ data, onChange }: { data: FlowNodeData; onChange: (patch: Partial<FlowNodeData>) => void }) {
+  const [defs, setDefs] = React.useState<DefinicaoDeCampo[] | null>(null);
+  const [busca, setBusca] = React.useState("");
+
+  React.useEffect(() => {
+    Promise.all(
+      (["contact", "deal"] as const).map((e) =>
+        fetch(`/api/custom-fields?entity=${e}&todos=1`).then((r) => r.json()).then((d) => (d.fields ?? []) as DefinicaoDeCampo[])
+      )
+    )
+      .then((listas) => setDefs(listas.flat()))
+      .catch(() => setDefs([]));
+  }, []);
+
+  if (defs === null) return null;
+  if (defs.length === 0) {
+    return (
+      <p className="rounded-[14px] bg-raised px-3 py-2.5 text-caption text-text-tertiary">
+        Você ainda não criou campos.{" "}
+        <Link href="/deals/configure" className="text-accent-fg hover:underline">Criar campos</Link> para a IA poder lê-los e preenchê-los.
+      </p>
+    );
+  }
+
+  const marcados = data.crmToolFields ?? defs.map((d) => d.key);
+  const set = (keys: string[]) => onChange({ crmToolFields: [...new Set(keys)] });
+  const termo = busca.trim().toLowerCase();
+  const visiveis = termo ? defs.filter((d) => d.label.toLowerCase().includes(termo) || d.key.includes(termo)) : defs;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <Label>Campos que a IA lê e preenche</Label>
+        <span className="text-caption text-text-tertiary">
+          {marcados.length} de {defs.length}
+        </span>
+      </div>
+      {defs.length > 8 && (
+        <Input className="mt-1.5 h-9" placeholder="Buscar campo" aria-label="Buscar campo" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      )}
+      <div className="mt-1.5 flex max-h-[240px] flex-col gap-1.5 overflow-y-auto rounded-[14px] bg-raised p-3">
+        {(["contact", "deal"] as const).map((entity) => {
+          const lista = visiveis.filter((d) => d.entity === entity);
+          if (!lista.length) return null;
+          return (
+            <div key={entity} className="flex flex-col gap-1.5">
+              <span className="font-mono text-caption text-text-tertiary">{entity === "contact" ? "Contato" : "Negócio"}</span>
+              {lista.map((d) => (
+                <label key={d.id} className="flex cursor-pointer items-center gap-2.5 text-small">
+                  <Checkbox
+                    checked={marcados.includes(d.key)}
+                    onCheckedChange={(v) => set(v ? [...marcados, d.key] : marcados.filter((k) => k !== d.key))}
+                  />
+                  <span className="text-text-primary">
+                    {d.label}
+                    <span className="ml-1.5 text-text-tertiary">{TIPO_POR_ID.get(d.type)?.rotulo}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex items-center gap-3 text-caption">
+        <button type="button" className="text-accent-fg hover:underline" onClick={() => set(defs.map((d) => d.key))}>
+          Marcar todos
+        </button>
+        <button type="button" className="text-accent-fg hover:underline" onClick={() => set([])}>
+          Limpar
+        </button>
+      </div>
+      <p className="mt-1.5 text-caption text-text-tertiary">
+        Só os marcados vão para a IA. Nenhum marcado significa nenhum, não todos. Menos campos deixam a IA mais certeira e
+        cada mensagem mais barata.
+      </p>
+    </div>
+  );
+}
+
 export function CrmBlockFields({
   iconKey,
   data,
@@ -520,6 +605,8 @@ export function CrmBlockFields({
             ))}
           </div>
         </div>
+
+        {["buscar", "atualizar_campos", "registrar_lead"].some((a) => actions.includes(a)) && <CamposDaIa data={data} onChange={onChange} />}
 
         {actions.includes("mover_etapa") && (
           <div>

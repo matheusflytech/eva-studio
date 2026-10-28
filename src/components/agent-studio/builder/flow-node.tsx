@@ -224,6 +224,7 @@ export interface FlowNodeData {
   crmToolActions?: string[];     // verbos liberados
   crmAllowedStageIds?: string[]; // etapas para onde a IA pode mover
   crmMaxAmount?: string;         // teto de valor; acima disso, só cria marcado para revisão
+  crmToolFields?: string[];      // campos que a IA lê e preenche; ausente = todos (blocos antigos)
   [key: string]: unknown;
 }
 

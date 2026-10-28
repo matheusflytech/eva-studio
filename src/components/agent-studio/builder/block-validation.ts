@@ -100,8 +100,9 @@ export function validateNode(data: FlowNodeData): string | null {
       return vazio(data.mcpServerId) ? "Escolha o servidor MCP." : null;
 
     case "tool-crm":
-      return (data.crmToolActions ?? []).length === 0
-        ? "Nenhuma ação liberada: a IA não poderá fazer nada."
+      if ((data.crmToolActions ?? []).length === 0) return "Nenhuma ação liberada: a IA não poderá fazer nada.";
+      return ["atualizar_campos", "registrar_lead"].some((a) => data.crmToolActions?.includes(a)) && data.crmToolFields?.length === 0
+        ? "Nenhum campo marcado: a IA não terá onde salvar os dados do cliente."
         : null;
 
     // O motor exige etapa e etiqueta explícitas nesses dois. Nos outros

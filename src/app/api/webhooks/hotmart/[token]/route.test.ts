@@ -57,4 +57,9 @@ describe("webhook Hotmart", () => {
     expect(ap.applyEvent).toHaveBeenCalled();
     expect(db.hotmartEvent.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "e1" } }));
   });
+  it("hottok que vem no corpo não vai para o log", async () => {
+    con.connectionByToken.mockResolvedValue(active);
+    await POST(req("segredo", { id: "ev", event: "UPDATE_SUBSCRIPTION_CHARGE_DATE", hottok: "segredo" }), params);
+    expect(db.hotmartEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ payload: expect.not.objectContaining({ hottok: expect.anything() }) }), select: { id: true } });
+  });
 });

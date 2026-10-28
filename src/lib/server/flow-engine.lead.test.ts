@@ -35,7 +35,8 @@ vi.mock("@/lib/server/sequences", () => ({ stopEnrollmentsOnReply: vi.fn() }));
 vi.mock("@/lib/server/outbound", () => ({ registerBroadcastReply: vi.fn() }));
 vi.mock("@/lib/server/leads", () => leads);
 vi.mock("@/lib/server/crm", () => crm);
-vi.mock("@/lib/server/custom-fields", () => ({ carregarDefinicoes: vi.fn(async () => []) }));
+const campos = vi.hoisted(() => ({ carregarDefinicoes: vi.fn(async (_o: string, _e: string) => [] as { key: string; label: string; type: string; options: [] }[]) }));
+vi.mock("@/lib/server/custom-fields", () => campos);
 vi.mock("@/lib/server/credentials", () => ({ getCredentialSecret: vi.fn(async () => "chave") }));
 vi.mock("@/lib/server/llm", () => llm);
 vi.mock("@/lib/server/ia/uso", () => ({ chavesNoLimite: vi.fn(async () => new Set<string>()), registrarUso: vi.fn() }));
@@ -87,5 +88,31 @@ describe("crm_registrar_lead", () => {
     expect(ultimaSync.variables).toMatchObject({ nome: "Ana Souza", telefone: "(47) 99970-5773" });
     expect(ultimaSync.variables).not.toHaveProperty("email");
     expect(leads.marcarComoLead).toHaveBeenCalledWith("contato-1", expect.objectContaining({ channel: "website" }));
+  });
+});
+
+describe("campos que a IA usa", () => {
+  it("só os campos marcados no bloco viram parâmetro e são gravados", async () => {
+    campos.carregarDefinicoes.mockImplementation(async (_o: string, entity: string) =>
+      entity === "contact" ? [{ key: "consumo", label: "Consumo", type: "text", options: [] }, { key: "cpf", label: "CPF", type: "text", options: [] }] : []
+    );
+    db.agentFlow.findUnique.mockResolvedValue({
+      ...fluxo,
+      nodes: fluxo.nodes.map((n) => (n.id === "crm" ? { ...n, data: { ...n.data, crmToolFields: ["consumo"] } } : n)),
+    });
+    let ferramentas: { name: string; params: { name: string }[] }[] = [];
+    llm.callLlmWithTools.mockImplementation(
+      async (opts: { executeTool: (c: LlmToolCall) => Promise<string>; tools: typeof ferramentas }) => {
+        ferramentas = opts.tools;
+        await opts.executeTool({ id: "1", name: "crm_registrar_lead", arguments: { nome: "Ana", consumo: "300", cpf: "123" } });
+        return { text: "ok" };
+      }
+    );
+    await advanceConversation({ agentId: "a1", channel: "website", contactId: "site-1", text: "oi" });
+
+    const params = ferramentas.find((t) => t.name === "crm_registrar_lead")!.params.map((p) => p.name);
+    expect(params).toContain("consumo");
+    expect(params).not.toContain("cpf");
+    expect(crm.preencherCamposDoContato).toHaveBeenCalledWith("o1", "contato-1", { consumo: "300" });
   });
 });
