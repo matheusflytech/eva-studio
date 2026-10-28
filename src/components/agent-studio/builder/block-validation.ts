@@ -99,6 +99,11 @@ export function validateNode(data: FlowNodeData): string | null {
     case "tool-mcp":
       return vazio(data.mcpServerId) ? "Escolha o servidor MCP." : null;
 
+    case "tool-calendar":
+      if (vazio(data.calendarConnectionId) || vazio(data.calendarId)) return "Escolha a agenda onde a IA marca as reuniões.";
+      if ((data.calendarDays ?? [1, 2, 3, 4, 5]).length === 0) return "Marque pelo menos um dia de atendimento.";
+      return (data.calendarStart ?? "09:00") < (data.calendarEnd ?? "18:00") ? null : "O horário final precisa ser depois do inicial.";
+
     case "tool-crm":
       if ((data.crmToolActions ?? []).length === 0) return "Nenhuma ação liberada: a IA não poderá fazer nada.";
       return ["atualizar_campos", "registrar_lead"].some((a) => data.crmToolActions?.includes(a)) && data.crmToolFields?.length === 0

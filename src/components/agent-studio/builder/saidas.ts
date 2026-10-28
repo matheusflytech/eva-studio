@@ -31,7 +31,7 @@ export interface Saida {
   tipo: TipoDeSaida;
 }
 
-const FERRAMENTAS = new Set(["tool-http", "tool-knowledge", "tool-mcp", "tool-crm"]);
+const FERRAMENTAS = new Set(["tool-http", "tool-knowledge", "tool-mcp", "tool-crm", "tool-calendar"]);
 
 export const ehFerramenta = (iconKey: string) => FERRAMENTAS.has(iconKey);
 

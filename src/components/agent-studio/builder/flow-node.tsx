@@ -225,6 +225,14 @@ export interface FlowNodeData {
   crmAllowedStageIds?: string[]; // etapas para onde a IA pode mover
   crmMaxAmount?: string;         // teto de valor; acima disso, só cria marcado para revisão
   crmToolFields?: string[];      // campos que a IA lê e preenche; ausente = todos (blocos antigos)
+  // ── Ferramenta Agenda Google ─────────────────────────────────────────
+  calendarConnectionId?: string; // GoogleCalendarConnection (a agenda de quem)
+  calendarId?: string;
+  calendarDurationMin?: number;
+  calendarDays?: number[];       // 0 = domingo
+  calendarStart?: string;        // "09:00" (SP)
+  calendarEnd?: string;          // "18:00" (SP)
+  calendarMeet?: boolean;        // padrão: ligado
   [key: string]: unknown;
 }
 

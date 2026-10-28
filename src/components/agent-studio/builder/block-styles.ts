@@ -36,6 +36,7 @@ export const BLOCK_CATEGORY: Record<IconKey, CategoryColor> = {
   "tool-knowledge": "indigo",
   "tool-mcp": "indigo",
   "tool-crm": "indigo",
+  "tool-calendar": "indigo",
   "crm-deal": "teal",
   "crm-stage": "teal",
   "crm-task": "teal",

@@ -18,6 +18,7 @@ import { EmailDoContrato } from "./email-do-contrato";
 import { Notice } from "@/components/ui/notice";
 import { KeyValueList } from "./key-value-list";
 import { McpToolPicker } from "./mcp-tool-picker";
+import { CalendarToolFields } from "./calendar-tool-fields";
 import { CrmBlockFields } from "./crm-block-fields";
 import { CaptureConfig } from "./capture-config";
 import { SaidasDaIa } from "./saidas-da-ia";
@@ -904,6 +905,8 @@ export function NodeInspector({
         {(iconKey.startsWith("crm-") || iconKey === "tool-crm") && (
           <CrmBlockFields iconKey={iconKey} data={node.data} onChange={onChange} />
         )}
+
+        {iconKey === "tool-calendar" && <CalendarToolFields data={node.data} onChange={onChange} />}
 
         {iconKey === "tool-mcp" && (
           <div className="flex flex-col gap-3">

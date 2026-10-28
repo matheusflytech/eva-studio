@@ -1,4 +1,5 @@
 import {
+  CalendarClock,
   PlayCircle,
   MessageCircle,
   ListChecks,
@@ -53,6 +54,7 @@ export const ICON_REGISTRY = {
   "crm-note": StickyNote,
   "crm-lookup": Search,
   "tool-crm": Building2,
+  "tool-calendar": CalendarClock,
   "studio-block": LayoutList,
   "track-event": Activity,
   "go-to-flow": Route,

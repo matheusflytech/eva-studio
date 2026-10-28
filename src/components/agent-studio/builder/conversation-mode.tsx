@@ -28,7 +28,7 @@ interface Item {
 /** Blocos que o cliente enxerga como mensagem. */
 const FALA = new Set<IconKey>(["message", "capture", "agent", "ai-agent"]);
 /** Blocos que só existem pendurados num agente de IA, nunca no fio principal. */
-const FERRAMENTA = new Set<IconKey>(["tool-http", "tool-knowledge", "tool-mcp", "tool-crm"]);
+const FERRAMENTA = new Set<IconKey>(["tool-http", "tool-knowledge", "tool-mcp", "tool-crm", "tool-calendar"]);
 
 const CRM_RESUMO: Partial<Record<IconKey, (d: FlowNodeData) => string>> = {
   "crm-deal": (d) => `Cria negócio${d.crmDealName ? ` “${d.crmDealName}”` : ""}${d.crmDealAmount ? ` · ${d.crmDealAmount}` : ""}`,
