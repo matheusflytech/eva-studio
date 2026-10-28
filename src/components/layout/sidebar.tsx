@@ -154,14 +154,14 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
       /* ignora */
     }
   }
+  // Folga ao entrar e ao sair: passar o mouse de raspão pela borda não pisca o menu.
   const abrir = () => {
     clearTimeout(fechar.current);
-    setAberto(true);
+    fechar.current = setTimeout(() => setAberto(true), 120);
   };
-  // Folga ao sair: passar o mouse de raspão pela borda não pisca o menu.
   const soltar = () => {
     clearTimeout(fechar.current);
-    fechar.current = setTimeout(() => setAberto(false), 180);
+    fechar.current = setTimeout(() => setAberto(false), 350);
   };
   const [naoLidas, setNaoLidas] = React.useState(0);
   const pathname = usePathname();
@@ -215,7 +215,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
             }
       }
       className={cn(
-        "absolute inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-border-subtle bg-panel px-3 py-3.5 transition-[width,box-shadow] duration-[var(--dur-base)] ease-[var(--ease-out)]",
+        "absolute inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-border-subtle bg-panel px-3 py-3.5 transition-[width,box-shadow] duration-[var(--dur-slow)] ease-[var(--ease-out)]",
         mobile ? "w-full" : collapsed ? "w-[68px]" : "w-[240px]",
         sobreposto && "shadow-[0_24px_64px_-12px_rgb(0_0_0/0.28)]"
       )}
