@@ -5,14 +5,21 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
 import { calcularRitmo, montarCalor, preencherMeses } from "./dashboard-overview";
 
 describe("calcularRitmo", () => {
-  it("pontos = parte da média mensal já alcançada; no ritmo quando passa do esperado até hoje", () => {
-    expect(calcularRitmo(5000, [10000, 10000, 10000], 15, 30)).toEqual({ pontos: 50, noRitmo: true, mediaMensal: 10000, esperadoAteHoje: 5000 });
-    expect(calcularRitmo(4000, [10000, 0, 8000], 15, 30)).toMatchObject({ pontos: 44, noRitmo: false, mediaMensal: 9000 });
+  it("pontos = receita projetada até o fim do período sobre a média dos 3 anteriores", () => {
+    expect(calcularRitmo(5000, [10000, 10000, 10000], 15, 30)).toEqual({
+      pontos: 100, noRitmo: true, referencia: 10000, esperadoAteHoje: 5000, projetada: 10000,
+    });
+    // Período sem receita não entra na média.
+    expect(calcularRitmo(4000, [10000, 0, 8000], 15, 30)).toMatchObject({ pontos: 89, noRitmo: false, referencia: 9000, projetada: 8000 });
     expect(calcularRitmo(30000, [10000, 10000, 10000], 30, 30).pontos).toBe(100);
   });
 
+  it("período que termina hoje: projeção é a própria receita", () => {
+    expect(calcularRitmo(6000, [12000, 12000, 12000], 30, 30)).toMatchObject({ projetada: 6000, pontos: 50, noRitmo: false });
+  });
+
   it("sem histórico: 100 se vendeu, 0 se não", () => {
-    expect(calcularRitmo(100, [0, 0, 0], 1, 30)).toMatchObject({ pontos: 100, mediaMensal: 0 });
+    expect(calcularRitmo(100, [0, 0, 0], 1, 30)).toMatchObject({ pontos: 100, referencia: 0 });
     expect(calcularRitmo(0, [0, 0, 0], 1, 30)).toMatchObject({ pontos: 0, noRitmo: false });
   });
 });

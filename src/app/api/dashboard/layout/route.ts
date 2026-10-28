@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { FONTE_POR_CHAVE } from "@/lib/server/analytics";
 import { sanearConsulta, tiposPermitidos, type Consulta } from "@/lib/consulta";
 import { sanearRelatorio, tipoDoCartao, type ReportQuery, type VizType } from "@/lib/report-query";
+import { FONTES_DA_VISAO, alturaPadrao, lerLayoutSalvo, painelPadrao, type WidgetSalvo } from "@/lib/dashboard-layout";
 
 // ---------------------------------------------------------------------------
 // O painel que a pessoa montou.
@@ -16,8 +17,10 @@ import { sanearRelatorio, tipoDoCartao, type ReportQuery, type VizType } from "@
 
 // "funil" entra aqui: sem ele, o cartão de conversão do Painel do funil voltava
 // como "numero" ao salvar.
-const TIPOS = new Set(["numero", "linha", "pizza", "barras", "tabela", "funil"]);
-const LARGURAS = new Set([1, 2, 3]);
+// "especial" é o desenho próprio dos cartões da visão geral (Receita, Ritmo...).
+const TIPOS = new Set(["numero", "linha", "pizza", "barras", "tabela", "funil", "especial"]);
+const LARGURAS = new Set([1, 2, 3, 4]);
+const ALTURAS = new Set([1, 2, 3]);
 
 export interface Widget {
   id: string;
@@ -25,22 +28,13 @@ export interface Widget {
   fonte: string;
   titulo: string;
   largura: number;
+  altura?: number;
+  destaque?: boolean;
   /** Só para fonte "custom": o que o cliente montou. */
   consulta?: Consulta;
   /** Só para fonte "report": o cartão do construtor (v2). */
   relatorio?: { query: ReportQuery; viz: VizType };
 }
-
-/** O painel de quem nunca mexeu. Mostra o essencial de venda sem pedir configuração. */
-const PADRAO: Widget[] = [
-  { id: "p1", tipo: "numero", fonte: "vendas", titulo: "Vendas fechadas", largura: 1 },
-  { id: "p2", tipo: "numero", fonte: "receita", titulo: "Receita", largura: 1 },
-  { id: "p3", tipo: "numero", fonte: "ticket", titulo: "Ticket médio", largura: 1 },
-  { id: "p4", tipo: "linha", fonte: "receitaPorDia", titulo: "Receita por dia", largura: 2 },
-  { id: "p5", tipo: "barras", fonte: "porEtapa", titulo: "Onde o dinheiro está parado", largura: 1 },
-  { id: "p6", tipo: "pizza", fonte: "porCanalVendas", titulo: "Vendas por canal", largura: 1 },
-  { id: "p7", tipo: "tabela", fonte: "vendasRecentes", titulo: "Últimas vendas", largura: 2 },
-];
 
 export async function GET() {
   const orgId = await requireOrgId();
@@ -64,8 +58,8 @@ export async function GET() {
         const consulta = sanearConsulta(w.consulta);
         return consulta ? [{ ...w, consulta }] : [];
       })
-    : PADRAO;
-  return NextResponse.json({ widgets, padrao: !salvo });
+    : null;
+  return NextResponse.json({ widgets: widgets ? lerLayoutSalvo(widgets as WidgetSalvo[]) : painelPadrao(), padrao: !salvo });
 }
 
 export async function PUT(request: Request) {
@@ -84,6 +78,11 @@ export async function PUT(request: Request) {
     const fonte = String(w?.fonte ?? "");
     const largura = LARGURAS.has(Number(w?.largura)) ? Number(w.largura) : 1;
     const id = String(w?.id ?? crypto.randomUUID()).slice(0, 40);
+    const tamanho = (tipo: string) => ({
+      largura,
+      altura: ALTURAS.has(Number(w?.altura)) ? Number(w.altura) : alturaPadrao(tipo, fonte),
+      ...(w?.destaque === true ? { destaque: true } : {}),
+    });
 
     // Cartão montado pelo cliente: a consulta é saneada, e o tipo precisa
     // caber nela (não existe pizza de "por mês").
@@ -92,7 +91,7 @@ export async function PUT(request: Request) {
       if (!consulta) continue;
       const permitidos = tiposPermitidos(consulta);
       const tipo = permitidos.find((t) => t === w?.tipo) ?? permitidos[0];
-      widgets.push({ id, tipo, fonte, titulo: String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão", largura, consulta });
+      widgets.push({ id, tipo, fonte, titulo: String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão", ...tamanho(tipo), consulta });
       continue;
     }
 
@@ -100,19 +99,21 @@ export async function PUT(request: Request) {
       const relatorio = sanearRelatorio(w?.relatorio);
       if (!relatorio) continue;
       const titulo = String(w?.titulo ?? "Meu cartão").slice(0, 80) || "Meu cartão";
-      widgets.push({ id, tipo: tipoDoCartao(relatorio.viz), fonte, titulo, largura, relatorio });
+      const tipo = tipoDoCartao(relatorio.viz);
+      widgets.push({ id, tipo, fonte, titulo, ...tamanho(tipo), relatorio });
       continue;
     }
 
     const definicao = FONTE_POR_CHAVE.get(fonte);
     if (!definicao) continue;
-    const tipo = TIPOS.has(w?.tipo) ? String(w.tipo) : "numero";
+    // Cartão da visão geral só tem o desenho dele; o resto não usa "especial".
+    const tipo = FONTES_DA_VISAO.has(fonte) ? "especial" : TIPOS.has(w?.tipo) && w.tipo !== "especial" ? String(w.tipo) : "numero";
     widgets.push({
       id,
       tipo,
       fonte,
       titulo: String(w?.titulo ?? definicao.rotulo).slice(0, 80) || definicao.rotulo,
-      largura,
+      ...tamanho(tipo),
     });
   }
 
@@ -130,5 +131,5 @@ export async function DELETE() {
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   await prisma.dashboardLayout.deleteMany({ where: { orgId: ctx.orgId } });
-  return NextResponse.json({ ok: true, widgets: PADRAO });
+  return NextResponse.json({ ok: true, widgets: painelPadrao() });
 }

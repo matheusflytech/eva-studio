@@ -2,7 +2,28 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/components/crm/negocios/animacao/gsap", () => ({ CURVA: {}, Flip: {}, reduzMovimento: () => true }));
 
-import { colunasPelaLargura, moverPara } from "./arrastar-cartoes";
+import { colunasPelaLargura, linhasPelaAltura, moverComTeclado, moverPara } from "./arrastar-cartoes";
+
+describe("moverComTeclado", () => {
+  const l = ["a", "b", "c"].map((id) => ({ id }));
+  it("troca com o vizinho e não passa das pontas", () => {
+    expect(ids(moverComTeclado(l, "b", 1))).toBe("acb");
+    expect(ids(moverComTeclado(l, "b", -1))).toBe("bac");
+    expect(moverComTeclado(l, "a", -1)).toBe(l);
+    expect(moverComTeclado(l, "c", 1)).toBe(l);
+  });
+});
+
+describe("linhasPelaAltura", () => {
+  it("encaixa na linha mais perto, entre 1 e 3", () => {
+    // linhas de 168 px com vão de 16
+    expect(linhasPelaAltura(168, 168, 16)).toBe(1);
+    expect(linhasPelaAltura(300, 168, 16)).toBe(2);
+    expect(linhasPelaAltura(536, 168, 16)).toBe(3);
+    expect(linhasPelaAltura(2000, 168, 16)).toBe(3);
+    expect(linhasPelaAltura(10, 168, 16)).toBe(1);
+  });
+});
 
 const ids = (l: { id: string }[]) => l.map((w) => w.id).join("");
 

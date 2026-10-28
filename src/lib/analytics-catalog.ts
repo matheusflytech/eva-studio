@@ -4,7 +4,8 @@
 // banco) para que a tela de ajuda possa listar as mesmas fontes sem duplicar
 // a lista. Documentação que repete a fonte de verdade envelhece em silêncio.
 
-export type TipoDeFonte = "numero" | "serie" | "quebra" | "tabela" | "funil";
+// "especial": cartão da visão geral, com desenho próprio (dados de /api/dashboard/overview).
+export type TipoDeFonte = "numero" | "serie" | "quebra" | "tabela" | "funil" | "especial";
 
 export interface DefinicaoDeFonte {
   chave: string;
@@ -14,7 +15,7 @@ export interface DefinicaoDeFonte {
   tipo: TipoDeFonte;
   /** Como formatar um `numero`. */
   formato?: "dinheiro" | "inteiro" | "porcento" | "dias";
-  grupo: "Vendas" | "Funil" | "Atendimento";
+  grupo: "Visão geral" | "Vendas" | "Funil" | "Atendimento";
   /**
    * Quais filtros globais do painel (funis, responsável) a fonte respeita.
    * "todos": os dois. "um-funil": responsável sim, mas o funil é um só (as
@@ -25,6 +26,14 @@ export interface DefinicaoDeFonte {
 }
 
 export const FONTES: DefinicaoDeFonte[] = [
+  { chave: "visaoReceita", rotulo: "Receita", explicacao: "Negócios ganhos no período, somados, contra o período anterior de mesmo tamanho.", tipo: "especial", formato: "dinheiro", filtros: "todos", grupo: "Visão geral" },
+  { chave: "visaoVendas", rotulo: "Vendas", explicacao: "Quantos negócios foram ganhos no período, contra o período anterior.", tipo: "especial", formato: "inteiro", filtros: "todos", grupo: "Visão geral" },
+  { chave: "visaoConversas", rotulo: "Conversas", explicacao: "Conversas novas no período, contra o período anterior. O anel mostra quantas terminaram sem atendente.", tipo: "especial", formato: "inteiro", filtros: "nenhum", grupo: "Visão geral" },
+  { chave: "visaoConversao", rotulo: "Conversão", explicacao: "Negócios ganhos sobre negócios criados no período, contra o período anterior.", tipo: "especial", formato: "porcento", filtros: "todos", grupo: "Visão geral" },
+  { chave: "ritmo", rotulo: "Ritmo", explicacao: "Receita projetada até o fim do período contra a média dos 3 períodos anteriores. Só para períodos que incluem hoje.", tipo: "especial", filtros: "todos", grupo: "Visão geral" },
+  { chave: "receitaPorMes", rotulo: "Receita por mês", explicacao: "Receita de cada mês desde o começo do ano passado, com a média.", tipo: "especial", filtros: "todos", grupo: "Visão geral" },
+  { chave: "mapaDeHorarios", rotulo: "Mapa de horários", explicacao: "Mensagens de clientes no período, por dia da semana e bloco de 2 horas.", tipo: "especial", filtros: "nenhum", grupo: "Visão geral" },
+
   { chave: "vendas", rotulo: "Vendas fechadas", explicacao: "Negócios que entraram numa etapa de ganho no período.", tipo: "numero", formato: "inteiro", filtros: "todos", grupo: "Vendas" },
   { chave: "receita", rotulo: "Receita", explicacao: "Soma do valor dos negócios ganhos no período.", tipo: "numero", formato: "dinheiro", filtros: "todos", grupo: "Vendas" },
   { chave: "ticket", rotulo: "Ticket médio", explicacao: "Receita dividida pelo número de vendas.", tipo: "numero", formato: "dinheiro", filtros: "todos", grupo: "Vendas" },

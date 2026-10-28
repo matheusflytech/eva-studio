@@ -26,7 +26,23 @@ describe("PUT /api/dashboard/layout", () => {
 
   it("descarta fonte inexistente e tipo inventado", async () => {
     const d = await (await put([{ id: "a", tipo: "xpto", fonte: "vendas" }, { id: "b", tipo: "numero", fonte: "nao-existe" }])).json();
-    expect(d.widgets).toEqual([{ id: "a", tipo: "numero", fonte: "vendas", titulo: "Vendas fechadas", largura: 1 }]);
+    expect(d.widgets).toEqual([{ id: "a", tipo: "numero", fonte: "vendas", titulo: "Vendas fechadas", largura: 1, altura: 1 }]);
+  });
+
+  it("aceita largura 4, altura e destaque; altura fora do limite cai no padrão do tipo", async () => {
+    const d = await (
+      await put([
+        { id: "a", tipo: "numero", fonte: "ritmo", titulo: "Ritmo", largura: 4, altura: 9, destaque: true },
+        { id: "b", tipo: "linha", fonte: "receitaPorDia", titulo: "R", largura: 7, altura: 3, destaque: "sim" },
+      ])
+    ).json();
+    expect(d.widgets[0]).toEqual({ id: "a", tipo: "especial", fonte: "ritmo", titulo: "Ritmo", largura: 4, altura: 2, destaque: true });
+    expect(d.widgets[1]).toEqual({ id: "b", tipo: "linha", fonte: "receitaPorDia", titulo: "R", largura: 1, altura: 3 });
+  });
+
+  it("'especial' não vale para fonte que não é da visão geral", async () => {
+    const d = await (await put([{ id: "a", tipo: "especial", fonte: "vendas", titulo: "V", largura: 1 }])).json();
+    expect(d.widgets[0].tipo).toBe("numero");
   });
 
   it("cartão montado sai saneado, no formato novo", async () => {
@@ -48,8 +64,10 @@ describe("GET /api/dashboard/layout", () => {
     });
     const d = await (await GET()).json();
     expect(d.padrao).toBe(false);
-    expect(d.widgets[0].tipo).toBe("funil");
-    expect(d.widgets[1].consulta).toMatchObject({
+    // Layout de antes do painel único: os cartões da visão geral entram no topo.
+    expect(d.widgets.slice(0, 7).every((w: { tipo: string }) => w.tipo === "especial")).toBe(true);
+    expect(d.widgets[7]).toMatchObject({ tipo: "funil", altura: 2 });
+    expect(d.widgets[8].consulta).toMatchObject({
       funilIds: ["p1"],
       filtros: { logica: "e", grupos: [{ logica: "e", condicoes: [{ campo: "etapa", op: "qualquer", valores: ["s1"] }] }] },
     });
@@ -60,13 +78,13 @@ describe("GET /api/dashboard/layout", () => {
       widgets: [{ id: "a", tipo: "numero", fonte: "funilConversao", titulo: "Conversão", largura: 2 }],
     });
     const d = await (await GET()).json();
-    expect(d.widgets[0].tipo).toBe("funil");
+    expect(d.widgets.find((w: { fonte: string }) => w.fonte === "funilConversao").tipo).toBe("funil");
   });
 
   it("sem layout salvo, o padrão", async () => {
     db.dashboardLayout.findUnique.mockResolvedValue(null);
     const d = await (await GET()).json();
     expect(d.padrao).toBe(true);
-    expect(d.widgets.length).toBeGreaterThan(0);
+    expect(d.widgets[0]).toMatchObject({ fonte: "visaoReceita", tipo: "especial", destaque: true });
   });
 });

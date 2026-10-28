@@ -724,6 +724,7 @@ body {
   .dash-grade {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: auto !important;
     gap: 10px !important;
   }
   .dash-grade > .dash-largo { grid-column: span 2 / span 2 !important; }
