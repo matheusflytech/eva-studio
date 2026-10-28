@@ -7,11 +7,13 @@ import { publicarEvento } from "@/lib/server/eventos/barramento";
 import { normalizeEvent } from "@/lib/hotmart/normalize";
 import { decide } from "@/lib/hotmart/decide";
 import type { ProductConfig, StageRole } from "@/lib/hotmart/types";
+import { remap, targetKey, type FieldMap } from "@/lib/hotmart/fields";
 import type { Products } from "./connection";
 
-// Aplica um evento da Hotmart no CRM do contrato com as regras do n8n da
-// Renata: contato, negócio do produto, etapa sem voltar, campos, venda e
-// evento de automação. Erro de regra vira resultado "error" (sem exceção).
+// Aplica um evento da Hotmart no CRM do contrato com as regras do n8n:
+// contato, negócio do produto, etapa sem voltar, campos (no destino que o
+// contrato escolheu), venda e evento de automação. Erro de regra vira
+// resultado "error" (sem exceção).
 
 export interface ApplyResult {
   result: "ok" | "ignored" | "error";
@@ -30,7 +32,7 @@ const CONTACT_SELECT = { id: true, name: true, phone: true, customFields: true }
 const DEAL_SELECT = { id: true, name: true, stageId: true, customFields: true } as const;
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload externo */
-export async function applyEvent(orgId: string, products: Products, payload: any): Promise<ApplyResult> {
+export async function applyEvent(orgId: string, products: Products, payload: any, map: FieldMap = {}): Promise<ApplyResult> {
   const productId = payload?.data?.product?.id ? String(payload.data.product.id) : "";
   const product: ProductConfig | undefined = products[productId];
   if (!product) return { result: "ignored", detail: `Produto ${productId || "?"} sem funil ligado.` };
@@ -43,8 +45,9 @@ export async function applyEvent(orgId: string, products: Products, payload: any
     const byEmail = n.email
       ? await prisma.contact.findFirst({ where: { orgId, email: { equals: n.email, mode: "insensitive" } }, select: CONTACT_SELECT })
       : null;
-    const byCpf = !byEmail && n.cpf
-      ? await prisma.contact.findFirst({ where: { orgId, customFields: { path: ["cpf_cnpj"], equals: n.cpf } }, select: CONTACT_SELECT })
+    const cpfKey = targetKey(map, "cpf_cnpj");
+    const byCpf = !byEmail && n.cpf && cpfKey
+      ? await prisma.contact.findFirst({ where: { orgId, customFields: { path: [cpfKey], equals: n.cpf } }, select: CONTACT_SELECT })
       : null;
     const contact = byEmail ?? byCpf;
     const cf = (contact?.customFields ?? {}) as Record<string, unknown>;
@@ -66,20 +69,23 @@ export async function applyEvent(orgId: string, products: Products, payload: any
     }
     let dealId = deal?.id ?? null;
     const dcf = (deal?.customFields ?? {}) as Record<string, unknown>;
+    // Lê de volta pelo campo escolhido (chave padrão quando não há mapa).
+    const read = (values: Record<string, unknown>, id: string) => { const k = targetKey(map, id); return k ? values[k] : undefined; };
+    const boughtNow = read(cf, "produtos_comprados");
 
     const d = decide(
       {
         model: product.model,
         hasLateStage: !!product.stages.late,
-        card: deal ? { role: roleOf(deal.stageId), name: deal.name, lastEvent: (dcf.ultimo_evento_hotmart as string) ?? null, transaction: (dcf.transacao_hotmart as string) ?? null } : null,
-        contact: contact ? { products: Array.isArray(cf.produtos_comprados) ? cf.produtos_comprados.map(String) : [], ltvCents: Number(cf.ltv_hotmart ?? 0) || 0 } : null,
+        card: deal ? { role: roleOf(deal.stageId), name: deal.name, lastEvent: (read(dcf, "ultimo_evento_hotmart") as string) ?? null, transaction: (read(dcf, "transacao_hotmart") as string) ?? null } : null,
+        contact: contact ? { products: Array.isArray(boughtNow) ? boughtNow.map(String) : [], ltvCents: Number(read(cf, "ltv_hotmart") ?? 0) || 0 } : null,
       },
       { event: n.event, transaction: n.transaction, cardName: n.cardName, plan: n.plan, amountBrlCents: n.amountBrlCents, productSlug: product.slug, directChannel: n.deal.customFields.canal_de_origem === "direto" }
     );
 
     // Contato: cria só com o básico e preenche os campos pelo helper tolerante
     // (valor fora do tipo é descartado, não derruba a venda).
-    const contactFields = { ...n.contact.customFields, ...d.contact };
+    const contactFields = remap(map, { ...n.contact.customFields, ...d.contact });
     let contactId = contact?.id ?? null;
     if (!contactId) {
       contactId = (await criarContato(orgId, { name: n.contact.name, email: n.email || undefined, phone: n.contact.phone || undefined, source: "hotmart" })).id;
@@ -89,10 +95,11 @@ export async function applyEvent(orgId: string, products: Products, payload: any
     await preencherCamposDoContato(orgId, contactId, contactFields);
 
     // Negócio.
-    const dealFields: Record<string, unknown> = d.firstAccessOnly
+    const standardDealFields: Record<string, unknown> = d.firstAccessOnly
       ? { data_do_primeiro_acesso: n.deal.customFields.data_do_primeiro_acesso }
       : { ...n.deal.customFields, ...d.dealFields, ...(d.lossReason ? { motivo_da_perda: d.lossReason } : {}) };
-    if (d.dropChannel) delete dealFields.canal_de_origem;
+    if (d.dropChannel) delete standardDealFields.canal_de_origem;
+    const dealFields = remap(map, standardDealFields);
 
     if (d.action === "create" && d.target) {
       const stageId = product.stages[d.target];

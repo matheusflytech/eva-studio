@@ -2353,6 +2353,8 @@ model HotmartConnection {
   token       String    @unique
   secrets     String    @default("")
   products    Json      @default("{}")
+  // Dado da Hotmart -> chave do campo personalizado (null = não grava). Ver lib/hotmart/fields.ts.
+  fields      Json      @default("{}")
   status      String    @default("active") // active | paused
   lastEventAt DateTime?
   createdAt   DateTime  @default(now())

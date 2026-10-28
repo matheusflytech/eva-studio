@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { connectionByToken, hottokOf, sameSecret, type Products } from "@/lib/server/hotmart/connection";
 import { applyEvent } from "@/lib/server/hotmart/apply";
+import type { FieldMap } from "@/lib/hotmart/fields";
 
 // ---------------------------------------------------------------------------
 // Webhook da Hotmart (2.0) de um contrato. O token na URL acha a conexão; o
@@ -61,7 +62,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   }
 
   after(async () => {
-    const r = await applyEvent(connection.orgId, connection.products as unknown as Products, payload);
+    const r = await applyEvent(connection.orgId, connection.products as unknown as Products, payload, connection.fields as FieldMap);
     await prisma.hotmartEvent.update({
       where: { id: row.id },
       data: { result: r.result, detail: r.detail ?? null, contactId: r.contactId ?? null, dealId: r.dealId ?? null, processedAt: new Date() },

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/server/permissions";
 import { getConnection, type Products } from "@/lib/server/hotmart/connection";
 import { applyEvent } from "@/lib/server/hotmart/apply";
+import type { FieldMap } from "@/lib/hotmart/fields";
 
 // Últimos eventos recebidos (log do painel) e "Reprocessar" um evento.
 export async function GET() {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   const ev = typeof id === "string" ? await prisma.hotmartEvent.findFirst({ where: { id, orgId: ctx.orgId } }) : null;
   const c = await getConnection(ctx.orgId);
   if (!ev || !c) return NextResponse.json({ error: "Evento não encontrado." }, { status: 404 });
-  const r = await applyEvent(ctx.orgId, c.products as unknown as Products, ev.payload);
+  const r = await applyEvent(ctx.orgId, c.products as unknown as Products, ev.payload, c.fields as FieldMap);
   await prisma.hotmartEvent.update({
     where: { id: ev.id },
     data: { result: r.result, detail: r.detail ?? null, contactId: r.contactId ?? null, dealId: r.dealId ?? null, processedAt: new Date() },

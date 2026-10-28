@@ -1,8 +1,9 @@
 import type { ProductConfig } from "./types";
 
-// Porta do nó "Normalizar evento" dos workflows do n8n da Renata. Puro.
+// Porta do nó "Normalizar evento" dos workflows do n8n. Puro.
 // Datas em horário de SP: data e hora `AAAA-MM-DDTHH:mm`, data `AAAA-MM-DD`;
-// moeda em centavos. As chaves dos campos são as do Beeno (já copiadas).
+// moeda em centavos. As chaves dos campos são as padrão (fields.ts); o mapa
+// da conexão troca pelo campo que o contrato escolheu.
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload externo, lido com cuidado */
 
 const CURRENCIES = ["BRL", "USD", "EUR"];
@@ -113,16 +114,17 @@ export function normalizeEvent(h: any, product: ProductConfig): NormalizedEvent 
   const k = String(origin.sck || "").trim().toLowerCase();
   const producer = d.producer?.name ? String(d.producer.name).toLowerCase() : "";
   const afName = af?.name ? String(af.name).toLowerCase() : "";
-  // Valores do campo "Canal de origem" (opções iguais às do Beeno).
+  // Valores do campo "Canal de origem" (CHANNEL_OPTIONS). Afiliado com o nome
+  // do produtor (ou o contrário) é o próprio produtor vendendo, não afiliado.
+  const isProducer = !!producer && (afName.includes(producer) || producer.includes(afName));
   const channel =
-    afName && producer && afName !== producer && !afName.includes("estefan") ? "afiliado"
+    afName && producer && !isProducer ? "afiliado"
     : purchase.order_bump?.is_order_bump === true ? "upsell"
     : s === "qr_code" || s === "qrcode" ? "evento-qrcode"
-    : s === "site" || k.startsWith("site_") ? "site-renata"
+    : s === "site" || k.startsWith("site_") ? "site"
     : s.includes("instagram") || s === "ig" ? "instagram"
     : s.includes("whatsapp") || s === "wpp" || s === "wa" ? "whatsapp"
     : s.includes("email") || s.includes("e-mail") ? "email"
-    : s === "eva_holding" || s.startsWith("eva") ? "equipe-comercial"
     : k === "hotmart_product_page" || k === "hotmart_site" ? "pagina-hotmart"
     : k.startsWith("hotmart_club_") || k.startsWith("new_club_sales_page") || k.startsWith("hotmart_mem") ? "area-membros"
     : k === "hotmart_sales_agent" ? "agente-hotmart"

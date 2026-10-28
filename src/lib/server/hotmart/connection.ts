@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/server/crypto";
 import { ROLE_BY_STAGE_NAME, ROLE_LABELS, type ProductConfig, type StageRole } from "@/lib/hotmart/types";
+import { compatible, hotmartFields, targetKey, type FieldMap } from "@/lib/hotmart/fields";
+import { gerarChaveUnica } from "@/lib/server/custom-fields";
 
 // Conexão Hotmart de um contrato: token da URL, hottok cifrado e o mapa
 // produto -> funil -> papel de cada etapa.
@@ -45,7 +47,7 @@ export function sameSecret(a: string, b: string): boolean {
 }
 
 /** Cria (ou atualiza) a conexão. hottok vazio = mantém o atual. */
-export async function saveConnection(orgId: string, input: { hottok?: string; products?: Products; status?: "active" | "paused" }) {
+export async function saveConnection(orgId: string, input: { hottok?: string; products?: Products; fields?: FieldMap; status?: "active" | "paused" }) {
   const secrets = input.hottok ? encryptSecret(JSON.stringify({ hottok: input.hottok.trim() })) : undefined;
   return prisma.hotmartConnection.upsert({
     where: { orgId },
@@ -59,9 +61,67 @@ export async function saveConnection(orgId: string, input: { hottok?: string; pr
     update: {
       ...(secrets ? { secrets } : {}),
       ...(input.products ? { products: input.products as object } : {}),
+      ...(input.fields ? { fields: input.fields as object } : {}),
       ...(input.status ? { status: input.status } : {}),
     },
   });
+}
+
+/** Valor do painel que pede para criar o campo padrão. */
+export const CREATE_FIELD = "+new";
+
+/**
+ * Resolve as escolhas do painel (dado -> "+new" | chave de campo | "" para não
+ * gravar) num mapa salvo. Cria os campos pedidos que faltam (e os obrigatórios
+ * da regra, mesmo sem escolha) e completa as opções das listas de destino.
+ * Escolha que não dá para aplicar vira erro com o nome do dado.
+ */
+export async function resolveFieldMap(orgId: string, saved: FieldMap, raw: unknown, products: Products): Promise<{ map: FieldMap; errors: string[] }> {
+  const choices = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const catalog = hotmartFields(products);
+  const defs = await prisma.customField.findMany({ where: { orgId, pipelineId: null }, select: { id: true, entity: true, key: true, type: true, options: true } });
+  const count = { contact: 0, deal: 0 } as Record<string, number>;
+  for (const e of ["contact", "deal"]) count[e] = await prisma.customField.count({ where: { orgId, entity: e } });
+  const find = (entity: string, key: string | null) => (key ? defs.find((d) => d.entity === entity && d.key === key) : undefined);
+  const map: FieldMap = { ...saved };
+  const errors: string[] = [];
+
+  for (const f of catalog) {
+    const v = choices[f.id];
+    let choice = typeof v === "string" ? v : undefined;
+    // Obrigatório sem campo: cria, mesmo que ninguém tenha aberto a seção Campos.
+    if (f.required && (choice === "" || (choice === undefined && !find(f.entity, targetKey(map, f.id))))) choice = CREATE_FIELD;
+    if (choice === undefined) continue;
+    if (choice === "") { map[f.id] = null; continue; }
+    if (choice !== CREATE_FIELD) {
+      const d = find(f.entity, choice);
+      if (d && compatible(f.type, d.type)) map[f.id] = d.key;
+      else errors.push(`${f.label}: o campo escolhido não existe ou é de outro tipo.`);
+      continue;
+    }
+    const same = find(f.entity, f.id);
+    if (same && compatible(f.type, same.type)) { map[f.id] = same.key; continue; }
+    // Chave a partir do id padrão (não do rótulo): o mesmo nome em todo contrato.
+    const key = await gerarChaveUnica(orgId, f.entity, f.id);
+    const created = await prisma.customField.create({
+      data: { orgId, entity: f.entity, key, label: f.label, type: f.type, options: (f.options ?? []) as object, position: count[f.entity] },
+      select: { id: true, entity: true, key: true, type: true, options: true },
+    });
+    count[f.entity] += 1;
+    defs.push(created);
+    map[f.id] = key;
+  }
+
+  // Lista de destino sem a opção que a regra grava descartaria o valor.
+  for (const f of catalog) {
+    const d = f.options && find(f.entity, targetKey(map, f.id));
+    if (!d || (d.type !== "select" && d.type !== "multiselect")) continue;
+    const current = Array.isArray(d.options) ? (d.options as { value: string; label: string }[]) : [];
+    const labels = new Set(current.map((o) => o.label.toLowerCase()));
+    const missing = f.options!.filter((o) => !current.some((x) => x.value === o.value)).map((o) => (labels.has(o.label.toLowerCase()) ? { ...o, label: `${o.label} (${o.value})` } : o));
+    if (missing.length) await prisma.customField.update({ where: { id: d.id }, data: { options: [...current, ...missing] as object } });
+  }
+  return { map, errors };
 }
 
 /** Produtos vindos do painel, conferindo que funil e etapas são deste contrato. */

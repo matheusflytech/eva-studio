@@ -1,6 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
-vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
-import { sameSecret, suggestStages } from "./connection";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+type Def = { id: string; entity: string; key: string; type: string; label?: string; options: { value: string; label: string }[] };
+const db = vi.hoisted(() => ({
+  defs: [] as Def[],
+  customField: {
+    findMany: vi.fn(async () => db.defs),
+    count: vi.fn(async ({ where }: { where: { entity: string } }) => db.defs.filter((d) => d.entity === where.entity).length),
+    create: vi.fn(async ({ data }: { data: Def }) => ({ ...data, id: `new-${data.key}` })),
+    update: vi.fn(async (_args: { data: { options: { value: string }[] } }) => ({})),
+  },
+}));
+vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/server/custom-fields", () => ({ gerarChaveUnica: async (_o: string, _e: string, label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "_") }));
+import { CREATE_FIELD, resolveFieldMap, sameSecret, suggestStages } from "./connection";
 
 describe("suggestStages", () => {
   it("liga papel pelo nome da etapa, sem acento nem maiúscula", () => {
@@ -14,5 +25,41 @@ describe("sameSecret", () => {
     expect(sameSecret("abc", "abc")).toBe(true);
     expect(sameSecret("abc", "abd")).toBe(false);
     expect(sameSecret("", "")).toBe(false);
+  });
+});
+
+describe("resolveFieldMap", () => {
+  const products = { "1": { slug: "curso", name: "Curso", model: "one_time" as const, pipelineId: "p", stages: {} } };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.defs = [];
+  });
+
+  it("contrato novo: cria os obrigatórios mesmo sem escolha e o que foi pedido", async () => {
+    const r = await resolveFieldMap("o1", {}, { ltv_hotmart: CREATE_FIELD, cupom: "" }, products);
+    expect(r.errors).toEqual([]);
+    const criados = db.customField.create.mock.calls.map((c) => (c[0] as { data: Def }).data.label);
+    expect(criados).toEqual(expect.arrayContaining(["LTV Hotmart", "Último evento Hotmart", "Transação Hotmart"]));
+    expect(r.map).toMatchObject({ ltv_hotmart: "ltv_hotmart", cupom: null, transacao_hotmart: "transacao_hotmart" });
+  });
+
+  it("campo de mesma chave é reaproveitado; campo do cliente recebe as opções que faltam", async () => {
+    db.defs = [
+      { id: "f1", entity: "deal", key: "ultimo_evento_hotmart", type: "text", options: [] },
+      { id: "f2", entity: "deal", key: "transacao_hotmart", type: "text", options: [] },
+      { id: "f3", entity: "deal", key: "origem", type: "select", options: [{ value: "site", label: "Site" }] },
+    ];
+    const r = await resolveFieldMap("o1", {}, { canal_de_origem: "origem" }, products);
+    expect(db.customField.create).not.toHaveBeenCalled();
+    expect(r.map.canal_de_origem).toBe("origem");
+    const opcoes = db.customField.update.mock.calls[0][0].data.options.map((o) => o.value);
+    expect(opcoes).toContain("afiliado");
+    expect(opcoes.filter((v) => v === "site")).toHaveLength(1);
+  });
+
+  it("campo de tipo errado vira erro com o nome do dado", async () => {
+    db.defs = [{ id: "f1", entity: "contact", key: "valor", type: "text", options: [] }];
+    const r = await resolveFieldMap("o1", {}, { ltv_hotmart: "valor" }, products);
+    expect(r.errors[0]).toMatch(/^LTV Hotmart/);
   });
 });
