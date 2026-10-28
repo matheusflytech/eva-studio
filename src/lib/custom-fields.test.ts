@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatarValor, normalizarValor, parseNumero, valorNumerico } from "./custom-fields";
+import { chaveSugerida, formatarValor, normalizarValor, parseNumero, valorNumerico } from "./custom-fields";
 
 const numero = { type: "number" as const, label: "Consumo", options: [] };
 const data = { type: "date" as const, label: "Visita", options: [] };
@@ -46,5 +46,14 @@ describe("campo hora", () => {
     expect(normalizarValor(hora, "14:30:00")).toEqual({ ok: true, valor: "14:30" });
     expect(normalizarValor(hora, "25:00").ok).toBe(false);
     expect(normalizarValor(hora, "14h30").ok).toBe(false);
+  });
+});
+
+describe("nome interno do campo", () => {
+  it("prévia igual à regra do servidor: slug, reservado e sufixo", () => {
+    expect(chaveSugerida("Data do pedido", new Set())).toBe("data_do_pedido");
+    expect(chaveSugerida("Data do pedido", new Set(["data_do_pedido"]))).toBe("data_do_pedido_2");
+    expect(chaveSugerida("E-mail", new Set())).toBe("e_mail");
+    expect(chaveSugerida("Telefone", new Set())).toBe("telefone_campo");
   });
 });

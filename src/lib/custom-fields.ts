@@ -104,6 +104,15 @@ export function slugificar(rotulo: string): string {
   return /^\d/.test(base) ? `c_${base}` : base;
 }
 
+/** Prévia do nome interno que o servidor vai gerar (mesma regra de gerarChaveUnica). */
+export function chaveSugerida(rotulo: string, existentes: Set<string>): string {
+  let base = slugificar(rotulo);
+  if (CHAVES_RESERVADAS.has(base)) base = `${base}_campo`;
+  let key = base;
+  for (let n = 2; existentes.has(key); n += 1) key = `${base}_${n}`;
+  return key;
+}
+
 export function parseMoeda(texto: string): number | null {
   const limpo = texto.replace(/[^\d,.-]/g, "").trim();
   if (!limpo) return null;

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, X, Copy, Check } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,35 @@ import { Modal, ModalContent } from "@/components/ui/modal";
 import { ListaOrdenavel } from "@/components/crm/config/lista-ordenavel";
 import { ConfirmarExclusao } from "@/components/crm/config/confirmar-exclusao";
 import { CampoEditor } from "@/components/crm/campos-personalizados";
-import { TIPOS_DE_CAMPO, TIPO_POR_ID, type DefinicaoDeCampo, type EntidadeDoCampo, type OpcaoDeCampo, type TipoDeCampo } from "@/lib/custom-fields";
+import { TIPOS_DE_CAMPO, TIPO_POR_ID, chaveSugerida, type DefinicaoDeCampo, type EntidadeDoCampo, type OpcaoDeCampo, type TipoDeCampo } from "@/lib/custom-fields";
 import { cn } from "@/lib/utils";
 
 interface FunilSimples { id: string; name: string }
+
+/** Nome interno do campo (o `key` da API e de custom_fields), com copiar. */
+function NomeInterno({ chave }: { chave: string }) {
+  const [copiado, setCopiado] = React.useState(false);
+  return (
+    <button
+      type="button"
+      title="Copiar o nome interno (API e integrações)"
+      aria-label={`Copiar o nome interno ${chave}`}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(chave);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 1500);
+        } catch {
+          /* sem área de transferência */
+        }
+      }}
+      className="inline-flex max-w-full items-center gap-1 rounded-md px-1 font-mono text-caption text-text-secondary hover:bg-hover hover:text-text-primary"
+    >
+      <span className="truncate">{chave}</span>
+      {copiado ? <Check size={11} className="shrink-0 text-success" aria-hidden="true" /> : <Copy size={11} className="shrink-0" aria-hidden="true" />}
+    </button>
+  );
+}
 
 // Sugestões por tipo de negócio: a pessoa não começa de uma página em branco.
 const SUGESTOES: Record<EntidadeDoCampo, { label: string; type: TipoDeCampo; options?: string[] }[]> = {
@@ -108,7 +133,9 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
                   {c.showOnCard && <Badge>No cartão</Badge>}
                   {c.pipelineId && <Badge>{funis.find((f) => f.id === c.pipelineId)?.name ?? "Um funil"}</Badge>}
                 </div>
-                <div className="mt-0.5 truncate text-caption text-text-tertiary">
+                <div className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-caption text-text-tertiary">
+                  <NomeInterno chave={c.key} />
+                  <span aria-hidden="true">·</span>
                   {TIPO_POR_ID.get(c.type)?.rotulo}
                   {c.options.length > 0 && `: ${c.options.map((o) => o.label).join(", ")}`}
                 </div>
@@ -147,6 +174,7 @@ export function CamposEditor({ entity }: { entity: EntidadeDoCampo }) {
           entity={entity}
           campo={editando === "novo" ? null : editando}
           sugestao={rascunhoNovo}
+          chaves={new Set(campos.map((c) => c.key))}
           funis={funis}
           aoFechar={() => setEditando(null)}
           aoSalvar={async () => { setEditando(null); await carregar(); }}
@@ -196,6 +224,7 @@ function CampoModal({
   entity,
   campo,
   sugestao,
+  chaves,
   funis,
   aoFechar,
   aoSalvar,
@@ -203,6 +232,8 @@ function CampoModal({
   entity: EntidadeDoCampo;
   campo: DefinicaoDeCampo | null;
   sugestao: { label: string; type: TipoDeCampo; options?: string[] } | null;
+  /** Nomes internos que já existem nesta entidade (para a prévia do novo). */
+  chaves: Set<string>;
   funis: FunilSimples[];
   aoFechar: () => void;
   aoSalvar: () => void;
@@ -263,6 +294,13 @@ function CampoModal({
           <div>
             <Label htmlFor="cf-nome">Nome do campo</Label>
             <Input id="cf-nome" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: Consumo mensal (kWh)" autoFocus={!editandoExistente} />
+            {(campo || label.trim()) && (
+              <p className="mt-1 flex flex-wrap items-center gap-1 text-caption text-text-tertiary">
+                Nome interno{campo ? "" : " (fica assim ao criar)"}:
+                {campo ? <NomeInterno chave={campo.key} /> : <code className="font-mono text-text-secondary">{chaveSugerida(label, chaves)}</code>}
+                <span>· é o que a API e as integrações usam, e não muda se o nome mudar.</span>
+              </p>
+            )}
           </div>
 
           <div>
