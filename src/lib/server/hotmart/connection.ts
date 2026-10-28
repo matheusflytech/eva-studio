@@ -93,6 +93,9 @@ export async function resolveFieldMap(orgId: string, saved: FieldMap, raw: unkno
     let choice = typeof v === "string" ? v : undefined;
     // Obrigatório sem campo: cria, mesmo que ninguém tenha aberto a seção Campos.
     if (f.required && (choice === "" || (choice === undefined && !find(f.entity, targetKey(map, f.id))))) choice = CREATE_FIELD;
+    // Essencial nunca escolhido e sem campo de mesma chave: cria também (o
+    // padrão da seção Campos). "Não gravar" já salvo fica no mapa e não volta.
+    if (f.essential && choice === undefined && !(f.id in map) && !find(f.entity, f.id)) choice = CREATE_FIELD;
     if (choice === undefined) continue;
     if (choice === "") { map[f.id] = null; continue; }
     if (choice !== CREATE_FIELD) {
