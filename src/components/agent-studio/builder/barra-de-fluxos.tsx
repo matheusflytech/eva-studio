@@ -5,15 +5,18 @@ import { Ellipsis, Plus, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { IconButton } from "@/components/ui/icon-button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { MAX_FLUXOS } from "@/lib/subfluxos";
+import { MAX_FLUXOS, linkDoWhatsapp } from "@/lib/subfluxos";
 import type { Subfluxo } from "@/lib/data/flows";
 
 /**
  * Abas dos fluxos do bot (S4): o Principal e os extras. No fluxo extra
- * aberto, as palavras-chave que levam a conversa até ele, de qualquer ponto.
+ * aberto, as palavras-chave que levam a conversa até ele, de qualquer ponto,
+ * e o link do WhatsApp que já chega com a primeira delas escrita.
  */
 export function BarraDeFluxos({
+  agentId,
   fluxos,
   atual,
   ocupado,
@@ -23,6 +26,7 @@ export function BarraDeFluxos({
   onPalavras,
   onApagar,
 }: {
+  agentId: string;
   fluxos: Subfluxo[];
   /** null = Principal. */
   atual: string | null;
@@ -36,6 +40,40 @@ export function BarraDeFluxos({
   const [criando, setCriando] = React.useState(false);
   const [nome, setNome] = React.useState("");
   const aberto = fluxos.find((f) => f.id === atual) ?? null;
+  const toast = useToast();
+  const [numeros, setNumeros] = React.useState<{ canal: string; numero: string }[]>([]);
+
+  // Números de WhatsApp (oficial e QR) que este agente atende, para o link do fluxo.
+  React.useEffect(() => {
+    let vivo = true;
+    void fetch("/api/agents/overview")
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+      .then((d) => {
+        const agente = (d?.agents ?? []).find((a: { id: string }) => a.id === agentId);
+        const canais = (agente?.canais ?? []) as { id: string; label: string; detalhe: string }[];
+        if (vivo) setNumeros(canais.filter((c) => c.id.startsWith("whatsapp")).map((c) => ({ canal: c.label, numero: c.detalhe })));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [agentId]);
+
+  const links = aberto?.keywords[0]
+    ? numeros.flatMap((n) => {
+        const url = linkDoWhatsapp(n.numero, aberto.keywords[0]);
+        return url ? [{ ...n, url }] : [];
+      })
+    : [];
+
+  async function copiar(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copiado", description: `Abre o WhatsApp com "${aberto?.keywords[0]}" escrito.`, tone: "success" });
+    } catch {
+      window.prompt("Copie o link", url);
+    }
+  }
 
   const aba = (id: string | null, rotulo: string) => (
     <button
@@ -109,6 +147,16 @@ export function BarraDeFluxos({
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {links.map((l) => (
+                <DropdownMenuItem key={l.url} onSelect={() => void copiar(l.url)}>
+                  Copiar link do {l.canal} ({l.numero})
+                </DropdownMenuItem>
+              ))}
+              {links.length === 0 && (
+                <DropdownMenuItem disabled>
+                  {aberto.keywords.length ? "Link do WhatsApp: conecte um número ao agente" : "Link do WhatsApp: escreva uma palavra-chave"}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onSelect={() => {
                   const n = window.prompt("Novo nome do fluxo", aberto.name)?.trim();

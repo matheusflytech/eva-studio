@@ -6,6 +6,8 @@
 // builder usa as mesmas regras.
 // ---------------------------------------------------------------------------
 
+import { formatarTelefone } from "@/lib/telefone";
+
 export const FLUXO_PRINCIPAL = "main";
 export const MAX_FLUXOS = 30;
 export const MAX_PALAVRAS = 20;
@@ -47,4 +49,15 @@ export function fluxoDaPalavra(texto: string | undefined, fluxos: { id: string; 
   const t = normalizarPalavra(texto ?? "");
   if (!t) return null;
   return fluxos.find((f) => f.keywords.some((k) => normalizarPalavra(k) === t))?.id ?? null;
+}
+
+/**
+ * Link do WhatsApp que abre a conversa com a palavra-chave já escrita: o
+ * cliente só aperta enviar e cai no fluxo. null sem número de telefone.
+ */
+export function linkDoWhatsapp(numero: string | null | undefined, palavra: string): string | null {
+  const digitos = formatarTelefone(numero)?.digitos ?? "";
+  const texto = palavra.trim();
+  if (digitos.length < 10 || digitos.length > 15 || !texto) return null;
+  return `https://wa.me/${digitos}?text=${encodeURIComponent(texto)}`;
 }

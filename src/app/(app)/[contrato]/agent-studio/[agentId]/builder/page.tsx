@@ -836,6 +836,7 @@ export default function AgentBuilderPage() {
 
       {(tab === "editor" || tab === "conversa") && (
         <BarraDeFluxos
+          agentId={agentId}
           fluxos={fluxos}
           atual={fluxoAtual}
           ocupado={trocando}
