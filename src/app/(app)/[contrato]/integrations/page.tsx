@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio } from "lucide-react";
+import { BarChart3, Ellipsis, KeyRound, ListOrdered, LogIn, Mail, Plug, Plus, Radio, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CentralDeIa } from "@/components/integrations/central-de-ia";
 import { EmailPanel } from "@/components/integrations/email-panel";
+import { HotmartPanel } from "@/components/integrations/hotmart-panel";
 import { ApiKeysPanel } from "@/components/integrations/api-keys-panel";
 import { McpServersPanel } from "@/components/integrations/mcp-servers-panel";
 import { useContrato, usePathname, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
@@ -39,16 +40,17 @@ import { LogoOficial, ladoDoLogo } from "@/components/ui/logo-oficial";
 // Sobrou o que é real e tem banco atrás: credenciais de IA e e-mail,
 // servidores MCP e chaves de API.
 //
-// v5: quatro abas (IA, E-mail, Servidores MCP, API do contrato), com a aba na
+// v5: abas (IA, E-mail, Hotmart, Servidores MCP, API do contrato), com a aba na
 // URL (?tab=email...). Os atalhos (uso por agente, Entrar com OpenRouter, n8n
 // e webhooks, onde fica o WhatsApp) moram no "…" da barra.
 // ---------------------------------------------------------------------------
 
-type Aba = "ai" | "email" | "mcp" | "api";
+type Aba = "ai" | "email" | "hotmart" | "mcp" | "api";
 
 const ABAS: { value: Aba; label: string; icon: React.ReactNode }[] = [
   { value: "ai", label: "IA", icon: <MarcaEva size={14} /> },
   { value: "email", label: "E-mail", icon: <Mail aria-hidden="true" /> },
+  { value: "hotmart", label: "Hotmart", icon: <ShoppingBag aria-hidden="true" /> },
   { value: "mcp", label: "Servidores MCP", icon: <Plug aria-hidden="true" /> },
   { value: "api", label: "API do contrato", icon: <KeyRound aria-hidden="true" /> },
 ];
@@ -138,6 +140,7 @@ function Integracoes() {
           />
         )}
         {aba === "email" && <EmailPanel />}
+        {aba === "hotmart" && <HotmartPanel />}
         {aba === "mcp" && <McpServersPanel />}
         {aba === "api" && <ApiKeysPanel nivelDoTitulo={2} />}
       </div>
