@@ -133,6 +133,7 @@ function valor(campo: string, v: unknown, d: Dicionario, def?: CampoDoDicionario
     if (def.tipo === "currency" && typeof v === "number") return brl(v);
     if (def.tipo === "checkbox") return v === true || v === "true" ? "Sim" : "Não";
     if (def.tipo === "date" && typeof v === "string") return data(v, true);
+    if (def.tipo === "datetime" && typeof v === "string") return v.replace(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2}).*$/, "$3/$2/$1 $4");
     if (def.tipo === "select") return def.opcoes?.find((o) => o.value === String(v))?.label ?? String(v);
     if (def.tipo === "multiselect" && Array.isArray(v)) return v.map((x) => def.opcoes?.find((o) => o.value === String(x))?.label ?? String(x)).join(", ");
   }

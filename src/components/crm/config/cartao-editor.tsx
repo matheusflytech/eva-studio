@@ -70,6 +70,10 @@ function valorDeExemplo(def: DefinicaoDeCampo, agora: Date): unknown {
       return 150_000;
     case "date":
       return new Date(agora.getTime() + 10 * DIA).toISOString().slice(0, 10);
+    case "datetime":
+      return `${new Date(agora.getTime() + 10 * DIA).toISOString().slice(0, 10)}T14:30`;
+    case "time":
+      return "14:30";
     case "select":
       return def.options[0]?.value ?? "Exemplo";
     case "multiselect":

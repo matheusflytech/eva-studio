@@ -68,6 +68,12 @@ export function CampoEditor({
     case "date":
       return <Input id={id} type="date" value={String(valor ?? "")} onChange={(e) => onChange(e.target.value)} />;
 
+    case "datetime":
+      return <Input id={id} type="datetime-local" value={String(valor ?? "").replace(" ", "T").slice(0, 16)} onChange={(e) => onChange(e.target.value)} />;
+
+    case "time":
+      return <Input id={id} type="time" value={String(valor ?? "")} onChange={(e) => onChange(e.target.value)} />;
+
     case "select":
       return (
         <Select id={id} value={String(valor ?? "")} onChange={(e) => onChange(e.target.value)}>

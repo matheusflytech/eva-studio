@@ -477,6 +477,8 @@ async function montarFerramentaDeCampos(
     if (d.type === "currency") return `${base}. Valor em reais, só números.`;
     if (d.type === "number") return `${base}. Só o número.`;
     if (d.type === "date") return `${base}. Data no formato AAAA-MM-DD.`;
+    if (d.type === "datetime") return `${base}. Data e hora no formato AAAA-MM-DD HH:mm.`;
+    if (d.type === "time") return `${base}. Hora no formato HH:mm.`;
     if (d.type === "checkbox") return `${base}. "sim" ou "nao".`;
     return base;
   };

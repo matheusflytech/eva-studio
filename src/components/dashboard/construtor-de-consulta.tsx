@@ -96,7 +96,7 @@ export function ConstrutorDeConsulta({
   const tipo = permitidos.includes(tipoEscolhido) ? tipoEscolhido : permitidos[0];
 
   const camposNumericos = campos.filter((c) => c.type === "number" || c.type === "currency");
-  const camposAgrupaveis = campos.filter((c) => ["select", "multiselect", "checkbox", "text", "number", "currency", "date"].includes(c.type));
+  const camposAgrupaveis = campos.filter((c) => ["select", "multiselect", "checkbox", "text", "number", "currency", "date", "datetime", "time"].includes(c.type));
 
   const sugestao = descreverConsulta(consulta, rotulos);
   const tituloFinal = tituloMexido && titulo.trim() ? titulo.trim() : sugestao.charAt(0).toUpperCase() + sugestao.slice(1);
@@ -204,7 +204,7 @@ export function ConstrutorDeConsulta({
                     {camposAgrupaveis.map((c) => (
                       <option key={c.id} value={`cf:${c.key}`}>
                         Por {c.label.toLowerCase()}
-                        {c.type === "number" || c.type === "currency" ? " (em faixas)" : c.type === "date" ? " (por mês)" : ""}
+                        {c.type === "number" || c.type === "currency" ? " (em faixas)" : c.type === "date" || c.type === "datetime" ? " (por mês)" : ""}
                       </option>
                     ))}
                   </optgroup>

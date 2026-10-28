@@ -41,7 +41,7 @@ export function camposDeData(objeto: Objeto, opcoes: Opcoes): CampoDoContexto[] 
   return [
     ...CAMPOS_DO_CONTEXTO[objeto].filter((c) => c.tipo === "data" && c.caminho.startsWith("registro.")),
     ...(entidade
-      ? opcoes.camposPersonalizados.filter((c) => c.objeto === entidade && c.tipo === "date").map((c) => ({ caminho: `registro.custom_fields.${c.chave}`, rotulo: c.nome, tipo: "data" as const, grupo: "Campos personalizados" }))
+      ? opcoes.camposPersonalizados.filter((c) => c.objeto === entidade && (c.tipo === "date" || c.tipo === "datetime")).map((c) => ({ caminho: `registro.custom_fields.${c.chave}`, rotulo: c.nome, tipo: "data" as const, grupo: "Campos personalizados" }))
       : []),
   ];
 }

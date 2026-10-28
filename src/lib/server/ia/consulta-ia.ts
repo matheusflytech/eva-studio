@@ -94,7 +94,7 @@ function diaDaSemana(dia: string): string {
 
 const ROTULO_TIPO_CAMPO: Record<string, string> = {
   text: "texto", longtext: "texto", url: "texto", phone: "texto", email: "texto",
-  number: "número", currency: "dinheiro (reais)", date: "data", select: "lista (uma opção)",
+  number: "número", currency: "dinheiro (reais)", date: "data", datetime: "data e hora", time: "hora", select: "lista (uma opção)",
   multiselect: "lista (várias opções)", checkbox: "sim/não",
 };
 

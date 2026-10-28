@@ -17,6 +17,8 @@ export type TipoDeCampo =
   | "number"
   | "currency"
   | "date"
+  | "datetime"
+  | "time"
   | "select"
   | "multiselect"
   | "checkbox"
@@ -66,6 +68,8 @@ export const TIPOS_DE_CAMPO: TipoDeCampoInfo[] = [
   { id: "number", rotulo: "Número", descricao: "Uma quantidade que dá para somar e tirar média.", exemplo: "480", comOpcoes: false, numerico: true },
   { id: "currency", rotulo: "Valor em reais", descricao: "Dinheiro. Aparece como R$ e soma no dashboard.", exemplo: "R$ 28.500,00", comOpcoes: false, numerico: true },
   { id: "date", rotulo: "Data", descricao: "Um dia: visita agendada, vencimento.", exemplo: "15/12/2026", comOpcoes: false, numerico: false },
+  { id: "datetime", rotulo: "Data e hora", descricao: "Um momento: quando o pedido entrou, horário da reunião.", exemplo: "15/12/2026 14:30", comOpcoes: false, numerico: false },
+  { id: "time", rotulo: "Hora", descricao: "Só o horário: abertura da loja, melhor hora para ligar.", exemplo: "14:30", comOpcoes: false, numerico: false },
   { id: "select", rotulo: "Lista (uma opção)", descricao: "Escolher uma entre opções que você define.", exemplo: "Casa, Apartamento, Comércio", comOpcoes: true, numerico: false },
   { id: "multiselect", rotulo: "Lista (várias opções)", descricao: "Marcar mais de uma opção.", exemplo: "Telhado, Solo, Carport", comOpcoes: true, numerico: false },
   { id: "checkbox", rotulo: "Sim ou não", descricao: "Uma pergunta de resposta fechada.", exemplo: "Tem financiamento: Sim", comOpcoes: false, numerico: false },
@@ -100,6 +104,15 @@ export function slugificar(rotulo: string): string {
   return /^\d/.test(base) ? `c_${base}` : base;
 }
 
+/** Prévia do nome interno que o servidor vai gerar (mesma regra de gerarChaveUnica). */
+export function chaveSugerida(rotulo: string, existentes: Set<string>): string {
+  let base = slugificar(rotulo);
+  if (CHAVES_RESERVADAS.has(base)) base = `${base}_campo`;
+  let key = base;
+  for (let n = 2; existentes.has(key); n += 1) key = `${base}_${n}`;
+  return key;
+}
+
 export function parseMoeda(texto: string): number | null {
   const limpo = texto.replace(/[^\d,.-]/g, "").trim();
   if (!limpo) return null;
@@ -123,6 +136,26 @@ export function dataExiste(t: string): boolean {
   const [a, m, d] = t.split("-").map(Number);
   const conferida = new Date(Date.UTC(a, m - 1, d));
   return conferida.getUTCFullYear() === a && conferida.getUTCMonth() === m - 1 && conferida.getUTCDate() === d;
+}
+
+/** Tipos que guardam um dia (data e hora também): filtram, agrupam e ordenam como data. */
+export const ehTipoDeData = (type: string) => type === "date" || type === "datetime";
+
+/** "2026-10-28T11:16", "2026-10-28 11:16" ou com segundos -> "2026-10-28T11:16" (hora local, sem fuso). */
+export function dataHoraNormalizada(t: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(t.trim());
+  if (!m || !dataExiste(m[1])) return null;
+  const h = Number(m[2]);
+  const min = Number(m[3]);
+  if (h > 23 || min > 59) return null;
+  return `${m[1]}T${String(h).padStart(2, "0")}:${m[3]}`;
+}
+
+/** "9:05", "09:05" ou "09:05:00" -> "09:05". */
+export function horaNormalizada(t: string): string | null {
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(t.trim());
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
 }
 
 const semAcento = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
@@ -179,6 +212,18 @@ export function normalizarValor(def: Pick<DefinicaoDeCampo, "type" | "label" | "
       const t = String(bruto).trim();
       if (!dataExiste(t)) return { ok: false, erro: `${def.label}: informe uma data válida.` };
       return { ok: true, valor: t };
+    }
+
+    case "datetime": {
+      const v = dataHoraNormalizada(String(bruto));
+      if (!v) return { ok: false, erro: `${def.label}: informe uma data e hora válidas.` };
+      return { ok: true, valor: v };
+    }
+
+    case "time": {
+      const v = horaNormalizada(String(bruto));
+      if (!v) return { ok: false, erro: `${def.label}: informe uma hora válida (ex.: 14:30).` };
+      return { ok: true, valor: v };
     }
 
     case "select": {
@@ -250,6 +295,12 @@ export function formatarValor(def: Pick<DefinicaoDeCampo, "type" | "options">, v
     case "date": {
       const d = new Date(`${String(valor)}T12:00:00`);
       return Number.isNaN(d.getTime()) ? String(valor) : d.toLocaleDateString("pt-BR");
+    }
+    case "datetime": {
+      const v = dataHoraNormalizada(String(valor));
+      if (!v) return String(valor);
+      const [dia, hora] = v.split("T");
+      return `${dia.split("-").reverse().join("/")} ${hora}`;
     }
     case "select":
       return def.options.find((o) => o.value === valor)?.label ?? String(valor);

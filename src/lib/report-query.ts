@@ -489,7 +489,7 @@ export interface CampoPersonalizado {
 export function tipoDoPersonalizado(t: string): FieldType {
   if (t === "number") return "number";
   if (t === "currency") return "money";
-  if (t === "date") return "date";
+  if (t === "date" || t === "datetime") return "date";
   if (t === "checkbox") return "bool";
   return "text";
 }

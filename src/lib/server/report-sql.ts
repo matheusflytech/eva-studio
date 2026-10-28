@@ -420,6 +420,8 @@ function exprDoPersonalizado(col: string, c: CampoPersonalizado): Prisma.Sql {
       return sql`(CASE WHEN jsonb_typeof(${j} -> ${k}) = 'number' THEN (${j} ->> ${k})::float8 / 100 END)`;
     case "date":
       return sql`(CASE WHEN (${j} ->> ${k}) ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN (${j} ->> ${k})::timestamp END)`;
+    case "datetime":
+      return sql`(CASE WHEN (${j} ->> ${k}) ~ '^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}' THEN (${j} ->> ${k})::timestamp END)`;
     case "checkbox":
       return sql`(CASE WHEN jsonb_typeof(${j} -> ${k}) = 'boolean' THEN (${j} ->> ${k})::boolean END)`;
     case "multiselect": {

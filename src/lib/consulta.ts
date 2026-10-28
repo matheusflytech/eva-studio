@@ -239,7 +239,7 @@ const CAMPO_BASE_POR_ID = new Map(CAMPOS_DE_FILTRO.map((c) => [c.id, c]));
 
 export function tipoDeFiltroDoCampoPersonalizado(tipo: string): TipoDeFiltro {
   if (tipo === "number" || tipo === "currency") return "numero";
-  if (tipo === "date") return "data";
+  if (tipo === "date" || tipo === "datetime") return "data";
   if (tipo === "select") return "lista";
   if (tipo === "multiselect") return "multi";
   if (tipo === "checkbox") return "sim_nao";
