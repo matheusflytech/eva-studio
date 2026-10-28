@@ -223,6 +223,7 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
       detail: "Deixa o agente criar negócio, mover etapa, criar tarefa e etiquetar sozinho.",
       crmToolActions: ["buscar", "criar_negocio", "atualizar_campos", "criar_tarefa", "etiquetar"],
       crmAllowedStageIds: [],
+      crmToolFields: [],
       crmMaxAmount: "",
       hasTarget: false,
     },
