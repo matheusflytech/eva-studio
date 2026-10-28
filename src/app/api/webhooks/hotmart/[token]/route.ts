@@ -34,6 +34,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   } catch {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
+  // Alguns eventos repetem o hottok no corpo; o segredo não vai para o log.
+  delete payload.hottok;
   const event = String(payload.event ?? "");
   if (!event) return NextResponse.json({ ok: true, ignored: "sem evento" });
   if (connection.status !== "active") return NextResponse.json({ ok: true, ignored: "conexão pausada" });
