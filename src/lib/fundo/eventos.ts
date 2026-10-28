@@ -19,7 +19,13 @@ export interface DetalheDoPulso {
 export interface AvisoDaIlha {
   titulo: string;
   detalhe?: string;
-  /** Iniciais ou texto curto no círculo à esquerda. */
+  /**
+   * Alerta de algo que pede atenção e não veio de você (alguém esperando
+   * atendimento, compromisso chegando): cartão no topo, com ícone. Sem ele, é
+   * confirmação do que você acabou de fazer: uma linha discreta embaixo.
+   */
+  alerta?: "conversa" | "agenda";
+  /** Iniciais ou texto curto no círculo à esquerda (só alerta). */
   avatar?: string;
   acao?: { rotulo: string; href?: string; aoClicar?: () => void };
   /** Quanto tempo a ilha fica aberta (ms). Padrão 4000. */

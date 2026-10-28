@@ -141,7 +141,6 @@ export function useMudancaDeEtapa({
         const de = pedido.de;
         avisarNaIlha({
           titulo: pedido.para.id ? `${pedido.nome} foi para ${pedido.para.name}` : `${pedido.nome} foi reaberto`,
-          detalhe: "por você · agora",
           duracao: MS_PARA_DESFAZER,
           acao:
             corpo && de
@@ -154,7 +153,7 @@ export function useMudancaDeEtapa({
                     const r = await tentar(volta, corpo);
                     if (r !== "movido") return;
                     pulsar(ilha.elemento(pedido.dealId), 1);
-                    avisarNaIlha({ titulo: `${pedido.nome} voltou para ${de.name}`, detalhe: "por você · agora" });
+                    avisarNaIlha({ titulo: `${pedido.nome} voltou para ${de.name}` });
                     pedido.aoDesfazer?.();
                   },
                 }

@@ -67,7 +67,7 @@ import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/
 import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
 import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
 import { Comemoracao, DiaDeHoje, Momentos, VozDoQuadro, type EstiloDaTela } from "@/components/crm/negocios/eva-topo";
-import { comemoracao, desdeOntem, gargaloDaConversao, listaDeAtencao, momentos, montarRecado, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
+import { comemoracao, desdeOntem, listaDeAtencao, momentos, type ItemDeAtencao } from "@/components/crm/negocios/eva-voz";
 import { ModalDaLegenda } from "@/components/crm/negocios/legenda";
 import { QuadroContexto, type AcoesDoQuadro, type FocoDoPainel } from "@/components/crm/negocios/quadro-contexto";
 import { PersonalizarQuadro, type AbaDaPersonalizacao } from "@/components/crm/negocios/personalizar";
@@ -84,7 +84,6 @@ import { CAMPOS_DE_NEGOCIO } from "@/lib/filtro-crm";
 import { SEM_VALOR, diaLocal } from "@/lib/consulta";
 import { chaveDasColunas, colunasValidas } from "@/lib/listas/colunas";
 import { montarFiltro, totalAvancado, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
-import { avisarNaIlha } from "@/lib/fundo/eventos";
 import type { FilterOption } from "@/components/ui/filter-button";
 
 // ---------------------------------------------------------------------------
@@ -94,17 +93,10 @@ import type { FilterOption } from "@/components/ui/filter-button";
 // continuam; os estilos "Eva · 1/2/3" mostram a voz da Eva no design system.
 //
 // v5: o quadro é a tela. Filtros moram no botão "Filtros", importar/exportar/
-// configurar no "…", o recado da Eva vai para a ilha e "Seu dia" (desde
+// configurar no "…" e "Seu dia" (desde
 // ontem / pede atenção) abre numa gaveta.
 // ---------------------------------------------------------------------------
 
-/** Conversão entre etapas (vem de /api/deals/funil; alimenta o gargalo da voz da Eva). */
-interface EtapaDeConversao {
-  etapaId: string;
-  nome: string;
-  quantidade: number;
-  taxaDoInicio: number;
-}
 
 const BARRA_DE_NEGOCIOS: FiltroDaBarra[] = [
   { campo: "contato", rotulo: "Contatos", param: "contact", tipo: "lista" },
@@ -186,7 +178,6 @@ function NegociosConteudo() {
   const [erro, setErro] = React.useState<string | null>(null);
   const [versao, setVersao] = React.useState(0);
   const [contagens, setContagens] = React.useState<Record<string, number>>({});
-  const [conversao, setConversao] = React.useState<EtapaDeConversao[]>([]);
   const [novoNaEtapa, setNovoNaEtapa] = React.useState<string | null>(null);
   // "Criar negócio" da busca global: /deals?new=<carimbo>. Cada carimbo
   // abre o "novo negócio" uma vez (ajuste de estado no render, sem efeito).
@@ -288,11 +279,10 @@ function NegociosConteudo() {
     deFundo.current = false;
     let vivo = true;
     const q = new URLSearchParams({ pipeline: funil, porEtapa: String(POR_ETAPA), filtro: JSON.stringify(f) });
-    Promise.all([fetch(`/api/deals?${q}`), fetch(`/api/deals/funil?pipeline=${funil}`).catch(() => null)])
-      .then(async ([res, funilRes]) => {
+    fetch(`/api/deals?${q}`)
+      .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error ?? "Não foi possível carregar os negócios.");
-        const dadosDoFunil = funilRes?.ok ? await funilRes.json().catch(() => null) : null;
         if (!vivo || carga !== ultimaCarga.current) return;
         const campos: DefinicaoDeCampo[] = data.fields ?? [];
         if (silenciosa) {
@@ -308,7 +298,6 @@ function NegociosConteudo() {
           avisos: data.avisos ?? [],
           truncado: !!data.truncado,
         });
-        setConversao(dadosDoFunil?.conversao ?? []);
         setAgora(new Date());
         setErro(null);
       })
@@ -460,19 +449,6 @@ function NegociosConteudo() {
 
   // ── Voz da Eva (sobre os cartões carregados) ──
   const eva = estilo !== "classico";
-  const recado = React.useMemo(
-    () => (carregando || !eva ? null : montarRecado(stages, agora, opcoes.meuNome, gargaloDaConversao(conversao))),
-    [carregando, eva, stages, agora, conversao, opcoes.meuNome]
-  );
-  // O recado da Eva não ocupa mais a frente do quadro: vai para a ilha uma vez
-  // por visita, com o título sem a saudação e a frase principal como detalhe.
-  const recadoAvisado = React.useRef(false);
-  React.useEffect(() => {
-    if (!recado || recadoAvisado.current) return;
-    recadoAvisado.current = true;
-    const titulo = recado.titulo.replace(/^[^.]*\.\s+/, "") || recado.titulo;
-    avisarNaIlha({ titulo, detalhe: recado.partes.map((p) => p.texto).join("").trim() });
-  }, [recado]);
   const momentosDoFunil = React.useMemo(() => (eva ? momentos(stages, agora) : []), [eva, stages, agora]);
   const atencaoDoDia = React.useMemo(() => listaDeAtencao(stages, agora), [stages, agora]);
   const acontecimentosDoDia = React.useMemo(() => desdeOntem(stages, agora), [stages, agora]);
