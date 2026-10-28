@@ -362,13 +362,16 @@ function SecaoDeCampos({
   onSalvar: (escolhas: Record<string, string>) => void;
 }) {
   const catalogo = React.useMemo(() => hotmartFields(products).filter((f) => !f.required), [products]);
+  // Campos que a regra lê de volta (evento repetido) não podem receber outro dado.
+  const reservados = React.useMemo(
+    () => new Set(hotmartFields(products).filter((f) => f.required).map((f) => (salvo[f.id] ?? f.id) as string)),
+    [products, salvo]
+  );
   const [escolhas, setEscolhas] = React.useState<Record<string, string>>(() => Object.fromEntries(catalogo.map((f) => [f.id, escolhaInicial(f, salvo, campos)])));
   const [todos, setTodos] = React.useState(false);
-  // Dado opcional que já grava aparece mesmo com a lista fechada (pela escolha
-  // de quando abriu: trocar para "Não gravar" não some com a linha).
-  const [iniciais] = React.useState(escolhas);
-  const visiveis = catalogo.filter((f) => todos || f.essential || iniciais[f.id] !== "");
+  const visiveis = catalogo.filter((f) => todos || f.essential);
   const escondidos = catalogo.length - visiveis.length;
+  const gravandoEscondidos = catalogo.filter((f) => !f.essential && escolhas[f.id] !== "").length;
   const novos = catalogo.filter((f) => escolhas[f.id] === CRIAR).length;
 
   return (
@@ -386,7 +389,7 @@ function SecaoDeCampos({
           <div key={entity} className="pb-2">
             <RotuloDeGrupo>{entity === "contact" ? "Contato" : "Negócio"}</RotuloDeGrupo>
             {lista.map((f) => {
-              const existentes = doTipo.filter((x) => compatible(f.type, x.type));
+              const existentes = doTipo.filter((x) => compatible(f.type, x.type) && !reservados.has(x.key));
               const temPadrao = existentes.some((x) => x.key === f.id);
               return (
                 <LinhaDeConfig key={f.id} rotulo={f.label} descricao={f.hint} htmlFor={`hotmart-campo-${f.id}`}>
@@ -413,7 +416,7 @@ function SecaoDeCampos({
       <RodapeDaSecao mensagem={novos > 0 ? `${novos} ${novos === 1 ? "campo novo será criado" : "campos novos serão criados"} ao salvar.` : undefined}>
         {(escondidos > 0 || todos) && (
           <Button type="button" variant="ghost" onClick={() => setTodos((t) => !t)}>
-            {todos ? "Mostrar só os principais" : `Mostrar mais ${escondidos} dados`}
+            {todos ? "Mostrar só os principais" : `Mostrar mais ${escondidos} dados${gravandoEscondidos ? ` (${gravandoEscondidos} já gravando)` : ""}`}
           </Button>
         )}
         <Button type="button" disabled={ocupado} onClick={() => onSalvar(escolhas)}>

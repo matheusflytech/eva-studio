@@ -85,6 +85,8 @@ export async function resolveFieldMap(orgId: string, saved: FieldMap, raw: unkno
   const find = (entity: string, key: string | null) => (key ? defs.find((d) => d.entity === entity && d.key === key) : undefined);
   const map: FieldMap = { ...saved };
   const errors: string[] = [];
+  // Campos que a regra lê de volta (evento repetido) não recebem outro dado.
+  const reserved = new Set(catalog.filter((f) => f.required).map((f) => targetKey(map, f.id)));
 
   for (const f of catalog) {
     const v = choices[f.id];
@@ -95,7 +97,7 @@ export async function resolveFieldMap(orgId: string, saved: FieldMap, raw: unkno
     if (choice === "") { map[f.id] = null; continue; }
     if (choice !== CREATE_FIELD) {
       const d = find(f.entity, choice);
-      if (d && compatible(f.type, d.type)) map[f.id] = d.key;
+      if (d && compatible(f.type, d.type) && (f.required || !reserved.has(d.key))) map[f.id] = d.key;
       else errors.push(`${f.label}: o campo escolhido não existe ou é de outro tipo.`);
       continue;
     }

@@ -57,6 +57,12 @@ describe("resolveFieldMap", () => {
     expect(opcoes.filter((v) => v === "site")).toHaveLength(1);
   });
 
+  it("campo que a regra usa (transação) não recebe outro dado", async () => {
+    db.defs = [{ id: "f2", entity: "deal", key: "transacao_hotmart", type: "text", options: [] }];
+    const r = await resolveFieldMap("o1", {}, { cupom: "transacao_hotmart" }, products);
+    expect(r.errors[0]).toMatch(/^Cupom/);
+  });
+
   it("campo de tipo errado vira erro com o nome do dado", async () => {
     db.defs = [{ id: "f1", entity: "contact", key: "valor", type: "text", options: [] }];
     const r = await resolveFieldMap("o1", {}, { ltv_hotmart: "valor" }, products);
