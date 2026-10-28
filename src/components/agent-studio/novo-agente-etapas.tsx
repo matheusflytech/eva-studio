@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { ModeloSelect } from "./builder/modelo-select";
 import { montarFluxoInicial, type IaDoAgente } from "./builder/fluxo-inicial";
-import { FLOW_TEMPLATES, MODELOS_COM_N8N } from "./builder/flow-templates";
+import { FLOW_TEMPLATES, MODELOS_COM_IA, MODELOS_COM_N8N } from "./builder/flow-templates";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 import { saveFlow } from "@/lib/data/flows";
 import { generateId, cn } from "@/lib/utils";
@@ -92,7 +92,8 @@ export function NovoAgenteEtapas() {
   const [instructions, setInstructions] = React.useState("");
   const [guidelines, setGuidelines] = React.useState("");
 
-  const [fonte, setFonte] = React.useState<"conexao" | "bloco">("conexao");
+  // "nenhuma" = bot só de blocos: sem "Atendente com IA" nem modelo com bloco de IA.
+  const [fonte, setFonte] = React.useState<"conexao" | "bloco" | "nenhuma">("conexao");
   const [credenciais, setCredenciais] = React.useState<Credencial[] | null>(null);
   const [credentialId, setCredentialId] = React.useState("");
   const [model, setModel] = React.useState("");
@@ -134,6 +135,7 @@ export function NovoAgenteEtapas() {
   function validarEtapa(i: number): string | null {
     if (i === 0 && !name.trim()) return "Dê um nome para o agente.";
     if (i === 2 && fonte === "bloco" && (!credentialId || !model)) return "Escolha a chave e o modelo, ou use a Central de IA.";
+    if (i === 3 && fonte === "nenhuma" && (inicio === "ia" || MODELOS_COM_IA.has(inicio))) return "Este início usa IA. Escolha outro ou volte e escolha uma IA.";
     if (i === 3 && MODELOS_COM_N8N.has(inicio) && !/^https:\/\//.test(urlDoN8n.trim())) {
       return "Cole a URL do webhook do n8n (começa com https://).";
     }
@@ -158,7 +160,7 @@ export function NovoAgenteEtapas() {
     setErro(null);
     setCriando(true);
     const ia: IaDoAgente =
-      fonte === "conexao" || !provider ? { fonte: "conexao" } : { fonte: "bloco", provider, credentialId, model };
+      fonte !== "bloco" || !provider ? { fonte: "conexao" } : { fonte: "bloco", provider, credentialId, model };
     try {
       await create(agentId, {
         name: name.trim(),
@@ -309,6 +311,15 @@ export function NovoAgenteEtapas() {
               titulo="Uma chave e um modelo só para este agente"
               texto="Para quando este agente precisa de um modelo específico. Sem reserva automática."
             />
+            <Opcao
+              ativa={fonte === "nenhuma"}
+              onClick={() => {
+                setFonte("nenhuma");
+                if (inicio === "ia" || MODELOS_COM_IA.has(inicio)) setInicio("branco");
+              }}
+              titulo="Bot sem IA"
+              texto="Só blocos: mensagens, botões, perguntas e ações que você monta no builder. Dá para pôr IA depois."
+            />
             {fonte === "bloco" &&
               (credenciais && credenciais.length === 0 ? (
                 <Notice tone="warning">
@@ -346,14 +357,16 @@ export function NovoAgenteEtapas() {
 
         {etapa === 3 && (
           <div role="radiogroup" aria-label="Como o agente começa" className="flex flex-col gap-3">
-            <Opcao
-              ativa={inicio === "ia"}
-              onClick={() => setInicio("ia")}
-              titulo="Atendente com IA"
-              selo="Recomendado"
-              texto="Dá boas-vindas e a IA conversa usando o que você escreveu. Se a IA falhar, passa para um atendente."
-            />
-            {inicio === "ia" && (
+            {fonte !== "nenhuma" && (
+              <Opcao
+                ativa={inicio === "ia"}
+                onClick={() => setInicio("ia")}
+                titulo="Atendente com IA"
+                selo="Recomendado"
+                texto="Dá boas-vindas e a IA conversa usando o que você escreveu. Se a IA falhar, passa para um atendente."
+              />
+            )}
+            {inicio === "ia" && fonte !== "nenhuma" && (
               <div className="flex flex-col gap-3 rounded-[14px] bg-raised p-3">
                 <div>
                   <Label htmlFor="na-oi">Mensagem de boas-vindas (opcional)</Label>
@@ -372,7 +385,7 @@ export function NovoAgenteEtapas() {
               </div>
             )}
             <Opcao ativa={inicio === "branco"} onClick={() => setInicio("branco")} titulo="Em branco" texto="Só o Início. Você monta tudo no builder." />
-            {FLOW_TEMPLATES.map((t) => (
+            {FLOW_TEMPLATES.filter((t) => fonte !== "nenhuma" || !MODELOS_COM_IA.has(t.id)).map((t) => (
               <React.Fragment key={t.id}>
                 <Opcao ativa={inicio === t.id} onClick={() => setInicio(t.id)} titulo={t.name} texto={t.description} />
                 {inicio === t.id && MODELOS_COM_N8N.has(t.id) && (

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { montarFluxoInicial } from "./fluxo-inicial";
 import { validateFlow } from "./block-validation";
-import { FLOW_TEMPLATES } from "./flow-templates";
+import { FLOW_TEMPLATES, MODELOS_COM_IA } from "./flow-templates";
 import { precisaOrganizar } from "./auto-layout";
 
 describe("montarFluxoInicial", () => {
@@ -68,6 +68,11 @@ describe("modelos prontos", () => {
       expect(avisos, t.id).toEqual([]);
       for (const ia of nodes.filter((n) => n.data.iconKey === "ai-agent")) expect(ia.data.aiFonte, t.id).toBe("conexao");
     }
+  });
+
+  it("MODELOS_COM_IA lista exatamente os modelos com bloco de IA (o bot sem IA esconde estes)", () => {
+    const comIa = FLOW_TEMPLATES.filter((t) => t.build().nodes.some((n) => n.data.iconKey === "ai-agent")).map((t) => t.id);
+    expect(comIa.sort()).toEqual([...MODELOS_COM_IA].sort());
   });
 
   it("FAQ com IA: a base de conhecimento fica ligada na porta de ferramentas da IA", () => {
