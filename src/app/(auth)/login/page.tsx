@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Input, Label } from "@/components/ui/input";
@@ -69,12 +68,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-5 text-small text-text-tertiary">
-        Ainda não tem conta?{" "}
-        <Link href="/signup" className="font-medium text-text-primary hover:underline">
-          Criar conta
-        </Link>
-      </p>
+      <p className="mt-5 text-small text-text-tertiary">Ainda não tem acesso? Peça um convite a quem administra o seu contrato.</p>
     </div>
   );
 }

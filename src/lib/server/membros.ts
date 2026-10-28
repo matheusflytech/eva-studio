@@ -337,8 +337,10 @@ export async function convidarMembro(ctx: SessionContext, input: Convite, origem
     return { userId: existente.id, email, novo: false };
   }
 
+  // Conta nova nasce sem senha e segue o mesmo caminho de quem já tem conta:
+  // o link abre /invite, a pessoa define a senha e já entra no contrato.
   const admin = createAdminClient();
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${origem}/login` });
+  const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
   if (error || !data?.user) {
     throw new ErroDeMembro(error?.message ? `Não foi possível enviar o convite: ${error.message}` : "Não foi possível enviar o convite.");
   }
@@ -347,13 +349,15 @@ export async function convidarMembro(ctx: SessionContext, input: Convite, origem
     await prisma.$transaction([
       prisma.profile.create({ data: { id: userId, orgId: ctx.orgId, name: nome, email, role } }),
       prisma.membership.create({
-        data: { orgId: ctx.orgId, userId, role, roleId, status: "convidado", invitedById: ctx.userId },
+        data: { orgId: ctx.orgId, userId, role, roleId, status: "pendente", invitedById: ctx.userId },
       }),
     ]);
   } catch (e) {
     await admin.auth.admin.deleteUser(userId).catch(() => {});
     throw e;
   }
+  const erroDoEnvio = await enviarLinkDoConvite(email, ctx.orgId, userId, origem);
+  if (erroDoEnvio) throw new ErroDeMembro(`Convite salvo, mas o e-mail não saiu: ${erroDoEnvio}. Tente convidar de novo.`, 502);
   await registrarHistorico({ orgId: ctx.orgId, acao: "membro.convidou", objeto: "member", objetoId: userId, objetoNome: nome, detalhes: { email, papel: nomeDoPapel(role) } });
   return { userId, email, novo: true };
 }

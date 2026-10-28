@@ -6,7 +6,7 @@ import { FundoGelo } from "@/components/entrada/fundo-gelo";
 import { BustoConstelacao } from "@/components/entrada/busto-constelacao";
 
 // ---------------------------------------------------------------------------
-// Entrar e criar conta (v6): o cartão escuro flutua sobre o fundo "gelo"
+// Entrar (v6; conta nova só por convite): o cartão escuro flutua sobre o fundo "gelo"
 // (cordilheira em linhas finas). À esquerda o formulário; à direita Júlio
 // César em nuvem de pontos, que gira devagar seguindo o mouse e acende perto
 // da mão (proposta 2, "Constelação"). O cartão sobe do desfoque ao abrir.

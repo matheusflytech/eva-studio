@@ -11,7 +11,6 @@ type AuthResult = { ok: true } | { ok: false; error: string };
 interface AuthContextValue {
   session: Session | null;
   isLoading: boolean;
-  signUp: (input: { name: string; email: string; password: string; orgName: string }) => Promise<AuthResult>;
   logIn: (input: { email: string; password: string }) => Promise<AuthResult>;
   logOut: () => void;
   updateOrgLogo: (dataUrl: string) => void;
@@ -67,18 +66,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [contratoDaUrl, refresh]);
 
-  const signUp: AuthContextValue["signUp"] = async (input) => {
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    const data = await res.json();
-    if (!res.ok) return { ok: false, error: data.error ?? "Não foi possível criar a conta." };
-    setSession(await fetchSession());
-    return { ok: true };
-  };
-
   const logIn: AuthContextValue["logIn"] = async ({ email, password }) => {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -121,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         isLoading,
         sessaoDoContrato,
-        signUp,
         logIn,
         logOut,
         updateOrgLogo,
