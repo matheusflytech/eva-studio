@@ -25,7 +25,7 @@ export function camposDaRegra(objeto: Objeto, opcoes: Opcoes): CampoDoContexto[]
         .map((c) => ({
           caminho: `registro.custom_fields.${c.chave}`,
           rotulo: c.nome,
-          tipo: c.tipo === "number" || c.tipo === "currency" ? "numero" : c.tipo === "date" ? "data" : c.tipo === "boolean" ? "booleano" : "texto",
+          tipo: c.tipo === "number" || c.tipo === "currency" ? "numero" : c.tipo === "date" || c.tipo === "datetime" ? "data" : c.tipo === "boolean" ? "booleano" : "texto",
           grupo: "Campos personalizados",
         }))
     : [];

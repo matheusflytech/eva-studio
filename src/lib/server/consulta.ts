@@ -26,7 +26,7 @@ import {
   type Intervalo,
   type ResultadoDeConsulta,
 } from "@/lib/consulta";
-import { formatarValor, parseNumero, valorNumerico, type DefinicaoDeCampo } from "@/lib/custom-fields";
+import { ehTipoDeData, formatarValor, parseNumero, valorNumerico, type DefinicaoDeCampo } from "@/lib/custom-fields";
 
 // ---------------------------------------------------------------------------
 // Roda uma consulta montada pelo cliente.
@@ -125,6 +125,8 @@ export function valorDoCampoPersonalizado(campo: Pick<CampoDeFiltro, "tipo" | "d
   if (campo.tipo === "numero") return valorNumerico(def, v);
   if (campo.tipo === "multi") return Array.isArray(v) ? v.map(String) : [String(v)];
   if (campo.tipo === "sim_nao") return v === true || v === "true";
+  // Data e hora filtra pelo dia.
+  if (campo.tipo === "data") return String(v).slice(0, 10);
   return String(v);
 }
 
@@ -700,7 +702,7 @@ export function chavesDeGrupo(
     const a = faixas.inicio + i * faixas.passo;
     return [{ chave: `f${i}`, label: `${fmt(a)} a ${fmt(a + faixas.passo)}`, ordem: i }];
   }
-  if (def.type === "date") {
+  if (ehTipoDeData(def.type)) {
     const k = String(v).slice(0, 7);
     return [{ chave: k, label: rotuloTemporal(k, "mes"), ordem: Number(k.replace("-", "")) || 0 }];
   }
@@ -712,7 +714,7 @@ export function chavesDeGrupo(
 function ordemNatural(c: Consulta, defs: Defs): boolean {
   if (["etapa", "tipoEtapa", "faixaValor"].includes(c.agrupar)) return true;
   const def = c.agrupar.startsWith("cf:") ? defs.get(c.agrupar.slice(3)) : undefined;
-  return def?.type === "number" || def?.type === "currency" || def?.type === "date";
+  return def?.type === "number" || def?.type === "currency" || (!!def && ehTipoDeData(def.type));
 }
 
 function arredondar(v: number | null, formato: FormatoDeValor): number {
