@@ -48,6 +48,9 @@ model Organization {
   trash            TrashItem[]
   // Central de IA (2026-10-21-conexao-ia.sql): só relação, nenhuma coluna nova aqui.
   aiConnection     AiConnection?
+  // Hotmart nativa (2026-11-02-hotmart.sql): só relação.
+  hotmartConnection HotmartConnection?
+  sales             Sale[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -2339,4 +2342,86 @@ model StudioEvent {
   @@index([agentId, nodeId, createdAt])
   @@index([orgId, createdAt])
   @@map("eva_studio_studio_events")
+}
+
+// Hotmart nativa (F1): uma conexão por contrato. `token` vai na URL do
+// webhook; `secrets` é JSON cifrado ({ hottok }). `products`:
+// { "<id do produto>": { slug, name, model, pipelineId, stages: { role: stageId } } }.
+model HotmartConnection {
+  id          String    @id @default(uuid())
+  orgId       String    @unique
+  token       String    @unique
+  secrets     String    @default("")
+  products    Json      @default("{}")
+  status      String    @default("active") // active | paused
+  lastEventAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  events       HotmartEvent[]
+
+  @@map("eva_studio_hotmart_connections")
+}
+
+// Um por evento recebido: idempotência (connectionId + hotmartEventId), log do painel e "Reprocessar".
+model HotmartEvent {
+  id             String    @id @default(uuid())
+  orgId          String
+  connectionId   String
+  hotmartEventId String
+  event          String
+  productId      String?
+  transaction    String?
+  email          String?
+  payload        Json
+  result         String    @default("pending") // pending | ok | ignored | error
+  detail         String?
+  contactId      String?
+  dealId         String?
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+
+  connection HotmartConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, hotmartEventId])
+  @@index([orgId, createdAt])
+  @@map("eva_studio_hotmart_events")
+}
+
+// Uma linha por transação de plataforma de venda (cada mensalidade é uma transação).
+model Sale {
+  id             String    @id @default(uuid())
+  orgId          String
+  platform       String
+  transaction    String
+  productId      String?
+  productName    String?
+  offerCode      String?
+  plan           String?
+  subscriberCode String?
+  recurrence     Int?
+  status         String // approved | complete | refunded | chargeback | canceled | expired | delayed | pending | dispute | cart_abandoned
+  amountCents    Int       @default(0)
+  currency       String    @default("BRL")
+  amountBrlCents Int       @default(0)
+  paymentType    String?
+  installments   Int?
+  buyerEmail     String?
+  buyerName      String?
+  src            String?
+  sck            String?
+  channel        String?
+  orderedAt      DateTime?
+  approvedAt     DateTime?
+  contactId      String?
+  dealId         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, platform, transaction])
+  @@index([orgId, approvedAt])
+  @@map("eva_studio_sales")
 }
