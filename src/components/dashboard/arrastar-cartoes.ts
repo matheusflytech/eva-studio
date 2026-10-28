@@ -9,6 +9,11 @@ import { CURVA, Flip, reduzMovimento } from "@/components/crm/negocios/animacao/
 
 export const ALTURA_MAXIMA = 3;
 
+// Soltar o ponteiro depois de arrastar gera um clique no cartão; quem abre
+// o detalhe no clique pergunta isto antes.
+let soltouEm = 0;
+export const acabouDeArrastar = () => performance.now() - soltouEm < 400;
+
 /** Move `id` para a posição de `alvo` (o resto escorrega). */
 export function moverPara<T extends { id: string }>(lista: T[], id: string, alvo: string): T[] {
   const de = lista.findIndex((w) => w.id === id);
@@ -70,6 +75,7 @@ export function useArrastarCartoes<T extends { id: string; largura: number; altu
     const antes = atual.current;
     setArrastando(id);
     const soltar = () => {
+      soltouEm = performance.now();
       setArrastando(null);
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);

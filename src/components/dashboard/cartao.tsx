@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
+import { acabouDeArrastar } from "./arrastar-cartoes";
 
 // ---------------------------------------------------------------------------
 // A moldura de todo cartão do Dashboard: título pequeno, conteúdo, selo de
@@ -68,7 +69,7 @@ export function Cartao({
 
   // Clique em qualquer lugar do cartão abre o detalhe, menos nos controles.
   function clicar(e: React.MouseEvent) {
-    if (!clicavel || renomeando) return;
+    if (!clicavel || renomeando || acabouDeArrastar()) return;
     const alvo = e.target as HTMLElement;
     if (alvo.closest("button, a, input, select, [role='menu'], [role='radiogroup']")) return;
     if (window.getSelection()?.toString()) return;
@@ -132,6 +133,7 @@ export function Cartao({
             type="button"
             aria-label={`Mover o cartão ${titulo}. Setas mudam a posição; Shift com setas muda o tamanho.`}
             title="Arraste para mudar a ordem"
+            data-alca
             onPointerDown={aoArrastar}
             onKeyDown={aoTeclado}
             className={cn(

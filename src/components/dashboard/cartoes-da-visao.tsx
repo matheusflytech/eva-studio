@@ -220,7 +220,7 @@ function Ritmo({ v, escuro }: { v: Visao; escuro: boolean }) {
           <p className="mt-1 text-caption opacity-70">de 100</p>
         </div>
       </div>
-      <p className="mt-3 text-body font-medium">{r.referencia === 0 ? "Primeiro período com vendas" : r.noRitmo ? "Acima do ritmo" : "Abaixo do ritmo"}</p>
+      <p className="mt-3 text-body font-medium">{r.referencia === 0 ? (r.projetada > 0 ? "Primeiro período com vendas" : "Nenhuma venda ainda") : r.noRitmo ? "Acima do ritmo" : "Abaixo do ritmo"}</p>
       <p className="mt-1 text-small leading-snug opacity-75">
         {r.referencia > 0
           ? `No ritmo de hoje, o período fecha em ${reaisCurtos(r.projetada)}; a média dos 3 anteriores é ${reaisCurtos(r.referencia)}.`

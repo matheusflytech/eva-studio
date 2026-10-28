@@ -532,8 +532,20 @@ function Painel() {
       const lugar = encaixeDenso(lista.map((x) => ({ largura: x.largura, altura: x.altura ?? 1 })), colunas)[i];
       setAnuncio(`${w.titulo}: posição ${i + 1} de ${lista.length}, linha ${lugar.linha + 1}, coluna ${lugar.coluna + 1}`);
     }
-    if (lista !== widgets) animar(() => setWidgets(lista));
+    if (lista === widgets) return;
+    focoNaAlca.current = id;
+    animar(() => setWidgets(lista));
   }
+
+  // Mover pelo teclado reordena o DOM, e o navegador pode tirar o foco da alça: devolve.
+  const focoNaAlca = React.useRef<string | null>(null);
+  React.useLayoutEffect(() => {
+    const id = focoNaAlca.current;
+    if (!id) return;
+    focoNaAlca.current = null;
+    const alca = grade.current?.querySelector<HTMLElement>(`[data-cartao="${CSS.escape(id)}"] [data-alca]`);
+    if (alca && document.activeElement !== alca) alca.focus();
+  }, [widgets]);
 
   const temCartaoDeFunil = (widgets ?? []).some((w) => PAINEL_DO_FUNIL.some((p) => p.fonte === w.fonte && p.tipo !== "numero"));
   const historicoRecente =
