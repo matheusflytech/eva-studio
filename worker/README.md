@@ -23,20 +23,37 @@ Hoje roda no Render (plano grátis, mantido acordado por ping externo). O passo 
 para Railway.
 
 1. Novo projeto → Deploy from GitHub repo → aponte pra este repositório, **root directory: `worker`**
-2. Variáveis de ambiente — as três são obrigatórias, o processo **encerra na partida** sem as duas últimas:
-   - `DATABASE_URL` — a mesma da Vercel
-   - `EVA_STUDIO_URL` — a URL pública do app (hoje `https://evapp.vercel.app`), sem barra no fim
+2. Variáveis de ambiente — as quatro são obrigatórias, o processo **encerra na partida** sem elas:
+   - `DATABASE_URL` — o mesmo banco da Vercel. No Render usamos o pooler em modo sessão (porta 5432).
+   - `DATABASE_SSL_CA` — o certificado raiz do Supabase (`prod-ca-2021.crt`, em Supabase › Database ›
+     Settings › SSL Configuration › Download certificate), colado inteiro, com as quebras de linha. Sem ele
+     o worker cai na partida com `self-signed certificate in certificate chain`, porque valida o TLS do
+     Postgres por padrão. Não é segredo. (Atalho menos seguro: `DATABASE_SSL_REJECT_UNAUTHORIZED=false`.)
+   - `EVA_STUDIO_URL` — a URL pública do app (hoje `https://evapp.vercel.app`), sem barra no fim.
+     Conferir letra por letra: com a URL errada o WhatsApp conecta normal, mas a IA não responde
+     (no log: `getaddrinfo ENOTFOUND`).
    - `INTERNAL_API_SECRET` — **idêntico** ao configurado no projeto da Vercel; é o que autentica o worker
      nas rotas internas. Valores diferentes nos dois lados fazem tudo responder 401 em silêncio.
+   - Opcional, mas recomendado: `LOG_LEVEL=warn`. Em `info` o Baileys escreve no log do provedor o
+     conteúdo das conversas.
 3. Start command já vem do `package.json` (`npm start` → `node index.js`)
 4. Sem porta fixa necessária — o worker escuta na porta que o provedor injetar (Render e Railway fazem isso)
+5. Conferir no log: `Worker do WhatsApp por QR subindo` com `"modo":"canal"` e depois `WhatsApp conectado`.
+   O erro `Timed Out ... init queries` logo depois de conectar é do Baileys e não atrapalha.
+
+**Render (plano grátis).** Ele desliga o serviço depois de 15 min sem receber requisição, e o WhatsApp cai
+junto. Manter um ping externo (UptimeRobot ou cron-job.org) em `https://eva-studio-whatsapp-worker.onrender.com`
+a cada 10 min. O deploy automático estava desligado (em 23/10 o Render rodava código de um mês antes):
+ligar em Settings › Auto-Deploy › On Commit, ou fazer Manual Deploy › Deploy latest commit depois de cada
+merge que mexe em `worker/`.
 
 ## Cuidados (aprendidos em 23/10/2026)
 
 - **Um worker só no ar.** Dois workers no mesmo banco abrem duas sessões para o mesmo canal, gravam QRs
   diferentes e um sobrescreve as credenciais do outro no pareamento (o celular diz "não é possível conectar").
   Antes de subir em outro lugar (Railway, local), desligue o que está rodando.
-- **Worker parado não dá erro na tela de antes.** Em 21/10 o worker do Render parou e o QR que ficou no banco
+- **Worker parado não dá erro na tela de antes.** Em 21/10 o worker do Render parou (em 23/10 vimos que
+  não havia log nenhum em 7 dias: ping externo parado e código de um mês atrás) e o QR que ficou no banco
   continuou na tela por dois dias; escanear dava "não é possível conectar". Agora Configurações → Canais avisa
   quando a sessão espera QR sem mudança há mais de 3 minutos.
 - **Códigos de desconexão.** 408 (QR expirou) e 515 (reinício pedido logo depois de parear) são normais e não
@@ -62,11 +79,15 @@ para Railway.
 
 ## Rodando local pra testar
 
+**Desligue o worker do Render antes** (ver "Um worker só no ar"). Com o app rodando local em `:3100`:
+
 ```bash
 cd worker
 npm install
-DATABASE_URL="postgresql://..." npm start
+EVA_STUDIO_URL=http://localhost:3100 LOG_LEVEL=warn DATABASE_SSL_REJECT_UNAUTHORIZED=false PORT=3311 \
+  node --env-file=../.env.local index.js
 ```
 
-Depois é só clicar em "Conectar via QR code" na página do agente no Eva Studio — o worker detecta o pedido
-(polling) e gera o QR em até ~4s.
+Aponte para o app local, não para a Vercel: o `INTERNAL_API_SECRET` do `.env.local` é diferente do de
+produção e tudo responderia 401. Depois é só clicar em "Conectar" em Configurações › Canais — o worker
+detecta o pedido (polling) e gera o QR em até ~4s. Ao terminar, pare o processo e religue o do Render.
