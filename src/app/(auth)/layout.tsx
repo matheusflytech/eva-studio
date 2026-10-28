@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { FundoGelo } from "@/components/entrada/fundo-gelo";
 import { BustoConstelacao } from "@/components/entrada/busto-constelacao";
@@ -36,7 +37,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </div>
 
-      <span className="absolute bottom-6 z-10 font-mono text-caption text-[#8a93a3]">evapp.vercel.app</span>
+      <span className="absolute bottom-6 z-10 font-mono text-caption text-[#8a93a3]">
+        evapp.vercel.app ·{" "}
+        <Link href="/privacy" className="underline-offset-2 hover:underline">
+          privacidade
+        </Link>
+      </span>
     </div>
   );
 }
