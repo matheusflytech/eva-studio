@@ -1,4 +1,5 @@
 import type { CategoryColor } from "@/lib/design-system/tokens";
+import type { CalendarEventDto } from "@/lib/google-calendar/slots";
 import { diaDaSemana, diaEmSP, minutoDoDia, somarDias, type Dia } from "@/lib/tarefas/calendario";
 import { ehDiaTodo, tarefaEstaAtrasada } from "@/lib/tarefas/agrupar";
 import type { TarefaDaTela } from "@/lib/tarefas/tela";
@@ -42,6 +43,16 @@ export interface EventoDoCalendario {
   tarefa: TarefaDaTela | null;
   /** Fechamento previsto: o negócio (link para a ficha, valor e etapa). */
   negocio?: NegocioDoEvento;
+  /** Evento do Google Agenda: de que agenda, de quem e os links. */
+  agenda?: AgendaDoEvento;
+}
+
+export interface AgendaDoEvento {
+  calendario: string;
+  dono: string;
+  minha: boolean;
+  link: string | null;
+  reuniao: string | null;
 }
 
 export const SEMANA_CURTA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"] as const;
@@ -136,6 +147,24 @@ export function eventosDosNegocios(negocios: NegocioComPrevisao[]): EventoDoCale
     });
   }
   return eventos;
+}
+
+/** Adaptador: eventos do Google Agenda → eventos (origem "agenda", na cor da agenda). */
+export function eventosDaAgenda(lista: CalendarEventDto[]): EventoDoCalendario[] {
+  return lista.map((e) => ({
+    id: `agenda:${e.key}`,
+    titulo: e.title,
+    inicio: new Date(e.start),
+    fim: e.end ? new Date(e.end) : null,
+    diaTodo: e.allDay,
+    origem: "agenda",
+    cor: e.color,
+    tipo: null,
+    atrasada: false,
+    feita: false,
+    tarefa: null,
+    agenda: { calendario: e.calendar, dono: e.owner, minha: e.mine, link: e.link, reuniao: e.meet },
+  }));
 }
 
 /** Adaptador: tarefas com prazo → eventos. Sem prazo não tem dia no calendário. */

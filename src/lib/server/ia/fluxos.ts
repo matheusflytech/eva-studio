@@ -53,6 +53,7 @@ const BLOCOS_MANUAIS: Record<string, string> = {
   "tool-knowledge": "Base de conhecimento",
   "tool-mcp": "Servidor MCP",
   "tool-crm": "Ações de CRM",
+  "tool-calendar": "Agenda Google",
 };
 
 export const MAX_BLOCOS = 40;

@@ -6,6 +6,7 @@ import type { AiExit, BlockAction, BlockContent, FlowNodeData, KeyValueRow } fro
 import { truncateForPrompt } from "@/lib/server/prompt-utils";
 import { getCredentialSecret } from "@/lib/server/credentials";
 import type { LlmTool, LlmToolCall } from "@/lib/server/llm";
+import { CALENDAR_TOOLS, runCalendarTool } from "@/lib/server/google-calendar-tool";
 import { getProvider, type LlmProvider } from "@/lib/llm-providers";
 import { contextoDaConversa } from "@/lib/server/ia/prompt-do-agente";
 import { semChamadaEmTexto } from "@/lib/server/ia/chamada-em-texto";
@@ -976,6 +977,14 @@ async function runAiAgent(
       continue;
     }
 
+    if (tn.data.iconKey === "tool-calendar") {
+      for (const t of CALENDAR_TOOLS) {
+        tools.push(t);
+        toolNodeByName.set(t.name, tn);
+      }
+      continue;
+    }
+
     const tool: LlmTool =
       tn.data.iconKey === "tool-knowledge"
         ? {
@@ -1108,6 +1117,15 @@ async function runAiAgent(
             return resultado;
           } catch (error) {
             return `Erro no CRM: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        }
+
+        if (toolNode.data.iconKey === "tool-calendar") {
+          try {
+            const contactId = crmContext ? await crmContext.resolveContactId() : null;
+            return await runCalendarTool(call, toolNode.data, agente.orgId, contactId);
+          } catch (error) {
+            return `Erro na agenda: ${error instanceof Error ? error.message : String(error)}`;
           }
         }
 

@@ -14,10 +14,12 @@ import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 import { diaDaSemana, diaEmSP, mesmoDia, somarDias, type Dia } from "@/lib/tarefas/calendario";
 import type { VisaoDeTarefas } from "@/lib/tarefas/escopo";
 import type { TarefaDaTela } from "@/lib/tarefas/tela";
+import type { CalendarEventDto } from "@/lib/google-calendar/slots";
 import {
   NOMES_DOS_MESES,
   agruparPorDia,
   chaveDoDia,
+  eventosDaAgenda,
   eventosDasTarefas,
   eventosDosNegocios,
   resumirDia,
@@ -47,10 +49,8 @@ import { ESMAECER, MOLA } from "@/lib/design-system/movimento";
 // qualquer lugar, leva a esquerda para ele. Tudo no relógio de SP.
 //
 // Os dados chegam como EventoDoCalendario (calendario-dados.ts). Fontes: as
-// tarefas com prazo e os fechamentos previstos dos negócios abertos, no
-// intervalo do mês e da semana escolhidos; a agenda espelhada (Google/Outlook)
-// entraria como mais uma fonte em `eventos` abaixo, sem mexer nas grades nem
-// no detalhe.
+// tarefas com prazo, os fechamentos previstos dos negócios abertos e o Google
+// Agenda de quem a visão alcança, no intervalo do mês e da semana escolhidos.
 
 // Mola curta: a semana/o mês desliza para o lado da navegação e esmaece.
 
@@ -71,6 +71,17 @@ const AVISADOS_NA_ILHA = new Set<string>();
  * lista de Negócios (filtro e escopo do servidor). "Minhas" mostra só os de
  * quem está vendo; equipe e todas mostram os que a pessoa pode ver.
  */
+/** Eventos do Google Agenda de quem a visão alcança. Sem conexão (ou falha): lista vazia. */
+async function buscarAgenda(visao: VisaoDeTarefas, intervalo: { de: string; ate: string }): Promise<CalendarEventDto[]> {
+  try {
+    const q = new URLSearchParams({ visao, de: intervalo.de, ate: intervalo.ate });
+    const res = await fetch(`/api/integrations/google-calendar/events?${q}`);
+    return res.ok ? ((await res.json()).events ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function buscarFechamentos(intervalo: { de: string; ate: string }, meuId: string | null): Promise<NegocioComPrevisao[] | null> {
   const rapidos: unknown[] = [
     { campo: "tipoEtapa", op: "qualquer", valores: ["open"] },
@@ -104,6 +115,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   const [visoes, setVisoes] = React.useState<VisaoDeTarefas[]>(["minhas"]);
   const [tarefas, setTarefas] = React.useState<TarefaDaTela[] | null>(null);
   const [negocios, setNegocios] = React.useState<NegocioComPrevisao[]>([]);
+  const [agenda, setAgenda] = React.useState<CalendarEventDto[]>([]);
   // Quem está vendo (para "Minhas" nos fechamentos): undefined enquanto carrega.
   const [meuId, setMeuId] = React.useState<string | null | undefined>(undefined);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -173,6 +185,15 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     };
   }, [de, ate, visao, meuId, versao]);
 
+  // Google Agenda: como os fechamentos, falhar não derruba o calendário.
+  React.useEffect(() => {
+    let vivo = true;
+    buscarAgenda(visao, { de, ate }).then((lista) => vivo && setAgenda(lista));
+    return () => {
+      vivo = false;
+    };
+  }, [visao, de, ate, versao]);
+
   const mudou = React.useCallback(() => {
     carregar();
     onMudou();
@@ -194,11 +215,10 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
     mudou();
   }
 
-  // Fontes do calendário. Agenda externa: concatenar aqui os eventos dela
-  // (origem "agenda") quando a integração existir.
+  // Fontes do calendário: tarefas, fechamentos previstos e o Google Agenda.
   const eventos = React.useMemo<EventoDoCalendario[]>(
-    () => (tarefas ? [...eventosDasTarefas(tarefas, agora), ...eventosDosNegocios(negocios)] : []),
-    [tarefas, negocios, agora]
+    () => (tarefas ? [...eventosDasTarefas(tarefas, agora), ...eventosDosNegocios(negocios), ...eventosDaAgenda(agenda)] : []),
+    [tarefas, negocios, agenda, agora]
   );
   const porDia = React.useMemo(() => agruparPorDia(eventos), [eventos]);
   const comEventos = React.useMemo(() => new Set(porDia.keys()), [porDia]);

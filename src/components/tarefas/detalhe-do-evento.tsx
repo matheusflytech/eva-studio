@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlarmClock, CalendarDays, Check, Clock, RotateCcw, SquareArrowOutUpRight } from "lucide-react";
+import { AlarmClock, CalendarDays, Check, Clock, RotateCcw, SquareArrowOutUpRight, Video } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CATEGORY_CLASSES } from "@/lib/design-system/category-classes";
@@ -53,6 +53,10 @@ export function DetalheDoEvento({
     linhas.push({ rotulo: "Etapa", valor: e.negocio.funil ? `${e.negocio.etapa} · ${e.negocio.funil}` : e.negocio.etapa });
     if (e.negocio.empresa) linhas.push({ rotulo: "Empresa", valor: e.negocio.empresa });
   }
+  if (e.agenda) {
+    linhas.push({ rotulo: "Agenda", valor: e.agenda.calendario });
+    if (!e.agenda.minha) linhas.push({ rotulo: "De", valor: e.agenda.dono });
+  }
   if (t) {
     if (t.deal) linhas.push({ rotulo: "Negócio", valor: <Link href={`/deals/${t.deal.id}`} className="font-medium text-accent-fg hover:underline">{t.deal.name}</Link> });
     if (t.contact) linhas.push({ rotulo: "Contato", valor: <Link href={`/contacts/${t.contact.id}`} className="font-medium text-accent-fg hover:underline">{t.contact.name}</Link> });
@@ -97,7 +101,7 @@ export function DetalheDoEvento({
 
       {(linhas.length > 0 || t) && (
         <section aria-label="Sobre" className="flex flex-col gap-2">
-          <p className="text-small font-semibold text-text-primary">{e.origem === "negocio" ? "Sobre o negócio" : "Sobre esta tarefa"}</p>
+          <p className="text-small font-semibold text-text-primary">{e.origem === "negocio" ? "Sobre o negócio" : e.origem === "agenda" ? "Do Google Agenda" : "Sobre esta tarefa"}</p>
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-small">
             {linhas.map((l) => (
               <React.Fragment key={l.rotulo}>
@@ -119,6 +123,16 @@ export function DetalheDoEvento({
           <Button size="sm" variant="secondary" onClick={() => onReabrir(t)}>
             <RotateCcw size={14} aria-hidden="true" /> Reabrir
           </Button>
+        )}
+        {e.agenda?.reuniao && (
+          <a href={e.agenda.reuniao} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm" })}>
+            <Video size={14} aria-hidden="true" /> Entrar na reunião
+          </a>
+        )}
+        {e.agenda?.link && (
+          <a href={e.agenda.link} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            <SquareArrowOutUpRight size={14} aria-hidden="true" /> Abrir no Google
+          </a>
         )}
         {negocio && (
           <Link href={`/deals/${negocio.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>

@@ -229,6 +229,23 @@ export const BLOCK_DEFAULTS: BlockDefault[] = [
     },
   },
   {
+    key: "tool-calendar",
+    paletteLabel: "Ferramenta: Agenda Google",
+    data: {
+      label: "Agenda Google",
+      kind: "Conecta na porta de baixo de um Agente de IA",
+      detail: "Deixa o agente ver horários livres e marcar reunião na agenda escolhida.",
+      calendarConnectionId: "",
+      calendarId: "",
+      calendarDurationMin: 30,
+      calendarDays: [1, 2, 3, 4, 5],
+      calendarStart: "09:00",
+      calendarEnd: "18:00",
+      calendarMeet: true,
+      hasTarget: false,
+    },
+  },
+  {
     key: "human",
     paletteLabel: "Transferir p/ humano",
     data: { label: "Transferir p/ humano", kind: "Exceção", detail: "Descreva quando esse bloco deve transferir pra um atendente." },

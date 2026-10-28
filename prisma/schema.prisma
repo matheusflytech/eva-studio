@@ -51,6 +51,8 @@ model Organization {
   // Hotmart nativa (2026-11-02-hotmart.sql): só relação.
   hotmartConnection HotmartConnection?
   sales             Sale[]
+  // Google Agenda (2026-11-04-google-calendar.sql): só relação.
+  googleCalendarConnections GoogleCalendarConnection[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -2426,4 +2428,25 @@ model Sale {
   @@unique([orgId, platform, transaction])
   @@index([orgId, approvedAt])
   @@map("eva_studio_sales")
+}
+
+// Google Agenda de uma pessoa num contrato: refresh token cifrado e as agendas
+// escolhidas. Os eventos não ficam aqui: o servidor busca no Google.
+model GoogleCalendarConnection {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  email     String
+  secrets   String   @default("")
+  // [{ id, name, color, show }]
+  calendars Json     @default("[]")
+  status    String   @default("active") // active | error
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@map("eva_studio_google_calendar_connections")
 }

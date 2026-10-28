@@ -36,6 +36,7 @@ import { AbaAuditoria } from "@/components/configuracoes/aba-auditoria";
 import { AbaCanais } from "@/components/configuracoes/aba-canais";
 import { EscolhaDeCanvas, EscolhaDeTema } from "@/components/configuracoes/aparencia";
 import { CabecalhoDaSecao, LinhaDeConfig, RodapeDaSecao } from "@/components/configuracoes/secao";
+import { SecaoGoogleAgenda } from "@/components/configuracoes/google-agenda";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn } from "@/lib/utils";
 
@@ -239,6 +240,8 @@ function AbaConta() {
           </Button>
         </RodapeDaSecao>
       </form>
+
+      <SecaoGoogleAgenda />
 
       <section aria-labelledby="titulo-aparencia">
         <CabecalhoDaSecao

@@ -6,6 +6,7 @@ import {
   chaveDoDia,
   compararMeses,
   densidade,
+  eventosDaAgenda,
   eventosDasTarefas,
   eventosDosNegocios,
   horaDoEvento,
@@ -173,5 +174,15 @@ describe("fechamentos previstos", () => {
     const tarefaComHora = eventosDasTarefas([tarefa({ id: "t9", dueAt: "2026-10-30T13:00:00.000Z" })], new Date("2026-10-20T13:00:00Z"));
     const dia = agruparPorDia([...tarefaComHora, ...eventosDosNegocios([negocio])]).get("2026-10-30") ?? [];
     expect(dia.map((e) => e.origem)).toEqual(["negocio", "tarefa"]);
+  });
+});
+
+describe("eventosDaAgenda", () => {
+  it("evento do Google vira origem agenda, na cor da agenda, e conta como agenda no resumo", () => {
+    const [e] = eventosDaAgenda([
+      { key: "c:p:1", title: "Daily", start: "2026-10-30T12:00:00.000Z", end: "2026-10-30T12:30:00.000Z", allDay: false, link: null, meet: "https://meet.google.com/x", color: "violet", calendar: "Trabalho", owner: "Ana", mine: false },
+    ]);
+    expect(e).toMatchObject({ origem: "agenda", cor: "violet", diaTodo: false, tarefa: null, agenda: { reuniao: "https://meet.google.com/x", dono: "Ana", minha: false } });
+    expect(resumirDia([e]).agenda).toBe(1);
   });
 });
