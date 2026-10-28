@@ -35,6 +35,8 @@ interface Evento {
   createdAt: string;
 }
 type Linha = ProductConfig & { hotmartId: string };
+// Nenhum evento leva à lista de interesse; sem "atrasado" o evento cai em "aguardando".
+const OPCIONAIS: StageRole[] = ["waitlist", "late"];
 
 const RESULTADO: Record<string, { rotulo: string; variant: "success" | "neutral" | "danger" | "warning" }> = {
   ok: { rotulo: "Aplicado", variant: "success" },
@@ -186,7 +188,7 @@ export function HotmartPanel() {
         {linhas.map((l, i) => {
           const p = funil(l.pipelineId);
           const papeis = ROLES[l.model];
-          const faltando = p ? papeis.filter((r) => !l.stages[r]) : [];
+          const faltando = p ? papeis.filter((r) => !l.stages[r] && !OPCIONAIS.includes(r)) : [];
           return (
             <div key={i} className="flex flex-col gap-3 rounded-[14px] border border-border-subtle p-3">
               <div className="grid gap-2 sm:grid-cols-[140px_1fr_160px_1fr_auto]">
