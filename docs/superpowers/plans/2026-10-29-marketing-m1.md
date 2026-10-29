@@ -28,7 +28,7 @@
 - Modify `src/app/api/webhooks/meta/route.ts` (referral).
 - Modify `src/lib/server/hotmart/apply.ts`; create `scripts/backfill-hotmart-touches.mjs`.
 - Modify `worker/index.js` (spike: só log).
-- Create `src/app/api/marketing/{summary,spend,spend/[id],links,links/[id]}/route.ts`, `src/app/api/contacts/[id]/origin/route.ts`.
+- Create `src/app/api/marketing/{summary,spend,spend/[id],links,links/[id]}/route.ts`, `src/app/api/marketing/origin/route.ts`.
 - Create `src/app/(app)/[contrato]/marketing/page.tsx`; modify `sidebar.tsx`, `rotas.ts`, `busca/grupos.ts`, `permissoes/catalogo.ts`.
 - Modify `src/lib/report-query.ts`, `src/lib/server/report-sql.ts` (fonte `touchpoints`, campos de origem no negócio).
 - Modify `src/app/privacy/page.tsx` (uma linha LGPD).
@@ -178,7 +178,7 @@ export async function marketingSummary(orgId: string, de: string, ate: string): 
 ### Task 5: APIs, permissão e aba Marketing
 
 - [ ] Catálogo: módulo `{ id: "marketing", nome: "Marketing", acoes: ["ver", "editar"] }`; `marketing:editar` em `EXTRAS_DO_PAPEL` de owner/admin (`marketing:ver` entra no pacote `read`). Ajustar testes de catálogo se listarem as permissões.
-- [ ] Rotas: `GET /api/marketing/summary?de&ate` (ver); `GET/POST /api/marketing/spend`, `PATCH/DELETE /api/marketing/spend/[id]` (editar; validação: fonte obrigatória, datas `YYYY-MM-DD`, `from ≤ to`, valor > 0); `GET/POST /api/marketing/links`, `PATCH /api/marketing/links/[id]` (arquivar/renomear); `POST /api/contacts/[id]/origin` (`contatos:editar`, toque `manual`; com `dealId` também troca a origem do negócio).
+- [ ] Rotas: `GET /api/marketing/summary?de&ate` (ver); `GET/POST /api/marketing/spend`, `PATCH/DELETE /api/marketing/spend/[id]` (editar; validação: fonte obrigatória, datas `YYYY-MM-DD`, `from ≤ to`, valor > 0); `GET/POST /api/marketing/links`, `PATCH /api/marketing/links/[id]` (arquivar/renomear); `GET/POST /api/marketing/origin` (`?contactId=` ou `?dealId=`; POST grava toque `manual`, com `dealId` também troca a origem do negócio).
 - [ ] Tela `/[contrato]/marketing`: período (`SeletorDePeriodo` + URL), Resumo, Por origem e campanha (linha abre a lista de negócios), Investimento, Links rastreados, Instalar no site. Sidebar ("Dados"), `SECOES_DO_CONTRATO`, `PAGINAS` da busca.
 - [ ] Ficha do contato e do negócio: campo "Origem" (Indicação, Evento, Orgânico, Outro + campanha) que chama a rota de origem.
 - [ ] Commit.
