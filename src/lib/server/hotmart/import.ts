@@ -88,7 +88,7 @@ export async function processHotmartImport(job: BulkJob, hasTime: () => boolean,
   const options = job.options as unknown as ImportOptions;
   const c = await getConnection(job.orgId);
   const products = (c?.products ?? {}) as unknown as Products;
-  if (!c) throw new Error("Conexão Hotmart removida.");
+  if (!c) throw new ImportError("Conexão Hotmart removida.", 400);
   if (options.phase === "fetch") return fetchPhase(job, options, c.id, c.secrets, products, hasTime, deps);
   if (options.phase === "preview") return previewPhase(job, options, products, (c.fields ?? {}) as FieldMap);
   return applyPhase(job, products, (c.fields ?? {}) as FieldMap, hasTime);
@@ -116,7 +116,7 @@ function eventRow(orgId: string, connectionId: string, p: any) {
 
 async function fetchPhase(job: BulkJob, options: ImportOptions, connectionId: string, secrets: string, products: Products, hasTime: () => boolean, deps: ApiDeps): Promise<number> {
   const creds = apiCredentialsOf(secrets);
-  if (!creds) throw new Error("Credenciais da API da Hotmart removidas.");
+  if (!creds) throw new ImportError("Credenciais da API da Hotmart removidas.", 400);
   const cur: Cursor = job.cursor ? JSON.parse(job.cursor) : { product: 0, step: "subscriptions", status: 0, pageToken: null };
   const look: Lookup = job.buffer ? JSON.parse(job.buffer) : { subs: {}, buyers: {} };
   const range = { start_date: spMs(options.from, false), end_date: spMs(options.to, true) };

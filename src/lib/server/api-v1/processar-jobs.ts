@@ -10,7 +10,8 @@ import { linhasDoCsv, linhasDoJson, processarLinha, type EntidadeDeLote, type Li
 import { INCLUDE_CONTATO, serializarContatos, whereDeContatos } from "./contatos";
 import { INCLUDE_NEGOCIO, serializarNegocios, whereDeNegocios } from "./negocios";
 import { limparChavesVencidas } from "./idempotencia";
-import { IMPORT_KIND, processHotmartImport } from "@/lib/server/hotmart/import";
+import { IMPORT_KIND, ImportError, processHotmartImport } from "@/lib/server/hotmart/import";
+import { HotmartApiError } from "@/lib/server/hotmart/api";
 
 // ---------------------------------------------------------------------------
 // Processamento dos jobs em lote, chamado pelo relógio (/api/internal/scheduler,
@@ -53,7 +54,7 @@ export async function processarJobs({ orcamentoMs = 15_000, agora = () => Date.n
       console.error("[api-v1] job falhou", job.id, e);
       await prisma.bulkJob.update({
         where: { id: job.id },
-        data: { status: "failed", finishedAt: new Date(), lockedAt: null, result: { error: paraErroApi(e).message } as Prisma.InputJsonValue },
+        data: { status: "failed", finishedAt: new Date(), lockedAt: null, result: { error: e instanceof HotmartApiError || e instanceof ImportError ? e.message : paraErroApi(e).message } as Prisma.InputJsonValue },
       });
     }
   }
