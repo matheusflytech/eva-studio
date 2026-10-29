@@ -8,10 +8,15 @@ const db = vi.hoisted(() => ({
     create: vi.fn(async ({ data }: { data: Def }) => ({ ...data, id: `new-${data.key}` })),
     update: vi.fn(async (_args: { data: { options: { value: string }[] } }) => ({})),
   },
+  hotmartConnection: {
+    findUnique: vi.fn(async () => null as { secrets: string } | null),
+    upsert: vi.fn(async (_args: { update: { secrets?: string } }) => ({})),
+  },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
+vi.mock("@/lib/server/crypto", () => ({ encryptSecret: (s: string) => s, decryptSecret: (s: string) => s }));
 vi.mock("@/lib/server/custom-fields", () => ({ gerarChaveUnica: async (_o: string, _e: string, label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "_") }));
-import { CREATE_FIELD, resolveFieldMap, sameSecret, suggestStages } from "./connection";
+import { CREATE_FIELD, apiCredentialsOf, hottokOf, resolveFieldMap, saveConnection, sameSecret, suggestStages } from "./connection";
 
 describe("suggestStages", () => {
   it("liga papel pelo nome da etapa, sem acento nem maiúscula", () => {
@@ -25,6 +30,27 @@ describe("sameSecret", () => {
     expect(sameSecret("abc", "abc")).toBe(true);
     expect(sameSecret("abc", "abd")).toBe(false);
     expect(sameSecret("", "")).toBe(false);
+  });
+});
+
+describe("saveConnection", () => {
+  it("salvar as credenciais da API mantém o hottok; campo vazio mantém o salvo", async () => {
+    db.hotmartConnection.findUnique.mockResolvedValueOnce({ secrets: JSON.stringify({ hottok: "h1", clientId: "old" }) });
+    await saveConnection("o1", { hottok: " ", clientId: "id1", clientSecret: "sec1", basic: "b1" });
+    const secrets = db.hotmartConnection.upsert.mock.calls.at(-1)![0].update.secrets!;
+    expect(hottokOf(secrets)).toBe("h1");
+    expect(apiCredentialsOf(secrets)).toEqual({ clientId: "id1", clientSecret: "sec1", basic: "b1" });
+  });
+
+  it("sem segredo novo não mexe em secrets", async () => {
+    db.hotmartConnection.findUnique.mockClear();
+    await saveConnection("o1", { status: "paused" });
+    expect(db.hotmartConnection.findUnique).not.toHaveBeenCalled();
+    expect(db.hotmartConnection.upsert.mock.calls.at(-1)![0].update.secrets).toBeUndefined();
+  });
+
+  it("credencial incompleta não conta", () => {
+    expect(apiCredentialsOf(JSON.stringify({ clientId: "a", basic: "b" }))).toBeNull();
   });
 });
 

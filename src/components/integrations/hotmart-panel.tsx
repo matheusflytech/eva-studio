@@ -28,7 +28,7 @@ interface CampoDoContrato {
   type: string;
 }
 interface Estado {
-  connection: { url: string; hasHottok: boolean; products: Record<string, ProductConfig>; fields: FieldMap; status: string; lastEventAt: string | null } | null;
+  connection: { url: string; hasHottok: boolean; hasApiCredentials: boolean; products: Record<string, ProductConfig>; fields: FieldMap; status: string; lastEventAt: string | null } | null;
   pipelines: Pipeline[];
   customFields: CampoDoContrato[];
 }
@@ -41,6 +41,7 @@ interface Evento {
   detail: string | null;
   dealId: string | null;
   createdAt: string;
+  imported: boolean;
 }
 type Linha = ProductConfig & { hotmartId: string };
 // Nenhum evento leva à lista de interesse; sem "atrasado" o evento cai em "aguardando".
@@ -279,6 +280,10 @@ export function HotmartPanel() {
         />
       )}
 
+      {c && Object.keys(c.products).length > 0 && (
+        <SecaoDoHistorico temCredencial={c.hasApiCredentials} ocupado={ocupado} salvar={salvar} aoMudar={carregar} />
+      )}
+
       {c && (
         <>
           <CabecalhoDaSecao nivel={2} titulo="Últimos eventos" descricao="Os 50 mais recentes. Reprocessar aplica de novo com o mapeamento atual." />
@@ -302,7 +307,10 @@ export function HotmartPanel() {
                     return (
                       <tr key={e.id}>
                         <td className="whitespace-nowrap px-3 py-2 text-text-secondary">{dataHoraBR(e.createdAt)}</td>
-                        <td className="px-3 py-2 font-mono">{e.event}</td>
+                        <td className="px-3 py-2">
+                          <span className="font-mono">{e.event}</span>
+                          {e.imported && <Badge variant="neutral" className="ml-1.5">importação</Badge>}
+                        </td>
                         <td className="px-3 py-2 break-all">{e.email ?? "—"}</td>
                         <td className="px-3 py-2">
                           <div className="flex flex-col items-start gap-1">
@@ -423,6 +431,197 @@ function SecaoDeCampos({
           Salvar campos
         </Button>
       </RodapeDaSecao>
+    </>
+  );
+}
+
+interface Importacao {
+  status: string;
+  phase: "fetch" | "preview" | "apply";
+  from: string;
+  to: string;
+  total: number;
+  processed: number;
+  applied: number;
+  ignored: number;
+  failed: number;
+  preview: { events: number; contacts: Contagem; deals: Contagem; sales: Contagem } | null;
+  error: string | null;
+  finishedAt: string | null;
+}
+type Contagem = { new: number; existing: number };
+const ATIVA = ["queued", "processing", "awaiting_confirmation"];
+const CREDENCIAIS = [
+  { k: "clientId", rotulo: "Client ID" },
+  { k: "clientSecret", rotulo: "Client Secret" },
+  { k: "basic", rotulo: "Basic" },
+] as const;
+const hojeEmSP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const dataBR = (d: string) => d.split("-").reverse().join("/");
+const qtd = (x: number, um: string, varios: string) => `${x.toLocaleString("pt-BR")} ${x === 1 ? um : varios}`;
+
+// Histórico de vendas: credenciais da API (a importação só lê) e a importação
+// com prévia. O relógio do servidor faz o trabalho a cada minuto; a tela acompanha.
+function SecaoDoHistorico({
+  temCredencial,
+  ocupado,
+  salvar,
+  aoMudar,
+}: {
+  temCredencial: boolean;
+  ocupado: boolean;
+  salvar: (corpo: unknown, ok: string) => Promise<void>;
+  aoMudar: () => Promise<void>;
+}) {
+  const [cred, setCred] = React.useState({ clientId: "", clientSecret: "", basic: "" });
+  const [job, setJob] = React.useState<Importacao | null | undefined>(undefined);
+  const [de, setDe] = React.useState("2020-01-01");
+  const [ate, setAte] = React.useState(hojeEmSP);
+  const [erro, setErro] = React.useState<string | null>(null);
+  const [enviando, setEnviando] = React.useState(false);
+
+  const ler = React.useCallback(async () => {
+    const r = await fetch("/api/integrations/hotmart/import").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r) setJob(r.job);
+  }, []);
+  React.useEffect(() => {
+    void ler();
+  }, [ler]);
+
+  const rodando = !!job && (job.status === "queued" || job.status === "processing");
+  React.useEffect(() => {
+    if (!rodando) return;
+    const t = setInterval(() => void ler(), 5000);
+    return () => clearInterval(t);
+  }, [rodando, ler]);
+  // Parou de rodar (aplicou, falhou, cancelou): a lista de eventos mudou.
+  const rodava = React.useRef(rodando);
+  React.useEffect(() => {
+    if (rodava.current && !rodando) void aoMudar();
+    rodava.current = rodando;
+  }, [rodando, aoMudar]);
+
+  async function acao(url: string, method: string, corpo?: unknown) {
+    setEnviando(true);
+    setErro(null);
+    try {
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: corpo ? JSON.stringify(corpo) : undefined });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Não deu certo.");
+      await ler();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não deu certo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  const credCompleta = CREDENCIAIS.every(({ k }) => cred[k].trim());
+  const ativa = !!job && ATIVA.includes(job.status);
+  const p = job?.preview;
+  const cancelar = (
+    <Button type="button" variant="secondary" disabled={enviando} onClick={() => void acao("/api/integrations/hotmart/import", "DELETE")}>
+      Cancelar
+    </Button>
+  );
+
+  return (
+    <>
+      <CabecalhoDaSecao
+        nivel={2}
+        titulo="Histórico de vendas"
+        descricao="Traz as vendas antigas da Hotmart pela mesma regra do webhook: contato, card que faltar e uma linha por venda. Antes de gravar, mostra uma prévia."
+      />
+      <LinhaDeConfig
+        rotulo="API da Hotmart"
+        descricao="Na Hotmart: Ferramentas › Credenciais Hotmart › criar uma credencial da API. Copie o Client ID, o Client Secret e o Basic. A importação só lê."
+      >
+        <div className="flex max-w-md flex-col gap-2">
+          {CREDENCIAIS.map(({ k, rotulo }) => (
+            <Input
+              key={k}
+              aria-label={rotulo}
+              type="password"
+              autoComplete="off"
+              placeholder={temCredencial ? `${rotulo} (salvo; digite para trocar)` : rotulo}
+              value={cred[k]}
+              onChange={(e) => setCred((v) => ({ ...v, [k]: e.target.value }))}
+            />
+          ))}
+          <div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={ocupado || !credCompleta}
+              onClick={() => void salvar(cred, "Credenciais da API salvas.").then(() => setCred({ clientId: "", clientSecret: "", basic: "" }))}
+            >
+              Salvar credenciais
+            </Button>
+          </div>
+        </div>
+      </LinhaDeConfig>
+
+      <div className="flex flex-col gap-3 pb-4">
+        {erro && <Notice tone="danger">{erro}</Notice>}
+        {job === undefined ? null : !job || !ativa ? (
+          <>
+            {job?.status === "completed" && job.phase === "apply" && (
+              <Notice tone="info">
+                Importação concluída{job.finishedAt ? ` em ${dataHoraBR(job.finishedAt)}` : ""}: {qtd(job.applied, "evento aplicado", "eventos aplicados")}, {job.ignored} ignorados.
+              </Notice>
+            )}
+            {job?.status === "completed_with_errors" && (
+              <Notice tone="warning">
+                Importação concluída com {qtd(job.failed, "erro", "erros")} ({job.applied} aplicados). Os eventos com erro estão na lista abaixo para reprocessar.
+              </Notice>
+            )}
+            {job?.status === "completed" && job.phase !== "apply" && <Notice tone="info">Nada novo para importar no período.</Notice>}
+            {job?.status === "failed" && <Notice tone="danger">A importação parou: {job.error ?? "erro desconhecido"}</Notice>}
+            {job?.status === "canceled" && <Notice tone="info">Importação cancelada.</Notice>}
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-caption text-text-secondary">
+                De
+                <Input type="date" value={de} max={ate} onChange={(e) => setDe(e.target.value)} />
+              </label>
+              <label className="flex flex-col gap-1 text-caption text-text-secondary">
+                Até
+                <Input type="date" value={ate} min={de} onChange={(e) => setAte(e.target.value)} />
+              </label>
+              <Button type="button" disabled={enviando || !temCredencial || !de || !ate} onClick={() => void acao("/api/integrations/hotmart/import", "POST", { from: de, to: ate })}>
+                Buscar histórico
+              </Button>
+            </div>
+            {!temCredencial && <p className="text-caption text-text-tertiary">Salve as credenciais da API para buscar o histórico.</p>}
+          </>
+        ) : job.status === "awaiting_confirmation" && p ? (
+          <>
+            <Notice tone="info">
+              Vai criar {qtd(p.contacts.new, "contato", "contatos")}, {qtd(p.deals.new, "card", "cards")} e {qtd(p.sales.new, "venda", "vendas")}. Já existem{" "}
+              {qtd(p.contacts.existing, "contato", "contatos")}, {qtd(p.deals.existing, "card", "cards")} e {qtd(p.sales.existing, "venda", "vendas")}, que só são
+              atualizados. Os cards andam de etapa pela regra de sempre, sem disparar automações ({qtd(p.events, "evento", "eventos")} de {dataBR(job.from)} a{" "}
+              {dataBR(job.to)}).
+            </Notice>
+            <div className="flex gap-2">
+              <Button type="button" disabled={enviando} onClick={() => void acao("/api/integrations/hotmart/import/confirm", "POST")}>
+                Importar
+              </Button>
+              {cancelar}
+            </div>
+          </>
+        ) : (
+          <>
+            <Notice tone="info">
+              {job.phase === "fetch"
+                ? `Buscando na Hotmart: ${qtd(job.total, "evento encontrado", "eventos encontrados")}.`
+                : job.phase === "preview"
+                  ? "Contando o que muda no CRM."
+                  : `Importando: ${job.processed.toLocaleString("pt-BR")} de ${job.total.toLocaleString("pt-BR")}.`}{" "}
+              O servidor avança a cada minuto; pode fechar esta tela.
+            </Notice>
+            <div>{cancelar}</div>
+          </>
+        )}
+      </div>
     </>
   );
 }

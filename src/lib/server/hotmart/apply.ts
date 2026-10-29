@@ -8,6 +8,7 @@ import { normalizeEvent } from "@/lib/hotmart/normalize";
 import { decide } from "@/lib/hotmart/decide";
 import type { ProductConfig, StageRole } from "@/lib/hotmart/types";
 import { remap, targetKey, type FieldMap } from "@/lib/hotmart/fields";
+import type { OrigemDoMovimento } from "@/lib/server/stage-events";
 import type { Products } from "./connection";
 
 // Aplica um evento da Hotmart no CRM do contrato com as regras do n8n:
@@ -32,7 +33,9 @@ const CONTACT_SELECT = { id: true, name: true, phone: true, customFields: true }
 const DEAL_SELECT = { id: true, name: true, stageId: true, customFields: true } as const;
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- payload externo */
-export async function applyEvent(orgId: string, products: Products, payload: any, map: FieldMap = {}): Promise<ApplyResult> {
+/** `origin`: quem mexeu, no histórico de etapas. Na importação ("importacao") não sai `sale.*`. */
+export async function applyEvent(orgId: string, products: Products, payload: any, map: FieldMap = {}, opts: { origin?: OrigemDoMovimento } = {}): Promise<ApplyResult> {
+  const origin = opts.origin ?? "automacao";
   const productId = payload?.data?.product?.id ? String(payload.data.product.id) : "";
   const product: ProductConfig | undefined = products[productId];
   if (!product) return { result: "ignored", detail: `Produto ${productId || "?"} sem funil ligado.` };
@@ -100,24 +103,25 @@ export async function applyEvent(orgId: string, products: Products, payload: any
       : { ...n.deal.customFields, ...d.dealFields, ...(d.lossReason ? { motivo_da_perda: d.lossReason } : {}) };
     if (d.dropChannel) delete standardDealFields.canal_de_origem;
     const dealFields = remap(map, standardDealFields);
+    // Data de fechamento: a da aprovação; senão a do evento (na importação, antiga; no webhook, agora).
+    const eventMs = Number(payload?.creation_date ?? payload?.creationDate);
+    const closedAt = n.deal.closeDate ? new Date(`${n.deal.closeDate}T12:00:00-03:00`) : eventMs ? new Date(eventMs) : null;
 
     if (d.action === "create" && d.target) {
       const stageId = product.stages[d.target];
       if (!stageId) return { result: "error", detail: `Funil sem etapa para "${d.target}".`, contactId };
       const created = await createDeal({
         orgId, name: n.cardName, pipelineId: product.pipelineId, stageId, contactId,
-        amountCents: n.deal.amountCents ?? 0, currency: n.deal.currency ?? "BRL", customFields: dealFields, origem: "automacao",
+        amountCents: n.deal.amountCents ?? 0, currency: n.deal.currency ?? "BRL", customFields: dealFields, origem: origin,
       });
       dealId = created.id;
       if (n.key.value) await vincularExterno(orgId, "deal", dealId, n.key.value, n.key.source);
-      // Fechado na criação: a data de fechamento é a da aprovação, não a de agora.
-      if (created.closedAt && n.deal.closeDate) {
-        await prisma.deal.update({ where: { id: dealId }, data: { closedAt: new Date(`${n.deal.closeDate}T12:00:00-03:00`) } });
-      }
+      if (created.closedAt && closedAt) await prisma.deal.update({ where: { id: dealId }, data: { closedAt } });
     } else if (d.action === "update" && dealId) {
       const stageId = d.move && d.target ? product.stages[d.target] : undefined;
       if (stageId) {
-        await moveDealStage(dealId, stageId, { origem: "automacao", reabrir: true, ignorarObrigatorios: true, ...(d.lossReason ? { perda: { motivo: d.lossReason } } : {}) });
+        await moveDealStage(dealId, stageId, { origem: origin, reabrir: true, ignorarObrigatorios: true, ...(d.lossReason ? { perda: { motivo: d.lossReason } } : {}) });
+        if (closedAt) await prisma.deal.updateMany({ where: { id: dealId, closedAt: { not: null } }, data: { closedAt } });
       }
       await preencherCamposDoNegocio(orgId, dealId, dealFields);
       const data: { name?: string; amountCents?: number; currency?: string } = {};
@@ -150,7 +154,7 @@ export async function applyEvent(orgId: string, products: Products, payload: any
     }
 
     const tipo = SALE_EVENTS[n.event];
-    if (tipo && dealId && !d.repeated) {
+    if (tipo && dealId && !d.repeated && origin !== "importacao") {
       await publicarEvento({ orgId, tipo, objeto: "deal", objetoId: dealId, dados: { produto: product.slug, transacao: n.transaction, valorCents: n.deal.amountCents }, ator: { tipo: "integracao" } });
     }
 

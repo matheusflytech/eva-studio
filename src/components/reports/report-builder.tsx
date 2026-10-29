@@ -547,7 +547,7 @@ function LinhaDeFiltro({
   const sugestoes = useValoresDoCampo(dataset, filtro.field, escolhe);
 
   let valor: React.ReactNode = null;
-  if (["is_set", "is_empty", "is_true", "is_false", "panel"].includes(filtro.op)) valor = null;
+  if (["is_set", "is_empty", "is_true", "is_false", "panel", "this_month"].includes(filtro.op)) valor = null;
   else if (filtro.op === "in" || filtro.op === "not_in") {
     const marcados = new Set(filtro.values ?? []);
     valor = (

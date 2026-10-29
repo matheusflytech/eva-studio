@@ -6,6 +6,7 @@ import { ROTULO_CANAL, SEM_VALOR, type FiltrosGlobais } from "@/lib/consulta";
 import { DDDS_DA_UF, UFS } from "@/lib/ddd";
 import { dataExiste } from "@/lib/custom-fields";
 import { INFO_DO_TIPO } from "@/lib/tarefas/tipos";
+import { CHANNEL_OPTIONS } from "@/lib/hotmart/fields";
 import {
   DATASET_BY_KEY,
   GRAIN_LABEL,
@@ -59,6 +60,12 @@ const ROTULO_ORIGEM_ETAPA = { usuario: "Pessoa", fluxo: "Fluxo", api: "API", imp
 const ROTULO_RECORRENCIA = { unico: "Único", mensal: "Mensal", trimestral: "Trimestral", semestral: "Semestral", anual: "Anual" };
 const ROTULO_PAPEL = { owner: "Dono", admin: "Administrador", agent: "Atendente", viewer: "Leitor" };
 const ROTULO_MEMBRO = { ativo: "Ativo", convidado: "Convidado" };
+const ROTULO_STATUS_DA_VENDA = {
+  approved: "Aprovada", complete: "Completa", refunded: "Reembolsada", chargeback: "Chargeback", canceled: "Cancelada",
+  expired: "Expirada", delayed: "Atrasada", pending: "Pendente", dispute: "Em disputa", cart_abandoned: "Carrinho abandonado",
+};
+const ROTULO_PAGAMENTO = { CREDIT_CARD: "Cartão de crédito", PIX: "Pix", BILLET: "Boleto", PAYPAL: "PayPal", OUTRO: "Outro" };
+const ROTULO_CANAL_DA_VENDA = Object.fromEntries(CHANNEL_OPTIONS.map((o) => [o.value, o.label]));
 
 /** DDD do telefone: só dígitos, sem o 55 do país; o que não parece telefone do Brasil fica vazio. */
 function dddDo(col: string): Prisma.Sql {
@@ -381,6 +388,29 @@ const BASES: Record<string, Base> = {
       created: local(`se."createdAt"`),
     },
   },
+  sales: {
+    from: (org) => sql`FROM eva_studio_sales s WHERE s."orgId" = ${org}`,
+    fields: {
+      product: texto(`s."productName"`),
+      status: rotular(`s.status`, ROTULO_STATUS_DA_VENDA),
+      amount: reais(`s."amountBrlCents"`),
+      amount_original: reais(`s."amountCents"`),
+      currency: texto(`s.currency`),
+      offer: texto(`s."offerCode"`),
+      plan: texto(`s.plan`),
+      recurrence: raw(`s.recurrence::float8`),
+      payment_type: rotular(`s."paymentType"`, ROTULO_PAGAMENTO),
+      installments: raw(`s.installments::float8`),
+      channel: rotular(`s.channel`, ROTULO_CANAL_DA_VENDA),
+      src: texto(`s.src`),
+      sck: texto(`s.sck`),
+      buyer_email: texto(`s."buyerEmail"`),
+      buyer_name: texto(`s."buyerName"`),
+      ordered: local(`s."orderedAt"`),
+      approved: local(`s."approvedAt"`),
+      is_paid: raw(`(s.status IN ('approved', 'complete'))`),
+    },
+  },
   users: {
     from: (org) => sql`FROM eva_studio_memberships mb
       JOIN eva_studio_profiles p ON p.id = mb."userId"
@@ -532,6 +562,8 @@ function condicao(f: ReportFilter, c: Campo, globais?: FiltrosGlobais): Prisma.S
       if (globais.de && globais.ate) return entre(globais.de, globais.ate);
       return sql`(${e} >= ${HOJE} - ${globais.dias - 1}::int AND ${e} < ${HOJE} + 1)`;
     }
+    case "this_month":
+      return sql`(${e} >= date_trunc('month', ${HOJE}) AND ${e} < date_trunc('month', ${HOJE}) + interval '1 month')`;
     case "last_days": {
       const n = inteiro(f.value);
       return n === null ? null : sql`(${e} >= ${HOJE} - ${Math.max(n - 1, 0)}::int AND ${e} < ${HOJE} + 1)`;

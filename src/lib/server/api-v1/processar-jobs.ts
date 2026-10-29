@@ -10,6 +10,7 @@ import { linhasDoCsv, linhasDoJson, processarLinha, type EntidadeDeLote, type Li
 import { INCLUDE_CONTATO, serializarContatos, whereDeContatos } from "./contatos";
 import { INCLUDE_NEGOCIO, serializarNegocios, whereDeNegocios } from "./negocios";
 import { limparChavesVencidas } from "./idempotencia";
+import { IMPORT_KIND, processHotmartImport } from "@/lib/server/hotmart/import";
 
 // ---------------------------------------------------------------------------
 // Processamento dos jobs em lote, chamado pelo relógio (/api/internal/scheduler,
@@ -82,6 +83,7 @@ async function pegarProximo(tentados: Set<string>): Promise<BulkJob | null> {
 
 /** Devolve quantas linhas andou. Sempre solta a trava ao sair. */
 async function processarJob(job: BulkJob, temTempo: () => boolean): Promise<number> {
+  if (job.kind === IMPORT_KIND) return processHotmartImport(job, temTempo);
   return job.kind === "import" ? processarImportacao(job, temTempo) : processarExportacao(job, temTempo);
 }
 

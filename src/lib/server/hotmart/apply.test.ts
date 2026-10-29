@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const db = vi.hoisted(() => ({
   contact: { findFirst: vi.fn(), update: vi.fn(async () => ({})) },
-  deal: { findFirst: vi.fn(), update: vi.fn(async () => ({})) },
+  deal: { findFirst: vi.fn(), update: vi.fn(async () => ({})), updateMany: vi.fn(async () => ({ count: 1 })) },
   sale: { upsert: vi.fn(async () => ({})) },
 }));
 const crm = vi.hoisted(() => ({
@@ -76,7 +76,20 @@ describe("applyEvent", () => {
     await applyEvent("o1", products, payload("PURCHASE_REFUNDED"));
     expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s-former", expect.objectContaining({ perda: { motivo: "reembolso" } }));
     expect(crm.preencherCamposDoNegocio).toHaveBeenCalledWith("o1", "d1", expect.objectContaining({ motivo_da_perda: "reembolso" }));
+    // Sem data de aprovação no evento, fecha na data do evento.
+    expect(db.deal.updateMany).toHaveBeenCalledWith({ where: { id: "d1", closedAt: { not: null } }, data: { closedAt: new Date(Date.UTC(2026, 9, 28, 14)) } });
     expect(bus.publicarEvento).toHaveBeenCalledWith(expect.objectContaining({ tipo: "sale.refunded" }));
+  });
+
+  it("importação: histórico de etapa como importacao, fechamento na data da aprovação e sem sale.*", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", name: "Ana", phone: "55", customFields: {} });
+    ext.idPorExterno.mockResolvedValue("d1");
+    db.deal.findFirst.mockResolvedValue({ id: "d1", name: "Drawing Club | Ana | Founders", stageId: "s-cart", customFields: {} });
+    await applyEvent("o1", products, payload("PURCHASE_APPROVED"), {}, { origin: "importacao" });
+    expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s-new", expect.objectContaining({ origem: "importacao" }));
+    expect(db.deal.updateMany).toHaveBeenCalledWith({ where: { id: "d1", closedAt: { not: null } }, data: { closedAt: new Date("2026-10-28T12:00:00-03:00") } });
+    expect(db.sale.upsert).toHaveBeenCalled();
+    expect(bus.publicarEvento).not.toHaveBeenCalled();
   });
 
   it("mapa de campos: grava e lê pelo campo escolhido; dado sem destino não grava", async () => {
