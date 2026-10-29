@@ -1,4 +1,5 @@
 import "server-only";
+import { freezeDealOrigin } from "@/lib/server/marketing";
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { conferirReferencias } from "@/lib/server/api-validacao";
@@ -212,6 +213,9 @@ export async function createDeal(input: CreateDealInput) {
     toStageId: deal.stageId,
     origem: input.origem,
   });
+
+  // Origem de marketing congelada na criação (último toque pago do contato).
+  if (input.contactId) await freezeDealOrigin(deal.orgId, deal.id, input.contactId, deal.createdAt);
 
   return deal;
 }
