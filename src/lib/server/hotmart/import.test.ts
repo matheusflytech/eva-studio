@@ -85,10 +85,15 @@ const sale = (tx: string, productId: number, status: string, email: string, appr
   buyer: { name: email.split("@")[0], email },
   purchase: { transaction: tx, order_date: approved - 1000, approved_date: approved, status, price: { value: 100, currency_code: "BRL" }, payment: { type: "PIX" }, ...extra },
 });
-const api = vi.hoisted(() => ({ pages: [] as string[] }));
+const api = vi.hoisted(() => ({ pages: [] as string[], spans: [] as number[] }));
 vi.mock("./api", () => ({
   getPage: vi.fn(async (_c: unknown, path: string, params: Record<string, string | number | undefined>) => {
     api.pages.push(`${path}:${params.product_id}:${params.transaction_status ?? ""}:${params.page_token ?? ""}`);
+    if (path !== "/subscriptions") {
+      api.spans.push(Number(params.end_date) - Number(params.start_date));
+      // Fora da janela de T0 a API falsa não tem vendas.
+      if (T0 < Number(params.start_date) || T0 > Number(params.end_date)) return { items: [], nextPageToken: null };
+    }
     const pid = Number(params.product_id);
     if (path === "/subscriptions") {
       return pid === 222
@@ -112,7 +117,7 @@ vi.mock("./api", () => ({
   }),
 }));
 
-import { cancelImport, confirmImport, countPreview, processHotmartImport, startImport } from "./import";
+import { cancelImport, confirmImport, countPreview, dateWindows, processHotmartImport, startImport } from "./import";
 import type { BulkJob } from "@/generated/prisma/client";
 
 const job = () => db.s.job as unknown as BulkJob;
@@ -131,9 +136,18 @@ beforeEach(() => {
   db.s.sales = [];
   applied.calls = [];
   api.pages = [];
+  api.spans = [];
 });
 
 describe("importação da Hotmart", () => {
+  it("dateWindows: cobre o período inteiro sem buraco nem sobreposição", () => {
+    const w = dateWindows(0, 1000 * 86400e3);
+    expect(w[0].start_date).toBe(0);
+    expect(w.at(-1)!.end_date).toBe(1000 * 86400e3);
+    w.slice(1).forEach((x, i) => expect(x.start_date).toBe(w[i].end_date + 1));
+    expect(dateWindows(5, 5)).toEqual([{ start_date: 5, end_date: 5 }]);
+  });
+
   it("período inválido é recusado", async () => {
     await expect(startImport("o1", { from: "2025-02-01", to: "2025-01-01" })).rejects.toMatchObject({ status: 400 });
   });
@@ -147,6 +161,9 @@ describe("importação da Hotmart", () => {
     db.s.sales = ["A0"];
     await runUntil("awaiting_confirmation");
     expect(api.pages).toContain("/sales/history:111:APPROVED:p2");
+    // 2020..2025 (2192 dias, com 2020 e 2024 bissextos) vira 7 janelas de 365 dias (a Hotmart recusa mais de 2 anos).
+    expect(Math.max(...api.spans)).toBeLessThan(366 * 86400e3);
+    expect(api.pages.filter((p) => p === "/sales/users:111:APPROVED:")).toHaveLength(7);
     expect(db.s.events.map((e) => e.hotmartEventId).sort()).toEqual(
       ["import:A0:APPROVED", "import:A1:APPROVED", "import:C1:APPROVED", "import:C2:APPROVED", "import:R1:REFUNDED", "import:S2:CANCELLATION"].sort()
     );
