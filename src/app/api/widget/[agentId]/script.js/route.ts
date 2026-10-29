@@ -48,6 +48,87 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
   var isReturningVisitor = !!localStorage.getItem(STORAGE_KEY);
   var contactId = getContactId();
 
+  // Origem de marketing: UTMs, ids de clique, cookies da Meta, referrer e
+  // página de entrada. Guarda o primeiro e o último toque por 90 dias e manda
+  // o desta visita junto da 1ª mensagem.
+  var TOUCH_KEY = "eva_touch_" + AGENT_ID;
+  var TOUCH_TTL = 90 * 86400000;
+  function readTouch() {
+    try {
+      var t = JSON.parse(localStorage.getItem(TOUCH_KEY) || "null");
+      return t && t.savedAt && Date.now() - t.savedAt < TOUCH_TTL ? t : null;
+    } catch (e) { return null; }
+  }
+  function saveTouch(rec) {
+    try { localStorage.setItem(TOUCH_KEY, JSON.stringify(rec)); } catch (e) {}
+  }
+  function readCookie(name) {
+    var parts = document.cookie ? document.cookie.split("; ") : [];
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].indexOf(name + "=") === 0) return decodeURIComponent(parts[i].slice(name.length + 1));
+    }
+    return null;
+  }
+  var pendingTouch = (function () {
+    var q = new URLSearchParams(location.search);
+    var map = { utm_source: "utmSource", utm_medium: "utmMedium", utm_campaign: "utmCampaign", utm_content: "utmContent", utm_term: "utmTerm", utm_id: "utmId", gclid: "gclid", gbraid: "gbraid", wbraid: "wbraid", fbclid: "fbclid" };
+    var t = {}, has = false;
+    for (var k in map) {
+      var v = q.get(k);
+      if (v) { t[map[k]] = v.slice(0, 500); has = true; }
+    }
+    var ref = document.referrer;
+    var external = !!ref && ref.indexOf(location.origin) !== 0;
+    var saved = readTouch();
+    // Sem UTM nem id de clique, só conta a 1ª chegada vinda de outro site.
+    if (!has && !(external && !saved)) return null;
+    if (external) t.referrer = ref.slice(0, 500);
+    t.landingUrl = location.href.slice(0, 500);
+    var fbc = readCookie("_fbc"), fbp = readCookie("_fbp");
+    if (fbc) t.fbc = fbc;
+    if (fbp) t.fbp = fbp;
+    saveTouch({ first: saved ? saved.first : t, last: t, savedAt: Date.now() });
+    return t;
+  })();
+
+  // Quem sai do site para o WhatsApp leva a origem: os links wa.me da página
+  // ganham "(ref: CODE)" de uma visita gravada no servidor.
+  function tagWhatsAppLinks() {
+    var saved = readTouch();
+    if (!saved) return;
+    var links = document.querySelectorAll('a[href*="wa.me/"], a[href*="api.whatsapp.com/send"]');
+    if (!links.length) return;
+    function apply(code) {
+      for (var i = 0; i < links.length; i++) {
+        try {
+          var a = links[i];
+          var u = new URL(a.href);
+          var text = u.searchParams.get("text") || "";
+          if (text.indexOf("ref:") !== -1) continue;
+          u.searchParams.delete("text");
+          var qs = u.search ? u.search + "&" : "?";
+          a.href = u.origin + u.pathname + qs + "text=" + encodeURIComponent((text ? text + " " : "") + "(ref: " + code + ")");
+        } catch (e) {}
+      }
+    }
+    if (saved.code) return apply(saved.code);
+    fetch(API_ORIGIN + "/api/widget/" + AGENT_ID + "/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ touch: saved.last }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.code) return;
+        saved.code = d.code;
+        saveTouch(saved);
+        apply(d.code);
+      })
+      .catch(function () {});
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", tagWhatsAppLinks);
+  else tagWhatsAppLinks();
+
   var SHARED_CSS =
     '*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}' +
     '.header{background:#4f46e5;color:#fff;padding:14px 16px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between;}' +
@@ -248,13 +329,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ agen
     }
   }
 
+  // O toque desta visita vai na 1ª mensagem de verdade (não na saudação automática).
+  function withTouch(body) {
+    if (pendingTouch && (body.text || body.optionId || body.audio_base64 || body.attachment)) {
+      body.touch = pendingTouch;
+      pendingTouch = null;
+    }
+    return body;
+  }
+
   function send(payload, aoChegar) {
     setTyping(true);
     startPolling();
     fetch(API_ORIGIN + "/api/widget/" + AGENT_ID + "/message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.assign({ contactId: contactId }, payload)),
+      body: JSON.stringify(withTouch(Object.assign({ contactId: contactId }, payload))),
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {

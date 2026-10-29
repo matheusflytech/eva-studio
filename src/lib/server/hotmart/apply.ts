@@ -10,6 +10,7 @@ import type { ProductConfig, StageRole } from "@/lib/hotmart/types";
 import { remap, targetKey, type FieldMap } from "@/lib/hotmart/fields";
 import type { OrigemDoMovimento } from "@/lib/server/stage-events";
 import type { Products } from "./connection";
+import { recordHotmartTouch } from "@/lib/server/marketing";
 
 // Aplica um evento da Hotmart no CRM do contrato com as regras do n8n:
 // contato, negócio do produto, etapa sem voltar, campos (no destino que o
@@ -96,6 +97,9 @@ export async function applyEvent(orgId: string, products: Products, payload: any
       await prisma.contact.update({ where: { id: contactId }, data: { phone: n.contact.phone } });
     }
     await preencherCamposDoContato(orgId, contactId, contactFields);
+    // Origem (src/sck) antes do negócio: é ela que o createDeal congela.
+    const eventMs = Number(payload?.creation_date ?? payload?.creationDate);
+    await recordHotmartTouch(orgId, contactId, n.sale.src, n.sale.sck, n.sale.orderedAt ? new Date(n.sale.orderedAt) : eventMs ? new Date(eventMs) : new Date());
 
     // Negócio.
     const standardDealFields: Record<string, unknown> = d.firstAccessOnly
@@ -104,7 +108,6 @@ export async function applyEvent(orgId: string, products: Products, payload: any
     if (d.dropChannel) delete standardDealFields.canal_de_origem;
     const dealFields = remap(map, standardDealFields);
     // Data de fechamento: a da aprovação; senão a do evento (na importação, antiga; no webhook, agora).
-    const eventMs = Number(payload?.creation_date ?? payload?.creationDate);
     const closedAt = n.deal.closeDate ? new Date(`${n.deal.closeDate}T12:00:00-03:00`) : eventMs ? new Date(eventMs) : null;
 
     if (d.action === "create" && d.target) {

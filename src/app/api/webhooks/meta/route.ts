@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { registrarMensagemSemAgente } from "@/lib/server/canais/sem-agente";
 import { advanceConversation, type OutboundMessage } from "@/lib/server/flow-engine";
+import { touchFromMetaReferral } from "@/lib/marketing/touch";
 import { matchCommentAutomation } from "@/lib/server/comment-automation";
 import { classifyInstagramMessage } from "@/lib/server/instagram-events";
 import { verifyMetaSignature } from "@/lib/server/meta-signature";
@@ -65,6 +66,8 @@ interface MetaMessage {
   from: string;
   type: string;
   text?: { body?: string };
+  // 1ª mensagem vinda de anúncio Click to WhatsApp (source_id, source_type, ctwa_clid...).
+  referral?: Record<string, unknown>;
   // Resposta rápida de um botão de template (não é o mesmo que "interactive").
   button?: { text?: string; payload?: string };
   interactive?: {
@@ -112,7 +115,10 @@ interface InstagramMessagingEvent {
     attachments?: AnexoSocial[];
     reply_to?: { mid?: string; story?: { id?: string; url?: string } };
     quick_reply?: { payload?: string };
+    referral?: Record<string, unknown>;
   };
+  // Conversa aberta por anúncio (ad_id, source: "ADS").
+  referral?: Record<string, unknown>;
 }
 
 interface InstagramCommentValue {
@@ -420,6 +426,7 @@ async function handleWhatsAppEntries(entries: unknown[]): Promise<number> {
             optionId: entrada.optionId,
             media: entrada.media,
             externalId: message.id,
+            touch: touchFromMetaReferral("whatsapp_meta", message.referral) ?? undefined,
           });
           for (const reply of result.messages) {
             if (reply.digitando) {
@@ -481,8 +488,10 @@ async function handleMatchedComment(
 
 interface MessengerEvent {
   sender?: { id?: string };
-  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: AnexoSocial[]; quick_reply?: { payload?: string } };
-  postback?: { payload?: string };
+  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: AnexoSocial[]; quick_reply?: { payload?: string }; referral?: Record<string, unknown> };
+  postback?: { payload?: string; referral?: Record<string, unknown> };
+  // Conversa aberta por anúncio Click to Messenger (ad_id, source: "ADS").
+  referral?: Record<string, unknown>;
 }
 
 /**
@@ -593,6 +602,7 @@ async function handleMessengerEntries(entries: unknown[]): Promise<number> {
           optionId,
           media: entrada.media,
           externalId: event.message?.mid,
+          touch: touchFromMetaReferral("messenger", event.message?.referral ?? event.postback?.referral ?? event.referral) ?? undefined,
         });
         await registrarAnexosExtras(connection.agentId, "messenger", from, entrada.extras);
         for (const reply of result.messages) {
@@ -652,6 +662,7 @@ async function handleInstagramEntries(entries: unknown[]): Promise<number> {
           media: entrada.media,
           externalId: event.message?.mid,
           event: { kind: evento.kind, storyId: evento.storyId, isReaction: evento.isReaction },
+          touch: touchFromMetaReferral("instagram", event.message?.referral ?? event.referral) ?? undefined,
         });
         await registrarAnexosExtras(connection.agentId, "instagram", from, entrada.extras);
         for (const reply of result.messages) {

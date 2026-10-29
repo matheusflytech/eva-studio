@@ -1,10 +1,12 @@
 import "server-only";
+import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import {
   cleanTouch,
   extractRef,
   firstTouch,
   isPaid,
+  normalizeUtm,
   pickTouchpoint,
   spendFor,
   type SpendRow,
@@ -14,6 +16,11 @@ import {
 // Origem de marketing (M1): grava toques, liga o "ref: CODE" da mensagem ao
 // link/visita, congela a origem do negócio e monta o resumo da aba Marketing.
 // Nada aqui chama serviço de fora: só lemos o que já chegou.
+
+/** Hash do IP (com o segredo do servidor e o código): conta clique sem guardar o IP. */
+export function ipHash(ip: string, code: string): string {
+  return createHmac("sha256", process.env.INTERNAL_API_SECRET ?? "").update(`${ip}|${code}`).digest("hex");
+}
 
 const DEDUPE_MS = 24 * 3600_000;
 const DEDUPE_KEYS = ["utmSource", "utmCampaign", "linkId", "adId", "gclid", "fbclid", "ctwaClid"] as const;
@@ -117,6 +124,22 @@ export async function recordInboundTouches(a: { orgId: string; contactId: string
   if (!visit) return;
   if (!visit.matchedContactId) await prisma.linkClick.update({ where: { id: visit.id }, data: { matchedContactId: a.contactId } });
   await recordTouch(a.orgId, a.contactId, { ...cleanTouch(visit.raw), channel: "site", at: a.at });
+}
+
+/**
+ * Venda da Hotmart com src/sck: toque `hotmart` (utm_source = src, utm_campaign
+ * = sck), uma vez por par no contato. Nunca derruba a venda.
+ */
+export async function recordHotmartTouch(orgId: string, contactId: string, src: string | null | undefined, sck: string | null | undefined, at: Date): Promise<void> {
+  const utmSource = normalizeUtm(src);
+  const utmCampaign = normalizeUtm(sck);
+  if (!utmSource && !utmCampaign) return;
+  try {
+    const exists = await prisma.touchpoint.findFirst({ where: { orgId, contactId, channel: "hotmart", utmSource, utmCampaign }, select: { id: true } });
+    if (!exists) await recordTouch(orgId, contactId, { channel: "hotmart", utmSource, utmCampaign, at });
+  } catch (e) {
+    console.error("[marketing] falha ao gravar a origem da venda", e instanceof Error ? e.message : e);
+  }
 }
 
 // --- Resumo da aba Marketing ------------------------------------------------
