@@ -7,6 +7,7 @@ import { DDDS_DA_UF, UFS } from "@/lib/ddd";
 import { dataExiste } from "@/lib/custom-fields";
 import { INFO_DO_TIPO } from "@/lib/tarefas/tipos";
 import { CHANNEL_OPTIONS } from "@/lib/hotmart/fields";
+import { CHANNEL_LABEL } from "@/lib/marketing/touch";
 import {
   DATASET_BY_KEY,
   GRAIN_LABEL,
@@ -125,6 +126,8 @@ const BASES: Record<string, Base> = {
     escopo: ESCOPO_DO_NEGOCIO,
     from: (org) => sql`FROM eva_studio_deals d ${raw(JOIN_DO_NEGOCIO)}
       LEFT JOIN eva_studio_companies dco ON dco.id = d."companyId"
+      LEFT JOIN eva_studio_deal_origins dor ON dor."dealId" = d.id
+      LEFT JOIN eva_studio_touchpoints dtp ON dtp.id = dor."touchpointId"
       WHERE d."orgId" = ${org} AND d."archivedAt" IS NULL`,
     cf: `d."customFields"`,
     fields: {
@@ -143,6 +146,10 @@ const BASES: Record<string, Base> = {
       closed: local(`d."closedAt"`),
       expected: local(`d."expectedClosingAt"`),
       days_in_stage: raw(`floor(extract(epoch FROM (now() AT TIME ZONE 'UTC') - d."stageSince") / 86400)::float8`),
+      origin_channel: rotular(`dtp.channel`, CHANNEL_LABEL),
+      origin_source: raw(`dtp."utmSource"`),
+      origin_campaign: raw(`dtp."utmCampaign"`),
+      origin_paid: raw(`dtp.paid`),
     },
   },
   contacts: {
@@ -409,6 +416,25 @@ const BASES: Record<string, Base> = {
       ordered: local(`s."orderedAt"`),
       approved: local(`s."approvedAt"`),
       is_paid: raw(`(s.status IN ('approved', 'complete'))`),
+    },
+  },
+  touchpoints: {
+    from: (org) => sql`FROM eva_studio_touchpoints tp
+      JOIN eva_studio_contacts tpc ON tpc.id = tp."contactId"
+      LEFT JOIN eva_studio_tracked_links tpl ON tpl.id = tp."linkId"
+      WHERE tp."orgId" = ${org}`,
+    fields: {
+      channel: rotular(`tp.channel`, CHANNEL_LABEL),
+      source: raw(`tp."utmSource"`),
+      medium: raw(`tp."utmMedium"`),
+      campaign: raw(`tp."utmCampaign"`),
+      content: raw(`tp."utmContent"`),
+      ad_id: raw(`tp."adId"`),
+      link: raw(`tpl.name`),
+      paid: raw(`tp.paid`),
+      contact_name: texto(`tpc.name`),
+      contact_email: texto(`tpc.email`),
+      at: local(`tp.at`),
     },
   },
   users: {
