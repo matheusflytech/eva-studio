@@ -31,12 +31,31 @@ export async function connectionByToken(token: string) {
   return prisma.hotmartConnection.findUnique({ where: { token } });
 }
 
-export function hottokOf(secrets: string): string {
+/** O que fica cifrado em `secrets`: hottok do webhook e credenciais da API (importação). */
+export interface HotmartSecrets {
+  hottok?: string;
+  clientId?: string;
+  clientSecret?: string;
+  basic?: string;
+}
+export type ApiCredentials = Required<Pick<HotmartSecrets, "clientId" | "clientSecret" | "basic">>;
+
+function secretsOf(secrets: string): HotmartSecrets {
   try {
-    return String(JSON.parse(decryptSecret(secrets) || "{}").hottok ?? "");
+    return JSON.parse(decryptSecret(secrets) || "{}") as HotmartSecrets;
   } catch {
-    return "";
+    return {};
   }
+}
+
+export function hottokOf(secrets: string): string {
+  return String(secretsOf(secrets).hottok ?? "");
+}
+
+/** Credenciais da API da Hotmart, só se as três estão salvas. */
+export function apiCredentialsOf(secrets: string): ApiCredentials | null {
+  const s = secretsOf(secrets);
+  return s.clientId && s.clientSecret && s.basic ? { clientId: s.clientId, clientSecret: s.clientSecret, basic: s.basic } : null;
 }
 
 /** Compara em tempo constante (hash dos dois lados: tamanho diferente não vaza). */
@@ -46,9 +65,19 @@ export function sameSecret(a: string, b: string): boolean {
   return crypto.timingSafeEqual(h(a), h(b));
 }
 
-/** Cria (ou atualiza) a conexão. hottok vazio = mantém o atual. */
-export async function saveConnection(orgId: string, input: { hottok?: string; products?: Products; fields?: FieldMap; status?: "active" | "paused" }) {
-  const secrets = input.hottok ? encryptSecret(JSON.stringify({ hottok: input.hottok.trim() })) : undefined;
+const SECRET_KEYS = ["hottok", "clientId", "clientSecret", "basic"] as const;
+
+/** Cria (ou atualiza) a conexão. Segredo vazio = mantém o salvo. */
+export async function saveConnection(
+  orgId: string,
+  input: HotmartSecrets & { products?: Products; fields?: FieldMap; status?: "active" | "paused" }
+) {
+  const changed = Object.fromEntries(SECRET_KEYS.filter((k) => input[k]?.trim()).map((k) => [k, input[k]!.trim()]));
+  let secrets: string | undefined;
+  if (Object.keys(changed).length) {
+    const current = await prisma.hotmartConnection.findUnique({ where: { orgId }, select: { secrets: true } });
+    secrets = encryptSecret(JSON.stringify({ ...secretsOf(current?.secrets ?? ""), ...changed }));
+  }
   return prisma.hotmartConnection.upsert({
     where: { orgId },
     create: {
