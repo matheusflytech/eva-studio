@@ -56,6 +56,21 @@ describe("getPage", () => {
     expect(f.calls.at(-1)!.auth).toBe("Bearer tok3");
   });
 
+  it("erro: leva o motivo que a Hotmart mandou", async () => {
+    const f = fakeFetch([json({ error: "invalid_param", error_description: "max_results inválido" }, 400)]);
+    await expect(getPage(creds(), "/sales/users", {}, { fetch: f.fn })).rejects.toThrow("Hotmart respondeu 400 em /sales/users. Motivo: max_results inválido");
+  });
+
+  it("token recusado: mensagem de credencial com o motivo", async () => {
+    const fn = (async () => json({ error: "invalid_client", error_description: "Bad credentials" }, 401)) as unknown as typeof fetch;
+    await expect(getPage(creds(), "/sales/users", {}, { fetch: fn })).rejects.toThrow(/Credenciais da API da Hotmart recusadas.*Bad credentials/);
+  });
+
+  it("falha de rede vira HotmartApiError", async () => {
+    const fn = (async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
+    await expect(getPage(creds(), "/sales/users", {}, { fetch: fn })).rejects.toBeInstanceOf(HotmartApiError);
+  });
+
   it("só GET na API (o POST é só o token)", async () => {
     const f = fakeFetch([json({ items: [] })]);
     await getPage(creds(), "/sales/history", {}, { fetch: f.fn });

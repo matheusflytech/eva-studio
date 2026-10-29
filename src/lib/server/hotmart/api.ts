@@ -30,6 +30,26 @@ export class HotmartApiError extends Error {
   }
 }
 
+// Erro de rede vira HotmartApiError (status 0) para o painel mostrar o motivo.
+async function call(deps: ApiDeps, url: URL, init: RequestInit): Promise<Response> {
+  try {
+    return await (deps.fetch ?? fetch)(url, init);
+  } catch (e) {
+    throw new HotmartApiError(`Não consegui falar com a Hotmart (${e instanceof Error ? e.message : String(e)}).`, 0);
+  }
+}
+
+/** Motivo que a Hotmart manda no corpo do erro, se houver. */
+async function reasonOf(res: Response): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const d = JSON.parse(text);
+    return String(d.error_description || d.message || d.error || "").slice(0, 200);
+  } catch {
+    return text.slice(0, 200);
+  }
+}
+
 async function getToken(c: ApiCredentials, deps: ApiDeps, fresh = false): Promise<string> {
   const now = (deps.now ?? Date.now)();
   const cached = tokens.get(c.clientId);
@@ -39,11 +59,14 @@ async function getToken(c: ApiCredentials, deps: ApiDeps, fresh = false): Promis
   url.searchParams.set("client_id", c.clientId);
   url.searchParams.set("client_secret", c.clientSecret);
   const basic = c.basic.replace(/^Basic\s+/i, "");
-  const res = await (deps.fetch ?? fetch)(url, { method: "POST", headers: { Authorization: `Basic ${basic}` } });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) {
-    throw new HotmartApiError(res.status === 401 || res.status === 403 ? "Credenciais da API da Hotmart recusadas. Confira Client ID, Client Secret e Basic." : `Hotmart recusou o token (${res.status}).`, res.status);
+  const res = await call(deps, url, { method: "POST", headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/json" } });
+  if (!res.ok) {
+    const reason = await reasonOf(res);
+    const base = res.status === 400 || res.status === 401 || res.status === 403 ? "Credenciais da API da Hotmart recusadas. Confira Client ID, Client Secret e Basic." : `Hotmart recusou o token (${res.status}).`;
+    throw new HotmartApiError(reason ? `${base} Hotmart: ${reason}` : base, res.status);
   }
+  const data = await res.json().catch(() => ({}));
+  if (!data.access_token) throw new HotmartApiError("Hotmart não devolveu o token de acesso.", res.status);
   // Renova 60 s antes de vencer.
   tokens.set(c.clientId, { token: data.access_token, expiresAt: now + (Number(data.expires_in) || 3600) * 1000 - 60_000 });
   return data.access_token;
@@ -60,7 +83,7 @@ export async function getPage(c: ApiCredentials, path: string, params: Params, d
   let token = await getToken(c, deps);
   let renewed = false;
   for (let attempt = 0; ; attempt++) {
-    const res = await (deps.fetch ?? fetch)(url, { method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+    const res = await call(deps, url, { method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
     if (res.status === 401 && !renewed) {
       renewed = true;
       token = await getToken(c, deps, true);
@@ -71,7 +94,10 @@ export async function getPage(c: ApiCredentials, path: string, params: Params, d
       await sleep(Math.min(reset > 0 ? reset * 1000 : 10_000, 60_000));
       continue;
     }
-    if (!res.ok) throw new HotmartApiError(`Hotmart respondeu ${res.status} em ${path}.`, res.status);
+    if (!res.ok) {
+      const reason = await reasonOf(res);
+      throw new HotmartApiError(`Hotmart respondeu ${res.status} em ${path}.${reason ? ` Motivo: ${reason}` : ""}`, res.status);
+    }
     const data = await res.json();
     return { items: Array.isArray(data?.items) ? data.items : [], nextPageToken: data?.page_info?.next_page_token || null };
   }
