@@ -803,7 +803,7 @@ export const SALES_TEMPLATES: ReportTemplate[] = [
     }),
   },
   {
-    title: "Vendas por canal",
+    title: "Vendas Hotmart por canal",
     description: "Vendas pagas por canal de origem.",
     viz: "bar_h",
     query: venda({

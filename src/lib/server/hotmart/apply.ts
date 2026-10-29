@@ -103,6 +103,9 @@ export async function applyEvent(orgId: string, products: Products, payload: any
       : { ...n.deal.customFields, ...d.dealFields, ...(d.lossReason ? { motivo_da_perda: d.lossReason } : {}) };
     if (d.dropChannel) delete standardDealFields.canal_de_origem;
     const dealFields = remap(map, standardDealFields);
+    // Data de fechamento: a da aprovação; senão a do evento (na importação, antiga; no webhook, agora).
+    const eventMs = Number(payload?.creation_date ?? payload?.creationDate);
+    const closedAt = n.deal.closeDate ? new Date(`${n.deal.closeDate}T12:00:00-03:00`) : eventMs ? new Date(eventMs) : null;
 
     if (d.action === "create" && d.target) {
       const stageId = product.stages[d.target];
@@ -113,16 +116,12 @@ export async function applyEvent(orgId: string, products: Products, payload: any
       });
       dealId = created.id;
       if (n.key.value) await vincularExterno(orgId, "deal", dealId, n.key.value, n.key.source);
-      // Fechado na criação: a data de fechamento é a da aprovação, não a de agora.
-      if (created.closedAt && n.deal.closeDate) {
-        await prisma.deal.update({ where: { id: dealId }, data: { closedAt: new Date(`${n.deal.closeDate}T12:00:00-03:00`) } });
-      }
+      if (created.closedAt && closedAt) await prisma.deal.update({ where: { id: dealId }, data: { closedAt } });
     } else if (d.action === "update" && dealId) {
       const stageId = d.move && d.target ? product.stages[d.target] : undefined;
       if (stageId) {
         await moveDealStage(dealId, stageId, { origem: origin, reabrir: true, ignorarObrigatorios: true, ...(d.lossReason ? { perda: { motivo: d.lossReason } } : {}) });
-        // Fechou agora: a data de fechamento é a da aprovação (na importação, antiga).
-        if (n.deal.closeDate) await prisma.deal.updateMany({ where: { id: dealId, closedAt: { not: null } }, data: { closedAt: new Date(`${n.deal.closeDate}T12:00:00-03:00`) } });
+        if (closedAt) await prisma.deal.updateMany({ where: { id: dealId, closedAt: { not: null } }, data: { closedAt } });
       }
       await preencherCamposDoNegocio(orgId, dealId, dealFields);
       const data: { name?: string; amountCents?: number; currency?: string } = {};

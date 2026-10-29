@@ -107,7 +107,7 @@ function eventRow(orgId: string, connectionId: string, p: any) {
     productId: d.product?.id ? String(d.product.id) : null,
     transaction: d.purchase?.transaction ? String(d.purchase.transaction) : null,
     email: String(d.buyer?.email || d.subscriber?.email || "").trim().toLowerCase() || null,
-    payload: p as object, result: "pending", detail: "importação",
+    payload: p as object, result: "pending",
     // Data do evento na Hotmart: é a ordem em que a fase apply aplica.
     ...(p.creation_date ? { createdAt: new Date(Number(p.creation_date)) } : {}),
   };

@@ -76,6 +76,8 @@ describe("applyEvent", () => {
     await applyEvent("o1", products, payload("PURCHASE_REFUNDED"));
     expect(crm.moveDealStage).toHaveBeenCalledWith("d1", "s-former", expect.objectContaining({ perda: { motivo: "reembolso" } }));
     expect(crm.preencherCamposDoNegocio).toHaveBeenCalledWith("o1", "d1", expect.objectContaining({ motivo_da_perda: "reembolso" }));
+    // Sem data de aprovação no evento, fecha na data do evento.
+    expect(db.deal.updateMany).toHaveBeenCalledWith({ where: { id: "d1", closedAt: { not: null } }, data: { closedAt: new Date(Date.UTC(2026, 9, 28, 14)) } });
     expect(bus.publicarEvento).toHaveBeenCalledWith(expect.objectContaining({ tipo: "sale.refunded" }));
   });
 
