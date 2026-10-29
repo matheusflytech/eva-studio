@@ -43,7 +43,7 @@ import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/d
 import { ConteudoDeConsulta } from "@/components/dashboard/resultado-de-consulta";
 import { ReportBuilder, type ReportCard } from "@/components/reports/report-builder";
 import { ReportView, useReportResult } from "@/components/reports/report-view";
-import { BASES_COM_FILTROS_DO_PAINEL, DATASET_BY_KEY, formatarDimensao, formatarValor, tipoDoCartao, type ReportQuery, type ReportResult, type VizType } from "@/lib/report-query";
+import { BASES_COM_FILTROS_DO_PAINEL, DATASET_BY_KEY, SALES_TEMPLATES, formatarDimensao, formatarValor, tipoDoCartao, type ReportQuery, type ReportResult, type ReportTemplate, type VizType } from "@/lib/report-query";
 import { moverComTeclado, useArrastarCartoes, ALTURA_MAXIMA } from "@/components/dashboard/arrastar-cartoes";
 import { AdicionarCartao, Cartao } from "@/components/dashboard/cartao";
 import { ConteudoDaVisao, NumeroGrande, ROTULO_DO_GRUPO, tabelaDaVisao, type Visao } from "@/components/dashboard/cartoes-da-visao";
@@ -836,6 +836,7 @@ function Painel() {
         <EscolherFonte
           catalogo={catalogo}
           onEscolher={adicionar}
+          onModelo={(m) => { salvarDoConstrutorV2({ query: m.query, viz: m.viz, titulo: m.title }); setAdicionando(false); }}
           onMontar={() => { setAdicionando(false); setConstrutorV2({ editandoId: null }); }}
           onFechar={() => setAdicionando(false)}
         />
@@ -1044,10 +1045,11 @@ function Vazio() {
 // ── Escolher fonte ─────────────────────────────────────────────────────────
 
 function EscolherFonte({
-  catalogo, onEscolher, onMontar, onFechar,
+  catalogo, onEscolher, onModelo, onMontar, onFechar,
 }: {
   catalogo: Fonte[];
   onEscolher: (f: Fonte) => void;
+  onModelo: (m: ReportTemplate) => void;
   onMontar: () => void;
   onFechar: () => void;
 }) {
@@ -1057,6 +1059,7 @@ function EscolherFonte({
     ? catalogo.filter((f) => `${f.rotulo} ${f.explicacao}`.toLowerCase().includes(termo))
     : catalogo;
   const grupos = [...new Set(filtrado.map((f) => f.grupo))];
+  const modelos = termo ? SALES_TEMPLATES.filter((m) => `${m.title} ${m.description} vendas hotmart`.toLowerCase().includes(termo)) : SALES_TEMPLATES;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Adicionar cartão">
@@ -1105,7 +1108,7 @@ function EscolherFonte({
               </span>
             </span>
           </button>
-          {grupos.length === 0 ? (
+          {grupos.length === 0 && modelos.length === 0 ? (
             <p className="px-3 py-8 text-center text-small text-text-tertiary">
               Nada com “{busca}”.
             </p>
@@ -1138,6 +1141,32 @@ function EscolherFonte({
                 </div>
               </div>
             ))
+          )}
+          {modelos.length > 0 && (
+            <div className="mb-2 last:mb-0">
+              <p className="px-3 py-1.5 text-caption font-medium text-text-tertiary">Vendas (Hotmart)</p>
+              <div className="flex flex-col gap-0.5">
+                {modelos.map((m) => {
+                  const Icone = ICONE_DO_TIPO[tipoDoCartao(m.viz)];
+                  return (
+                    <button
+                      key={m.title}
+                      type="button"
+                      onClick={() => onModelo(m)}
+                      className="group flex items-start gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-hover"
+                    >
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-border-subtle bg-raised text-text-secondary">
+                        <Icone size={13} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-small text-text-primary">{m.title}</span>
+                        <span className="block text-caption text-text-tertiary">{m.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>

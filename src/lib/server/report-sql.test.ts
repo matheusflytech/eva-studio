@@ -110,6 +110,33 @@ describe("montarSql", () => {
     expect(painel.sql.values[1]).toBe(6);
   });
 
+  it("Vendas: presa ao contrato, valor em reais, status rotulado e mês atual em São Paulo", () => {
+    const m = montarSql("org-1", q({
+      dataset: "sales",
+      metrics: [{ op: "sum", field: "amount" }],
+      filters: { logic: "and", conditions: [{ field: "is_paid", op: "is_true" }, { field: "approved", op: "this_month" }] },
+      groupBy: [{ field: "status" }],
+    }))!;
+    const s = plano(m.sql);
+    expect(s).toContain(`FROM eva_studio_sales s WHERE s."orgId" = $1`);
+    expect(m.sql.values[0]).toBe("org-1");
+    expect(s).toContain(`SUM((s."amountBrlCents" / 100.0)::float8)`);
+    expect(s).toContain(`WHEN 'refunded' THEN 'Reembolsada'`);
+    expect(s).toContain(`(s.status IN ('approved', 'complete'))`);
+    expect(s).toContain(`date_trunc('month', (now() AT TIME ZONE 'America/Sao_Paulo')::date)`);
+  });
+
+  it("toda base do catálogo tem SQL e os cartões prontos de Vendas passam no saneamento com o visual pedido", async () => {
+    const { SALES_TEMPLATES, sanearRelatorio } = await import("@/lib/report-query");
+    for (const d of DATASETS) expect(montarSql("o", q({ dataset: d.key, metrics: [{ op: "count" }] })), d.key).not.toBeNull();
+    for (const t of SALES_TEMPLATES) {
+      const r = sanearRelatorio({ query: t.query, viz: t.viz, meta: 1000 });
+      expect(r?.viz, t.title).toBe(t.viz);
+      expect(r!.query.filters.conditions).toHaveLength(t.query.filters.conditions.length);
+      expect(montarSql("o", r!.query, { globais: { dias: 30, funis: [], donos: [] } }), t.title).not.toBeNull();
+    }
+  });
+
   it("funis e responsáveis da barra valem nas bases de negócio, e só nelas", () => {
     const globais = { dias: 30, funis: ["p1"], donos: ["u1", "__nenhum"] };
     const m = montarSql("o", q({ metrics: [{ op: "count" }] }), { globais })!;

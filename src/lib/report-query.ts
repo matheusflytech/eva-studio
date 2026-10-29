@@ -21,7 +21,7 @@ export interface DatasetDef {
   label: string;
   /** Uma linha: o que cada linha da base é. */
   description: string;
-  group: "CRM" | "Relações" | "Atendimento" | "Equipe";
+  group: "CRM" | "Relações" | "Vendas" | "Atendimento" | "Equipe";
   fields: FieldDef[];
   /** Campos personalizados que entram com o prefixo "cf:" (de que entidade). */
   customFields?: "deal" | "contact";
@@ -254,6 +254,33 @@ export const DATASETS: DatasetDef[] = [
     ],
   },
   {
+    key: "sales",
+    label: "Vendas (Hotmart)",
+    description: "Cada linha é uma transação.",
+    group: "Vendas",
+    defaultColumns: ["approved", "product", "buyer_name", "status", "amount", "channel"],
+    fields: [
+      f("product", "Produto"),
+      f("status", "Status"),
+      f("amount", "Valor", "money"),
+      f("amount_original", "Valor na moeda", "number"),
+      f("currency", "Moeda"),
+      f("offer", "Oferta"),
+      f("plan", "Plano"),
+      f("recurrence", "Nº da cobrança", "number"),
+      f("payment_type", "Forma de pagamento"),
+      f("installments", "Parcelas", "number"),
+      f("channel", "Canal de origem"),
+      f("src", "src"),
+      f("sck", "sck"),
+      f("buyer_email", "E-mail do comprador"),
+      f("buyer_name", "Comprador"),
+      f("ordered", "Data do pedido", "date"),
+      f("approved", "Data de aprovação", "date"),
+      f("is_paid", "Paga", "bool"),
+    ],
+  },
+  {
     key: "conversations",
     label: "Conversas",
     description: "Cada linha é uma conversa de um agente com um cliente.",
@@ -349,7 +376,7 @@ export const BASES_COM_FILTROS_DO_PAINEL = new Set([
 export type FilterOp =
   | "eq" | "neq" | "contains" | "not_contains" | "in" | "not_in"
   | "gt" | "gte" | "lt" | "lte" | "between"
-  | "last_days" | "next_days" | "panel"
+  | "last_days" | "next_days" | "panel" | "this_month"
   | "is_true" | "is_false"
   | "is_set" | "is_empty";
 
@@ -457,14 +484,14 @@ export const OPS_POR_TIPO: Record<FieldType, FilterOp[]> = {
   text: ["eq", "neq", "contains", "not_contains", "in", "not_in", "is_set", "is_empty"],
   number: ["eq", "neq", "gt", "gte", "lt", "lte", "between", "is_set", "is_empty"],
   money: ["eq", "neq", "gt", "gte", "lt", "lte", "between", "is_set", "is_empty"],
-  date: ["panel", "last_days", "next_days", "between", "is_set", "is_empty"],
+  date: ["panel", "this_month", "last_days", "next_days", "between", "is_set", "is_empty"],
   bool: ["is_true", "is_false"],
 };
 
 export const OP_LABEL: Record<FilterOp, string> = {
   eq: "é", neq: "não é", contains: "contém", not_contains: "não contém", in: "é qualquer de", not_in: "não é nenhum de",
   gt: "maior que", gte: "a partir de", lt: "menor que", lte: "até", between: "entre",
-  last_days: "nos últimos (dias)", next_days: "nos próximos (dias)", panel: "no período do painel",
+  last_days: "nos últimos (dias)", next_days: "nos próximos (dias)", panel: "no período do painel", this_month: "neste mês",
   is_true: "é sim", is_false: "é não", is_set: "está preenchido", is_empty: "está vazio",
 };
 
@@ -724,6 +751,69 @@ export function sanearRelatorio(bruto: unknown): { query: ReportQuery; viz: VizT
   const meta = Number(r?.meta);
   return VIZ_COM_META.includes(viz) && Number.isFinite(meta) && meta > 0 ? { query, viz, meta } : { query, viz };
 }
+
+// ── Cartões prontos ────────────────────────────────────────────────────────
+
+export interface ReportTemplate {
+  title: string;
+  description: string;
+  viz: VizType;
+  query: ReportQuery;
+}
+
+const venda = (parcial: Partial<ReportQuery>): ReportQuery => ({ ...QUERY_PADRAO("sales"), metrics: [{ op: "sum", field: "amount" }], ...parcial });
+const PAGAS: ReportFilter = { field: "is_paid", op: "is_true" };
+const NO_MES: ReportFilter = { field: "approved", op: "this_month" };
+const NO_PERIODO: ReportFilter = { field: "approved", op: "panel" };
+
+/** Vendas da Hotmart no "Adicionar cartão". Meta por produto: duplique o cartão e filtre o produto. */
+export const SALES_TEMPLATES: ReportTemplate[] = [
+  {
+    title: "Receita do mês",
+    description: "Soma das vendas pagas no mês. Defina a meta ao editar.",
+    viz: "gauge",
+    query: venda({ filters: { logic: "and", conditions: [PAGAS, NO_MES] } }),
+  },
+  {
+    title: "Meta do mês",
+    description: "Quanto da meta de receita do mês já entrou.",
+    viz: "progress",
+    query: venda({ filters: { logic: "and", conditions: [PAGAS, NO_MES] } }),
+  },
+  {
+    title: "Receita por produto por mês",
+    description: "Vendas pagas, mês a mês, por produto.",
+    viz: "bar",
+    query: venda({
+      filters: { logic: "and", conditions: [PAGAS, NO_PERIODO] },
+      groupBy: [{ field: "approved", grain: "month" }, { field: "product" }],
+      sort: [{ key: "approved", dir: "asc" }],
+      limit: 500,
+    }),
+  },
+  {
+    title: "Reembolsos e chargebacks",
+    description: "Quantas vendas voltaram, por status.",
+    viz: "bar",
+    query: venda({
+      metrics: [{ op: "count" }],
+      filters: { logic: "and", conditions: [{ field: "status", op: "in", values: ["Reembolsada", "Chargeback"] }, NO_PERIODO] },
+      groupBy: [{ field: "status" }],
+      sort: [{ key: "m0", dir: "desc" }],
+    }),
+  },
+  {
+    title: "Vendas por canal",
+    description: "Vendas pagas por canal de origem.",
+    viz: "bar_h",
+    query: venda({
+      metrics: [{ op: "count" }],
+      filters: { logic: "and", conditions: [PAGAS, NO_PERIODO] },
+      groupBy: [{ field: "channel" }],
+      sort: [{ key: "m0", dir: "desc" }],
+    }),
+  },
+];
 
 /** Tipo do cartão antigo mais parecido (o painel usa para a largura inicial e o CSV). */
 export function tipoDoCartao(viz: VizType): "numero" | "linha" | "pizza" | "barras" | "tabela" {
