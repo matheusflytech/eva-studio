@@ -28,12 +28,14 @@ import { apiCredentialsOf, getConnection, type Products } from "./connection";
 export const IMPORT_KIND = "hotmart_import";
 export const ACTIVE_STATUSES = ["queued", "processing", "awaiting_confirmation"];
 const PAGE_SIZE = 100;
+// A Hotmart recusa (400) start_date..end_date maior que 2 anos: busca em janelas de 1 ano.
+const WINDOW_MS = 365 * 86400e3;
 const APPLY_SLICE = 25;
 const IN_CHUNK = 500;
 
 export type Phase = "fetch" | "preview" | "apply";
 export interface ImportOptions { phase: Phase; from: string; to: string; products: string[] }
-interface Cursor { product: number; step: "subscriptions" | "users" | "history"; status: number; pageToken: string | null }
+interface Cursor { product: number; step: "subscriptions" | "users" | "history"; status: number; window?: number; pageToken: string | null }
 /** Estado entre rodadas do relógio, em `buffer`: assinaturas do produto e compradores do status atual. */
 interface Lookup { subs: Record<string, HistorySubscription>; buyers: Record<string, HistoryBuyer> }
 export interface Counts { new: number; existing: number }
@@ -48,6 +50,13 @@ export class ImportError extends Error {
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** Dia em São Paulo -> ms UTC (início ou fim do dia). */
 const spMs = (day: string, end: boolean) => new Date(`${day}T${end ? "23:59:59.999" : "00:00:00"}-03:00`).getTime();
+
+/** Divide o período em janelas de até 1 ano, da mais antiga para a mais nova. */
+export function dateWindows(start: number, end: number): { start_date: number; end_date: number }[] {
+  const out = [];
+  for (let s = start; s <= end; s += WINDOW_MS) out.push({ start_date: s, end_date: Math.min(s + WINDOW_MS - 1, end) });
+  return out;
+}
 const importedWhere = (orgId: string) => ({ orgId, result: "pending", hotmartEventId: { startsWith: IMPORT_PREFIX } });
 
 export async function activeImport(orgId: string) {
@@ -120,6 +129,7 @@ async function fetchPhase(job: BulkJob, options: ImportOptions, connectionId: st
   const cur: Cursor = job.cursor ? JSON.parse(job.cursor) : { product: 0, step: "subscriptions", status: 0, pageToken: null };
   const look: Lookup = job.buffer ? JSON.parse(job.buffer) : { subs: {}, buyers: {} };
   const range = { start_date: spMs(options.from, false), end_date: spMs(options.to, true) };
+  const windows = dateWindows(range.start_date, range.end_date);
   let total = job.total;
   let moved = 0;
 
@@ -150,9 +160,9 @@ async function fetchPhase(job: BulkJob, options: ImportOptions, connectionId: st
       }
       moved += page.items.length;
       next = page.nextPageToken;
-      if (!next) Object.assign(cur, { step: "users", status: 0 });
+      if (!next) Object.assign(cur, { step: "users", status: 0, window: 0 });
     } else {
-      const params = { ...range, product_id: pid, transaction_status: IMPORTED_STATUSES[cur.status], max_results: PAGE_SIZE, page_token: cur.pageToken ?? undefined };
+      const params = { ...windows[cur.window ?? 0], product_id: pid, transaction_status: IMPORTED_STATUSES[cur.status], max_results: PAGE_SIZE, page_token: cur.pageToken ?? undefined };
       if (cur.step === "users") {
         const page = await getPage(creds, "/sales/users", params, deps);
         for (const item of page.items) {
@@ -174,9 +184,10 @@ async function fetchPhase(job: BulkJob, options: ImportOptions, connectionId: st
         next = page.nextPageToken;
         if (!next) {
           look.buyers = {};
-          if (cur.status + 1 < IMPORTED_STATUSES.length) Object.assign(cur, { step: "users", status: cur.status + 1 });
+          if ((cur.window ?? 0) + 1 < windows.length) Object.assign(cur, { step: "users", window: (cur.window ?? 0) + 1 });
+          else if (cur.status + 1 < IMPORTED_STATUSES.length) Object.assign(cur, { step: "users", status: cur.status + 1, window: 0 });
           else {
-            Object.assign(cur, { product: cur.product + 1, step: "subscriptions", status: 0 });
+            Object.assign(cur, { product: cur.product + 1, step: "subscriptions", status: 0, window: 0 });
             look.subs = {};
           }
         }
