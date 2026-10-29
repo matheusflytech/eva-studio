@@ -26,6 +26,7 @@ import {
   CheckSquare,
   ChevronDown,
   Search,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSondagem } from "@/components/inbox/use-sondagem";
@@ -84,6 +85,7 @@ const NAV_AVANCADO: NavGroup[] = [
       { href: "/companies", label: "Empresas", icon: Building2 },
       { href: "/leads", label: "Leads", icon: Users },
       { href: "/reports", label: "Relatórios", icon: ChartColumn },
+      { href: "/marketing", label: "Marketing", icon: Megaphone },
     ],
   },
   {

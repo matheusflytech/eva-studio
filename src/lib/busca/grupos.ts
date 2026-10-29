@@ -35,6 +35,7 @@ export const PAGINAS: Pagina[] = [
   { caminho: "/approvals", rotulo: "Aprovações", permissao: "disparos:ver", palavras: "templates modelos meta" },
   { caminho: "/library", rotulo: "Biblioteca", palavras: "modelos respostas" },
   { caminho: "/reports", rotulo: "Relatórios", permissao: "relatorios:ver" },
+  { caminho: "/marketing", rotulo: "Marketing", permissao: "marketing:ver", palavras: "origem campanha utm roas cac cpl investimento anuncios" },
   { caminho: "/integrations", rotulo: "Integrações", permissao: "integracoes:gerenciar", palavras: "api webhooks n8n" },
   { caminho: "/playground", rotulo: "Playground", permissao: "agentes:ver" },
   { caminho: "/settings", rotulo: "Configurações", palavras: "ajustes funis campos membros lixeira" },

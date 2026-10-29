@@ -14,6 +14,7 @@ import { EtapaAtual, TrilhaDeEtapas } from "./trilha-de-etapas";
 import { SobreONegocio } from "./sobre-o-negocio";
 import { AtividadeDoNegocio, FiltroNaBorda } from "./atividade";
 import { VinculosDoNegocio } from "./vinculos";
+import { OrigemDeMarketing } from "@/components/marketing/origem";
 import { CartaoLateral } from "./cartao-lateral";
 import { useItensDoNegocio } from "./produtos";
 import type { FiltroDaLinhaDoTempo } from "./linha-do-tempo";
@@ -198,6 +199,7 @@ export function FichaDoNegocio({ dealId }: { dealId: string }) {
           <div className="flex min-w-0 flex-col gap-3">
             <CartaoLateral deal={deal} membros={membros} patch={patch} produtos={produtos} moverEtapa={moverEtapa} />
             <VinculosDoNegocio deal={deal} conversas={linha.conversas} agora={agora} patch={patch} onVerTarefas={verTarefas} />
+            {contatos.length > 0 && <OrigemDeMarketing dealId={deal.id} />}
             <SobreONegocio deal={deal} defs={defs} membros={membros} patch={patch} valorDosProdutos={valorVemDosProdutos(produtos.dados)} />
           </div>
         </div>

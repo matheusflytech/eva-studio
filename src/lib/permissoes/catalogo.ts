@@ -23,6 +23,8 @@ export const MODULOS = [
   { id: "funis", nome: "Funis e campos", acoes: ["configurar"] },
   { id: "produtos", nome: "Produtos", acoes: ["gerenciar"] },
   { id: "relatorios", nome: "Relatórios e dashboard", acoes: ["ver"] },
+  // Origem dos contatos, investimento lançado à mão e links rastreados.
+  { id: "marketing", nome: "Marketing", acoes: ["ver", "editar"] },
   { id: "integracoes", nome: "Integrações", acoes: ["gerenciar"] },
   { id: "api", nome: "Chaves de API", acoes: ["gerenciar"] },
   { id: "membros", nome: "Membros, papéis e equipes", acoes: ["gerenciar"] },
@@ -121,8 +123,8 @@ export const LEGADO_DO_PAPEL: Record<PapelDeSistema, PermissaoLegada[]> = {
  * um papel personalizado com só ela passar no `requirePermission` antigo).
  */
 const EXTRAS_DO_PAPEL: Partial<Record<PapelDeSistema, PermissaoGranular[]>> = {
-  owner: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver"],
-  admin: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver"],
+  owner: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver", "marketing:editar"],
+  admin: ["lixeira:esvaziar", "automacoes:ver", "automacoes:gerenciar", "auditoria:ver", "marketing:editar"],
   agent: ["automacoes:ver"],
   viewer: ["automacoes:ver"],
 };

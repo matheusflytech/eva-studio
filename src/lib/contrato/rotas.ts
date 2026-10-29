@@ -29,6 +29,7 @@ export const SECOES_DO_CONTRATO = [
   "companies",
   "leads",
   "reports",
+  "marketing",
   "integrations",
   "playground",
   "settings",
