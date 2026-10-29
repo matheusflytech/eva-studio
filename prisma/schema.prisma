@@ -53,6 +53,11 @@ model Organization {
   sales             Sale[]
   // Google Agenda (2026-11-04-google-calendar.sql): só relação.
   googleCalendarConnections GoogleCalendarConnection[]
+  // Marketing M1 (2026-11-05-marketing.sql): só relações.
+  touchpoints       Touchpoint[]
+  trackedLinks      TrackedLink[]
+  linkClicks        LinkClick[]
+  marketingSpend    MarketingSpend[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -755,6 +760,9 @@ model Contact {
   tasks         Task[]
   crmNotes      Note[]
   enrollments   SequenceEnrollment[]
+  // Marketing M1: só relações.
+  touchpoints   Touchpoint[]
+  linkClicks    LinkClick[]
 
   @@index([orgId])
   @@index([orgId, email])
@@ -1258,6 +1266,8 @@ model Deal {
   // Regras de etapa (2026-10-20-regras-de-etapa.sql): também só relações.
   loss          DealLoss?
   activity      DealActivity?
+  // Marketing M1 (2026-11-05-marketing.sql): origem congelada, também só relação.
+  origin        DealOrigin?
 
   @@index([orgId, stageId])
   @@index([pipelineId])
@@ -2449,4 +2459,134 @@ model GoogleCalendarConnection {
 
   @@unique([orgId, userId])
   @@map("eva_studio_google_calendar_connections")
+}
+
+// ---------------------------------------------------------------------------
+// Marketing M1 (prisma/sql/2026-11-05-marketing.sql): de onde veio cada contato.
+// Spec: docs/superpowers/specs/2026-10-29-marketing-origem-design.md
+// ---------------------------------------------------------------------------
+
+// Um por vez que se sabe de onde o contato veio.
+model Touchpoint {
+  id          String   @id @default(uuid())
+  orgId       String
+  contactId   String
+  at          DateTime @default(now())
+  channel     String // site | whatsapp_link | ad_whatsapp | ad_instagram | ad_messenger | hotmart | manual
+  paid        Boolean  @default(false)
+  // UTMs em minúsculas, sem espaço nas pontas (lib/marketing/touch.ts).
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  utmId       String?
+  gclid       String?
+  gbraid      String?
+  wbraid      String?
+  fbclid      String?
+  fbc         String?
+  fbp         String?
+  ctwaClid    String?
+  adId        String?
+  linkId      String?
+  landingUrl  String?
+  referrer    String?
+  raw         Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealsLast    DealOrigin[] @relation("DealOriginLast")
+  dealsFirst   DealOrigin[] @relation("DealOriginFirst")
+
+  @@index([orgId, contactId, at])
+  @@index([orgId, utmSource, utmCampaign])
+  @@index([orgId, at])
+  @@map("eva_studio_touchpoints")
+}
+
+// Link /w/CODE que abre o WhatsApp com "ref: CODE" no texto.
+model TrackedLink {
+  id          String    @id @default(uuid())
+  orgId       String
+  code        String    @unique
+  name        String
+  agentId     String?
+  phone       String
+  message     String    @default("")
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  clicks      Int       @default(0)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  clickRows    LinkClick[]
+
+  @@index([orgId])
+  @@map("eva_studio_tracked_links")
+}
+
+// Clique num link rastreado, ou visita do site que saiu para o WhatsApp (code próprio, sem linkId).
+model LinkClick {
+  id               String   @id @default(uuid())
+  orgId            String
+  linkId           String?
+  code             String?  @unique
+  at               DateTime @default(now())
+  gclid            String?
+  fbclid           String?
+  referrer         String?
+  // sha256 de IP + código: nunca o IP puro.
+  ipHash           String?
+  raw              Json     @default("{}")
+  matchedContactId String?
+
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  link           TrackedLink? @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  matchedContact Contact?     @relation(fields: [matchedContactId], references: [id], onDelete: SetNull)
+
+  @@index([linkId, at])
+  @@map("eva_studio_link_clicks")
+}
+
+// Investimento lançado à mão. campaign "" = a fonte toda.
+model MarketingSpend {
+  id          String   @id @default(uuid())
+  orgId       String
+  source      String
+  campaign    String   @default("")
+  from        DateTime @db.Date
+  to          DateTime @db.Date
+  amountCents Int
+  note        String   @default("")
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, source, campaign])
+  @@map("eva_studio_marketing_spend")
+}
+
+// Origem congelada do negócio: último toque pago antes da criação (senão o último) e o primeiro.
+model DealOrigin {
+  dealId            String   @id
+  orgId             String
+  touchpointId      String?
+  firstTouchpointId String?
+  createdAt         DateTime @default(now())
+
+  deal       Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  touchpoint Touchpoint? @relation("DealOriginLast", fields: [touchpointId], references: [id], onDelete: SetNull)
+  first      Touchpoint? @relation("DealOriginFirst", fields: [firstTouchpointId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@map("eva_studio_deal_origins")
 }
