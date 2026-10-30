@@ -33,10 +33,9 @@ export const LLM_PROVIDERS: LlmProviderInfo[] = [
     credentialType: "groq",
     keyUrl: "https://console.groq.com/keys",
     models: [
-      { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B" },
-      { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (rápido)" },
+      // A Groq tirou o Llama 3.x e o Kimi K2 do plano (30/10/2026).
       { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B" },
-      { id: "moonshotai/kimi-k2-instruct", label: "Kimi K2" },
+      { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B (rápido)" },
     ],
   },
   {

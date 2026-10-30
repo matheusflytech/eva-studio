@@ -24,7 +24,7 @@ export const MODELO_POR_PROVEDOR: Record<LlmProvider, string> = {
   anthropic: "claude-sonnet-5",
   openai: "gpt-5.2-mini",
   google: "gemini-2.5-flash",
-  groq: "llama-3.3-70b-versatile",
+  groq: "openai/gpt-oss-120b",
   openrouter: "meta-llama/llama-3.3-70b-instruct",
   deepseek: "deepseek-chat",
   xai: "grok-4",

@@ -150,7 +150,7 @@ describe("POST /api/analytics/ia/consulta", () => {
     llm.callLlmWithTools.mockResolvedValue({ text: null, error: "groq 500: boom" });
     const res = await post({ pedido: "negócios do cliente Fulano CPF 123" });
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toMatch(/Tenta de novo/);
+    expect((await res.json()).error).toMatch(/instável agora/);
     expect(erro.mock.calls.flat().join(" ")).not.toContain("Fulano");
     erro.mockRestore();
   });

@@ -155,6 +155,8 @@ async function callOpenAiCompatible(opts: CallLlmOptions, baseUrl: string): Prom
         max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
         ...(opts.temperature !== undefined && opts.provider !== "openai" ? { temperature: opts.temperature } : {}),
         ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+        // GPT-OSS pensa antes de responder e o pensamento gasta o max_tokens: sem isso a resposta pode vir vazia.
+        ...(opts.model.startsWith("openai/gpt-oss") ? { reasoning_effort: opts.effort ?? "low" } : {}),
       }),
     });
     if (!res.ok) return { usage, text: null, error: `${opts.provider} ${res.status}: ${(await res.text()).slice(0, 300)}` };
