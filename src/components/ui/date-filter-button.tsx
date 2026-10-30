@@ -65,7 +65,7 @@ export function DateFilterButton({
         <ChevronDown size={14} className="shrink-0 text-text-tertiary" aria-hidden="true" />
       </DropdownMenuPrimitive.Trigger>
       <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content align="start" sideOffset={4} className={cn(overlayBox, "w-64 outline-none")}>
+        <DropdownMenuPrimitive.Content align="start" sideOffset={4} className={cn(overlayBox, "w-80 outline-none")}>
           {PERIODOS_PRONTOS.map((o) => {
             const marcado = atual === periodoParaTexto(o.periodo);
             return (

@@ -88,7 +88,9 @@ export function Popover({
     >
       {children}
     </div>,
-    document.body
+    // Dentro de Modal/Drawer do Radix o body fica sem clique e o foco preso no
+    // diálogo: o popover precisa nascer dentro dele.
+    ancora.current?.closest('[role="dialog"][data-state]') ?? document.body
   );
 }
 
