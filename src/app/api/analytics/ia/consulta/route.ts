@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/server/permissions";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { callLlmWithTools } from "@/lib/server/llm";
 import { escolherProvedorDeIa } from "@/lib/server/ia/provedor";
+import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 import { registrarUso } from "@/lib/server/ia/uso";
 import { carregarCatalogo } from "@/lib/server/ia/catalogo";
 import { sanearRelatorio } from "@/lib/report-query";
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
   if (resultado.error || !resultado.text) {
     // Só o provedor e o começo do erro dele (status HTTP): nada do pedido.
     console.error(`[ia/consulta] ${provedor.provider} falhou: ${(resultado.error ?? "resposta vazia").slice(0, 80)}`);
-    return NextResponse.json({ error: "A IA não conseguiu responder agora. Tenta de novo em instantes." }, { status: 502 });
+    return NextResponse.json({ error: mensagemDeFalhaDaIa(provedor.provider, provedor.model, resultado.error) }, { status: 502 });
   }
 
   const json = extrairJson(resultado.text);
