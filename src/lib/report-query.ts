@@ -21,7 +21,7 @@ export interface DatasetDef {
   label: string;
   /** Uma linha: o que cada linha da base é. */
   description: string;
-  group: "CRM" | "Relações" | "Vendas" | "Atendimento" | "Equipe";
+  group: "CRM" | "Relações" | "Vendas" | "Marketing" | "Atendimento" | "Equipe";
   fields: FieldDef[];
   /** Campos personalizados que entram com o prefixo "cf:" (de que entidade). */
   customFields?: "deal" | "contact";
@@ -66,6 +66,10 @@ export const DATASETS: DatasetDef[] = [
       f("closed", "Fechado em", "date"),
       f("expected", "Previsão de fechamento", "date"),
       f("days_in_stage", "Dias na etapa", "number"),
+      f("origin_channel", "Origem: canal"),
+      f("origin_source", "Origem: fonte"),
+      f("origin_campaign", "Origem: campanha"),
+      f("origin_paid", "Origem paga", "bool"),
     ],
   },
   {
@@ -278,6 +282,26 @@ export const DATASETS: DatasetDef[] = [
       f("ordered", "Data do pedido", "date"),
       f("approved", "Data de aprovação", "date"),
       f("is_paid", "Paga", "bool"),
+    ],
+  },
+  {
+    key: "touchpoints",
+    label: "Origens dos contatos",
+    description: "Cada linha é uma vez que se soube de onde um contato veio.",
+    group: "Marketing",
+    defaultColumns: ["at", "contact_name", "channel", "source", "campaign", "paid"],
+    fields: [
+      f("channel", "Canal"),
+      f("source", "Fonte (utm_source)"),
+      f("medium", "Meio (utm_medium)"),
+      f("campaign", "Campanha (utm_campaign)"),
+      f("content", "Conteúdo (utm_content)"),
+      f("ad_id", "Id do anúncio"),
+      f("link", "Link rastreado"),
+      f("paid", "Pago", "bool"),
+      f("contact_name", "Contato"),
+      f("contact_email", "E-mail do contato"),
+      f("at", "Quando", "date"),
     ],
   },
   {

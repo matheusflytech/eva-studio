@@ -6,6 +6,7 @@ import { transcreverAudio } from "@/lib/server/transcribe";
 import { entenderAnexo, MAX_ANEXO_BYTES } from "@/lib/server/anexos";
 import { guardarBuffer } from "@/lib/server/media-inbound";
 import { classificarMime, mimeBase } from "@/lib/server/storage";
+import { cleanTouch } from "@/lib/marketing/touch";
 
 // Limites de tamanho pra não deixar entrada gigante inflar o banco / prompt.
 const MAX_TEXT = 4000;
@@ -128,9 +129,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     if (!text || !String(text).trim()) text = `📎 ${nome || "arquivo"}`;
   }
 
+  // Origem que o script do widget capturou (UTMs, ids de clique): só texto curto.
+  const touchFields = cleanTouch(body.touch);
+  const touch = Object.keys(touchFields).length ? { ...touchFields, channel: "site" as const } : undefined;
+
   const result = await advanceConversation({
     agentId,
     channel: "website",
+    touch,
     contactId,
     text,
     optionId,

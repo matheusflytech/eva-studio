@@ -55,6 +55,8 @@ import { emBaloes, paraTextoSimples, paraWhatsApp, pausaDeDigitacao } from "@/li
 import { entenderAnexosDoWhatsApp, transcreverAudioDoWhatsApp, type AnexoGuardado } from "@/lib/server/anexos-whatsapp";
 import { caminhoDaOrg, urlAssinada } from "@/lib/server/storage";
 import { FLUXO_PRINCIPAL, fluxoDaPalavra } from "@/lib/subfluxos";
+import { recordInboundTouches } from "@/lib/server/marketing";
+import type { TouchInput } from "@/lib/marketing/touch";
 
 /** Link assinado da mídia do Bloco: o canal baixa na hora; o site e os testes mostram por uma semana. */
 const VALIDADE_DA_MIDIA = 7 * 24 * 3600;
@@ -113,6 +115,9 @@ export interface AdvanceInput {
   // O que a IA entendeu de um anexo (descrição de imagem, texto de PDF). Vai junto
   // da pergunta para o modelo, mas não é gravado na conversa.
   anexoContexto?: string;
+  // De onde a pessoa veio, quando o canal sabe (UTMs do widget, referral de
+  // anúncio da Meta). O "ref: CODE" de link rastreado sai do próprio texto.
+  touch?: TouchInput;
 }
 
 export interface AdvanceResult {
@@ -1443,6 +1448,8 @@ export async function advanceConversation(input: AdvanceInput): Promise<AdvanceR
 async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
   const agent = await prisma.agent.findUnique({ where: { id: input.agentId } });
   if (!agent) return { messages: [], status: "ended" };
+  // Hora da chegada: o toque de origem fica antes de um negócio criado nesta rodada.
+  const recebidaEm = new Date();
 
   // Áudio do WhatsApp (1:1) vira texto antes de tudo: a equipe lê a transcrição
   // em Conversas e a IA responde como se a pessoa tivesse digitado.
@@ -1473,6 +1480,9 @@ async function avancarConversa(input: AdvanceInput): Promise<AdvanceResult> {
       if (contactId && isInbound) {
         await stopEnrollmentsOnReply(contactId);
         await registerBroadcastReply(input.agentId, input.contactId);
+        await recordInboundTouches({ orgId: agent!.orgId, contactId, text: input.text, touch: input.touch, at: recebidaEm }).catch((e) =>
+          console.error("[flow-engine] falha ao gravar a origem do contato", e instanceof Error ? e.message : e)
+        );
       }
       return contactId;
     } catch (error) {

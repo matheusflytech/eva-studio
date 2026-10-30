@@ -25,6 +25,7 @@ import { useRegistroEmFoco, type RegistroEmFoco } from "@/components/busca/regis
 import { CHANNEL_LABEL, nomeDoContato, type Contact, type TagRow } from "./tipos";
 import { DadosDoContato } from "./dados-do-contato";
 import { EtiquetasDoContato } from "./etiquetas-do-contato";
+import { OrigemDeMarketing } from "@/components/marketing/origem";
 import { FotoDoContato } from "./foto-do-contato";
 import { TrocarFoto } from "@/components/crm/trocar-foto";
 import { Bloco, cidadeDo, linkDeLigar } from "./ficha-do-contato";
@@ -301,8 +302,9 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
         )}
 
         {abaVisivel === "dados" && (
-          <section aria-label="Dados do contato">
+          <section aria-label="Dados do contato" className="flex flex-col gap-3">
             <DadosDoContato contact={contato} onChanged={mudouContato} />
+            <OrigemDeMarketing contactId={contato.id} />
           </section>
         )}
       </div>
@@ -312,6 +314,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
           <div className="rounded-[18px] border border-border-subtle bg-panel p-4">
             <DadosDoContato contact={contato} onChanged={mudouContato} />
           </div>
+          <OrigemDeMarketing contactId={contato.id} />
         </aside>
       )}
       </div>

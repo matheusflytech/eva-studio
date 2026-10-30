@@ -75,6 +75,11 @@ export default function PrivacidadePage() {
               Google Agenda (detalhes na seção 4).
             </li>
             <li>
+              <strong>Origem de marketing:</strong> de onde o contato chegou (parâmetros UTM, identificadores de clique de anúncio,
+              página de entrada, site de origem e cliques em links de WhatsApp do contrato), para o contrato medir suas campanhas.
+              O endereço IP do clique é guardado só como código irreversível, e nada disso é enviado a terceiros.
+            </li>
+            <li>
               <strong>Dados técnicos:</strong> registros de acesso (data, hora e endereço IP), registros de auditoria e cookies
               necessários para manter a sessão.
             </li>

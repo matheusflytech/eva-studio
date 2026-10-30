@@ -32,6 +32,19 @@ import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
 import { chamarMotor, reivindicarEspera } from "./motor.js";
 
+// Spike Marketing M1: ver como o Baileys entrega o clique em anúncio (Click to
+// WhatsApp) antes de gravar origem por aqui. Só loga; não grava nada.
+function logarAnuncio(m) {
+  if (!m) return;
+  for (const corpo of Object.values(m)) {
+    const ctx = corpo && typeof corpo === "object" ? corpo.contextInfo : null;
+    if (ctx && (ctx.externalAdReply || ctx.conversionSource)) {
+      console.log("[spike-anuncio]", JSON.stringify({ externalAdReply: ctx.externalAdReply, conversionSource: ctx.conversionSource, conversionData: ctx.conversionData ? "presente" : null, entryPointConversionSource: ctx.entryPointConversionSource, entryPointConversionApp: ctx.entryPointConversionApp }));
+      return;
+    }
+  }
+}
+
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.error("DATABASE_URL não definida. Encerrando.");
@@ -333,6 +346,7 @@ async function startSession(chave) {
       const analise = analisarMensagem(msg, sock.user);
       if (!analise) continue;
       const { contato, grupo, responder } = analise;
+      logarAnuncio(msg.message);
       const optionId = extractOptionId(msg);
       let text = textoDaMensagem(msg.message);
       const midia = extractMedia(msg);
