@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { montarMeuDia, pontuar, resumoDoDia, urgenciaDoSla, valorNormalizado, type ItemDoDia } from "./meu-dia";
-import { concluirEProximo, iniciarFila, idAtual, progressoDaFila, pular, removerDaFila } from "./fila";
+import { concluirEProximo, iniciarFila, idAtual, progressoDaFila, pular, removerDaFila, voltar } from "./fila";
 import { resolverVisao, responsaveisDaVisao, tarefaNoEscopo, visoesPermitidas } from "./escopo";
 
 // Terça, 20/10/2026, 10:00 em SP.
@@ -127,6 +127,23 @@ describe("fila: Concluir e próximo", () => {
     expect(f.ids).toEqual(["a", "b", "c"]);
     expect(idAtual(f)).toBe("b");
     expect(idAtual(iniciarFila([]))).toBeNull();
+  });
+
+  it("voltar reabre o pulado e depois segue para o que estava aberto", () => {
+    let f = iniciarFila(["a", "b", "c", "d"]);
+    f = pular(f); // a pulado, em b
+    f = pular(f); // b pulado, em c
+    f = voltar(f); // último pulado: b
+    expect(idAtual(f)).toBe("b");
+    expect(f.pulados).toEqual(["a"]);
+    f = concluirEProximo(f);
+    expect(idAtual(f)).toBe("c");
+    f = voltar(f, "a");
+    expect(idAtual(f)).toBe("a");
+    f = concluirEProximo(f); // a concluído; segue no c
+    expect(idAtual(f)).toBe("c");
+    expect(voltar(f)).toBe(f); // sem pulados
+    expect(voltar(f, "b")).toBe(f); // concluído não volta
   });
 
   it("item que some da lista não perde a posição", () => {

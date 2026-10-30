@@ -22,7 +22,7 @@ export function idAtual(f: EstadoDaFila): string | null {
   return f.atual >= 0 ? f.ids[f.atual] ?? null : null;
 }
 
-/** Próximo índice ainda não resolvido depois de `de`; pulados voltam no fim da volta. */
+/** Próximo índice ainda não resolvido depois de `de`; pulado só volta com `voltar`. */
 function proximoPendente(f: EstadoDaFila, de: number, resolvidos: Set<string>): number {
   for (let k = de + 1; k < f.ids.length; k++) if (!resolvidos.has(f.ids[k])) return k;
   return -1;
@@ -44,6 +44,14 @@ export function pular(f: EstadoDaFila): EstadoDaFila {
   const pulados = f.pulados.includes(id) ? f.pulados : [...f.pulados, id];
   const resolvidos = new Set([...f.concluidos, ...pulados]);
   return { ...f, pulados, atual: proximoPendente(f, f.atual, resolvidos) };
+}
+
+/** Reabre um pulado (padrão: o último) como atual; o que estava aberto segue pendente. */
+export function voltar(f: EstadoDaFila, id: string | undefined = f.pulados.at(-1)): EstadoDaFila {
+  if (!id || !f.pulados.includes(id)) return f;
+  const atual = f.ids.indexOf(id);
+  if (atual < 0) return f;
+  return { ...f, pulados: f.pulados.filter((x) => x !== id), atual };
 }
 
 /** Item sumiu da lista (outra pessoa concluiu, adiou): tira da fila sem perder a posição. */

@@ -1,15 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ArrowRight, CircleCheck, ExternalLink, MessagesSquare, SkipForward, X } from "lucide-react";
+import { ArrowRight, CircleCheck, ExternalLink, MessagesSquare, SkipForward, Undo2, X } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PhoneNumber } from "@/components/ui/phone-number";
-import { concluirEProximo, idAtual, iniciarFila, progressoDaFila, pular, type EstadoDaFila } from "@/lib/tarefas/fila";
+import { concluirEProximo, idAtual, iniciarFila, progressoDaFila, pular, voltar, type EstadoDaFila } from "@/lib/tarefas/fila";
 import { textoDoPrazo } from "@/lib/tarefas/formato";
 import { formatMoney } from "@/lib/design-system/format";
+import { cn } from "@/lib/utils";
 import type { ItemDoDiaDaTela } from "@/lib/tarefas/tela";
 import { AcaoRapida, IconeDoTipo } from "./pecas";
 import { useConcluirTarefa } from "./concluir";
@@ -37,14 +38,34 @@ export function FilaDeTrabalho({
   const [porId] = React.useState(() => new Map(itens.map((i) => [i.id, i])));
   const [fila, setFila] = React.useState<EstadoDaFila>(() => iniciarFila(itens.map((i) => i.id)));
   const [agora] = React.useState(() => new Date());
-  const { abrir, dialogo } = useConcluirTarefa(() => {
+  // Hora em que cada um foi concluído aqui, e o último (que entra com animação).
+  const [concluidoEm, setConcluidoEm] = React.useState<Map<string, Date>>(() => new Map());
+  const [recente, setRecente] = React.useState<string | null>(null);
+
+  const id = idAtual(fila);
+  const idRef = React.useRef(id);
+  React.useEffect(() => {
+    idRef.current = id;
+  });
+
+  const concluir = React.useCallback(() => {
+    const atual = idRef.current;
+    if (atual) {
+      setConcluidoEm((m) => new Map(m).set(atual, new Date()));
+      setRecente(atual);
+    }
     setFila((f) => concluirEProximo(f));
+  }, []);
+
+  const { abrir, dialogo } = useConcluirTarefa(() => {
+    concluir();
     onMudou();
   });
 
-  const id = idAtual(fila);
   const item = id ? porId.get(id) ?? null : null;
   const { feitos, total } = progressoDaFila(fila);
+  const concluidos = new Set(fila.concluidos);
+  const pulados = new Set(fila.pulados);
 
   React.useEffect(() => {
     function tecla(e: KeyboardEvent) {
@@ -54,12 +75,24 @@ export function FilaDeTrabalho({
     return () => window.removeEventListener("keydown", tecla);
   }, [onSair]);
 
+  // A cada troca, o registro aberto (ou o fim da fila) entra na tela.
+  const alvo = React.useRef<HTMLLIElement>(null);
+  const primeira = React.useRef(true);
+  React.useEffect(() => {
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    alvo.current?.scrollIntoView({ block: "nearest", behavior: suave ? "smooth" : "auto" });
+  }, [fila.atual]);
+
   return (
     <section aria-label={titulo} className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-title-sm text-text-primary">{titulo}</h2>
-          <p className="text-small text-text-secondary tabular-nums">
+          <p className="text-small text-text-secondary tabular-nums" aria-live="polite">
             {feitos} de {total} feitos{fila.pulados.length ? ` · ${fila.pulados.length} pulado${fila.pulados.length === 1 ? "" : "s"}` : ""}
           </p>
         </div>
@@ -68,69 +101,149 @@ export function FilaDeTrabalho({
         </Button>
       </header>
 
-      {!item ? (
-        <Panel>
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CircleCheck size={20} aria-hidden className="text-success" />
-            <p className="text-body text-text-primary">Fila terminada.</p>
-            <Button variant="secondary" onClick={onSair}>
-              Voltar ao Meu dia
-            </Button>
-          </div>
-        </Panel>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <Panel>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start gap-3">
-                <IconeDoTipo tipo={item.tipo} className="mt-1" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-title-sm text-text-primary">{item.titulo}</p>
-                  <p className="mt-0.5 text-small text-text-secondary">
-                    {item.dueAt ? textoDoPrazo(item.dueAt, item.diaTodo, agora) : item.fonte === "responder" ? "Cliente esperando resposta" : "Sem prazo"}
-                    {item.tarefa?.overdue && <span className="font-medium text-danger"> · atrasada</span>}
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <ol className="flex min-w-0 flex-col gap-2">
+          {fila.ids.map((rid) => {
+            const r = porId.get(rid);
+            if (!r) return null;
+            if (concluidos.has(rid)) return <RegistroConcluido key={rid} item={r} em={concluidoEm.get(rid)} animar={rid === recente} />;
+            if (pulados.has(rid)) return <RegistroPulado key={rid} item={r} onVoltar={() => setFila((f) => voltar(f, rid))} />;
+            if (rid !== id) return <RegistroProximo key={rid} item={r} agora={agora} />;
+            return (
+              <li key={rid} ref={alvo} className="scroll-my-4">
+                <Panel className="border-border-default">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-3">
+                      <IconeDoTipo tipo={r.tipo} className="mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-title-sm text-text-primary">{r.titulo}</p>
+                        <p className="mt-0.5 text-small text-text-secondary">
+                          <Prazo item={r} agora={agora} />
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AcaoRapida
+                        tamanho="md"
+                        tipo={r.tipo}
+                        contato={r.contexto.contato ? { telefone: r.contexto.contato.telefone, email: r.contexto.contato.email, conversaId: r.contexto.conversaId } : null}
+                      />
+                      {r.tarefa ? (
+                        <Button variant="primary" onClick={() => abrir(r.tarefa!)}>
+                          <CircleCheck size={14} aria-hidden /> Concluir e próximo
+                        </Button>
+                      ) : r.fonte !== "proximo_passo" ? (
+                        <Button variant="primary" onClick={concluir}>
+                          <ArrowRight size={14} aria-hidden /> Feito, próximo
+                        </Button>
+                      ) : null}
+                      <Button variant="ghost" onClick={() => setFila((f) => pular(f))}>
+                        <SkipForward size={14} aria-hidden /> Pular
+                      </Button>
+                      {fila.pulados.length > 0 && (
+                        <Button variant="ghost" onClick={() => setFila((f) => voltar(f))}>
+                          <Undo2 size={14} aria-hidden /> Voltar
+                        </Button>
+                      )}
+                    </div>
+                    {r.fonte === "proximo_passo" && r.contexto.negocio && (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-small font-medium text-text-primary">Próximo passo para {r.contexto.negocio.nome}</span>
+                        <QuickAdd
+                          dealId={r.contexto.negocio.id}
+                          placeholder="ex.: whatsapp amanhã 10h"
+                          onCriada={() => {
+                            concluir();
+                            onMudou();
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Panel>
+              </li>
+            );
+          })}
+          {!item && (
+            <li ref={alvo} className="scroll-my-4">
+              <Panel>
+                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                  <CircleCheck size={20} aria-hidden className="text-success" />
+                  <p className="text-body text-text-primary">
+                    Fila terminada · {feitos} concluída{feitos === 1 ? "" : "s"}
+                    {fila.pulados.length ? ` · ${fila.pulados.length} pulada${fila.pulados.length === 1 ? "" : "s"}` : ""}
                   </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <AcaoRapida
-                  tamanho="md"
-                  tipo={item.tipo}
-                  contato={item.contexto.contato ? { telefone: item.contexto.contato.telefone, email: item.contexto.contato.email, conversaId: item.contexto.conversaId } : null}
-                />
-                {item.tarefa ? (
-                  <Button variant="primary" onClick={() => abrir(item.tarefa!)}>
-                    <CircleCheck size={14} aria-hidden /> Concluir e próximo
+                  <Button variant="secondary" onClick={onSair}>
+                    Voltar ao Meu dia
                   </Button>
-                ) : item.fonte !== "proximo_passo" ? (
-                  <Button variant="primary" onClick={() => setFila((f) => concluirEProximo(f))}>
-                    <ArrowRight size={14} aria-hidden /> Feito, próximo
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => setFila((f) => pular(f))}>
-                  <SkipForward size={14} aria-hidden /> Pular
-                </Button>
-              </div>
-              {item.fonte === "proximo_passo" && item.contexto.negocio && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-small font-medium text-text-primary">Próximo passo para {item.contexto.negocio.nome}</span>
-                  <QuickAdd
-                    dealId={item.contexto.negocio.id}
-                    placeholder="ex.: whatsapp amanhã 10h"
-                    onCriada={() => {
-                      setFila((f) => concluirEProximo(f));
-                      onMudou();
-                    }}
-                  />
                 </div>
-              )}
-            </div>
-          </Panel>
-          <ContextoDoRegistro item={item} />
-        </div>
-      )}
+              </Panel>
+            </li>
+          )}
+        </ol>
+        {item && (
+          <div className="lg:sticky lg:top-4">
+            <ContextoDoRegistro item={item} />
+          </div>
+        )}
+      </div>
       {dialogo}
     </section>
+  );
+}
+
+function Prazo({ item, agora }: { item: ItemDoDiaDaTela; agora: Date }) {
+  return (
+    <>
+      {item.dueAt ? textoDoPrazo(item.dueAt, item.diaTodo, agora) : item.fonte === "responder" ? "Cliente esperando resposta" : "Sem prazo"}
+      {item.tarefa?.overdue && <span className="font-medium text-danger"> · atrasada</span>}
+    </>
+  );
+}
+
+function RegistroConcluido({ item, em, animar }: { item: ItemDoDiaDaTela; em?: Date; animar: boolean }) {
+  return (
+    <li
+      className={cn(
+        "flex items-center gap-3 rounded-[14px] border border-success/30 bg-success-subtle px-4 py-2.5",
+        animar && "motion-safe:animate-[ds-done_var(--dur-slow)_var(--ease-out)]"
+      )}
+    >
+      <CircleCheck
+        size={18}
+        aria-hidden
+        className={cn("shrink-0 text-success", animar && "motion-safe:animate-[ds-check-pop_var(--dur-slow)_var(--ease-out)]")}
+      />
+      <span className="min-w-0 flex-1 truncate text-small text-text-primary">{item.titulo}</span>
+      <span className="shrink-0 text-caption font-medium text-success">
+        Concluído{em ? ` às ${em.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}
+      </span>
+    </li>
+  );
+}
+
+function RegistroPulado({ item, onVoltar }: { item: ItemDoDiaDaTela; onVoltar: () => void }) {
+  return (
+    <li className="flex items-center gap-3 rounded-[14px] border border-border-subtle bg-panel px-4 py-1.5">
+      <SkipForward size={16} aria-hidden className="shrink-0 text-text-tertiary" />
+      <span className="min-w-0 flex-1 truncate text-small text-text-secondary">{item.titulo}</span>
+      <span className="shrink-0 text-caption text-text-tertiary">Pulada</span>
+      <Button variant="ghost" size="sm" onClick={onVoltar} aria-label={`Voltar para ${item.titulo}`}>
+        <Undo2 size={14} aria-hidden /> Voltar
+      </Button>
+    </li>
+  );
+}
+
+function RegistroProximo({ item, agora }: { item: ItemDoDiaDaTela; agora: Date }) {
+  return (
+    <li className="flex items-center gap-3 rounded-[14px] border border-border-subtle px-4 py-2.5">
+      <IconeDoTipo tipo={item.tipo} className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-small text-text-primary">{item.titulo}</span>
+      <span className="shrink-0 text-caption text-text-tertiary">
+        <Prazo item={item} agora={agora} />
+      </span>
+    </li>
   );
 }
 

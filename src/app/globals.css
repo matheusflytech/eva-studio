@@ -602,6 +602,17 @@ body {
   from { transform: translateY(4px); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
+/* Fila do dia: registro concluído entra verde, com o ✓ saltando. */
+@keyframes ds-done {
+  0% { transform: scale(0.97); box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-fg) 45%, transparent); }
+  60% { box-shadow: 0 0 0 6px transparent; }
+  100% { transform: none; box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes ds-check-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: none; }
+}
 
 /* React Flow — linhas e controles nos tokens (valem nos dois temas). */
 .react-flow__attribution {
