@@ -121,7 +121,7 @@ function Marketing() {
   }, [window_.de, window_.ate, reload]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-4 md:p-6">
+    <div className="flex w-full flex-col gap-6 px-4 pb-6 pt-4 lg:px-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-title font-semibold text-text-primary">Marketing</h1>
@@ -180,7 +180,7 @@ function SummaryTiles({ summary }: { summary: Summary | null }) {
     { label: "Negócios com origem", value: t ? pct(t.originPct) : "…", hint: t ? `${t.dealsWithOrigin} de ${t.deals}` : undefined },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
       {tiles.map((x) => (
         <div key={x.label} className="rounded-[14px] border border-border-subtle bg-panel p-3">
           <p className="text-caption text-text-secondary">{x.label}</p>
@@ -242,14 +242,21 @@ function OriginTable({ summary }: { summary: Summary | null }) {
                     </tr>
                     {isOpen && (
                       <tr className="border-b border-border-subtle bg-raised">
-                        <td colSpan={10} className="px-6 py-2">
-                          <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                        <td colSpan={10} className="px-6 py-3">
+                          <ul className="grid max-h-72 grid-cols-1 gap-x-6 gap-y-1 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
                             {r.dealList.map((d) => (
-                              <li key={d.id}>
-                                <Link href={`/deals/${d.id}`} className="text-accent hover:underline">{d.name}</Link>
+                              <li key={d.id} className="min-w-0">
+                                <Link href={`/deals/${d.id}`} title={d.name} className="block truncate rounded py-0.5 text-text-primary outline-none hover:text-accent-fg hover:underline focus-visible:ring-2 focus-visible:ring-focus">
+                                  {d.name}
+                                </Link>
                               </li>
                             ))}
                           </ul>
+                          {r.deals > r.dealList.length && (
+                            <p className="mt-2 text-caption text-text-tertiary">
+                              Mostrando {r.dealList.length} de {r.deals} negócios.
+                            </p>
+                          )}
                         </td>
                       </tr>
                     )}
