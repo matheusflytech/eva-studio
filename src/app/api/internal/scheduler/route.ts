@@ -9,6 +9,7 @@ import { entregarPendentes } from "@/lib/server/webhooks/entrega";
 import { entregarEventosPendentes } from "@/lib/server/eventos/barramento";
 import { rodarAutomacoes } from "@/lib/server/automacoes/varreduras";
 import { retomarEsperasVencidas } from "@/lib/server/esperas";
+import { syncDueMetaAccounts } from "@/lib/server/meta-ads";
 
 // ---------------------------------------------------------------------------
 // Relógio do produto: entrega os passos de sequência vencidos e os disparos
@@ -105,6 +106,13 @@ export async function POST(request: Request) {
     return { entregues: 0, falhas: 0 };
   });
 
+  // Gasto da Meta Ads (aba Marketing): contas ligadas com leitura vencida (a cada 6 h).
+  // Só lê da Meta; sem o SQL da M2 a tabela não existe e o passo só loga.
+  const metaAds = await syncDueMetaAccounts({ orcamentoMs: Math.min(10_000, Math.max(0, 45_000 - (Date.now() - startedAt))) }).catch((e) => {
+    console.error("[scheduler] leitura da Meta Ads falhou", e instanceof Error ? e.message : e);
+    return { contas: 0, linhas: 0 };
+  });
+
   // Lixeira: o que passou dos 30 dias some de vez. Também nunca derruba a
   // rodada (sem o SQL da lixeira a tabela não existe e a conta é 0).
   const lixeiraLimpa = await limparLixeiraVencida().catch((e) => {
@@ -121,6 +129,7 @@ export async function POST(request: Request) {
     automacoes,
     esperas,
     lixeira: { expiradas: lixeiraLimpa },
+    metaAds,
     sequences: { ...sequences, newlyEnrolled },
     broadcasts: {
       ran: broadcasts.ran,

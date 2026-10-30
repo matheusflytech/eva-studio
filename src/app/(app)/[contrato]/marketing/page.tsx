@@ -9,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/auth-context";
 import { permite } from "@/lib/permissoes/catalogo";
@@ -147,6 +148,7 @@ function Marketing() {
       {error && <p role="alert" className="text-small text-danger">{error}</p>}
       <SummaryTiles summary={summary} />
       <OriginTable summary={summary} />
+      <MetaAdsSection canEdit={canEdit} onChange={refresh} />
       <SpendSection canEdit={canEdit} onChange={refresh} />
       <LinksSection canEdit={canEdit} />
       <InstallSection />
@@ -262,6 +264,154 @@ function OriginTable({ summary }: { summary: Summary | null }) {
   );
 }
 
+interface MetaState {
+  configured: boolean;
+  connections: { id: string; status: string; externalLabel: string; tokenType: string; expiresAt: string | null; lastError: string | null }[];
+  accounts: { id: string; externalId: string; name: string; currency: string; enabled: boolean; lastSyncAt: string | null; lastSyncError: string | null }[];
+}
+
+const META_RESULT: Record<string, { title: string; tone: "success" | "danger" | "neutral" }> = {
+  ok: { title: "Meta Ads conectada. Ligue as contas que devem entrar no custo.", tone: "success" },
+  erro: { title: "Não deu para conectar a Meta Ads. Tente de novo.", tone: "danger" },
+  cancelado: { title: "Conexão com a Meta cancelada.", tone: "neutral" },
+};
+
+/** Gasto que vem sozinho da Meta Ads (M2). Só leitura: a Eva não mexe nos anúncios. */
+function MetaAdsSection({ canEdit, onChange }: { canEdit: boolean; onChange: () => void }) {
+  const toast = useToast();
+  const [data, setData] = React.useState<MetaState | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [now] = React.useState(() => Date.now());
+  const load = React.useCallback(() => api<MetaState>("/api/marketing/meta").then(setData).catch(() => setData(null)), []);
+  React.useEffect(() => {
+    load();
+    // Volta do Facebook Login: avisa o resultado e limpa a URL.
+    const url = new URL(window.location.href);
+    const r = META_RESULT[url.searchParams.get("meta") ?? ""];
+    if (r) {
+      toast(r);
+      url.searchParams.delete("meta");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, [load, toast]);
+
+  const connect = () => {
+    const contrato = window.location.pathname.split("/")[1] ?? "";
+    window.location.href = `/api/marketing/meta/start?contrato=${encodeURIComponent(contrato)}`;
+  };
+
+  async function run(fn: () => Promise<unknown>, ok?: string) {
+    setBusy(true);
+    try {
+      await fn();
+      if (ok) toast({ title: ok, tone: "success" });
+      load();
+      onChange();
+    } catch (err) {
+      toast({ title: (err as Error).message, tone: "danger" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const conn = data?.connections[0] ?? null;
+  const daysLeft = conn?.expiresAt ? Math.ceil((Date.parse(conn.expiresAt) - now) / 86_400_000) : null;
+  const accounts = data?.accounts ?? [];
+
+  return (
+    <Section title="Meta Ads" description="O investimento das campanhas da Meta entra sozinho, por dia e por anúncio, e junta com os contatos que vieram desses anúncios.">
+      {!data ? (
+        <p className="text-small text-text-secondary">Carregando…</p>
+      ) : !conn ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {data.configured ? (
+            canEdit ? (
+              <Button type="button" onClick={connect}>Conectar Meta Ads</Button>
+            ) : (
+              <p className="text-small text-text-secondary">Peça a um administrador para conectar a Meta Ads.</p>
+            )
+          ) : (
+            <p className="text-small text-text-secondary">A conexão com a Meta ainda não está configurada neste ambiente.</p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 text-small">
+          {conn.status === "needs_reauth" ? (
+            <p role="alert" className="rounded-[10px] bg-danger-subtle px-3 py-2 text-danger">
+              O acesso à Meta parou de valer{conn.lastError ? ` (${conn.lastError})` : ""}. Reconecte para o custo voltar a entrar.
+            </p>
+          ) : daysLeft !== null && daysLeft <= 10 ? (
+            <p role="status" className="rounded-[10px] bg-raised px-3 py-2 text-text-primary">
+              O acesso à Meta vence em {Math.max(0, daysLeft)} dia(s). Reconecte antes para não parar de entrar o custo.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-text-primary">
+              Conectada como <strong>{conn.externalLabel || "conta da Meta"}</strong>
+              {conn.tokenType === "system_user" ? " (acesso do portfólio, não expira)" : ""}
+            </span>
+            {canEdit && (
+              <span className="ml-auto flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="secondary" loading={busy} onClick={() => run(() => api("/api/marketing/meta/sync", { method: "POST" }), "Sincronizado")}>
+                  Sincronizar agora
+                </Button>
+                {(conn.status === "needs_reauth" || (daysLeft !== null && daysLeft <= 10)) && (
+                  <Button type="button" size="sm" onClick={connect}>Reconectar</Button>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => window.confirm("Desconectar a Meta Ads? O custo já importado continua na aba.") && run(() => api("/api/marketing/meta", { method: "DELETE" }), "Meta Ads desconectada")}
+                >
+                  Desconectar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => window.confirm("Apagar todo o custo importado da Meta? Não tem volta.") && run(() => api("/api/marketing/meta?data=1", { method: "DELETE" }), "Dados importados apagados")}
+                >
+                  Apagar dados importados
+                </Button>
+              </span>
+            )}
+          </div>
+          {accounts.length === 0 ? (
+            <p className="text-text-secondary">Nenhuma conta de anúncios nesta conexão.</p>
+          ) : (
+            <ul className="divide-y divide-border-subtle">
+              {accounts.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
+                  <Switch
+                    checked={a.enabled}
+                    disabled={!canEdit || busy}
+                    aria-label={`Usar a conta ${a.name}`}
+                    onCheckedChange={(v) => run(() => api("/api/marketing/meta", { method: "PATCH", body: JSON.stringify({ accountId: a.id, enabled: v }) }))}
+                  />
+                  <span className="font-medium text-text-primary">{a.name}</span>
+                  <span className="text-text-tertiary">{a.externalId.replace(/^act_/, "")} · {a.currency}</span>
+                  <span className={cn("ml-auto", a.lastSyncError ? "text-danger" : "text-text-secondary")}>
+                    {a.currency !== "BRL" && a.enabled
+                      ? "Moeda diferente de real: ainda não entra no total"
+                      : a.lastSyncError
+                        ? `Erro: ${a.lastSyncError}`
+                        : a.lastSyncAt
+                          ? `Lido em ${new Date(a.lastSyncAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+                          : a.enabled
+                            ? "Lendo na próxima rodada…"
+                            : "Desligada"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 const EMPTY_SPEND = { source: "", campaign: "", from: "", to: "", amount: "", note: "" };
 
 function SpendSection({ canEdit, onChange }: { canEdit: boolean; onChange: () => void }) {
@@ -269,6 +419,7 @@ function SpendSection({ canEdit, onChange }: { canEdit: boolean; onChange: () =>
   const [data, setData] = React.useState<{ spends: Spend[]; suggestions: { source: string; campaign: string }[] } | null>(null);
   const [form, setForm] = React.useState(EMPTY_SPEND);
   const [editing, setEditing] = React.useState<string | null>(null);
+  const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const load = React.useCallback(() => api<NonNullable<typeof data>>("/api/marketing/spend").then(setData).catch(() => setData({ spends: [], suggestions: [] })), []);
   React.useEffect(() => {
@@ -287,6 +438,7 @@ function SpendSection({ canEdit, onChange }: { canEdit: boolean; onChange: () =>
       toast({ title: editing ? "Investimento atualizado" : "Investimento lançado", tone: "success" });
       setForm(EMPTY_SPEND);
       setEditing(null);
+      setOpen(false);
       load();
       onChange();
     } catch (err) {
@@ -308,8 +460,16 @@ function SpendSection({ canEdit, onChange }: { canEdit: boolean; onChange: () =>
   }
 
   return (
-    <Section title="Investimento" description="Quanto foi gasto por fonte e campanha. Use os mesmos nomes da UTM (utm_source e utm_campaign) para o custo juntar com os contatos. Campanha vazia vale para a fonte toda.">
-      {canEdit && (
+    <Section
+      title="Outros investimentos"
+      description="Para o que não vem sozinho: Google Ads, evento, influenciador. Não lance aqui o que já vem da Meta Ads, senão o custo conta duas vezes. Use os nomes da UTM (utm_source e utm_campaign) para juntar com os contatos."
+    >
+      {canEdit && !open && !editing && (
+        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+          Lançar à mão
+        </Button>
+      )}
+      {canEdit && (open || editing) && (
         <form onSubmit={save} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
           <Field label="Fonte" required>
             <Input list="mk-sources" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="facebook" required />
@@ -328,9 +488,7 @@ function SpendSection({ canEdit, onChange }: { canEdit: boolean; onChange: () =>
           </Field>
           <div className="flex gap-2">
             <Button type="submit" loading={saving}>{editing ? "Salvar" : "Lançar"}</Button>
-            {editing && (
-              <Button type="button" variant="ghost" onClick={() => { setEditing(null); setForm(EMPTY_SPEND); }}>Cancelar</Button>
-            )}
+            <Button type="button" variant="ghost" onClick={() => { setEditing(null); setOpen(false); setForm(EMPTY_SPEND); }}>Cancelar</Button>
           </div>
           <datalist id="mk-sources">{sources.map((s) => <option key={s} value={s} />)}</datalist>
           <datalist id="mk-campaigns">{campaigns.map((c) => <option key={c} value={c} />)}</datalist>

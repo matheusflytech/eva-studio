@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   dealOrigin: { create: vi.fn(), findMany: vi.fn() },
   sale: { findMany: vi.fn() },
   marketingSpend: { findMany: vi.fn() },
+  adDailyMetric: { findMany: vi.fn(async (): Promise<unknown[]> => []), groupBy: vi.fn(async (): Promise<unknown[]> => []) },
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
@@ -21,6 +22,8 @@ beforeEach(() => {
   db.touchpoint.findFirst.mockResolvedValue(null);
   db.touchpoint.create.mockResolvedValue({ id: "tp-new" });
   db.deal.findMany.mockResolvedValue([]);
+  db.adDailyMetric.findMany.mockResolvedValue([]);
+  db.adDailyMetric.groupBy.mockResolvedValue([]);
 });
 
 describe("recordTouch", () => {
@@ -92,5 +95,22 @@ describe("marketingSummary", () => {
     expect(r).toMatchObject({ leads: 1, deals: 1, won: 1, revenueCents: 50000, spendCents: 10000, cplCents: 10000, cacCents: 10000, roas: 5 });
     expect(s.totals).toMatchObject({ deals: 2, dealsWithOrigin: 1, originPct: 0.5, revenueCents: 50000 });
     expect(s.rows.at(-1)!.source).toBeNull();
+  });
+
+  it("gasto da Meta entra sozinho na campanha; toque de anúncio e utm_id caem na mesma linha", async () => {
+    const ad = { id: "t1", channel: "ad_whatsapp", utmSource: "facebook", utmCampaign: null, utmId: null, adId: "a1" };
+    const utm = { id: "t2", channel: "site", utmSource: "google", utmCampaign: "x", utmId: "c1", adId: null };
+    db.touchpoint.findMany.mockResolvedValueOnce([{ ...ad, at: AT }, { ...utm, at: AT }]);
+    db.deal.findMany
+      .mockResolvedValueOnce([{ id: "d1", name: "A", origin: { touchpoint: ad } }])
+      .mockResolvedValueOnce([{ id: "d1", name: "A", amountCents: 30000, origin: { touchpoint: ad } }]);
+    db.sale.findMany.mockResolvedValue([]);
+    db.marketingSpend.findMany.mockResolvedValue([]);
+    db.adDailyMetric.findMany.mockResolvedValue([{ adId: "a1", campaignId: "c1", campaignName: "Black Friday" }]);
+    db.adDailyMetric.groupBy.mockResolvedValue([{ campaignId: "c1", _sum: { spendCents: 15000 } }]);
+    const s = await marketingSummary("o1", "2026-10-01", "2026-10-31");
+    expect(s.rows).toHaveLength(1);
+    expect(s.rows[0]).toMatchObject({ source: "facebook", campaign: "black friday", spendCents: 15000, leads: 2, deals: 1, won: 1, revenueCents: 30000, roas: 2 });
+    expect(db.adDailyMetric.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: "o1", currency: "BRL" }) }));
   });
 });

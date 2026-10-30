@@ -58,6 +58,10 @@ model Organization {
   trackedLinks      TrackedLink[]
   linkClicks        LinkClick[]
   marketingSpend    MarketingSpend[]
+  // Marketing M2 (2026-11-06-meta-ads.sql): só relações.
+  marketingConnections MarketingConnection[]
+  marketingAccounts    MarketingAccount[]
+  adDailyMetrics       AdDailyMetric[]
   // Quando a pessoa terminou (ou pulou) a configuração inicial guiada. Nulo = ainda não.
   onboardedAt DateTime?
 
@@ -2589,4 +2593,90 @@ model DealOrigin {
 
   @@index([orgId])
   @@map("eva_studio_deal_origins")
+}
+
+// ---------------------------------------------------------------------------
+// Marketing M2 (prisma/sql/2026-11-06-meta-ads.sql): gasto da Meta Ads.
+// Spec: docs/superpowers/specs/2026-10-29-marketing-m2-meta-ads-design.md
+// ---------------------------------------------------------------------------
+
+// Autorização do contrato num provedor de anúncios. Token cifrado (crypto.ts) em secrets.
+model MarketingConnection {
+  id             String    @id @default(uuid())
+  orgId          String
+  provider       String // meta
+  status         String    @default("active") // active | needs_reauth | revoked | error
+  externalUserId String
+  externalLabel  String    @default("")
+  tokenType      String    @default("user") // system_user | user
+  secrets        String    @default("")
+  expiresAt      DateTime?
+  lastError      String?
+  connectedById  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  accounts     MarketingAccount[]
+
+  @@unique([orgId, provider, externalUserId])
+  @@index([externalUserId])
+  @@map("eva_studio_marketing_connections")
+}
+
+// Conta de anúncios vista na conexão. Só sincroniza com enabled.
+model MarketingAccount {
+  id              String    @id @default(uuid())
+  orgId           String
+  connectionId    String
+  kind            String // meta_ads
+  externalId      String // act_123
+  name            String
+  currency        String    @default("BRL")
+  timezone        String    @default("America/Sao_Paulo")
+  enabled         Boolean   @default(false)
+  syncedThrough   DateTime? @db.Date
+  nextSyncAt      DateTime  @default(now())
+  syncLockedUntil DateTime?
+  lastSyncAt      DateTime?
+  lastSyncError   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   MarketingConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  metrics      AdDailyMetric[]
+
+  @@unique([orgId, kind, externalId])
+  @@index([nextSyncAt])
+  @@map("eva_studio_marketing_accounts")
+}
+
+// Um dia de um anúncio. Gasto em centavos da moeda da conta.
+model AdDailyMetric {
+  id            String   @id @default(uuid())
+  orgId         String
+  accountId     String
+  date          DateTime @db.Date
+  campaignId    String
+  campaignName  String   @default("")
+  adsetId       String   @default("")
+  adsetName     String   @default("")
+  adId          String
+  adName        String   @default("")
+  spendCents    Int      @default(0)
+  currency      String   @default("BRL")
+  impressions   Int      @default(0)
+  clicks        Int      @default(0)
+  leads         Int      @default(0)
+  conversations Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  organization Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  account      MarketingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, date, adId])
+  @@index([orgId, date])
+  @@index([orgId, adId])
+  @@map("eva_studio_ad_daily_metrics")
 }
