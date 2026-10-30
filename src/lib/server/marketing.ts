@@ -12,6 +12,7 @@ import {
   type SpendRow,
   type TouchInput,
 } from "@/lib/marketing/touch";
+import { metaCampaignKey } from "@/lib/marketing/meta-ads";
 
 // Origem de marketing (M1): grava toques, liga o "ref: CODE" da mensagem ao
 // link/visita, congela a origem do negócio e monta o resumo da aba Marketing.
@@ -166,11 +167,11 @@ export interface MarketingSummary {
   rows: MarketingRow[];
 }
 
-const TP_SELECT = { id: true, channel: true, utmSource: true, utmCampaign: true } as const;
-type Tp = { id: string; channel: string; utmSource: string | null; utmCampaign: string | null };
+const TP_SELECT = { id: true, channel: true, utmSource: true, utmCampaign: true, utmId: true, adId: true } as const;
+type Tp = { id: string; channel: string; utmSource: string | null; utmCampaign: string | null; utmId: string | null; adId: string | null };
 
 /** Fonte da linha: a utm_source; sem ela, o canal (whatsapp_link, site...). */
-const keyOf = (tp: Tp | null | undefined) => (tp ? { source: tp.utmSource ?? tp.channel, campaign: tp.utmCampaign ?? "" } : null);
+const utmKey = (tp: Tp | null | undefined) => (tp ? { source: tp.utmSource ?? tp.channel, campaign: tp.utmCampaign ?? "" } : null);
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
 
 function ratios(r: Pick<MarketingRow, "spendCents" | "leads" | "won" | "revenueCents">) {
@@ -190,7 +191,7 @@ export async function marketingSummary(orgId: string, from: string, to: string):
   const window = { gte: start, lte: end };
 
   // shortcut: 1º toque de cada contato do contrato lido inteiro; trocar por DISTINCT ON em SQL quando passar de ~50 mil contatos com toque.
-  const [firsts, created, won, sales, spends] = await Promise.all([
+  const [firsts, created, won, sales, spends, metaAds, metaSpend] = await Promise.all([
     prisma.touchpoint.findMany({
       where: { orgId },
       distinct: ["contactId"],
@@ -213,7 +214,28 @@ export async function marketingSummary(orgId: string, from: string, to: string):
       where: { orgId, from: { lte: new Date(`${to}T00:00:00Z`) }, to: { gte: new Date(`${from}T00:00:00Z`) } },
       select: { source: true, campaign: true, from: true, to: true, amountCents: true },
     }),
+    // Meta Ads (M2): anúncio → campanha (nome mais recente) e o gasto do período por campanha.
+    // shortcut: um registro por anúncio já importado; trocar por tabela de estrutura quando passar de ~20 mil anúncios.
+    prisma.adDailyMetric.findMany({
+      where: { orgId },
+      distinct: ["adId"],
+      orderBy: [{ adId: "asc" }, { date: "desc" }],
+      select: { adId: true, campaignId: true, campaignName: true },
+    }),
+    // shortcut: só contas em BRL entram no total; outra moeda precisa de câmbio (fora da M2).
+    prisma.adDailyMetric.groupBy({
+      by: ["campaignId"],
+      where: { orgId, currency: "BRL", date: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } },
+      _sum: { spendCents: true },
+    }),
   ]);
+
+  // Toque de anúncio importado (adId) ou com utm_id de campanha importada cai na linha da campanha da Meta.
+  const campaignOfAd = new Map(metaAds.map((a) => [a.adId, a.campaignId]));
+  const campaignName = new Map(metaAds.map((a) => [a.campaignId, a.campaignName]));
+  const metaKeyOfCampaign = (id: string | null | undefined) => (id && campaignName.has(id) ? metaCampaignKey(campaignName.get(id)!) : null);
+  const keyOf = (tp: Tp | null | undefined) =>
+    (tp && (metaKeyOfCampaign(tp.adId ? campaignOfAd.get(tp.adId) : null) ?? metaKeyOfCampaign(tp.utmId))) || utmKey(tp);
 
   const rows = new Map<string, MarketingRow>();
   const row = (k: { source: string | null; campaign: string }) => {
@@ -273,6 +295,10 @@ export async function marketingSummary(orgId: string, from: string, to: string):
   const spendRows: SpendRow[] = spends.map((s) => ({ source: s.source, campaign: s.campaign, from: ymd(s.from), to: ymd(s.to), amountCents: s.amountCents }));
   for (const s of spendRows) row(s).spendCents = 0; // garante a linha; o valor sai do rateio abaixo
   for (const r of rows.values()) if (r.source !== null) r.spendCents = spendFor(spendRows, r.source, r.campaign, from, to);
+  for (const m of metaSpend) {
+    const k = metaKeyOfCampaign(m.campaignId);
+    if (k) row(k).spendCents += m._sum.spendCents ?? 0;
+  }
 
   const list = [...rows.values()].map((r) => ({ ...r, ...ratios(r) }));
   const sum = (k: "spendCents" | "leads" | "deals" | "won" | "revenueCents") => list.reduce((n, r) => n + r[k], 0);
