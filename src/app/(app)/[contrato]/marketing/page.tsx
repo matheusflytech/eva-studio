@@ -121,7 +121,7 @@ function Marketing() {
   }, [window_.de, window_.ate, reload]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 p-4 md:p-6">
+    <div className="flex w-full flex-col gap-6 px-4 pb-6 pt-4 lg:px-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-title font-semibold text-text-primary">Marketing</h1>
@@ -180,7 +180,7 @@ function SummaryTiles({ summary }: { summary: Summary | null }) {
     { label: "Negócios com origem", value: t ? pct(t.originPct) : "…", hint: t ? `${t.dealsWithOrigin} de ${t.deals}` : undefined },
   ];
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
       {tiles.map((x) => (
         <div key={x.label} className="rounded-[14px] border border-border-subtle bg-panel p-3">
           <p className="text-caption text-text-secondary">{x.label}</p>
