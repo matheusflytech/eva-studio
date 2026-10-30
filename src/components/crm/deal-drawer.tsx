@@ -247,8 +247,13 @@ export function DealDrawer({
   }
 
   // No servidor nao existe document; o portal so monta depois da hidratacao.
-  const [montado, setMontado] = React.useState(false);
-  React.useEffect(() => { setMontado(true); }, []);
+  // Aberto de dentro de uma gaveta do Radix (ficha do contato), nasce dentro
+  // dela: fora, o body fica sem clique e o foco volta para a gaveta.
+  const [alvo, setAlvo] = React.useState<Element | null>(null);
+  React.useEffect(() => {
+    setAlvo([...document.querySelectorAll("[role='dialog'][data-state='open']")].pop() ?? document.body);
+  }, []);
+  const montado = alvo !== null;
 
   // Foco: entra no painel ao abrir e volta para quem abriu ao fechar.
   const painel = React.useRef<HTMLElement>(null);
@@ -530,6 +535,6 @@ export function DealDrawer({
       {mudanca.elementos}
       {dialogoDeConclusao}
     </div>,
-    document.body
+    alvo
   );
 }

@@ -396,13 +396,14 @@ function ValorDaCondicao({
       );
     }
     return (
-      <div className="flex items-center gap-1.5">
-        <Input type="date" value={f.valor ?? ""} aria-label={f.op === "entre" ? "De" : "Data"} className="h-8 text-small" onChange={(e) => aoMudar({ ...f, valor: e.target.value })} />
+      // Duas datas não cabem lado a lado numa linha estreita: a segunda desce.
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Input type="date" value={f.valor ?? ""} aria-label={f.op === "entre" ? "De" : "Data"} className="h-8 w-auto flex-1 text-small" onChange={(e) => aoMudar({ ...f, valor: e.target.value })} />
         {f.op === "entre" && (
-          <>
+          <span className="flex flex-1 items-center gap-1.5">
             <span className="text-caption text-text-tertiary">e</span>
-            <Input type="date" value={f.ate ?? ""} aria-label="Até" className="h-8 text-small" onChange={(e) => aoMudar({ ...f, ate: e.target.value })} />
-          </>
+            <Input type="date" value={f.ate ?? ""} aria-label="Até" className="h-8 w-auto flex-1 text-small" onChange={(e) => aoMudar({ ...f, ate: e.target.value })} />
+          </span>
         )}
       </div>
     );
