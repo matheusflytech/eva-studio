@@ -17,6 +17,7 @@ import {
   Grid3x3,
   Hash,
   Plus,
+  Sparkles,
   Table2,
   Target,
   Trash2,
@@ -390,6 +391,15 @@ function PedirParaEva({ atual, aoReceber }: { atual: { query: ReportQuery; viz: 
 
   return (
     <section data-anim className="flex flex-col gap-2">
+      <div>
+        <label htmlFor={atual ? "rb-eva-ajuste" : "rb-eva"} className="flex items-center gap-1.5 text-small font-medium text-text-primary">
+          <Sparkles size={14} aria-hidden className="text-accent-fg" />
+          {atual ? "Ajuste com a IA da Eva" : "Crie com a IA da Eva"}
+        </label>
+        <p className="mt-0.5 text-caption text-text-tertiary">
+          {atual ? "Diga o que mudar e a Eva refaz o cartão." : "Escreva o que quer ver e a Eva monta a base, os filtros e o gráfico."}
+        </p>
+      </div>
       <CampoDePedido
         id={atual ? "rb-eva-ajuste" : "rb-eva"}
         placeholder={atual ? "Ajuste com a Eva: agora só os ganhos, separe por mês..." : "Peça para a Eva: quanto vendi por mês este ano?"}
