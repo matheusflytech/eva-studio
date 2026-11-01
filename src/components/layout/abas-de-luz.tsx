@@ -52,7 +52,7 @@ interface Estado {
   arrastando: boolean;
 }
 
-function elastico(): boolean {
+export function elastico(): boolean {
   if (typeof window === "undefined") return true;
   try {
     if (window.localStorage.getItem("eva:arco") === "elastico") return true;

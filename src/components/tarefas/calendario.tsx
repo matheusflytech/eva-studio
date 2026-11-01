@@ -29,6 +29,7 @@ import {
   type NegocioComPrevisao,
 } from "./calendario-dados";
 import { avisosDoCalendario, diasDaSemana, eventoEmDestaque, intervaloDaVisao, paraAvisarNaIlha, type AvisoDoCalendario } from "./calendario-semana";
+import type { NumeroDoCabecalho } from "@/components/layout/cabecalho-de-tela";
 import { valorCurto } from "@/components/crm/negocios/modelo";
 import { usePreferencia } from "@/components/crm/negocios/use-preferencia";
 import { buscarTarefas, FiltroDeQuem, type Resposta } from "./lista";
@@ -314,6 +315,16 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
       </>
     );
 
+  const numeros: NumeroDoCabecalho[] | undefined =
+    tarefas === null
+      ? undefined
+      : [
+          { rotulo: "hoje", valor: resumirDia(porDia.get(chaveDoDia(hoje)) ?? []).tarefas },
+          { rotulo: "na semana", valor: resumirDia(semana.flatMap((d) => porDia.get(chaveDoDia(d)) ?? [])).tarefas },
+          { rotulo: "atrasadas", valor: doMes.atrasadas, tom: "perigo" },
+          { rotulo: "fechamentos no mês", valor: doMes.fechamentos },
+        ];
+
   const variantes: Variants = {
     entra: (d: number) => ({ opacity: 0, x: reduzir ? 0 : d * 56, filter: reduzir ? "blur(0px)" : "blur(6px)" }),
     centro: { opacity: 1, x: 0, filter: "blur(0px)" },
@@ -323,9 +334,10 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
 
   return moldura({
     contagem,
+    numeros,
     lateral: <FiltroDeQuem visoes={visoes} visao={visao} onEscolher={setVisao} />,
     conteudo: (
-      <div className="overflow-hidden rounded-[22px] border border-border-subtle bg-panel">
+      <div className="vidro relative overflow-hidden rounded-[22px]">
         {/* Cabeçalho: o dia escolhido, os avisos e a navegação. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border-subtle px-5 py-4">
           <div aria-hidden="true" className="flex w-12 flex-col overflow-hidden rounded-[10px] border border-border-subtle text-center shadow-[0_1px_2px_rgb(0_0_0/0.05)]">

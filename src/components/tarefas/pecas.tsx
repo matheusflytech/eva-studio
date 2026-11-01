@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { NumeroDoCabecalho } from "@/components/layout/cabecalho-de-tela";
 import { Bot, CalendarCheck, Circle, CircleCheck, ListTodo, Mail, MapPin, MessageCircle, Phone, Users, type LucideIcon } from "lucide-react";
 import Link from "@/components/contrato/link";
 import { buttonVariants } from "@/components/ui/button";
@@ -133,6 +134,8 @@ export function TituloDeGrupo({ id, children, className }: { id?: string; childr
 export interface PartesDaTela {
   /** Ao lado do título: "27 hoje · 24 atrasadas". */
   contagem?: React.ReactNode;
+  /** Números do cabeçalho (pílulas de vidro que sobem ao abrir a tela). */
+  numeros?: NumeroDoCabecalho[];
   /** À direita do título, depois de "Nova tarefa": "…" e a ação principal. */
   acoes?: React.ReactNode;
   /** À direita da sub-barra, ao lado das abas. */
