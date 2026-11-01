@@ -29,6 +29,7 @@ import { sinalHumano } from "./eva-voz";
 import { sinalDoNegocio, type IconeDoSinal, type NegocioKanban, type SinalDoNegocio } from "./modelo";
 import { acoesDisponiveis, linhasDoCartao, rotulosPersonalizados, textoDoCampo, topoDoCartao, type ContextoDoCampo } from "./cartao";
 import { QuadroContexto } from "./quadro-contexto";
+import { VidroContexto } from "./quadro-vidro";
 import { urlDoAvatar } from "@/lib/avatar";
 
 /**
@@ -150,6 +151,7 @@ function DealCardBase({
   comLink?: boolean;
 }) {
   const quadro = React.useContext(QuadroContexto);
+  const vidro = React.useContext(VidroContexto);
   const compacto = layout.densidade === "compacto";
   const topo = topoDoCartao(deal, layout.campos);
   const ctx: ContextoDoCampo = { tipoDaEtapa, agora, defs, prazoParado, nomeDaEtapa };
@@ -165,13 +167,19 @@ function DealCardBase({
   return (
     <div
       data-cartao
+      data-arrastando={vidro && arrastando ? "" : undefined}
       className={cn(
-        "relative flex flex-col rounded-[16px] border border-border-subtle bg-panel",
-        "shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] ease-out",
-        "group-hover/card:-translate-y-0.5 group-hover/card:border-border-default group-hover/card:shadow-[0_8px_24px_-12px_rgb(0_0_0/0.18)]",
+        "relative flex flex-col rounded-[16px]",
+        vidro
+          ? "vidro group-hover/card:-translate-y-0.5"
+          : [
+              "border border-border-subtle bg-panel shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] ease-out",
+              "group-hover/card:-translate-y-0.5 group-hover/card:border-border-default group-hover/card:shadow-[0_8px_24px_-12px_rgb(0_0_0/0.18)]",
+              arrastando && "border-border-default shadow-overlay",
+            ],
         compacto ? "gap-2 p-2.5" : "gap-2.5 p-3",
-        arrastando && "border-border-default shadow-overlay",
-        tipoDaEtapa === "lost" && "opacity-75"
+        // opacity cria uma raiz de fundo e apagaria o desfoque: no vidro o perdido não é esmaecido.
+        tipoDaEtapa === "lost" && !vidro && "opacity-75"
       )}
     >
       {/* Topo: a pessoa (ou o negócio) e o "⋯". */}

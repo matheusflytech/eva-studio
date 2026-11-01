@@ -17,6 +17,7 @@ import type { EtapaKanban, NegocioKanban } from "./modelo";
 import { VozDoQuadro } from "./eva-topo";
 import { vazioDaEtapa } from "./eva-voz";
 import { NumeroAnimado } from "./animacao/numero-animado";
+import { VidroContexto } from "./quadro-vidro";
 
 function CartaoArrastavel({
   deal,
@@ -154,6 +155,7 @@ export function StageColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
   const humana = React.useContext(VozDoQuadro);
+  const vidro = React.useContext(VidroContexto);
   const aberta = etapa.type === "open";
   const total = etapa.count ?? etapa.deals.length;
   const corpoId = React.useId();
@@ -176,13 +178,16 @@ export function StageColumn({
 
   const vazio = vazioDaEtapa(etapa.type, etapa.name, etapaAnterior);
   // Soltar aqui: realce suave (fundo e anel), a coluna continua a mesma.
-  const destaque = isOver ? "bg-accent-subtle/70 ring-1 ring-accent-solid/60" : "bg-raised";
+  const destaque = isOver ? "bg-accent-subtle/70 ring-1 ring-accent-solid/60" : vidro ? "vidro-faixa" : "bg-raised";
+  // Cor da etapa só no topo da faixa de vidro.
+  const faixaCor = vidro ? ({ "--faixa-cor": `var(--cat-${corDeDadoDaEtapa(etapa.color, etapa.type)}-solid)` } as React.CSSProperties) : undefined;
 
   if (recolhida) {
     return (
       <section
         ref={setNodeRef}
         data-etapa={etapa.name}
+        style={faixaCor}
         aria-label={`${etapa.name}, ${total} itens (recolhida)`}
         className={cn("flex w-10 shrink-0 snap-start flex-col items-center rounded-[18px] py-2 transition-colors duration-120", destaque)}
       >
@@ -203,6 +208,7 @@ export function StageColumn({
     <section
       ref={setNodeRef}
       data-etapa={etapa.name}
+      style={faixaCor}
       aria-label={`${etapa.name}, ${total} itens`}
       className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200 xl:w-80", destaque)}
     >

@@ -63,6 +63,7 @@ import { opcoesDaBarra, opcoesDoEditor, opcoesExtrasDoEditor, useOpcoesDoCrm } f
 import { PreviaDoNegocio, type EtapaDaPrevia } from "@/components/crm/negocios/previa";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
+import { QuadroVidro } from "@/components/crm/negocios/quadro-vidro";
 import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/lista-de-negocios";
 import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
 import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
@@ -904,8 +905,9 @@ function NegociosConteudo() {
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <QuadroContexto.Provider value={acoesDoQuadro}>
+          <QuadroVidro>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
-            <div className="relative">
+            <div className="quadro-vidro relative">
               <div ref={quadroRef} className="flex min-h-96 snap-x gap-4 overflow-x-auto pb-3 [height:calc(100dvh-226px)] xl:gap-5">
                 {stages.map((stage, i) => (
                   <StageColumn
@@ -937,6 +939,7 @@ function NegociosConteudo() {
               )}
             </DragOverlay>
           </DndContext>
+          </QuadroVidro>
           </QuadroContexto.Provider>
         </VozDoQuadro.Provider>
       )}
