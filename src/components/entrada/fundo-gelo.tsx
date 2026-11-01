@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 // (a mesma linguagem das curvas de nível do fundo vivo) sobre céu cor de gelo,
 // com neblina embaixo. ~54 perfis empilhados do fundo (claro, "ar" na frente)
 // para a frente (mais marcado); o preenchimento de cada perfil esconde os de
-// trás. A serra respira bem devagar (~30 quadros/s); com "reduzir movimento"
+// trás. A serra respira bem devagar (~20 quadros/s); com "reduzir movimento"
 // fica mais lenta, nunca parada. Para com a aba oculta.
 // ---------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ export function FundoGelo({ className }: { className?: string }) {
     let quadro = 0, ultimo = 0, acumulado = 0;
     const desenhar = (t: number) => {
       quadro = requestAnimationFrame(desenhar);
-      if (t - ultimo < 33) return; // ~30 quadros/s bastam para algo tão lento
+      if (t - ultimo < 50) return; // ~20 quadros/s bastam para algo tão lento
       acumulado += (t - (ultimo || t)) * (calmo.matches ? 0.35 : 1);
       ultimo = t;
       if (!ceu || !nevoa) return;
@@ -92,7 +92,7 @@ export function FundoGelo({ className }: { className?: string }) {
         // cada perfil balança um pouquinho fora de fase: a serra "respira"
         const fase = Math.sin(acumulado * 0.00022 + j * 0.35) * 0.0025;
         g.beginPath();
-        for (let x = 0; x <= W; x += 3) {
+        for (let x = 0; x <= W; x += 6) {
           const u = x / W + (p - 0.5) * 0.05 * Math.sin(j * 0.7) + deriva + fase;
           const y = yBase - alt * serra(u, 0.55 + p * 0.4);
           if (x) g.lineTo(x, y); else g.moveTo(x, y);

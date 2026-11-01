@@ -108,6 +108,7 @@ export function BustoConstelacao({ className }: { className?: string }) {
       const entrada = Math.min(1, tempo / 1.4); // os pontos acendem em cascata de cima para baixo
       g!.clearRect(0, 0, W, H);
       g!.globalCompositeOperation = "lighter";
+      g!.fillStyle = "rgb(214,222,240)";
       for (const p of pts) {
         const altura = p.y / bh + 0.5;
         if (altura > entrada * 1.25) continue;
@@ -123,11 +124,12 @@ export function BustoConstelacao({ className }: { className?: string }) {
         const fy = altura - faixa;
         if (Math.abs(fy) < 0.06) a += (1 - Math.abs(fy) / 0.06) * 0.6;
         a *= (0.75 + 0.25 * Math.sin(tempo * 1.6 + p.f)) * Math.min(1, (entrada * 1.25 - altura) * 6);
-        g!.fillStyle = `rgba(214,222,240,${Math.min(1, a)})`;
+        g!.globalAlpha = Math.min(1, a);
         const r = 0.6 + p.v * 0.9 * k;
         g!.fillRect(sx, sy, r, r);
       }
       g!.globalCompositeOperation = "source-over";
+      g!.globalAlpha = 1;
     }
     const aoMudarAba = () => {
       cancelAnimationFrame(quadro);

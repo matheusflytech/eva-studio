@@ -8,9 +8,8 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { ehCaminhoDeSecao, idCurto } from "@/lib/contrato/rotas";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
-import { FundoVivo } from "@/components/layout/fundo-vivo";
+import { FundoGelo } from "@/components/entrada/fundo-gelo";
 import { MarcaEva } from "@/components/layout/marca-eva";
-import { pulsar } from "@/lib/fundo/eventos";
 import type { ContratoDaSessao } from "@/lib/data/types";
 
 // "Olá Fulano, qual contrato deseja acessar?" — depois do login, e pelo
@@ -19,8 +18,8 @@ import type { ContratoDaSessao } from "@/lib/data/types";
 //
 // A lista é só navegação: entrar em /<id>/... confere o vínculo no servidor.
 //
-// Visual: continuação do login. Mesmo palco escuro (preto, feixe de luz,
-// fundo vivo) e o mesmo cartão de vidro, agora com a lista dos contratos.
+// Visual: continuação do login. Mesmo fundo "gelo" e o mesmo cartão escuro,
+// agora com a lista dos contratos.
 
 interface Resposta {
   nome: string;
@@ -36,10 +35,8 @@ interface Resposta {
 /** O palco do login fica montado o tempo todo: carregando, redirecionando ou com a lista. */
 function Palco({ children }: { children?: React.ReactNode }) {
   return (
-    <div data-theme="dark" className="tela-de-entrada relative flex min-h-[100dvh] flex-col overflow-hidden">
-      <FundoVivo escuro forca={2.4} className="pointer-events-none absolute inset-0 h-full w-full" />
-      <span className="feixe-de-luz" aria-hidden="true" />
-      <span className="feixe-de-luz feixe-fino" aria-hidden="true" />
+    <div data-theme="light" className="relative flex min-h-[100dvh] flex-col overflow-hidden bg-[#eef2f6]">
+      <FundoGelo className="pointer-events-none absolute inset-0 h-full w-full" />
       {children}
     </div>
   );
@@ -132,7 +129,7 @@ function Escolher() {
   return (
     <>
       <header className="relative z-10 flex items-center justify-between gap-3 px-4 pt-5 sm:px-8 sm:pt-7">
-        <span className="text-small font-semibold text-text-secondary">Eva Holding</span>
+        <span className="text-small font-semibold text-[#121214]">Eva Holding</span>
         <div className="flex items-center gap-1.5">
           {dados?.superadmin && (
             <NextLink href="/admin" className={buttonVariants({ variant: "ghost", size: "sm" })}>
@@ -153,9 +150,9 @@ function Escolher() {
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 py-8">
-        <div className="cartao-vidro w-full max-w-[460px]">
-          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[13px] bg-page ring-1 ring-border-default">
-            <MarcaEva size={22} className="text-text-primary" />
+        <div data-theme="dark" className="cartao-de-entrada w-full max-w-[460px] px-8 py-9">
+          <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[13px] bg-[#f2f2f4]">
+            <MarcaEva size={22} className="text-[#0c0c0e]" />
           </span>
           <h1 className="text-center text-title font-semibold tracking-tight text-text-primary">
             Olá {dados?.nome || session.name}, qual contrato deseja acessar?
@@ -191,7 +188,6 @@ function Escolher() {
                     {/* Link esticado: a linha inteira entra no contrato; o botão de copiar fica por cima. */}
                     <NextLink
                       href={`/${idCurto(c.id)}${para}`}
-                      onClick={(e) => pulsar(e.currentTarget, 1.6)}
                       className="min-w-0 flex-1 truncate py-3 text-body font-medium text-text-primary outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[10px] focus-visible:after:ring-2 focus-visible:after:ring-focus"
                     >
                       {c.name}
@@ -232,7 +228,7 @@ function Escolher() {
         </div>
       </main>
 
-      <span className="relative z-10 pb-6 text-center font-mono text-caption text-text-disabled">evapp.vercel.app</span>
+      <span className="relative z-10 pb-6 text-center font-mono text-caption text-[#8a93a3]">evapp.vercel.app</span>
     </>
   );
 }
