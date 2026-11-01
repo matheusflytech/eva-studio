@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { nomeDoParametro, parametrosDaTela } from "@/lib/contrato/rotas";
@@ -638,13 +639,7 @@ function Painel() {
 
       <div className="flex flex-col gap-3 print:hidden">
         <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] text-text-primary">Dashboard</h1>
-          {visao && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-panel px-3 py-1 text-small tabular-nums text-text-secondary">
-              <span className={cn("size-2 rounded-full", visao.aoVivo > 0 ? "bg-success" : "bg-text-tertiary/50")} aria-hidden="true" />
-              {visao.aoVivo} {visao.aoVivo === 1 ? "conversa agora" : "conversas agora"}
-            </span>
-          )}
+          <CabecalhoDeTela titulo="Dashboard" numeros={visao ? [{ rotulo: visao.aoVivo === 1 ? "conversa agora" : "conversas agora", valor: visao.aoVivo }] : undefined} />
           <span className="text-caption tabular-nums text-text-tertiary" aria-live="polite">
             {estadoSalvar === "salvando" ? "Salvando…" : estadoSalvar === "salvo" ? "Salvo" : ""}
           </span>

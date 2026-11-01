@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato, parametrosDaTela } from "@/lib/contrato/rotas";
@@ -656,12 +657,18 @@ function NegociosConteudo() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-5 pt-1 lg:px-8 2xl:px-10">
       {/* Barra da tela: título, funil, modo e, à direita, busca, filtros, "…" e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Negócios</h1>
-        {quadro && (
-          <span className="font-mono text-caption tabular-nums text-text-tertiary">
-            {qtdAbertos.toLocaleString("pt-BR")} {qtdAbertos === 1 ? "aberto" : "abertos"}
-          </span>
-        )}
+        <CabecalhoDeTela
+          titulo="Negócios"
+          numeros={
+            quadro
+              ? [
+                  { rotulo: qtdAbertos === 1 ? "aberto" : "abertos", valor: qtdAbertos },
+                  { rotulo: "no funil", valor: totalAberto, formatar: (n) => formatMoney(n / 100) },
+                  { rotulo: "ponderado", valor: ponderado, formatar: (n) => formatMoney(n / 100) },
+                ]
+              : undefined
+          }
+        />
         <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
         {pipelines.length > 0 && (
           <DropdownMenu>
@@ -829,12 +836,6 @@ function NegociosConteudo() {
               Seu dia
               {atencaoDoDia.length > 0 && <span className="font-mono text-caption tabular-nums text-warning">{atencaoDoDia.length}</span>}
             </Button>
-          )}
-          {quadro && (
-            <p className="font-mono text-caption tabular-nums text-text-tertiary">
-              <span className="text-text-primary">{formatMoney(totalAberto / 100)}</span> no funil ·{" "}
-              <span className="text-text-primary">{formatMoney(ponderado / 100)}</span> ponderado
-            </p>
           )}
         </div>
       </div>
