@@ -1028,3 +1028,41 @@ body {
   .vidro-faixa { background: var(--surface-raised); box-shadow: none; }
 }
 @media (prefers-reduced-motion: reduce) { .vidro { transition: none; } }
+
+/* ---------------------------------------------------------------------------
+   Abas de luz (abas-de-luz.tsx): o anel/haste, a borda do vidro que acende por
+   onde a luz passa e o brilho embaixo da barra. As cores vêm de --arc (aba ativa).
+   --------------------------------------------------------------------------- */
+.arco-haste {
+  stroke: var(--arc);
+  stroke-width: 2px;
+  fill: color-mix(in srgb, var(--arc) 13%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--arc) 70%, transparent));
+  transition: stroke 0.35s ease, fill 0.35s ease;
+}
+.arco-borda {
+  z-index: 1;
+  padding: 1px;
+  background:
+    radial-gradient(110px 40px at var(--luz-x, 50%) 100%, var(--arc), transparent 75%),
+    radial-gradient(110px 40px at var(--luz-x, 50%) 0%, color-mix(in srgb, var(--arc) 55%, transparent), transparent 75%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.85;
+}
+.arco-brilho {
+  left: calc(var(--luz-x, 50%) - 80px);
+  width: 160px;
+  height: 22px;
+  margin-top: -6px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--arc) 50%, transparent), transparent);
+  filter: blur(7px);
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+:root[data-theme="light"] .arco-brilho,
+[data-theme="light"] .arco-brilho { opacity: 0.45; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .arco-borda, .arco-brilho { display: none; }
+}

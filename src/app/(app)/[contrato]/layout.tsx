@@ -62,9 +62,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* No computador: marca, abas e conta no topo, atalhos num trilho de vidro à
             esquerda. O menu de 240px não cabia num celular de 390px: abaixo de 1024px
             ele vira uma gaveta, aberta por uma barra no topo. */}
-        <TopoDaCasca className="hidden lg:grid" />
+        <TopoDaCasca className="hidden min-[860px]:grid" />
 
-        <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-border-subtle bg-panel/80 px-3 py-2 backdrop-blur lg:hidden" data-print-ocultar>
+        <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-border-subtle bg-panel/80 px-3 py-2 backdrop-blur min-[860px]:hidden" data-print-ocultar>
           <button
             type="button"
             onClick={() => setMenuAberto(true)}
@@ -81,7 +81,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {menuAberto && (
-          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Menu">
+          <div className="fixed inset-0 z-50 min-[860px]:hidden" role="dialog" aria-label="Menu">
             <div className="absolute inset-0 bg-backdrop backdrop-blur-md" onClick={() => setMenuAberto(false)} />
             <div className="absolute inset-y-0 left-0 w-[290px] max-w-[88vw]">
               <button
@@ -98,11 +98,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1">
-        <Trilho className="hidden lg:flex" />
-        <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[88px]">
+        <Trilho className="hidden min-[860px]:flex" />
+        <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col min-[860px]:pl-[88px]">
           {/* Notificações: descem do topo só quando acontece algo (nada fixo aqui). */}
           <Ilha />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pt-2">
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto min-[860px]:pt-2">
             {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
             <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
               <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>
