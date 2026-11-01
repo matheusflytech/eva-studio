@@ -12,7 +12,7 @@ import { Trilho } from "@/components/layout/trilho";
 import { ehIdDeContrato, idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 import { buttonVariants } from "@/components/ui/button";
 import { BuscaGlobal, useBuscaGlobal } from "@/components/busca/paleta-de-busca";
-import { FundoVivo } from "@/components/layout/fundo-vivo";
+import { FundoDeMontanhas } from "@/components/layout/fundo-de-montanhas";
 import { Ilha } from "@/components/layout/ilha";
 import { pulsar } from "@/lib/fundo/eventos";
 import { MarcaEva } from "@/components/layout/marca-eva";
@@ -59,7 +59,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           vivo (curvas de nível) por trás dos dois. */}
       <div className="app-backdrop relative isolate flex h-[100dvh] flex-col overflow-hidden">
         <div className="luzes-do-fundo" aria-hidden="true"><i /><i /><i /><i /></div>
-        <FundoVivo forca={2.6} niveis={16} passo={11} />
+        <FundoDeMontanhas />
         {/* No computador: marca, abas e conta no topo, atalhos num trilho de vidro à
             esquerda. O menu de 240px não cabia num celular de 390px: abaixo de 1024px
             ele vira uma gaveta, aberta por uma barra no topo. */}
