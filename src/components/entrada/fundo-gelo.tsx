@@ -33,7 +33,8 @@ function ruido1d(rand: () => number, n: number) {
 
 const PERFIS = 54;
 
-export function FundoGelo({ className, escuro = false }: { className?: string; escuro?: boolean }) {
+/** `realce` > 1 deixa as linhas e o céu mais marcados (usado atrás da casca, onde o blur apaga o desenho). */
+export function FundoGelo({ className, escuro = false, realce = 1 }: { className?: string; escuro?: boolean; realce?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
   React.useEffect(() => {
@@ -67,9 +68,9 @@ export function FundoGelo({ className, escuro = false }: { className?: string; e
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       ceu = g.createLinearGradient(0, 0, 0, H);
-      ceu.addColorStop(0, escuro ? "#0d1524" : "#f8fafc"); ceu.addColorStop(1, escuro ? "#080d17" : "#e9eef4");
+      ceu.addColorStop(0, escuro ? "#0d1524" : realce > 1 ? "#f1f6fc" : "#f8fafc"); ceu.addColorStop(1, escuro ? "#080d17" : realce > 1 ? "#d3deec" : "#e9eef4");
       nevoa = g.createLinearGradient(0, H * 0.6, 0, H);
-      nevoa.addColorStop(0, escuro ? "rgba(8,13,23,0)" : "rgba(235,240,245,0)"); nevoa.addColorStop(1, escuro ? "rgba(8,13,23,0.96)" : "rgba(233,238,244,0.96)");
+      nevoa.addColorStop(0, escuro ? "rgba(8,13,23,0)" : "rgba(211,222,236,0)"); nevoa.addColorStop(1, escuro ? "rgba(8,13,23,0.96)" : realce > 1 ? "rgba(211,222,236,0.7)" : "rgba(233,238,244,0.96)");
     };
     const obs = new ResizeObserver(() => { ajustar(); desenhar(); });
 
@@ -88,8 +89,8 @@ export function FundoGelo({ className, escuro = false }: { className?: string; e
         }
         g.lineTo(W, H); g.lineTo(0, H); g.closePath();
         g.fillStyle = ceu; g.fill();
-        g.strokeStyle = escuro ? `rgba(150,182,232,${0.1 + 0.4 * Math.pow(p, 1.2)})` : `rgba(56,74,102,${0.14 + 0.5 * Math.pow(p, 1.2)})`;
-        g.lineWidth = 0.55 + p * 0.55;
+        g.strokeStyle = escuro ? `rgba(150,182,232,${Math.min(1, (0.1 + 0.4 * Math.pow(p, 1.2)) * realce)})` : `rgba(56,74,102,${Math.min(1, (0.14 + 0.5 * Math.pow(p, 1.2)) * realce)})`;
+        g.lineWidth = (0.55 + p * 0.55) * (realce > 1 ? 1.5 : 1);
         g.stroke();
       }
       g.fillStyle = nevoa;
@@ -99,7 +100,7 @@ export function FundoGelo({ className, escuro = false }: { className?: string; e
     desenhar();
     obs.observe(canvas);
     return () => obs.disconnect();
-  }, [escuro]);
+  }, [escuro, realce]);
 
   return <canvas ref={ref} aria-hidden="true" className={cn("block", className)} />;
 }
