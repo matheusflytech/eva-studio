@@ -6,7 +6,7 @@ describe("normalizarLayout", () => {
     const l = normalizarLayout(null, ["consumo"], ["consumo"]);
     expect(l.campos).toContain("cf:consumo");
     expect(l.previa).toContain("cf:consumo");
-    expect(l.densidade).toBe("confortavel");
+    expect(l.densidade).toBe("compacto");
   });
   it("descarta campo desconhecido, repetido e personalizado que sumiu", () => {
     const l = normalizarLayout({ campos: ["valor", "valor", "xyz", "cf:apagado", "cf:ok"], previa: [], densidade: "compacto" }, ["ok"]);
