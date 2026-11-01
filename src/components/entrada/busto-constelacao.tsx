@@ -91,6 +91,10 @@ export function BustoConstelacao({ className }: { className?: string }) {
     let giro = 0, incl = 0, t0 = 0, acumulado = 0, ultimo = 0;
     function desenhar(t: number) {
       quadro = requestAnimationFrame(desenhar);
+      // ~30 quadros/s; parado enquanto se digita, para a tela não competir com o teclado
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement) { ultimo = t; return; }
+      if (t0 && t - ultimo < 33) return;
       if (!t0) t0 = ultimo = t;
       acumulado += (t - ultimo) * (calmo.matches ? 0.4 : 1);
       ultimo = t;
