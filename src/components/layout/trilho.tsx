@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { ThemeToggle } from "@/components/ui/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NAV_AVANCADO } from "./navegacao";
+import { LancadorDeFerramentas } from "./lancador-de-ferramentas";
 
 const BOTAO = cn(
   "relative grid size-[42px] place-items-center rounded-full text-text-secondary transition-[background-color,color,scale] duration-150",
@@ -49,6 +50,7 @@ export function Trilho({ className }: { className?: string }) {
   const aba = useSearchParams().get("tab");
   const naAgenda = pathname === "/tasks" && aba === "calendar";
   const naTarefas = pathname === "/tasks" && !naAgenda;
+  const [ferramentas, setFerramentas] = React.useState(false);
   const emMais = NAV_AVANCADO.some((g) => g.items.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)));
   return (
     <aside
@@ -100,30 +102,12 @@ export function Trilho({ className }: { className?: string }) {
 
       <span aria-hidden="true" className="my-2 h-px w-6 bg-border-subtle" />
 
-      <DropdownMenu>
-        <Dica texto="Mais ferramentas">
-          <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Mais ferramentas" className={cn(BOTAO, emMais && "bg-hover text-text-primary")}>
-              <LayoutGrid size={19} aria-hidden />
-            </button>
-          </DropdownMenuTrigger>
-        </Dica>
-        <DropdownMenuContent side="right" align="start" sideOffset={12} className="max-h-[min(70dvh,520px)] w-56 overflow-y-auto">
-          {NAV_AVANCADO.map((grupo, i) => (
-            <React.Fragment key={grupo.label}>
-              {i > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuLabel>{grupo.label}</DropdownMenuLabel>
-              {grupo.items.map((item) => (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href}>
-                    <item.icon size={15} className="shrink-0" /> {item.label}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </React.Fragment>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Dica texto="Ferramentas">
+        <button type="button" onClick={() => setFerramentas(true)} aria-label="Ferramentas" className={cn(BOTAO, emMais && "bg-hover text-text-primary")}>
+          <LayoutGrid size={19} aria-hidden />
+        </button>
+      </Dica>
+      <LancadorDeFerramentas open={ferramentas} onOpenChange={setFerramentas} pathname={pathname} />
 
       <span className="min-h-3 flex-1" />
 
