@@ -58,7 +58,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Uma superfície só: menu colado na borda, conteúdo ao lado, e o fundo
           vivo (curvas de nível) por trás dos dois. */}
       <div className="app-backdrop relative isolate flex h-[100dvh] flex-col overflow-hidden">
-        <FundoVivo />
+        <div className="luzes-do-fundo" aria-hidden="true"><i /><i /><i /><i /></div>
+        <FundoVivo forca={2.6} niveis={16} passo={11} />
         {/* No computador: marca, abas e conta no topo, atalhos num trilho de vidro à
             esquerda. O menu de 240px não cabia num celular de 390px: abaixo de 1024px
             ele vira uma gaveta, aberta por uma barra no topo. */}

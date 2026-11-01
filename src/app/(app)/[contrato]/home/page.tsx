@@ -2,15 +2,12 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { ArrowRight, CalendarDays, ChartColumn, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, Search, SquareCheck, Workflow, Bot } from "lucide-react";
+import { ArrowRight, CalendarDays, ChartColumn, Check, ChevronRight, MessageSquare, Minus, Pencil, Plus, SquareCheck, Workflow, Bot } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
-import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
-import { FundoVivo } from "@/components/layout/fundo-vivo";
 import { OrbeEva } from "@/components/layout/orbe-eva";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { VisaoDeHoje } from "@/components/inicio/visao-de-hoje";
 import { useTheme } from "@/components/ui/theme";
-import { iniciais } from "@/components/inbox/tipos";
 import { buttonVariants } from "@/components/ui/button";
 import { avisarNaIlha, pulsar } from "@/lib/fundo/eventos";
 import { cn, formatRelativeDate } from "@/lib/utils";
@@ -115,7 +112,6 @@ function resumoDoDia(p: Pendencia[], conversas7d: number): string {
 export default function InicioPage() {
   const { session } = useAuth();
   const escuro = useTheme().resolved === "dark";
-  const { abrir } = useBuscaGlobal();
   const [dados, setDados] = React.useState<Payload | null>(null);
   const [carregando, setCarregando] = React.useState(true);
   const [blocos, setBlocos] = React.useState<IdDoBloco[]>(PADRAO);
@@ -199,55 +195,26 @@ export default function InicioPage() {
 
   return (
     <div className="relative -mt-11 flex flex-1 flex-col gap-4 pb-6 lg:-mt-5">
-      {/* Topo iridescente com as curvas vivas por cima, como uma tela de boas-vindas. */}
-      {/* No escuro o topo vira um iridescente fundo (mesmas luzes, apagadas) com
-          texto claro; os cartões pretos de dentro viram vidro. */}
-      <section
-        className={cn(
-          "heroi-iridescente relative flex min-h-[300px] shrink-0 flex-col overflow-hidden rounded-b-[34px] px-7 pb-5 pt-16",
-          escuro ? "heroi-escuro text-[#f2f2f4]" : "text-[#121214]"
+      {/* Saudação do protótipo: sem bloco grande; a esfera da Eva resume o dia ao lado dos botões. */}
+      <section className="flex flex-wrap items-center gap-3 px-6 pt-16 lg:pt-5">
+        <OrbeEva falando={falando} className="-my-3 h-[64px] w-[64px] shrink-0 cursor-pointer" />
+        <p className="min-w-0 flex-1 text-small leading-snug text-text-secondary">
+          <b className="font-semibold text-text-primary">
+            {saudacao(hora)} {primeiroNome}.
+          </b>{" "}
+          {carregando ? "Vendo o que precisa de você…" : comecar ? "Vamos montar o seu CRM: funil, campos e WhatsApp em um minuto." : semAgente ? "Nada por aqui ainda. Comece criando um agente." : resumoDoDia(pendencias, dados?.resumo.conversas7d ?? 0)}
+        </p>
+        {!semAgente && !comecar && (
+          <button
+            type="button"
+            onClick={() => setEditando((v) => !v)}
+            aria-label={editando ? "Pronto" : "Personalizar"}
+            className="vidro relative inline-flex h-9 items-center gap-2 rounded-full px-4 text-small font-semibold text-text-primary transition-transform duration-150 active:scale-[0.96]"
+          >
+            {editando ? <Check size={15} /> : <Pencil size={15} />}
+            {editando ? "Pronto" : "Personalizar"}
+          </button>
         )}
-      >
-        <FundoVivo escuro={escuro} forca={3.2} niveis={14} className={cn("pointer-events-none absolute inset-0 h-full w-full", escuro ? "mix-blend-screen opacity-70" : "mix-blend-multiply")} />
-        <div className="relative flex items-start gap-3">
-          <h1 className="min-w-0 text-[30px] font-light leading-[1.08] tracking-[-0.035em] sm:text-[38px]">
-            {saudacao(hora)}
-            <b className="block font-bold">{primeiroNome ? `${primeiroNome}!` : "bem-vindo!"}</b>
-          </h1>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {!semAgente && !comecar && (
-              <button
-                type="button"
-                onClick={() => setEditando((v) => !v)}
-                aria-label={editando ? "Pronto" : "Personalizar"}
-                className={cn("inline-flex h-[38px] items-center gap-2 rounded-full px-3 text-small font-semibold transition-transform duration-150 active:scale-[0.96] sm:px-4", escuro ? "bg-[#f2f2f4] text-[#121214]" : "bg-[#121214] text-[#f2f2f4]")}
-              >
-                {editando ? <Check size={15} /> : <Pencil size={15} />}
-                <span className="hidden sm:inline">{editando ? "Pronto" : "Personalizar"}</span>
-              </button>
-            )}
-            <button type="button" onClick={abrir} aria-label="Buscar" className={cn("hidden h-[38px] w-[38px] place-items-center rounded-full transition-transform duration-150 active:scale-[0.94] sm:grid", escuro ? "bg-[#f2f2f4] text-[#121214]" : "bg-[#121214] text-[#f2f2f4]")}>
-              <Search size={16} />
-            </button>
-            <span className={cn("hidden h-[38px] w-[38px] place-items-center rounded-full text-small font-semibold sm:grid", escuro ? "bg-white/10" : "bg-white/60")}>{iniciais(session?.name ?? "") || "?"}</span>
-          </div>
-        </div>
-
-        <div className="relative mt-auto grid gap-3 md:grid-cols-2">
-          <div className={cn("flex flex-col gap-1.5 rounded-[22px] px-5 py-4 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06]" : "bg-[#121214]")}>
-            <span className="text-small text-[#a8a8ad]">Conversas nos últimos 7 dias</span>
-            <b className="self-end text-[34px] font-medium leading-none tracking-[-0.035em] tabular-nums">{dados ? dados.resumo.conversas7d : "—"}</b>
-          </div>
-          <div className={cn("flex items-center gap-1.5 rounded-[22px] py-2.5 pl-1 pr-5 text-[#f2f2f4]", escuro ? "border border-white/10 bg-white/[0.06]" : "bg-[#121214]")}>
-            <OrbeEva falando={falando} className="-my-4 -mr-2 h-[116px] w-[116px] shrink-0 cursor-pointer" />
-            <span className="flex min-w-0 flex-col gap-1">
-              <span className="font-mono text-caption text-[#8a8a90]">Eva · resumo do dia</span>
-              <span className="text-small leading-snug text-[#d6d6da]">
-                {carregando ? "Vendo o que precisa de você…" : comecar ? "Vamos montar o seu CRM: funil, campos e WhatsApp em um minuto." : semAgente ? "Nada por aqui ainda. Comece criando um agente." : resumoDoDia(pendencias, dados?.resumo.conversas7d ?? 0)}
-              </span>
-            </span>
-          </div>
-        </div>
       </section>
 
       {(comecar || semAgente) && (

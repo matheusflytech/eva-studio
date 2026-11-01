@@ -1066,3 +1066,14 @@ body {
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .arco-borda, .arco-brilho { display: none; }
 }
+
+/* Luzes por trás do vidro (como no protótipo): quatro manchas que derivam
+   devagar, para o desfoque dos cartões ter cor para mostrar. Só transform. */
+.luzes-do-fundo { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.luzes-do-fundo i { position: absolute; width: 56vmax; height: 56vmax; border-radius: 50%; animation: eva-deriva 46s ease-in-out infinite alternate; will-change: transform; }
+.luzes-do-fundo i:nth-child(1) { left: -14vmax; top: -16vmax; background: radial-gradient(closest-side, var(--vidro-luz-1), transparent); }
+.luzes-do-fundo i:nth-child(2) { right: -18vmax; top: 2vmax; background: radial-gradient(closest-side, var(--vidro-luz-2), transparent); animation-delay: -12s; }
+.luzes-do-fundo i:nth-child(3) { right: 6vmax; bottom: -26vmax; background: radial-gradient(closest-side, var(--vidro-luz-3), transparent); animation-delay: -24s; }
+.luzes-do-fundo i:nth-child(4) { left: 4vmax; bottom: -30vmax; background: radial-gradient(closest-side, var(--vidro-luz-4), transparent); animation-delay: -34s; }
+@keyframes eva-deriva { to { transform: translate(5vmax, 4vmax) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .luzes-do-fundo i { animation: none; } }
