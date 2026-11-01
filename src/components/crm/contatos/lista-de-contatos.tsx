@@ -560,7 +560,7 @@ export function ListaDeContatos({
           {/* Sem nada aberto a lista ocupa a largura (linhas com celular, e-mail,
               etiquetas…); a ficha ou as atividades só abrem quando pedidas. */}
           <div className={cn("flex min-h-0 w-full flex-col", painel && "lg:w-[360px] lg:shrink-0")}>
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="vidro relative min-h-0 flex-1 overflow-y-auto rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-2">
               {carregandoAgora && !dados ? (
                 <div role="status" aria-label="Carregando contatos" className="flex flex-col">
                   {Array.from({ length: 8 }, (_, i) => (

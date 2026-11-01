@@ -4,14 +4,13 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "next/navigation";
 import { usePathname } from "@/lib/contrato/navegacao";
-import { CalendarCheck, CalendarDays, Contact, Handshake, LayoutGrid, Plus, Search, Settings, Aperture } from "lucide-react";
+import { CalendarCheck, CalendarDays, Contact, Handshake, Plus, Search, Settings, Aperture } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { ThemeToggle } from "@/components/ui/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NAV_AVANCADO } from "./navegacao";
-import { LancadorDeFerramentas } from "./lancador-de-ferramentas";
 
 const BOTAO = cn(
   "relative grid size-[42px] place-items-center rounded-full text-text-secondary transition-[background-color,color,scale] duration-150",
@@ -50,13 +49,11 @@ export function Trilho({ className }: { className?: string }) {
   const aba = useSearchParams().get("tab");
   const naAgenda = pathname === "/tasks" && aba === "calendar";
   const naTarefas = pathname === "/tasks" && !naAgenda;
-  const [ferramentas, setFerramentas] = React.useState(false);
-  const emMais = NAV_AVANCADO.some((g) => g.items.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`)));
   return (
     <aside
       aria-label="Atalhos"
       className={cn("vidro absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-center gap-1 rounded-[30px] py-2.5", className)}
-      style={{ height: "min(calc(100% - 12px), 560px)" }}
+      style={{ height: "calc(100% - 12px)", maxHeight: 820 }}
       data-print-ocultar
     >
       <Dica texto={`Buscar (${mac ? "⌘K" : "Ctrl+K"})`}>
@@ -102,16 +99,24 @@ export function Trilho({ className }: { className?: string }) {
 
       <span aria-hidden="true" className="my-2 h-px w-6 bg-border-subtle" />
 
-      <Dica texto="Ferramentas">
-        <button type="button" onClick={() => setFerramentas(true)} aria-label="Ferramentas" className={cn(BOTAO, emMais && "bg-hover text-text-primary")}>
-          <LayoutGrid size={19} aria-hidden />
-        </button>
-      </Dica>
-      <LancadorDeFerramentas open={ferramentas} onOpenChange={setFerramentas} pathname={pathname} />
+      {/* As ferramentas direto no trilho, em grupos; rola quando a janela é baixa. */}
+      <nav aria-label="Ferramentas" className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {NAV_AVANCADO.map((grupo) => (
+          <React.Fragment key={grupo.label}>
+            {grupo.items.map((item) => {
+              const ativo = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <AtalhoDeTela key={item.href} href={item.href} rotulo={item.label} ativo={ativo}>
+                  <item.icon size={19} aria-hidden />
+                </AtalhoDeTela>
+              );
+            })}
+            <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 bg-border-subtle last:hidden" />
+          </React.Fragment>
+        ))}
+      </nav>
 
-      <span className="min-h-3 flex-1" />
-
-      <AtalhoDeTela href="/settings" rotulo="Configurações" ativo={pathname === "/settings" || pathname.startsWith("/settings/")}>
+            <AtalhoDeTela href="/settings" rotulo="Configurações" ativo={pathname === "/settings" || pathname.startsWith("/settings/")}>
         <Settings size={19} aria-hidden />
       </AtalhoDeTela>
       <ThemeToggle className="size-[42px] rounded-full border-0 bg-transparent hover:bg-hover" />
