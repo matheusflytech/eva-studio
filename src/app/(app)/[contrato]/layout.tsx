@@ -7,6 +7,8 @@ import { useRouter, usePathname, useParams } from "next/navigation";
 import { Menu, X, ShieldOff, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Sidebar } from "@/components/layout/sidebar";
+import { TopoDaCasca } from "@/components/layout/topo-da-casca";
+import { Trilho } from "@/components/layout/trilho";
 import { ehIdDeContrato, idCurto, mesmoContrato } from "@/lib/contrato/rotas";
 import { buttonVariants } from "@/components/ui/button";
 import { BuscaGlobal, useBuscaGlobal } from "@/components/busca/paleta-de-busca";
@@ -55,14 +57,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <BuscaGlobal>
       {/* Uma superfície só: menu colado na borda, conteúdo ao lado, e o fundo
           vivo (curvas de nível) por trás dos dois. */}
-      <div className="app-backdrop relative isolate flex h-[100dvh] flex-col overflow-hidden lg:flex-row">
+      <div className="app-backdrop relative isolate flex h-[100dvh] flex-col overflow-hidden">
         <FundoVivo />
-        {/* O menu de 240px não cabe num celular de 390px: ocupava a tela inteira e
-            o conteúdo desaparecia. Abaixo de 1024px vira uma gaveta, aberta por
-            uma barra no topo. O menu acompanha o tema do app. */}
-        <div className="relative z-20 hidden lg:flex" data-print-ocultar>
-          <Sidebar />
-        </div>
+        {/* No computador: marca, abas e conta no topo, atalhos num trilho de vidro à
+            esquerda. O menu de 240px não cabia num celular de 390px: abaixo de 1024px
+            ele vira uma gaveta, aberta por uma barra no topo. */}
+        <TopoDaCasca className="hidden lg:grid" />
 
         <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-border-subtle bg-panel/80 px-3 py-2 backdrop-blur lg:hidden" data-print-ocultar>
           <button
@@ -97,15 +97,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1">
+        <Trilho className="hidden lg:flex" />
+        <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col lg:pl-[88px]">
           {/* Notificações: descem do topo só quando acontece algo (nada fixo aqui). */}
           <Ilha />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pt-5">
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pt-2">
             {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
             <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
               <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>
             </ViewTransition>
           </main>
+        </div>
         </div>
       </div>
     </BuscaGlobal>
