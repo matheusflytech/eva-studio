@@ -162,13 +162,13 @@ describe("tokens: globals.css igual ao espelho em TS", () => {
 });
 
 describe("tema", () => {
-  it("lê a preferência com padrão claro", () => {
+  it("lê a preferência com padrão escuro", () => {
     expect(parseThemePreference("dark")).toBe("dark");
     expect(parseThemePreference("light")).toBe("light");
-    // "Seguir o sistema" saiu: quem tinha salvo volta ao claro.
-    expect(parseThemePreference("system")).toBe("light");
-    expect(parseThemePreference("roxo")).toBe("light");
-    expect(parseThemePreference(null)).toBe("light");
+    // "Seguir o sistema" saiu: quem tinha salvo volta ao padrão.
+    expect(parseThemePreference("system")).toBe("dark");
+    expect(parseThemePreference("roxo")).toBe("dark");
+    expect(parseThemePreference(null)).toBe("dark");
   });
 
   it("resolve só pela escolha (o tema do sistema não entra)", () => {
@@ -192,9 +192,9 @@ describe("tema", () => {
 
   it("lê e grava o cookie", () => {
     expect(readThemeCookie("a=1; eva-theme=dark; b=2")).toBe("dark");
-    expect(readThemeCookie("eva-theme=xyz")).toBe("light");
-    expect(readThemeCookie("eva-theme=system")).toBe("light");
-    expect(readThemeCookie(undefined)).toBe("light");
+    expect(readThemeCookie("eva-theme=xyz")).toBe("dark");
+    expect(readThemeCookie("eva-theme=system")).toBe("dark");
+    expect(readThemeCookie(undefined)).toBe("dark");
     expect(serializeThemeCookie("light")).toMatch(/^eva-theme=light; Path=\/; Max-Age=\d+; SameSite=Lax$/);
   });
 
@@ -216,13 +216,13 @@ describe("tema", () => {
   it("script do <head> segue a mesma regra de resolveTheme", () => {
     expect(rodarScript({ salvo: "dark" })).toBe("dark");
     expect(rodarScript({ salvo: "light", escuro: true })).toBe("light");
-    // Sistema escuro não muda nada: "system" salvo vira o claro.
-    expect(rodarScript({ salvo: "system", escuro: true })).toBe("light");
-    expect(rodarScript({ salvo: null, escuro: true })).toBe("light");
-    expect(rodarScript({ salvo: null, escuro: false })).toBe("light");
+    // Sistema escuro não muda nada: "system" salvo vira o padrão.
+    expect(rodarScript({ salvo: "system", escuro: true })).toBe("dark");
+    expect(rodarScript({ salvo: null, escuro: true })).toBe("dark");
+    expect(rodarScript({ salvo: null, escuro: false })).toBe("dark");
     expect(rodarScript({ salvo: null, cookie: "x=1; eva-theme=dark" })).toBe("dark");
     expect(rodarScript({ lsQuebrado: true, cookie: "eva-theme=dark" })).toBe("dark");
-    expect(rodarScript({ salvo: "lixo", escuro: true })).toBe("light");
+    expect(rodarScript({ salvo: "lixo", escuro: true })).toBe("dark");
   });
 });
 

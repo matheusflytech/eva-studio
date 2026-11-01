@@ -53,7 +53,7 @@ function subscribe(avisar: () => void) {
 
 // Snapshot como string: useSyncExternalStore compara por ===.
 const snapshot = () => `${lerPreferencia()}|${resolveTheme(lerPreferencia())}`;
-const snapshotServidor = () => `${PREFERENCIA_PADRAO}|light`;
+const snapshotServidor = () => `${PREFERENCIA_PADRAO}|${resolveTheme(PREFERENCIA_PADRAO)}`;
 
 export function setThemePreference(pref: ThemePreference) {
   try {
