@@ -51,18 +51,23 @@ export function CabecalhoDeTela({ titulo, numeros, className }: { titulo: string
   return (
     <div className={cn("flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2", className)}>
       <h1 className="text-title font-semibold tracking-tight text-text-primary">{titulo}</h1>
-      {numeros && numeros.length > 0 && (
-        <ul className="flex flex-wrap items-center gap-2" aria-label="Resumo">
-          {numeros.map((n) => (
-            <li key={n.rotulo} className="vidro relative inline-flex h-9 items-center gap-2 rounded-full px-3.5">
-              <span className={cn("font-mono text-body font-semibold", n.tom === "perigo" && n.valor > 0 ? "text-danger" : "text-text-primary")}>
-                <Contador valor={n.valor} formatar={n.formatar} />
-              </span>
-              <span className="text-caption text-text-secondary">{n.rotulo}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {numeros && numeros.length > 0 && <PilulasDeNumeros numeros={numeros} />}
     </div>
+  );
+}
+
+/** As pílulas de vidro com os números (a fila do cabeçalho; também usada na ficha do contato). */
+export function PilulasDeNumeros({ numeros, className }: { numeros: NumeroDoCabecalho[]; className?: string }) {
+  return (
+    <ul className={cn("flex flex-wrap items-center gap-2", className)} aria-label="Resumo">
+      {numeros.map((n) => (
+        <li key={n.rotulo} className="vidro relative inline-flex h-9 items-center gap-2 rounded-full px-3.5">
+          <span className={cn("font-mono text-body font-semibold", n.tom === "perigo" && n.valor > 0 ? "text-danger" : "text-text-primary")}>
+            <Contador valor={n.valor} formatar={n.formatar} />
+          </span>
+          <span className="text-caption text-text-secondary">{n.rotulo}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

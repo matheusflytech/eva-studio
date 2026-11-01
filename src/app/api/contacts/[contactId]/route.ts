@@ -81,6 +81,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
       id: d.deal.id,
       name: d.deal.name,
       amountCents: d.deal.amountCents,
+      probability: d.deal.probability,
       stage: d.deal.stage.name,
       stageType: d.deal.stage.type,
       pipeline: d.deal.pipeline.name,

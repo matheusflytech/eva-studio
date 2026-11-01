@@ -29,9 +29,14 @@ import { OrigemDeMarketing } from "@/components/marketing/origem";
 import { FotoDoContato } from "./foto-do-contato";
 import { TrocarFoto } from "@/components/crm/trocar-foto";
 import { Bloco, cidadeDo, linkDeLigar } from "./ficha-do-contato";
+import { FunilDoContato, type NegocioDoContato } from "./funil-do-contato";
+import { PilulasDeNumeros } from "@/components/layout/cabecalho-de-tela";
+import { formatMoney } from "@/lib/design-system/format";
 
 interface Ficha {
   contact: Contact;
+  deals?: NegocioDoContato[];
+  tasks?: { doneAt: string | null }[];
 }
 
 type AbaDaPagina = "resumo" | "atividade" | "dados";
@@ -183,6 +188,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
   const nome = nomeDoContato(contato);
   const whatsapp = linkDoWhatsAppWeb(contato.phone);
   const cidade = cidadeDo(contato);
+  const negocios = ficha.deals ?? [];
   const mudouContato = (c: Contact) => setFicha((f) => (f ? { ...f, contact: c } : f));
   const canais = [...new Set(contato.channels.map((ch) => CHANNEL_LABEL[ch.channel] ?? ch.channel))];
   const abas: { value: AbaDaPagina; label: string }[] = [
@@ -266,6 +272,14 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
           </div>
         </header>
 
+        <PilulasDeNumeros
+          numeros={[
+            { rotulo: "ganho", valor: negocios.filter((n) => n.stageType === "won").reduce((s, n) => s + n.amountCents, 0), formatar: (n) => formatMoney(n / 100) },
+            { rotulo: "em aberto", valor: negocios.filter((n) => n.stageType === "open").reduce((s, n) => s + n.amountCents, 0), formatar: (n) => formatMoney(n / 100) },
+            { rotulo: "tarefas abertas", valor: (ficha.tasks ?? []).filter((t) => !t.doneAt).length },
+          ]}
+        />
+
         {erro && <Notice tone="danger">{erro}</Notice>}
 
         <SegmentedControl label="Seções do contato" options={abas} value={abaVisivel} onChange={setAba} className="self-start" />
@@ -285,6 +299,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
               </div>
               {canais.length > 0 && <p className="font-mono text-caption text-text-tertiary">Canais: {canais.join(" · ")}</p>}
             </div>
+            <FunilDoContato negocios={negocios} />
             <ContactActivity
               contactId={contato.id}
               secoes={["tarefas", "negocios", "conversas", "sequencias"]}
