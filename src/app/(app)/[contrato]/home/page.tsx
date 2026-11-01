@@ -8,6 +8,7 @@ import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { FundoVivo } from "@/components/layout/fundo-vivo";
 import { OrbeEva } from "@/components/layout/orbe-eva";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
+import { VisaoDeHoje } from "@/components/inicio/visao-de-hoje";
 import { useTheme } from "@/components/ui/theme";
 import { iniciais } from "@/components/inbox/tipos";
 import { buttonVariants } from "@/components/ui/button";
@@ -262,6 +263,8 @@ export default function InicioPage() {
           )}
         </div>
       )}
+
+      {!carregando && !semAgente && !comecar && <VisaoDeHoje pendencias={agora} escuro={escuro} />}
 
       {!carregando && !semAgente && !comecar && (
         <div className="grid gap-4 px-6 lg:grid-cols-2">

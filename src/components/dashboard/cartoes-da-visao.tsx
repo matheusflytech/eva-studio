@@ -232,7 +232,7 @@ function Ritmo({ v, escuro }: { v: Visao; escuro: boolean }) {
 }
 
 /** Curva suave (Catmull-Rom) que passa por todos os pontos, em coordenadas do viewBox. */
-function curva(p: readonly (readonly [number, number])[]) {
+export function curva(p: readonly (readonly [number, number])[]) {
   if (p.length < 2) return "";
   let d = `M${p[0][0]},${p[0][1]}`;
   for (let i = 0; i < p.length - 1; i++) {
