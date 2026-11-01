@@ -5,7 +5,8 @@ import Link from "@/components/contrato/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
-import { ConteudoDaVisao, curva, reais, type Visao } from "@/components/dashboard/cartoes-da-visao";
+import { ConteudoDaVisao, curva, reais, ROTULO_DO_GRUPO, type Visao } from "@/components/dashboard/cartoes-da-visao";
+import { DonutChart, type DonutSegment } from "@/components/charts/donut-chart";
 
 export interface PendenciaDaFila {
   id: string;
@@ -87,16 +88,36 @@ function Fila({ pendencias }: { pendencias: PendenciaDaFila[] }) {
   );
 }
 
+const CANAL: Record<string, string> = { whatsapp_meta: "whatsapp", whatsapp_qr: "whatsapp" };
+const rotuloDoCanal = (c: string) => ROTULO_DO_GRUPO[CANAL[c] ?? c] ?? c;
+
+/** Conversas por canal, juntando as duas formas de WhatsApp. */
+function OrigemDasConversas({ canais }: { canais: DonutSegment[] }) {
+  const juntos = new Map<string, number>();
+  for (const c of canais) juntos.set(rotuloDoCanal(c.label), (juntos.get(rotuloDoCanal(c.label)) ?? 0) + c.value);
+  const segmentos = [...juntos].map(([label, value]) => ({ label, value })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+  if (segmentos.length === 0) return <p className="text-small text-text-tertiary">Sem conversas no período.</p>;
+  return <DonutChart segments={segmentos} size={150} />;
+}
+
 /** "Visão de hoje": números do topo e quatro painéis de vidro, tudo do banco do contrato. */
 export function VisaoDeHoje({ pendencias, escuro }: { pendencias: PendenciaDaFila[]; escuro: boolean }) {
   const [visao, setVisao] = React.useState<Visao | null>(null);
   const [erro, setErro] = React.useState(false);
+  const [canais, setCanais] = React.useState<DonutSegment[] | null>(null);
 
   React.useEffect(() => {
     fetch("/api/dashboard/overview")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setVisao)
       .catch(() => setErro(true));
+  }, []);
+
+  React.useEffect(() => {
+    fetch("/api/analytics/fontes")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { quebras?: { porCanalConversas?: DonutSegment[] } }) => setCanais(d.quebras?.porCanalConversas ?? []))
+      .catch(() => setCanais([]));
   }, []);
 
   if (erro) return null;
@@ -127,6 +148,12 @@ export function VisaoDeHoje({ pendencias, escuro }: { pendencias: PendenciaDaFil
         </Painel>
         <Painel titulo="Ritmo" nota="contra a média dos 3 períodos anteriores" className="lg:col-span-5">
           {visao && <ConteudoDaVisao fonte="ritmo" visao={visao} escuro={escuro} />}
+        </Painel>
+        <Painel titulo="Quando falam com você" nota="mensagens por dia e hora" className="lg:col-span-7">
+          {visao && <ConteudoDaVisao fonte="mapaDeHorarios" visao={visao} escuro={escuro} />}
+        </Painel>
+        <Painel titulo="Origem das conversas" nota="por canal" className="lg:col-span-5">
+          {canais ? <OrigemDasConversas canais={canais} /> : <p className="text-small text-text-tertiary">Carregando…</p>}
         </Painel>
       </div>
     </section>

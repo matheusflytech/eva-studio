@@ -46,10 +46,11 @@ export function TopoDaCasca({ className }: { className?: string }) {
   return (
     <header className={cn("relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 pb-3 pt-3", className)} data-print-ocultar>
       <Link href="/home" className="flex items-center gap-2.5 justify-self-start" aria-label="Eva, início">
-        <span className="grid size-9 place-items-center rounded-[12px] bg-accent-solid text-text-on-accent shadow-[0_8px_20px_-8px_var(--accent-solid)]">
-          <MarcaEva size={20} />
+        <MarcaEva size={26} title="Eva" className="text-text-primary" />
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-[17px] font-semibold tracking-[-0.02em] text-text-primary">Eva</span>
+          <small className="text-caption font-normal tracking-wide text-text-tertiary">CRM</small>
         </span>
-        <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
       </Link>
 
       <AbasDeLuz itens={ABAS} ativo={ativo} etiqueta={(item) => (item.href === "/conversations" ? rotuloDeNaoLidas(naoLidas) : item.badge)} />
