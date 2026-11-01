@@ -269,24 +269,6 @@ export default function InicioPage() {
       {!carregando && !semAgente && !comecar && (
         <div className="grid gap-4 px-6 lg:grid-cols-2">
           <div className="flex flex-col gap-3">
-            {/* Só o que pede ação agora. */}
-            <div className={cn("rounded-[20px] border border-border-subtle bg-panel px-5", editando && "motion-safe:animate-[eva-tremer_.32s_ease-in-out_infinite_alternate]")}>
-              {agora.length === 0 ? (
-                <p className="flex h-[52px] items-center gap-2 text-small text-text-secondary">
-                  <Check size={15} className="text-success" /> Nada pedindo você agora.
-                </p>
-              ) : (
-                agora.map((p, i) => (
-                  <Link key={p.id} href={p.href} className={cn("flex h-[52px] items-center gap-3 text-small text-text-secondary hover:text-text-primary", i > 0 && "border-t border-border-subtle")}>
-                    <span className="min-w-0 flex-1 truncate">{p.titulo.replace(/^\d+\s*/, "").replace(/^Uma\s/, "")}</span>
-                    <b className={cn("inline-flex items-center gap-2 font-semibold tabular-nums", p.tipo === "urgente" ? "text-danger" : "text-text-primary")}>
-                      {p.quantidade ?? 1}
-                      <ChevronRight size={14} className="text-text-tertiary" />
-                    </b>
-                  </Link>
-                ))
-              )}
-            </div>
             {blocos.includes("atalhos") && (
               <Bloco editando={editando} onTirar={() => tirar("atalhos")} semMoldura>
                 <div className="grid grid-cols-3 gap-2.5">
