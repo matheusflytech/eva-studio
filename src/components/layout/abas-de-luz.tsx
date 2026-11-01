@@ -25,6 +25,8 @@ const COR_DA_ABA: Record<string, string> = {
   "/deals": "amber",
   "/contacts": "violet",
   "/tasks": "orange",
+  "/tasks?tab=calendar": "amber",
+  "/reports": "teal",
   "/dashboard": "cyan",
   "/agent-studio": "rose",
 };

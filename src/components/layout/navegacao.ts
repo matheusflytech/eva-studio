@@ -17,6 +17,7 @@ import {
   Handshake,
   CheckSquare,
   Megaphone,
+  CalendarDays,
 } from "lucide-react";
 
 export interface ItemDeNavegacao {
@@ -46,7 +47,9 @@ export const NAV_PRINCIPAL: GrupoDeNavegacao[] = [
       { href: "/deals", label: "Negócios", icon: Handshake },
       { href: "/contacts", label: "Contatos", icon: Contact },
       { href: "/tasks", label: "Tarefas", icon: CheckSquare },
+      { href: "/tasks?tab=calendar", label: "Agenda", icon: CalendarDays },
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/reports", label: "Relatórios", icon: ChartColumn },
       { href: "/agent-studio", label: "Eva Studio", icon: Aperture, animated: true },
     ],
   },
