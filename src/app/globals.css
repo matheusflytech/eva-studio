@@ -1100,3 +1100,27 @@ body {
 .app-conteudo .bg-panel.sem-desfoque {
   background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
 }
+
+/* Cartões do quadro: imagem e link dentro dele não iniciam arrasto nativo do navegador (Safari
+   cancelava o arrasto do dnd-kit ao pegar o cartão pela foto do responsável). */
+[data-deal-id] img,
+[data-deal-id] a {
+  -webkit-user-drag: none;
+}
+
+/* Arrastando um cartão (deals/page.tsx marca o html): o vidro refeito a cada quadro era o que
+   travava o arrasto em máquinas mais fracas (só a do autor, mais forte, aguentava). Sem desfoque nos
+   cartões e colunas parados, sem a lente de refração no cartão que segue o ponteiro, e as luzes
+   do fundo congeladas (elas animam por trás de todo o desfoque). */
+html[data-arrastando-cartao] .group\/card > .vidro,
+html[data-arrastando-cartao] .vidro-faixa,
+html[data-arrastando-cartao] .quadro-vidro .bg-panel {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: var(--vidro-fundo-forte);
+}
+html[data-arrastando-cartao] .vidro[data-arrastando] {
+  -webkit-backdrop-filter: blur(6px) !important;
+  backdrop-filter: blur(6px) !important;
+}
+html[data-arrastando-cartao] .luzes-do-fundo i { animation-play-state: paused; }
