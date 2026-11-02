@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 // (a mesma linguagem das curvas de nível do fundo vivo) sobre céu cor de gelo,
 // com neblina embaixo. ~54 perfis empilhados do fundo (claro, "ar" na frente)
 // para a frente (mais marcado); o preenchimento de cada perfil esconde os de
-// trás. A serra respira bem devagar (~30 quadros/s); com "reduzir movimento"
-// fica mais lenta, nunca parada. Para com a aba oculta.
+// trás. Desenhada uma vez (e de novo ao redimensionar): animar custava quadros e
+// travava a digitação do login.
 // ---------------------------------------------------------------------------
 
 function semente(s: number) {
@@ -33,7 +33,8 @@ function ruido1d(rand: () => number, n: number) {
 
 const PERFIS = 54;
 
-export function FundoGelo({ className }: { className?: string }) {
+/** `realce` > 1 deixa as linhas e o céu mais marcados (usado atrás da casca, onde o blur apaga o desenho). */
+export function FundoGelo({ className, escuro = false, realce = 1 }: { className?: string; escuro?: boolean; realce?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
   React.useEffect(() => {
@@ -41,7 +42,6 @@ export function FundoGelo({ className }: { className?: string }) {
     if (!canvas) return;
     const g = canvas.getContext("2d");
     if (!g) return;
-    const calmo = window.matchMedia("(prefers-reduced-motion: reduce)");
     const r = ruido1d(semente(11), 1024), rs = semente(7);
     // Picos com posição, altura e largura próprias (o maior perto do meio) e
     // um detalhe fino de rocha por cima.
@@ -68,56 +68,39 @@ export function FundoGelo({ className }: { className?: string }) {
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       ceu = g.createLinearGradient(0, 0, 0, H);
-      ceu.addColorStop(0, "#f8fafc"); ceu.addColorStop(1, "#e9eef4");
+      ceu.addColorStop(0, escuro ? "#0d1524" : realce > 1 ? "#f1f6fc" : "#f8fafc"); ceu.addColorStop(1, escuro ? "#080d17" : realce > 1 ? "#d3deec" : "#e9eef4");
       nevoa = g.createLinearGradient(0, H * 0.6, 0, H);
-      nevoa.addColorStop(0, "rgba(235,240,245,0)"); nevoa.addColorStop(1, "rgba(233,238,244,0.96)");
+      nevoa.addColorStop(0, escuro ? "rgba(8,13,23,0)" : "rgba(211,222,236,0)"); nevoa.addColorStop(1, escuro ? "rgba(8,13,23,0.96)" : realce > 1 ? "rgba(211,222,236,0.7)" : "rgba(233,238,244,0.96)");
     };
-    ajustar();
-    const obs = new ResizeObserver(ajustar);
-    obs.observe(canvas);
+    const obs = new ResizeObserver(() => { ajustar(); desenhar(); });
 
-    let quadro = 0, ultimo = 0, acumulado = 0;
-    const desenhar = (t: number) => {
-      quadro = requestAnimationFrame(desenhar);
-      if (t - ultimo < 33) return; // ~30 quadros/s bastam para algo tão lento
-      acumulado += (t - (ultimo || t)) * (calmo.matches ? 0.35 : 1);
-      ultimo = t;
+    const desenhar = () => {
       if (!ceu || !nevoa) return;
       g.fillStyle = ceu;
       g.fillRect(0, 0, W, H);
-      const deriva = Math.sin(acumulado * 0.00005) * 0.006;
       for (let j = 0; j < PERFIS; j++) {
         const p = j / (PERFIS - 1);
         const yBase = H * (0.36 + 0.62 * p), alt = H * 0.4 * (1 - p * 0.55);
-        // cada perfil balança um pouquinho fora de fase: a serra "respira"
-        const fase = Math.sin(acumulado * 0.00022 + j * 0.35) * 0.0025;
         g.beginPath();
-        for (let x = 0; x <= W; x += 3) {
-          const u = x / W + (p - 0.5) * 0.05 * Math.sin(j * 0.7) + deriva + fase;
+        for (let x = 0; x <= W; x += 6) {
+          const u = x / W + (p - 0.5) * 0.05 * Math.sin(j * 0.7);
           const y = yBase - alt * serra(u, 0.55 + p * 0.4);
           if (x) g.lineTo(x, y); else g.moveTo(x, y);
         }
         g.lineTo(W, H); g.lineTo(0, H); g.closePath();
         g.fillStyle = ceu; g.fill();
-        g.strokeStyle = `rgba(56,74,102,${0.14 + 0.5 * Math.pow(p, 1.2)})`;
-        g.lineWidth = 0.55 + p * 0.55;
+        g.strokeStyle = escuro ? `rgba(150,182,232,${Math.min(1, (0.1 + 0.4 * Math.pow(p, 1.2)) * realce)})` : `rgba(56,74,102,${Math.min(1, (0.14 + 0.5 * Math.pow(p, 1.2)) * realce)})`;
+        g.lineWidth = (0.55 + p * 0.55) * (realce > 1 ? 1.5 : 1);
         g.stroke();
       }
       g.fillStyle = nevoa;
       g.fillRect(0, 0, W, H);
     };
-    const aoMudarAba = () => {
-      cancelAnimationFrame(quadro);
-      if (!document.hidden) { ultimo = 0; quadro = requestAnimationFrame(desenhar); }
-    };
-    quadro = requestAnimationFrame(desenhar);
-    document.addEventListener("visibilitychange", aoMudarAba);
-    return () => {
-      cancelAnimationFrame(quadro);
-      obs.disconnect();
-      document.removeEventListener("visibilitychange", aoMudarAba);
-    };
-  }, []);
+    ajustar();
+    desenhar();
+    obs.observe(canvas);
+    return () => obs.disconnect();
+  }, [escuro, realce]);
 
   return <canvas ref={ref} aria-hidden="true" className={cn("block", className)} />;
 }

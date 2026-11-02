@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { nomeDoParametro, parametrosDaTela } from "@/lib/contrato/rotas";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/exportar/cartao";
 import { FunnelChart, type EtapaDoFunil } from "@/components/charts/funnel-chart";
 import { AreaChart } from "@/components/charts/area-chart";
+import { useSondagem } from "@/components/inbox/use-sondagem";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
@@ -427,6 +429,21 @@ function Painel() {
 
   React.useEffect(() => { void carregarDados(); }, [carregarDados]);
 
+  // Tempo real: de 15 em 15 s os números se atualizam sozinhos, sem esqueleto,
+  // e o contador rola do valor antigo ao novo. Só com a aba à vista.
+  useSondagem(async () => {
+    if (carregadoEm === null) return;
+    const q = filtrosGlobaisParaQuery(globais);
+    const daVisao = new URLSearchParams(q);
+    if (canal) daVisao.set("channel", canal);
+    const [fontes, visaoNova] = await Promise.all([
+      fetch(`/api/analytics/fontes${q ? `?${q}` : ""}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/dashboard/overview?${daVisao}`).then((r) => (r.ok ? r.json() : null)),
+    ]);
+    if (fontes) setDados(fontes);
+    if (visaoNova) setVisao(visaoNova);
+  }, 15_000);
+
   // ── Layout: carrega, salva sozinho, volta se falhar ──
   const ultimoSalvo = React.useRef<Widget[] | null>(null);
   const pularSalvar = React.useRef(true);
@@ -638,13 +655,7 @@ function Painel() {
 
       <div className="flex flex-col gap-3 print:hidden">
         <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] text-text-primary">Dashboard</h1>
-          {visao && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-panel px-3 py-1 text-small tabular-nums text-text-secondary">
-              <span className={cn("size-2 rounded-full", visao.aoVivo > 0 ? "bg-success" : "bg-text-tertiary/50")} aria-hidden="true" />
-              {visao.aoVivo} {visao.aoVivo === 1 ? "conversa agora" : "conversas agora"}
-            </span>
-          )}
+          <CabecalhoDeTela titulo="Dashboard" numeros={visao ? [{ rotulo: visao.aoVivo === 1 ? "conversa agora" : "conversas agora", valor: visao.aoVivo }] : undefined} />
           <span className="text-caption tabular-nums text-text-tertiary" aria-live="polite">
             {estadoSalvar === "salvando" ? "Salvando…" : estadoSalvar === "salvo" ? "Salvo" : ""}
           </span>

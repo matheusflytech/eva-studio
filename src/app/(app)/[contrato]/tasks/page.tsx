@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/styles";
 import { pulsar } from "@/lib/fundo/eventos";
@@ -69,12 +70,12 @@ function Tarefas() {
     if (criando) campo.current?.focus();
   }, [criando]);
 
-  const moldura: Moldura = ({ contagem, acoes, lateral, conteudo, coluna }) => (
+  const moldura: Moldura = ({ contagem, numeros, acoes, lateral, conteudo, coluna }) => (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
       {/* Barra da tela: título e contagem; à direita, Nova tarefa, "…" e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Tarefas</h1>
-        {contagem && <span className="font-mono text-caption tabular-nums text-text-tertiary">{contagem}</span>}
+        <CabecalhoDeTela titulo="Tarefas" numeros={numeros} />
+        {!numeros && contagem && <span className="font-mono text-caption tabular-nums text-text-tertiary">{contagem}</span>}
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary" onClick={abrirCriacao} title="Nova tarefa (T)" aria-keyshortcuts="T">
             <Plus size={14} aria-hidden="true" />

@@ -233,9 +233,9 @@ function Conversas() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] border-t border-border-subtle lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_240px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 px-3 pb-3 pt-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_240px]">
         <ListaDeConversas
-          className={cn("lg:border-r lg:border-border-subtle", selecionada ? "hidden lg:flex" : "flex")}
+          className={cn("vidro relative overflow-hidden rounded-[22px]", selecionada ? "hidden lg:flex" : "flex")}
           itens={lista}
           selecionada={selecionada}
           onSelecionar={selecionar}
@@ -262,7 +262,7 @@ function Conversas() {
         {atual ? (
           <ConversaAberta
             key={atual.id}
-            className={cn(selecionada ? "flex" : "hidden lg:flex")}
+            className={cn("vidro relative overflow-hidden rounded-[22px]", selecionada ? "flex" : "hidden lg:flex")}
             conversa={atual}
             meuId={meuId}
             membros={membros}
@@ -271,7 +271,7 @@ function Conversas() {
             onAbrirCliente={() => setPainelAberto(true)}
           />
         ) : (
-          <section className={cn("min-h-0 flex-col items-center justify-center p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
+          <section className={cn("vidro relative overflow-hidden rounded-[22px] min-h-0 flex-col items-center justify-center p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
             <MessagesSquare size={24} className="mb-3 text-text-tertiary" aria-hidden="true" />
             <h2 className="text-title-sm font-semibold tracking-tight text-text-primary">
               {selecionada ? "Carregando a conversa..." : "Escolha uma conversa"}
@@ -287,7 +287,7 @@ function Conversas() {
         {atual && (
           <PainelDoCliente
             key={`painel-${atual.id}`}
-            className="hidden border-l border-border-subtle xl:flex"
+            className="vidro relative overflow-hidden rounded-[22px] hidden xl:flex"
             conversa={atual}
             onMudou={atualizarTudo}
           />

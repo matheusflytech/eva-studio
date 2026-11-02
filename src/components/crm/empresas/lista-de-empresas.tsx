@@ -227,7 +227,7 @@ export function ListaDeEmpresas() {
           }
         />
       ) : (
-        <ul aria-label="Empresas" aria-busy={isLoading || undefined} className="flex flex-col">
+        <ul aria-label="Empresas" aria-busy={isLoading || undefined} className="vidro relative flex min-h-0 flex-col overflow-y-auto rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-2">
           {visiveis.map((c) => (
             <LinhaDaEmpresa key={c.id} empresa={c} />
           ))}

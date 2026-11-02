@@ -49,22 +49,26 @@ function nomeDoMes(mes: string, curto = false) {
 
 /**
  * O número conta do valor anterior até o novo (de zero na primeira vez).
- * Sem animação para quem pediu menos movimento.
+ * Vale também com "reduzir movimento": contar não é movimento de tela.
  */
 export function useContagem(valor: number | null): number | null {
   const [visto, setVisto] = React.useState<number | null>(valor === null ? null : 0);
   const anterior = React.useRef<number>(0);
   React.useEffect(() => {
     const de = anterior.current;
-    if (valor !== null) anterior.current = valor;
     // Sem animação (nada a contar ou menos movimento): o valor entra direto, no próximo quadro.
-    const direto = valor === null || de === valor || reduzMovimento();
+    const direto = valor === null || de === valor;
     const inicio = performance.now();
     let quadro = 0;
     const passo = (agora: number) => {
-      if (direto) return setVisto(valor);
-      const t = Math.min(1, (agora - inicio) / 600);
-      setVisto(de + (valor - de) * (1 - (1 - t) ** 3));
+      if (direto) {
+        if (valor !== null) anterior.current = valor;
+        return setVisto(valor);
+      }
+      const t = Math.min(1, Math.max(0, (agora - inicio) / 600));
+      const v = de + (valor - de) * (1 - (1 - t) ** 3);
+      anterior.current = v;
+      setVisto(v);
       if (t < 1) quadro = requestAnimationFrame(passo);
     };
     quadro = requestAnimationFrame(passo);
@@ -231,10 +235,105 @@ function Ritmo({ v, escuro }: { v: Visao; escuro: boolean }) {
   );
 }
 
+/** Curva suave (Catmull-Rom) que passa por todos os pontos, em coordenadas do viewBox. */
+export function curva(p: readonly (readonly [number, number])[]) {
+  if (p.length < 2) return "";
+  let d = `M${p[0][0]},${p[0][1]}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const [x0, y0] = p[i - 1] ?? p[i], [x1, y1] = p[i], [x2, y2] = p[i + 1], [x3, y3] = p[i + 2] ?? p[i + 1];
+    d += ` C${x1 + (x2 - x0) / 6},${y1 + (y2 - y0) / 6} ${x2 - (x3 - x1) / 6},${y2 - (y3 - y1) / 6} ${x2},${y2}`;
+  }
+  return d;
+}
+
+/**
+ * Receita dos últimos 6 ou 12 meses em linha: o número grande sobe, a linha se
+ * desenha da esquerda para a direita e a média fica tracejada. Passar o mouse
+ * (ou focar) num ponto mostra o mês.
+ */
+function ReceitaEmLinha({ meses, quantos }: { meses: Mes[]; quantos: number }) {
+  const ultimos = Array.from({ length: quantos }, (_, i) => {
+    const fim = meses.at(-1)?.mes ?? "";
+    const [a, m] = fim.split("-").map(Number);
+    const k = m - 1 - (quantos - 1 - i);
+    const mes = `${a + Math.floor(k / 12)}-${String(((k % 12) + 12) % 12 + 1).padStart(2, "0")}`;
+    return meses.find((x) => x.mes === mes) ?? { mes, receita: 0, vendas: 0, criados: 0 };
+  });
+  const total = ultimos.reduce((s, m) => s + m.receita, 0);
+  const vendas = ultimos.reduce((s, m) => s + m.vendas, 0);
+  const media = total / quantos;
+  const max = Math.max(1, ...ultimos.map((m) => m.receita));
+  const n = Math.max(1, quantos - 1);
+  const pontos = ultimos.map((m, i) => [(i / n) * 600, 190 - (m.receita / max) * 170] as const);
+  const linha = curva(pontos);
+  const [desenhada, setDesenhada] = React.useState(false);
+  React.useEffect(() => {
+    const q = requestAnimationFrame(() => setDesenhada(true));
+    return () => cancelAnimationFrame(q);
+  }, []);
+  const pronta = desenhada || reduzMovimento();
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-1">
+      <NumeroGrande valor={total} formatar={reais} />
+      <p className="text-caption text-text-tertiary tabular-nums">
+        vendidos em {quantos} meses · {vendas} {vendas === 1 ? "venda" : "vendas"} · média {reaisCurtos(media)}/mês
+      </p>
+      <div className="relative mt-2 min-h-[120px] flex-1">
+        <svg viewBox="0 0 600 200" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible" role="img" aria-label={`Receita dos últimos ${quantos} meses`}>
+          <defs>
+            <linearGradient id="receita-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--color-accent-solid)" stopOpacity="0.28" />
+              <stop offset="1" stopColor="var(--color-accent-solid)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <line x1="0" x2="600" y1={190 - (media / max) * 170} y2={190 - (media / max) * 170} strokeDasharray="5 6" strokeWidth="1" vectorEffect="non-scaling-stroke" className="stroke-text-tertiary/60" />
+          <path d={`${linha} L600,200 L0,200 Z`} fill="url(#receita-area)" style={{ opacity: pronta ? 1 : 0, transition: "opacity 900ms ease-out 500ms" }} />
+          <path
+            d={linha}
+            pathLength={1}
+            fill="none"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            className="stroke-accent-solid"
+            style={{ strokeDasharray: 1, strokeDashoffset: pronta ? 0 : 1, transition: "stroke-dashoffset 1400ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+          />
+        </svg>
+        {ultimos.map((m, i) => (
+          <span
+            key={m.mes}
+            tabIndex={0}
+            role="img"
+            aria-label={`${nomeDoMes(m.mes)}: ${reais(m.receita)}, ${m.vendas} ${m.vendas === 1 ? "venda" : "vendas"}`}
+            title={`${nomeDoMes(m.mes)}: ${reais(m.receita)}, ${m.vendas} ${m.vendas === 1 ? "venda" : "vendas"}`}
+            className="absolute size-3 -translate-x-1/2 translate-y-1/2 rounded-full border-2 border-accent-solid bg-panel outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            style={{ left: `${(pontos[i][0] / 600) * 100}%`, bottom: `${((200 - pontos[i][1]) / 200) * 100}%`, opacity: pronta ? 1 : 0, transition: `opacity 300ms ease-out ${300 + i * 90}ms` }}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between text-caption text-text-tertiary">
+        {ultimos.map((m) => (
+          <span key={m.mes}>{nomeDoMes(m.mes, true)}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ReceitaPorMes({ meses, periodo }: { meses: Mes[]; periodo: Visao["periodo"] }) {
   const anos = [...new Set(meses.map((m) => m.mes.slice(0, 4)))];
-  const [ano, setAno] = React.useState(anos.at(-1) ?? "");
+  const [ano, setAno] = React.useState("12M");
   const atual = meses.at(-1)?.mes ?? "";
+  if (ano === "6M" || ano === "12M") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex justify-end">
+          <SegmentedControl label="Período" value={ano} onChange={setAno} options={[{ value: "6M", label: "6M" }, { value: "12M", label: "12M" }, ...anos.map((a) => ({ value: a, label: a }))]} />
+        </div>
+        <ReceitaEmLinha key={ano} meses={meses} quantos={ano === "6M" ? 6 : 12} />
+      </div>
+    );
+  }
   const doAno = Array.from({ length: 12 }, (_, i) => `${ano}-${String(i + 1).padStart(2, "0")}`).map(
     (mes) => meses.find((m) => m.mes === mes) ?? { mes, receita: 0, vendas: 0, criados: 0 }
   );
@@ -248,7 +347,7 @@ function ReceitaPorMes({ meses, periodo }: { meses: Mes[]; periodo: Visao["perio
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-caption text-text-tertiary tabular-nums">{reais(total)} em {ano}</span>
-        {anos.length > 1 && <SegmentedControl label="Ano" value={ano} onChange={setAno} options={anos.map((a) => ({ value: a, label: a }))} />}
+        <SegmentedControl label="Período" value={ano} onChange={setAno} options={[{ value: "6M", label: "6M" }, { value: "12M", label: "12M" }, ...anos.map((a) => ({ value: a, label: a }))]} />
       </div>
       <div className="relative mt-3 min-h-0 flex-1">
         {media > 0 && (

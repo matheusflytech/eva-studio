@@ -1,5 +1,6 @@
 "use client";
 
+import { PilulasDeNumeros, type NumeroDoCabecalho } from "@/components/layout/cabecalho-de-tela";
 import * as React from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export function CabecalhoDeContatos({
   onAba,
   onNovo,
   menu,
+  numeros,
 }: {
   /** Ex.: "1.284 no total". */
   rotulo?: string;
@@ -34,6 +36,8 @@ export function CabecalhoDeContatos({
   onNovo: () => void;
   /** Itens do "…" (DropdownMenuItem). */
   menu?: React.ReactNode;
+  /** Pílulas de números ao lado do título. */
+  numeros?: NumeroDoCabecalho[];
 }) {
   return (
     <header className="flex flex-wrap items-end gap-x-5 gap-y-3">
@@ -42,6 +46,7 @@ export function CabecalhoDeContatos({
         <h1 className="text-heading font-semibold tracking-tight text-text-primary">Contatos</h1>
       </div>
       <SegmentedControl label="Seções de contatos" options={ABAS} value={aba} onChange={onAba} className="mb-0.5" />
+      {numeros && numeros.length > 0 && <PilulasDeNumeros numeros={numeros} className="mb-0.5" />}
       <div className="ml-auto flex items-center gap-2">
         <Button variant="primary" onClick={onNovo}>
           <Plus size={14} aria-hidden="true" />

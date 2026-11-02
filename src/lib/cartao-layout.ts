@@ -69,7 +69,7 @@ export const MAX_CAMPOS_NA_PREVIA = 20;
 export const LAYOUT_PADRAO: LayoutDoCartao = {
   campos: ["contato", "valor", "previsao", "responsavel"],
   previa: ["empresa", "valor", "etapa", "previsao", "responsavel", "ultimaInteracao", "criadoEm"],
-  densidade: "confortavel",
+  densidade: "compacto",
   acoes: [...ACOES_DO_CARTAO],
   secoes: ["detalhes", "contato", "atividade"],
 };
@@ -134,7 +134,7 @@ export function normalizarLayout(
   return {
     campos: lista(o.campos, MAX_CAMPOS_NO_CARTAO, chaves) ?? LAYOUT_PADRAO.campos,
     previa: lista(o.previa, MAX_CAMPOS_NA_PREVIA, chaves) ?? LAYOUT_PADRAO.previa,
-    densidade: o.densidade === "compacto" ? "compacto" : "confortavel",
+    densidade: o.densidade === "confortavel" ? "confortavel" : LAYOUT_PADRAO.densidade,
     // Layout salvo antes do v4 não tem estes dois: vale o padrão.
     acoes: acoesDe(o.acoes),
     secoes: secoesDe(o.secoes),

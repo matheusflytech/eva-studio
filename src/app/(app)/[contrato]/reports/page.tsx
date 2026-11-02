@@ -1,5 +1,6 @@
 "use client";
 
+import { Contador } from "@/components/layout/cabecalho-de-tela";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { ArrowRight, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
@@ -115,7 +116,7 @@ export default function ReportsPage() {
           ))}
         </div>
       ) : semNada ? (
-        <div className="w-full rounded-[18px] border border-border-subtle bg-panel px-5 py-10 text-center">
+        <div className="w-full vidro relative rounded-[22px] px-5 py-10 text-center">
           <p className="text-body font-medium text-text-primary">Nenhuma conversa nos últimos {dias} dias.</p>
           <p className="mx-auto mt-1 max-w-md text-small text-text-secondary">
             Assim que um agente atender alguém, pelo canal ou pelo Playground, os números aparecem aqui.
@@ -244,10 +245,12 @@ function Numero({
   apoio?: React.ReactNode;
   alerta?: boolean;
 }) {
+  const m = /^(d[d.]*)(D*)$/.exec(valor);
+  const numero = m ? { n: Number(m[1].replace(/./g, "")), sufixo: m[2] } : null;
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-[18px] border border-border-subtle bg-panel px-5 py-4">
+    <div className="flex min-w-0 flex-col gap-1 vidro relative rounded-[22px] px-5 py-4">
       <span className="flex items-center gap-1.5 whitespace-nowrap text-small text-text-secondary">{rotulo}</span>
-      <span className={cn("text-display font-medium tracking-[-0.035em] tabular-nums", alerta ? "text-warning" : "text-text-primary")}>{valor}</span>
+      <span className={cn("text-display font-medium tracking-[-0.035em] tabular-nums", alerta ? "text-warning" : "text-text-primary")}>{numero ? <Contador valor={numero.n} formatar={(n) => `${Math.round(n).toLocaleString("pt-BR")}${numero.sufixo}`} /> : valor}</span>
       {apoio && <span className="truncate font-mono text-caption text-text-tertiary">{apoio}</span>}
     </div>
   );
@@ -344,9 +347,9 @@ function OndePara({ itens }: { itens: Payload["ondePara"] }) {
 function Horarios({ porHora, mensagens }: { porHora: Payload["porHora"]; mensagens: number }) {
   return (
     <Grupo titulo="Mensagens recebidas por hora · fuso de São Paulo">
-      <div className="rounded-[18px] border border-border-subtle bg-panel px-5 py-4">
+      <div className="vidro relative rounded-[22px] px-5 py-4">
         <p className="flex items-baseline gap-2">
-          <span className="text-display font-medium tracking-[-0.035em] tabular-nums text-text-primary">{mensagens.toLocaleString("pt-BR")}</span>
+          <span className="text-display font-medium tracking-[-0.035em] tabular-nums text-text-primary"><Contador valor={mensagens} /></span>
           <span className="text-small text-text-secondary">mensagens recebidas no período</span>
         </p>
         <div className="mt-4">

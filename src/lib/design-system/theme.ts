@@ -21,8 +21,8 @@ export const THEME_COOKIE = "eva-theme";
 /** Um ano: preferência de tema não expira na prática. */
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-/** Sem escolha salva, a Eva abre clara (decisão do produto, 20/10/2026). */
-export const PREFERENCIA_PADRAO: ThemePreference = "light";
+/** Sem escolha salva, a casca abre escura (vidro sobre as curvas). Antes: clara, decisão de 20/10/2026. */
+export const PREFERENCIA_PADRAO: ThemePreference = "dark";
 
 export function parseThemePreference(valor: unknown): ThemePreference {
   return valor === "light" || valor === "dark" ? valor : PREFERENCIA_PADRAO;
@@ -55,7 +55,7 @@ export function serializeThemeCookie(pref: ThemePreference): string {
  * Script inline do <head>. ES5 de propósito (roda antes de qualquer bundle) e
  * todo envolto em try: localStorage pode lançar em aba anônima/bloqueada.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);p=m?m[1]:${JSON.stringify("light")}}var r=document.documentElement;r.setAttribute("data-theme",p==="dark"?"dark":"light")}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var k=${JSON.stringify(THEME_STORAGE_KEY)},p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"){var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);p=m?m[1]:${JSON.stringify(PREFERENCIA_PADRAO)}}var r=document.documentElement;r.setAttribute("data-theme",p==="dark"?"dark":"light")}catch(e){}})();`;
 
 /*
  * Canvas do builder. Por padrão acompanha o tema (claro no claro, escuro no

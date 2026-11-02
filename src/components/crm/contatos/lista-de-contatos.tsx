@@ -451,6 +451,11 @@ export function ListaDeContatos({
   return (
     <div className={cn("flex flex-col gap-4", vista === "lista" && "min-h-0 flex-1")}>
       <CabecalhoDeContatos
+        numeros={contagens.todos === undefined ? undefined : [
+          { rotulo: "contatos", valor: contagens.todos },
+          ...(contagens.meus === undefined ? [] : [{ rotulo: "meus", valor: contagens.meus }]),
+          ...(contagens["sem-dono"] === undefined ? [] : [{ rotulo: "sem responsável", valor: contagens["sem-dono"] }]),
+        ]}
         rotulo={dados ? `${numero.format(total)} ${filtrandoAlgo(estado) ? (total === 1 ? "encontrado" : "encontrados") : "no total"}` : undefined}
         aba={aba}
         onAba={onAba}
@@ -485,10 +490,8 @@ export function ListaDeContatos({
             className={cn(
               "min-w-0 flex-1",
               "[&>div>div:first-child]:items-center [&>div>div:first-child]:border-b-0",
-              "[&_[role=tablist]]:items-center [&_[role=tablist]]:gap-1",
-              "[&_[role=tab]]:mb-0 [&_[role=tab]]:h-8 [&_[role=tab]]:rounded-full [&_[role=tab]]:border-0 [&_[role=tab]]:px-3 [&_[role=tab]]:text-small",
-              "[&_[role=tab][aria-selected=true]]:bg-raised [&_[role=tab][aria-selected=true]]:ring-1 [&_[role=tab][aria-selected=true]]:ring-border-subtle",
-              "[&_[role=tab]:hover]:bg-hover [&_[role=tablist]>span>span]:mb-0 [&>div>div:first-child>button]:mb-0"
+              "[&_[role=tablist]]:items-center",
+              "[&_[role=tablist]>span>span]:mb-0 [&>div>div:first-child>button]:mb-0"
             )}
           >
             <AbasDeVisoes
@@ -560,7 +563,7 @@ export function ListaDeContatos({
           {/* Sem nada aberto a lista ocupa a largura (linhas com celular, e-mail,
               etiquetas…); a ficha ou as atividades só abrem quando pedidas. */}
           <div className={cn("flex min-h-0 w-full flex-col", painel && "lg:w-[360px] lg:shrink-0")}>
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="vidro relative min-h-0 flex-1 overflow-y-auto rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-2">
               {carregandoAgora && !dados ? (
                 <div role="status" aria-label="Carregando contatos" className="flex flex-col">
                   {Array.from({ length: 8 }, (_, i) => (

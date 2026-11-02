@@ -223,7 +223,7 @@ export default function AutomacoesPage() {
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col" aria-label="Automações">
+        <ul className="vidro relative flex flex-col rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-2" aria-label="Automações">
           {visiveis.map((a) => {
             const Icone = ICONE_DO_OBJETO[a.objeto] ?? Workflow;
             const s = STATUS_DA_AUTOMACAO[a.status] ?? STATUS_DA_AUTOMACAO.rascunho;

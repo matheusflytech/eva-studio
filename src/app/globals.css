@@ -908,3 +908,195 @@ body {
 @media (prefers-reduced-motion: reduce) {
   :where(button, [role="button"], [role="tab"], summary):not(:disabled):active { transform: scale(0.99); }
 }
+
+/* ---------------------------------------------------------------------------
+   Vidro líquido (Quadro de Negócios).
+
+   O cartão é uma lente. Quatro camadas: tinta translúcida; desfoque com
+   saturação (é a saturação que dá a sensação de luz); brilho no topo e uma
+   borda de luz (clara no canto de cima à esquerda e no de baixo à direita);
+   sombra de profundidade com um aro fino. No Chromium há uma quinta: o fundo
+   entorta nas bordas quando o ponteiro está no cartão ou ele é arrastado
+   (filtro SVG em quadro-vidro.tsx). No Safari e no Firefox sobra o vidro
+   fosco, que já é o grosso do efeito.
+
+   Regras de uso: só o cartão é vidro. A coluna é uma faixa sem desfoque (um
+   backdrop-filter na coluna esconderia as luzes de fundo do cartão) e o fundo
+   colorido fica atrás do quadro, parado, enquanto os cartões rolam por cima.
+   "Reduzir transparência" e "Aumentar contraste" voltam ao painel sólido.
+   --------------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  --vidro-fundo: rgba(255, 255, 255, 0.46);
+  --vidro-fundo-forte: rgba(255, 255, 255, 0.66);
+  --vidro-topo: rgba(255, 255, 255, 0.6);
+  --vidro-aro: rgba(0, 0, 0, 0.06);
+  --vidro-brilho: rgba(255, 255, 255, 0.95);
+  --vidro-brilho-baixo: rgba(255, 255, 255, 0.6);
+  --vidro-luz-interna: rgba(255, 255, 255, 0.22);
+  --vidro-sombra: 0 1px 1px rgba(20, 30, 60, 0.05), 0 12px 30px -12px rgba(40, 64, 120, 0.3);
+  --vidro-sombra-alta: 0 2px 2px rgba(20, 30, 60, 0.06), 0 26px 50px -16px rgba(40, 64, 120, 0.42);
+  --vidro-faixa: rgba(255, 255, 255, 0.26);
+  --vidro-faixa-borda: rgba(255, 255, 255, 0.7);
+  --vidro-luz-1: rgba(70, 150, 255, 0.62);
+  --vidro-luz-2: rgba(160, 120, 255, 0.52);
+  --vidro-luz-3: rgba(255, 160, 110, 0.55);
+  --vidro-luz-4: rgba(80, 215, 170, 0.45);
+}
+[data-theme="dark"] {
+  --vidro-fundo: rgba(255, 255, 255, 0.075);
+  --vidro-fundo-forte: rgba(255, 255, 255, 0.12);
+  --vidro-topo: rgba(255, 255, 255, 0.14);
+  --vidro-aro: rgba(0, 0, 0, 0.4);
+  --vidro-brilho: rgba(255, 255, 255, 0.5);
+  --vidro-brilho-baixo: rgba(255, 255, 255, 0.22);
+  --vidro-luz-interna: rgba(255, 255, 255, 0.05);
+  --vidro-sombra: 0 1px 1px rgba(0, 0, 0, 0.3), 0 14px 32px -12px rgba(0, 0, 0, 0.6);
+  --vidro-sombra-alta: 0 2px 2px rgba(0, 0, 0, 0.35), 0 28px 54px -16px rgba(0, 0, 0, 0.7);
+  --vidro-faixa: rgba(255, 255, 255, 0.035);
+  --vidro-faixa-borda: rgba(255, 255, 255, 0.09);
+  --vidro-luz-1: rgba(48, 140, 232, 0.32);
+  --vidro-luz-2: rgba(130, 96, 255, 0.26);
+  --vidro-luz-3: rgba(255, 128, 90, 0.2);
+  --vidro-luz-4: rgba(30, 190, 150, 0.2);
+}
+
+/* Fundo colorido atrás do quadro: é o que o vidro desfoca. Não rola com os cartões. */
+.quadro-vidro { position: relative; isolation: isolate; }
+.quadro-vidro::before {
+  display: none; /* a casca já tem luzes e montanhas; a mancha do quadro sobrava */
+  content: ""; position: absolute; inset: -12px -16px; z-index: -1; pointer-events: none;
+  /* As bordas somem aos poucos: sem isso o fundo vira uma caixa colorida com canto. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent), linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent), linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+  mask-composite: intersect;
+  background:
+    radial-gradient(34% 46% at 14% 22%, var(--vidro-luz-1), transparent 100%),
+    radial-gradient(32% 44% at 86% 20%, var(--vidro-luz-2), transparent 100%),
+    radial-gradient(36% 46% at 72% 84%, var(--vidro-luz-3), transparent 100%),
+    radial-gradient(32% 44% at 24% 86%, var(--vidro-luz-4), transparent 100%);
+}
+
+/* Faixa da coluna: sem desfoque, com um fio de luz e a cor da etapa só no topo. */
+.vidro-faixa {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 12%, transparent), transparent 40%), color-mix(in srgb, var(--vidro-faixa) 55%, transparent);
+  box-shadow: none;
+}
+
+/* Cartão. Sem suporte a backdrop-filter, fica o painel sólido de antes. */
+.vidro { background: var(--surface-panel); border: 1px solid var(--border-subtle); }
+/* Responde ao toque na hora, antes de soltar (o arraste tem o seu próprio movimento). */
+.group\/card:active > .vidro:not([data-arrastando]) { scale: 0.98; }
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .vidro {
+    background: var(--vidro-fundo);
+    border-color: transparent;
+    -webkit-backdrop-filter: blur(16px) saturate(175%);
+    backdrop-filter: blur(16px) saturate(175%);
+    box-shadow: inset 0 1px 0 var(--vidro-topo), 0 0 0 0.5px var(--vidro-aro), var(--vidro-sombra), inset 0 0 20px var(--vidro-luz-interna);
+    transition: background-color 0.25s ease, box-shadow 0.25s ease, translate 0.25s var(--ease-out), scale 0.12s var(--ease-out);
+  }
+  /* Borda de luz: um fio de 1px com degradê, só nas pontas da diagonal. */
+  .vidro::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: linear-gradient(135deg, var(--vidro-brilho) 0%, transparent 30%, transparent 64%, var(--vidro-brilho-baixo) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .group\/card:hover > .vidro,
+  .vidro[data-arrastando] {
+    background: var(--vidro-fundo-forte);
+    box-shadow: inset 0 1px 0 var(--vidro-topo), 0 0 0 0.5px var(--vidro-aro), var(--vidro-sombra-alta), inset 0 0 20px var(--vidro-luz-interna);
+  }
+
+  /* Lente: só no Chromium (quadro-vidro.tsx marca o html), só no cartão sob o ponteiro ou arrastado. */
+  @media (hover: hover) {
+    html[data-refracao="sim"] .group\/card:hover > .vidro {
+      -webkit-backdrop-filter: url(#eva-vidro-lente) blur(10px) saturate(190%);
+      backdrop-filter: url(#eva-vidro-lente) blur(10px) saturate(190%);
+    }
+  }
+  html[data-refracao="sim"] .vidro[data-arrastando] {
+    -webkit-backdrop-filter: url(#eva-vidro-lente) blur(8px) saturate(200%);
+    backdrop-filter: url(#eva-vidro-lente) blur(8px) saturate(200%);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .vidro { background: var(--surface-panel); border: 1px solid var(--border-default); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .vidro::before, .quadro-vidro::before { display: none; }
+  .vidro-faixa { background: var(--surface-raised); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { .vidro { transition: none; } }
+
+/* ---------------------------------------------------------------------------
+   Abas de luz (abas-de-luz.tsx): o anel/haste, a borda do vidro que acende por
+   onde a luz passa e o brilho embaixo da barra. As cores vêm de --arc (aba ativa).
+   --------------------------------------------------------------------------- */
+.arco-haste {
+  stroke: var(--arc);
+  stroke-width: 2px;
+  fill: color-mix(in srgb, var(--arc) 13%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--arc) 70%, transparent));
+  transition: stroke 0.35s ease, fill 0.35s ease;
+}
+.arco-borda {
+  z-index: 1;
+  padding: 1px;
+  background:
+    radial-gradient(110px 40px at var(--luz-x, 50%) 100%, var(--arc), transparent 75%),
+    radial-gradient(110px 40px at var(--luz-x, 50%) 0%, color-mix(in srgb, var(--arc) 55%, transparent), transparent 75%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.85;
+}
+.arco-brilho {
+  left: calc(var(--luz-x, 50%) - 80px);
+  width: 160px;
+  height: 22px;
+  margin-top: -6px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--arc) 50%, transparent), transparent);
+  filter: blur(7px);
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+:root[data-theme="light"] .arco-brilho,
+[data-theme="light"] .arco-brilho { opacity: 0.45; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .arco-borda, .arco-brilho { display: none; }
+}
+
+/* Luzes por trás do vidro (como no protótipo): quatro manchas que derivam
+   devagar, para o desfoque dos cartões ter cor para mostrar. Só transform. */
+.luzes-do-fundo { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.luzes-do-fundo i { position: absolute; width: 56vmax; height: 56vmax; border-radius: 50%; animation: eva-deriva 46s ease-in-out infinite alternate; will-change: transform; }
+.luzes-do-fundo i:nth-child(1) { left: -14vmax; top: -16vmax; background: radial-gradient(closest-side, var(--vidro-luz-1), transparent); }
+.luzes-do-fundo i:nth-child(2) { right: -18vmax; top: 2vmax; background: radial-gradient(closest-side, var(--vidro-luz-2), transparent); animation-delay: -12s; }
+.luzes-do-fundo i:nth-child(3) { right: 6vmax; bottom: -26vmax; background: radial-gradient(closest-side, var(--vidro-luz-3), transparent); animation-delay: -24s; }
+.luzes-do-fundo i:nth-child(4) { left: 4vmax; bottom: -30vmax; background: radial-gradient(closest-side, var(--vidro-luz-4), transparent); animation-delay: -34s; }
+@keyframes eva-deriva { to { transform: translate(5vmax, 4vmax) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .luzes-do-fundo i { animation: none; } }
+
+/* Negócios: a coluna leva a cor da etapa no topo, num degradê que some. */
+.vidro-faixa {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 16%, transparent), transparent 150px), color-mix(in srgb, var(--vidro-faixa) 45%, transparent);
+}
+
+/* Dentro da casca toda superfície de painel é vidro (como no protótipo): as
+   telas antigas tinham cartões brancos e chapados sobre as montanhas. */
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .app-conteudo .bg-panel:not(.sem-desfoque) {
+    background: var(--vidro-fundo-forte);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+/* Listas longas e sem altura própria: o desfoque de fundo trava no meio da
+   rolagem no Chromium (o vidro "acaba" e a lista segue solta). Aqui fica um
+   painel quase opaco, sem backdrop-filter. */
+.app-conteudo .bg-panel.sem-desfoque {
+  background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
+}

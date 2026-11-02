@@ -29,7 +29,8 @@ import {
 
 const NO_MENU = 6;
 
-export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
+/** `avatar`: só a bolinha com as iniciais (canto do topo no computador); o menu abre para baixo. */
+export function OrgSwitcher({ collapsed, avatar }: { collapsed?: boolean; avatar?: boolean }) {
   const { session, logOut, updateOrgLogo } = useAuth();
   const { abrirAtalhos } = useBuscaGlobal();
   const pathname = usePathname();
@@ -65,14 +66,15 @@ export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
         <button
           className={cn(
             "flex w-full items-center gap-2.5 rounded-2xl border border-border-subtle bg-raised p-2 text-left transition-colors hover:bg-hover",
-            collapsed && "justify-center p-1.5"
+            collapsed && "justify-center p-1.5",
+            avatar && "size-9 w-9 justify-center rounded-full border-0 bg-transparent p-0"
           )}
           aria-label="Sua conta e seus contratos"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-inverse text-small font-semibold text-inverse-fg">
+          <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-inverse text-small font-semibold text-inverse-fg", avatar && "size-9 rounded-full")}>
             {iniciais(nome) || "?"}
           </span>
-          {!collapsed && (
+          {!collapsed && !avatar && (
             <>
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate text-small font-semibold text-text-primary">{nome}</span>
@@ -86,7 +88,7 @@ export function OrgSwitcher({ collapsed }: { collapsed?: boolean }) {
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" sideOffset={10} className="z-50 w-[300px] rounded-3xl p-1.5">
+      <DropdownMenuContent side={avatar ? "bottom" : "top"} align={avatar ? "end" : "start"} sideOffset={10} className="z-50 w-[300px] rounded-3xl p-1.5">
         <div className="flex items-center gap-3 px-2.5 pb-3 pt-2">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-inverse text-body font-semibold text-inverse-fg">{iniciais(nome) || "?"}</span>
           <span className="min-w-0">

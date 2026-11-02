@@ -17,6 +17,7 @@ import type { EtapaKanban, NegocioKanban } from "./modelo";
 import { VozDoQuadro } from "./eva-topo";
 import { vazioDaEtapa } from "./eva-voz";
 import { NumeroAnimado } from "./animacao/numero-animado";
+import { VidroContexto } from "./quadro-vidro";
 
 function CartaoArrastavel({
   deal,
@@ -154,6 +155,7 @@ export function StageColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etapa.id });
   const humana = React.useContext(VozDoQuadro);
+  const vidro = React.useContext(VidroContexto);
   const aberta = etapa.type === "open";
   const total = etapa.count ?? etapa.deals.length;
   const corpoId = React.useId();
@@ -176,13 +178,16 @@ export function StageColumn({
 
   const vazio = vazioDaEtapa(etapa.type, etapa.name, etapaAnterior);
   // Soltar aqui: realce suave (fundo e anel), a coluna continua a mesma.
-  const destaque = isOver ? "bg-accent-subtle/70 ring-1 ring-accent-solid/60" : "bg-raised";
+  const destaque = isOver ? "bg-accent-subtle/70 ring-1 ring-accent-solid/60" : vidro ? "vidro-faixa" : "bg-raised";
+  // Cor da etapa só no topo da faixa de vidro.
+  const faixaCor = vidro ? ({ "--faixa-cor": `var(--cat-${corDeDadoDaEtapa(etapa.color, etapa.type)}-solid)` } as React.CSSProperties) : undefined;
 
   if (recolhida) {
     return (
       <section
         ref={setNodeRef}
         data-etapa={etapa.name}
+        style={faixaCor}
         aria-label={`${etapa.name}, ${total} itens (recolhida)`}
         className={cn("flex w-10 shrink-0 snap-start flex-col items-center rounded-[18px] py-2 transition-colors duration-120", destaque)}
       >
@@ -203,8 +208,9 @@ export function StageColumn({
     <section
       ref={setNodeRef}
       data-etapa={etapa.name}
+      style={faixaCor}
       aria-label={`${etapa.name}, ${total} itens`}
-      className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200 xl:w-80", destaque)}
+      className={cn("flex max-h-full min-w-[272px] flex-1 basis-[272px] shrink-0 snap-start flex-col rounded-[22px] transition-colors duration-200 2xl:max-w-[460px]", destaque)}
     >
       <header className="group/cab flex flex-col gap-2.5 px-3.5 pb-3 pt-3.5">
         <div className="flex h-7 items-center gap-2">
@@ -239,8 +245,8 @@ export function StageColumn({
             type="button"
             onClick={() => onNovo(etapa.id)}
             className={cn(
-              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-default text-small font-medium text-text-tertiary",
-              "transition-colors duration-150 hover:border-accent-solid/50 hover:bg-accent-subtle/40 hover:text-accent-fg",
+              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] bg-hover/40 text-small font-medium text-text-tertiary",
+              "transition-colors duration-150 hover:bg-hover hover:text-text-primary",
               focusRing
             )}
           >
@@ -266,8 +272,8 @@ export function StageColumn({
         {etapa.deals.length === 0 && (
           <div
             className={cn(
-              "grid flex-1 place-items-center rounded-[14px] border border-dashed px-3 py-6 text-center text-small",
-              arrastandoAlgo ? "border-accent-solid text-accent-fg" : "border-border-default text-text-tertiary"
+              "grid flex-1 place-items-center rounded-[14px] px-3 py-6 text-center text-small",
+              arrastandoAlgo ? "border border-dashed border-accent-solid text-accent-fg" : "text-text-tertiary"
             )}
           >
             {arrastandoAlgo ? (

@@ -1,11 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { CabecalhoComIndicadores } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato, parametrosDaTela } from "@/lib/contrato/rotas";
 import {
   ChevronsLeftRight,
+  DollarSign,
+  Target,
+  TrendingUp,
   ChevronsRightLeft,
   ChevronsUpDown,
   CircleHelp,
@@ -63,6 +67,7 @@ import { opcoesDaBarra, opcoesDoEditor, opcoesExtrasDoEditor, useOpcoesDoCrm } f
 import { PreviaDoNegocio, type EtapaDaPrevia } from "@/components/crm/negocios/previa";
 import { DealCard } from "@/components/crm/negocios/deal-card";
 import { StageColumn } from "@/components/crm/negocios/stage-column";
+import { QuadroVidro } from "@/components/crm/negocios/quadro-vidro";
 import { ListaDeNegocios, type LinhaDeNegocio } from "@/components/crm/negocios/lista-de-negocios";
 import { NovoNegocio, type FunilDaTela } from "@/components/crm/negocios/novo-negocio";
 import { ImportarNegocios } from "@/components/crm/negocios/importar-negocios";
@@ -654,14 +659,19 @@ function NegociosConteudo() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-5 pt-1 lg:px-8 2xl:px-10">
       {/* Barra da tela: título, funil, modo e, à direita, busca, filtros, "…" e a ação principal. */}
+      <CabecalhoComIndicadores
+        titulo="Quadro de negócios"
+        indicadores={
+          quadro
+            ? [
+                { icone: DollarSign, rotulo: "Pipeline aberto", valor: totalAberto, formatar: (n) => formatMoney(n / 100) },
+                { icone: TrendingUp, rotulo: "Previsto ponderado", valor: ponderado, formatar: (n) => formatMoney(n / 100) },
+                ...(contagens.fechando === undefined ? [] : [{ icone: Target, rotulo: "Fecham este mês", valor: contagens.fechando }]),
+              ]
+            : undefined
+        }
+      />
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Negócios</h1>
-        {quadro && (
-          <span className="font-mono text-caption tabular-nums text-text-tertiary">
-            {qtdAbertos.toLocaleString("pt-BR")} {qtdAbertos === 1 ? "aberto" : "abertos"}
-          </span>
-        )}
-        <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
         {pipelines.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -802,10 +812,8 @@ function NegociosConteudo() {
         <div
           className={cn(
             "min-w-0 flex-1",
-            "[&_[role=tablist]]:gap-1 [&_[role=tablist]]:pb-0.5 [&_div:has(>[role=tablist])]:border-b-0",
-            "[&_[role=tab]]:mb-0 [&_[role=tab]]:h-8 [&_[role=tab]]:rounded-full [&_[role=tab]]:border-b-0 [&_[role=tab]]:px-3 [&_[role=tab]]:text-small",
-            "[&_[role=tab][aria-selected=true]]:bg-raised [&_[role=tab][aria-selected=true]]:ring-1 [&_[role=tab][aria-selected=true]]:ring-border-subtle",
-            "[&_[role=tab]:hover]:bg-hover [&_[role=tab]>span:last-child]:font-mono [&_[role=tab]>span:last-child]:text-caption"
+            "[&_div:has(>[role=tablist])]:border-b-0",
+            "[&_[role=tab]>span:last-child]:font-mono [&_[role=tab]>span:last-child]:text-caption"
           )}
         >
           <AbasDeVisoes
@@ -828,12 +836,6 @@ function NegociosConteudo() {
               Seu dia
               {atencaoDoDia.length > 0 && <span className="font-mono text-caption tabular-nums text-warning">{atencaoDoDia.length}</span>}
             </Button>
-          )}
-          {quadro && (
-            <p className="font-mono text-caption tabular-nums text-text-tertiary">
-              <span className="text-text-primary">{formatMoney(totalAberto / 100)}</span> no funil ·{" "}
-              <span className="text-text-primary">{formatMoney(ponderado / 100)}</span> ponderado
-            </p>
           )}
         </div>
       </div>
@@ -904,9 +906,10 @@ function NegociosConteudo() {
       ) : (
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <QuadroContexto.Provider value={acoesDoQuadro}>
+          <QuadroVidro>
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
-            <div className="relative">
-              <div ref={quadroRef} className="flex min-h-96 snap-x gap-4 overflow-x-auto pb-3 [height:calc(100dvh-226px)] xl:gap-5">
+            <div className="quadro-vidro relative">
+              <div ref={quadroRef} className="flex min-h-96 snap-x gap-4 overflow-x-auto pb-3 [height:calc(100dvh-210px)] xl:gap-5">
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
@@ -937,6 +940,7 @@ function NegociosConteudo() {
               )}
             </DragOverlay>
           </DndContext>
+          </QuadroVidro>
           </QuadroContexto.Provider>
         </VozDoQuadro.Provider>
       )}

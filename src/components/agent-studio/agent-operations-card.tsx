@@ -199,11 +199,11 @@ export function CartaoDoAgente({ agent }: { agent: AgentOverview }) {
   const n = agent.conversas7d;
 
   return (
-    <div className="group relative flex min-h-[188px] flex-col gap-4 rounded-[18px] border border-border-subtle bg-panel p-4 transition-colors hover:bg-raised">
+    <div className="group relative flex min-h-[188px] flex-col gap-4 vidro rounded-[22px] p-4">
       <Link
         href={`/agent-studio/${agent.id}`}
         aria-label={`Abrir ${agent.name}`}
-        className="absolute inset-0 rounded-[18px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="absolute inset-0 rounded-[22px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       />
       <div className="flex items-start justify-between gap-3">
         <OrbeDoAgente agenteId={agent.id} tamanho={56} leve />

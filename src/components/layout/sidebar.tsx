@@ -3,99 +3,15 @@
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { usePathname } from "@/lib/contrato/navegacao";
-import {
-  Home,
-  LayoutDashboard,
-  ChartColumn,
-  Aperture,
-  CheckCheck,
-  Send,
-  LayoutGrid,
-  BookOpen,
-  Plug,
-  MessageSquare,
-  PlayCircle,
-  Pin,
-  PinOff,
-  Users,
-  Contact,
-  Repeat,
-  Workflow,
-  Building2,
-  Handshake,
-  CheckSquare,
-  ChevronDown,
-  Search,
-  Megaphone,
-} from "lucide-react";
+import { Pin, PinOff, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSondagem } from "@/components/inbox/use-sondagem";
+import { useNaoLidas } from "@/components/inbox/use-nao-lidas";
+import { NAV_PRINCIPAL, NAV_AVANCADO } from "./navegacao";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 import { ThemeToggle } from "@/components/ui/theme";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { MarcaEva } from "@/components/layout/marca-eva";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  badge?: string;
-  animated?: boolean;
-}
-
-interface NavGroup {
-  label: string | null;
-  items: NavItem[];
-}
-
-// O menu principal tem só o que se usa todo dia: atender, vender, acompanhar.
-// O resto (réguas, disparos, integrações...) existe e funciona, mas mora em
-// "Mais ferramentas": quem abre o app pela primeira vez não precisa decifrar
-// quinze itens antes de responder o primeiro cliente.
-const NAV_PRINCIPAL: NavGroup[] = [
-  {
-    label: null,
-    items: [
-      { href: "/home", label: "Início", icon: Home },
-      { href: "/conversations", label: "Conversas", icon: MessageSquare },
-      { href: "/deals", label: "Negócios", icon: Handshake },
-      { href: "/contacts", label: "Contatos", icon: Contact },
-      { href: "/tasks", label: "Tarefas", icon: CheckSquare },
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/agent-studio", label: "Eva Studio", icon: Aperture, animated: true },
-    ],
-  },
-];
-
-const NAV_AVANCADO: NavGroup[] = [
-  {
-    label: "Automação",
-    items: [
-      { href: "/automations", label: "Automações", icon: Workflow },
-      { href: "/sequences", label: "Sequências", icon: Repeat },
-      { href: "/broadcasts", label: "Disparos", icon: Send },
-      { href: "/approvals", label: "Aprovações", icon: CheckCheck },
-      { href: "/library", label: "Biblioteca", icon: BookOpen },
-    ],
-  },
-  {
-    label: "Dados",
-    items: [
-      { href: "/companies", label: "Empresas", icon: Building2 },
-      { href: "/leads", label: "Leads", icon: Users },
-      { href: "/reports", label: "Relatórios", icon: ChartColumn },
-      { href: "/marketing", label: "Marketing", icon: Megaphone },
-    ],
-  },
-  {
-    label: "Ferramentas",
-    items: [
-      { href: "/integrations", label: "Integrações", icon: Plug },
-      { href: "/playground", label: "Playground", icon: PlayCircle },
-    ],
-  },
-];
 
 const CHAVE_MAIS = "eva_menu_mais";
 const CHAVE_FIXO = "eva_menu_fixo";
@@ -165,7 +81,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
     clearTimeout(fechar.current);
     fechar.current = setTimeout(() => setAberto(false), 350);
   };
-  const [naoLidas, setNaoLidas] = React.useState(0);
+  const naoLidas = useNaoLidas();
   const pathname = usePathname();
 
   // "Mais ferramentas" lembra se estava aberto. Começa fechado no servidor e lê
@@ -194,13 +110,6 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
     }
   }
 
-  // O menu tinha um "+99" escrito à mão, igual pra todo mundo, o tempo todo.
-  // Agora é quantas conversas estão esperando alguém olhar. A cada 20s e só com
-  // a aba à vista: é um número de relance, não precisa ser instantâneo.
-  useSondagem(async () => {
-    const res = await fetch("/api/inbox/summary");
-    if (res.ok) setNaoLidas((await res.json()).naoLidas ?? 0);
-  }, 20_000);
 
   return (
     // O espaço reservado na tela é o do menu fixo (240) ou o da faixa de ícones (68).
