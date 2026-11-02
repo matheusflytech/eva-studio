@@ -1,5 +1,6 @@
 "use client";
 
+import { Contador } from "@/components/layout/cabecalho-de-tela";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "@/lib/contrato/navegacao";
@@ -158,7 +159,7 @@ function Marketing() {
 
 function Section({ title, description, children, className }: { title: string; description?: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-[14px] border border-border-subtle bg-panel p-4 md:p-5", className)} aria-label={title}>
+    <section className={cn("rounded-[22px] border border-border-subtle bg-panel p-4 md:p-5", className)} aria-label={title}>
       <h2 className="text-body-lg font-semibold text-text-primary">{title}</h2>
       {description && <p className="mt-1 text-small text-text-secondary">{description}</p>}
       <div className="mt-4">{children}</div>
@@ -168,23 +169,23 @@ function Section({ title, description, children, className }: { title: string; d
 
 function SummaryTiles({ summary }: { summary: Summary | null }) {
   const t = summary?.totals;
-  const tiles: { label: string; value: string; hint?: string }[] = [
-    { label: "Investimento", value: t ? money(t.spendCents) : "…" },
-    { label: "Leads", value: t ? String(t.leads) : "…", hint: "Contatos cujo 1º toque foi no período" },
-    { label: "Negócios", value: t ? String(t.deals) : "…" },
-    { label: "Vendas", value: t ? String(t.won) : "…" },
-    { label: "Receita", value: t ? money(t.revenueCents) : "…" },
-    { label: "CPL", value: t ? money(t.cplCents) : "…", hint: "Custo por lead" },
-    { label: "CAC", value: t ? money(t.cacCents) : "…", hint: "Custo por venda" },
-    { label: "ROAS", value: t ? roasText(t.roas) : "…", hint: "Receita ÷ investimento" },
-    { label: "Negócios com origem", value: t ? pct(t.originPct) : "…", hint: t ? `${t.dealsWithOrigin} de ${t.deals}` : undefined },
+  const tiles: { label: string; value: string; hint?: string; count?: { n: number; fmt: (n: number) => string } }[] = [
+    { label: "Investimento", value: t ? money(t.spendCents) : "…", count: t ? { n: t.spendCents, fmt: money } : undefined },
+    { label: "Leads", value: t ? String(t.leads) : "…", hint: "Contatos cujo 1º toque foi no período", count: t ? { n: t.leads, fmt: (n) => String(Math.round(n)) } : undefined },
+    { label: "Negócios", value: t ? String(t.deals) : "…", count: t ? { n: t.deals, fmt: (n) => String(Math.round(n)) } : undefined },
+    { label: "Vendas", value: t ? String(t.won) : "…", count: t ? { n: t.won, fmt: (n) => String(Math.round(n)) } : undefined },
+    { label: "Receita", value: t ? money(t.revenueCents) : "…", count: t ? { n: t.revenueCents, fmt: money } : undefined },
+    { label: "CPL", value: t ? money(t.cplCents) : "…", hint: "Custo por lead", count: t && t.cplCents !== null ? { n: t.cplCents, fmt: money } : undefined },
+    { label: "CAC", value: t ? money(t.cacCents) : "…", hint: "Custo por venda", count: t && t.cacCents !== null ? { n: t.cacCents, fmt: money } : undefined },
+    { label: "ROAS", value: t ? roasText(t.roas) : "…", hint: "Receita ÷ investimento", count: t && t.roas !== null ? { n: t.roas, fmt: roasText } : undefined },
+    { label: "Negócios com origem", value: t ? pct(t.originPct) : "…", hint: t ? `${t.dealsWithOrigin} de ${t.deals}` : undefined, count: t && t.originPct !== null ? { n: t.originPct, fmt: pct } : undefined },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
       {tiles.map((x) => (
-        <div key={x.label} className="rounded-[14px] border border-border-subtle bg-panel p-3">
+        <div key={x.label} className="rounded-[18px] border border-border-subtle bg-panel p-3">
           <p className="text-caption text-text-secondary">{x.label}</p>
-          <p className="mt-1 text-title font-semibold tabular-nums text-text-primary">{x.value}</p>
+          <p className="mt-1 text-title font-semibold tabular-nums text-text-primary">{x.count ? <Contador valor={x.count.n} formatar={x.count.fmt} /> : x.value}</p>
           {x.hint && <p className="mt-0.5 text-caption text-text-tertiary">{x.hint}</p>}
         </div>
       ))}

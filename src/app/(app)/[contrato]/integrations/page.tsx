@@ -128,7 +128,7 @@ function Integracoes() {
         <SegmentedControl label="Integrações" value={aba} onChange={(v) => router.replace(`${pathname}?tab=${v}`)} options={ABAS} />
       </div>
 
-      <div className="w-full pt-2">
+      <div className={aba === "ai" ? "w-full pt-2" : "mt-2 w-full rounded-[22px] border border-border-subtle bg-panel p-6 shadow-[0_12px_40px_-20px_rgb(20_30_60/0.35)] sem-desfoque"}>
         {aba === "ai" && (
           <CentralDeIa
             novaAberta={novaAberta}

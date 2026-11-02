@@ -282,9 +282,9 @@ function LinhaDaAuditoria({ item, aberta, onAlternar }: { item: ItemDoHistorico;
         aria-expanded={temDetalhe ? aberta : undefined}
         aria-controls={temDetalhe ? idDoDetalhe : undefined}
         className={cn(
-          "flex w-full items-center gap-3 px-3.5 py-3 text-left outline-none transition-colors first:rounded-t-[18px] focus-visible:bg-hover",
-          temDetalhe && "hover:bg-raised",
-          aberta && "bg-raised"
+          "flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left outline-none transition-colors focus-visible:bg-hover",
+          temDetalhe && "hover:bg-hover/60",
+          aberta && "bg-hover/70"
         )}
       >
         <IconeDoAtor tipo={item.atorTipo} nome={item.atorNome} />
