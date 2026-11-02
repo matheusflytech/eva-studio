@@ -1946,9 +1946,36 @@ model CanalWhatsAppQr {
   creds       Json?
   keys        Json?
   lastError   String?
+  // Pareamento por código de 8 dígitos (alternativa ao QR): número pedido e código gerado.
+  pairingPhone String?
+  pairingCode  String?
+  // Quedas seguidas sem abrir (zera ao conectar) e marcas de tempo para o alerta.
+  reconnectAttempts  Int       @default(0)
+  lastConnectedAt    DateTime?
+  lastDisconnectedAt DateTime?
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@map("eva_studio_canais_whatsapp_qr")
+}
+
+// Grupos do número conectado por QR (o worker traz e mantém). `mode` diz se o
+// agente responde: mention (só quando marcado), all (tudo) ou off (só registra).
+model WhatsAppGroup {
+  id                String   @id @default(uuid())
+  orgId             String
+  channelId         String
+  jid               String
+  subject           String   @default("")
+  participantsCount Int      @default(0)
+  mode              String   @default("mention") // mention | all | off
+  present           Boolean  @default(true)
+  syncedAt          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([channelId, jid])
+  @@index([orgId])
+  @@map("eva_studio_whatsapp_groups")
 }
 
 // ---------------------------------------------------------------------------
