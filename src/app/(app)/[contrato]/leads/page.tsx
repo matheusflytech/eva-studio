@@ -257,8 +257,8 @@ function DraggableLeadCard({
       style={{ transform: transform ? CSS.Translate.toString(transform) : undefined, opacity: isDragging ? 0.35 : 1 }}
       onClick={onOpen}
       className={cn(
-        "group flex cursor-grab flex-col gap-2 rounded-[14px] border bg-panel p-3 transition-colors active:cursor-grabbing",
-        selected ? "border-accent-solid" : "border-border-subtle hover:border-border-default"
+        "group vidro relative flex cursor-grab flex-col gap-2 rounded-[16px] p-3 active:cursor-grabbing",
+        selected && "ring-1 ring-accent-solid"
       )}
     >
       <LeadCardContent lead={lead} selected={selected} anySelected={anySelected} onToggleSelect={onToggleSelect} />
@@ -272,7 +272,7 @@ function DroppableColumn({ stage, isOver, children }: { stage: string; isOver: b
     <div
       ref={setNodeRef}
       className={cn(
-        "flex w-[272px] shrink-0 flex-col rounded-2xl bg-raised/50 p-2 transition-shadow",
+        "vidro-faixa flex w-[272px] shrink-0 flex-col rounded-[22px] p-2 transition-shadow",
         isOver && "ring-1 ring-border-strong"
       )}
     >
