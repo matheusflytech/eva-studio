@@ -665,6 +665,7 @@ function NegociosConteudo() {
                   { rotulo: qtdAbertos === 1 ? "aberto" : "abertos", valor: qtdAbertos },
                   { rotulo: "no funil", valor: totalAberto, formatar: (n) => formatMoney(n / 100) },
                   { rotulo: "ponderado", valor: ponderado, formatar: (n) => formatMoney(n / 100) },
+                  ...(contagens.fechando === undefined ? [] : [{ rotulo: "fecham este mês", valor: contagens.fechando }]),
                 ]
               : undefined
           }

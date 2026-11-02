@@ -1078,3 +1078,14 @@ body {
 .luzes-do-fundo i:nth-child(4) { left: 4vmax; bottom: -30vmax; background: radial-gradient(closest-side, var(--vidro-luz-4), transparent); animation-delay: -34s; }
 @keyframes eva-deriva { to { transform: translate(5vmax, 4vmax) scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .luzes-do-fundo i { animation: none; } }
+
+/* Negócios como no protótipo: a coluna leva a cor da etapa no topo (um degradê
+   que some) e os cartões dentro dela vêm tingidos da mesma cor. */
+.vidro-faixa {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 16%, transparent), transparent 150px), color-mix(in srgb, var(--vidro-faixa) 45%, transparent);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .vidro-faixa .vidro {
+    background: color-mix(in srgb, var(--faixa-cor, transparent) 17%, var(--vidro-fundo-forte));
+  }
+}
