@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, QrCode, Trash2, X } from "lucide-react";
+import { Plus, QrCode, RefreshCw, Trash2, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { LogoDaMarca } from "@/components/ui/marca";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { CANAIS, type InfoDoCanal, type TipoDeCanal } from "@/lib/canais";
 import { ConectarCanal, ConectarWhatsAppQr } from "./conectar-canal";
+import { GruposDoCanal } from "./grupos-do-canal";
 import { CabecalhoDaSecao, EsqueletoDeLista } from "./secao";
 
 interface CanalNaTela {
@@ -170,6 +171,8 @@ function CartaoDoCanal({
 }) {
   // QR pendente: a pessoa volta para ler o QR do canal que já existe.
   const [qrDe, setQrDe] = React.useState<string | null>(null);
+  // Grupos do número conectado: quando o agente responde em cada um.
+  const [gruposDe, setGruposDe] = React.useState<string | null>(null);
   return (
     <li className="flex flex-col gap-3 px-1 py-4">
       <div className="flex items-start gap-3.5">
@@ -205,8 +208,28 @@ function CartaoDoCanal({
                 {SITUACAO[c.status].rotulo}
               </Badge>
               {c.tipo === "whatsapp_qr" && c.status !== "conectado" && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => setQrDe(qrDe === c.id ? null : c.id)} aria-expanded={qrDe === c.id}>
-                  <QrCode size={14} aria-hidden="true" /> {qrDe === c.id ? "Esconder QR" : "Mostrar QR"}
+                <>
+                  {/* Um clique: pede a sessão de novo. Se o número já foi pareado, o worker reabre com as
+                      credenciais salvas, sem QR; se não, mostra o QR (ou o código de 8 dígitos). */}
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      void fetch(`/api/canais/${c.id}/qr`, { method: "POST" });
+                      setQrDe(c.id);
+                    }}
+                  >
+                    <RefreshCw size={14} aria-hidden="true" /> Reconectar
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setQrDe(qrDe === c.id ? null : c.id)} aria-expanded={qrDe === c.id}>
+                    <QrCode size={14} aria-hidden="true" /> {qrDe === c.id ? "Esconder" : "QR ou código"}
+                  </Button>
+                </>
+              )}
+              {c.tipo === "whatsapp_qr" && c.status === "conectado" && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setGruposDe(gruposDe === c.id ? null : c.id)} aria-expanded={gruposDe === c.id}>
+                  <Users size={14} aria-hidden="true" /> Grupos
                 </Button>
               )}
               {desconectar && (
@@ -223,6 +246,11 @@ function CartaoDoCanal({
                       aoConectar(aviso);
                     }}
                   />
+                </div>
+              )}
+              {gruposDe === c.id && (
+                <div className="basis-full rounded-[14px] bg-raised p-4">
+                  <GruposDoCanal canalId={c.id} />
                 </div>
               )}
             </li>

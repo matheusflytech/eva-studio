@@ -19,8 +19,11 @@ import { loadAuthState } from "./auth-store.js";
 import {
   agenteDaSessao,
   detectarModo,
+  COLUNAS_DE_PAREAMENTO,
   gravarEstado,
   limparSessao,
+  numeroDoPareamento,
+  temColunasDePareamento,
   sessaoDoAgente,
   sessoesConectadas,
   sessoesPendentes,
@@ -31,6 +34,7 @@ import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js"
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
 import { chamarMotor, reivindicarEspera } from "./motor.js";
+import { gruposParaLinhas, modoDoGrupo, sincronizarGrupos, temTabelaDeGrupos } from "./grupos.js";
 
 // Spike Marketing M1: ver como o Baileys entrega o clique em anúncio (Click to
 // WhatsApp) antes de gravar origem por aqui. Só loga; não grava nada.
@@ -77,6 +81,10 @@ const logger = pino({ level: process.env.LOG_LEVEL || "warn" });
 const sessions = new Map(); // chave da sessão (canalId ou agentId) -> { sock }
 // "canal" ou "agente": decidido na subida pela existência da tabela nova.
 let MODO = "agente";
+// Tabela de grupos (SQL 2026-11-07) existe? Decidido na subida, como o MODO.
+let TEM_GRUPOS = false;
+// Colunas novas da sessão (pareamento, histórico de quedas): só no modo canal e com o SQL rodado.
+let TEM_PAREAMENTO = false;
 
 // Anexo que o cliente mandou. O WhatsApp entrega cada tipo numa chave
 // diferente da mensagem; aqui vira um formato só.
@@ -177,7 +185,32 @@ async function nomeDoGrupo(sock, jid) {
 }
 
 async function setConnectionState(chave, patch) {
+  // Sem o SQL 2026-11-07 as colunas novas não existem: some com elas do update.
+  if (!TEM_PAREAMENTO) patch = Object.fromEntries(Object.entries(patch).filter(([campo]) => !COLUNAS_DE_PAREAMENTO.includes(campo)));
   await gravarEstado(pool, MODO, chave, patch);
+}
+
+// Sessões que já pediram o código de pareamento neste socket (um pedido por socket;
+// o QR/código expira e o socket novo pede outro).
+const pareamentoPedido = new Set();
+
+// Lista de grupos do número no banco. Agrupa rajadas de eventos numa leitura só.
+const sincGrupos = new Map(); // chave -> timeout
+function agendarSincDeGrupos(chave, sock, atrasoMs = 3000) {
+  if (!TEM_GRUPOS || MODO !== "canal") return;
+  clearTimeout(sincGrupos.get(chave));
+  sincGrupos.set(
+    chave,
+    setTimeout(async () => {
+      sincGrupos.delete(chave);
+      try {
+        const total = await sincronizarGrupos(pool, chave, gruposParaLinhas(await sock.groupFetchAllParticipating()));
+        logger.info({ chave, total }, "Grupos sincronizados");
+      } catch (err) {
+        logger.warn({ err, chave }, "Não deu para sincronizar os grupos");
+      }
+    }, atrasoMs)
+  );
 }
 
 // Manda uma mensagem — texto puro, ou com botões nativos do WhatsApp se a
@@ -280,6 +313,10 @@ async function startSession(chave) {
 
   sock.ev.on("creds.update", saveCreds);
 
+  // Entrou, saiu ou renomearam um grupo: a lista do banco acompanha.
+  sock.ev.on("groups.upsert", () => agendarSincDeGrupos(chave, sock));
+  sock.ev.on("groups.update", () => agendarSincDeGrupos(chave, sock));
+
   // Recibos das mensagens que mandamos: entregue, lida (tiques e placar dos disparos).
   sock.ev.on("messages.update", async (updates) => {
     for (const { key, update } of updates) {
@@ -293,19 +330,51 @@ async function startSession(chave) {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      const qrDataUrl = await QRCode.toDataURL(qr);
-      await setConnectionState(chave, { status: "qr_pending", qrDataUrl });
+      // Pareamento por código: a pessoa informou o número na tela. Em vez do QR,
+      // pede ao WhatsApp o código de 8 dígitos desse número (digitado no celular
+      // em Aparelhos conectados > Conectar com número de telefone).
+      const numero = TEM_PAREAMENTO && !state.creds?.registered ? await numeroDoPareamento(pool, chave).catch(() => null) : null;
+      if (numero) {
+        if (!pareamentoPedido.has(chave)) {
+          pareamentoPedido.add(chave);
+          try {
+            const codigo = await sock.requestPairingCode(numero);
+            await setConnectionState(chave, { status: "qr_pending", qrDataUrl: null, pairingCode: codigo, lastError: null });
+          } catch (err) {
+            pareamentoPedido.delete(chave);
+            logger.warn({ err, chave }, "Não deu para pedir o código de pareamento");
+            await setConnectionState(chave, { status: "qr_pending", qrDataUrl: null, pairingCode: null, lastError: "O WhatsApp não gerou o código. Confira o número (com DDI) e tente de novo." });
+          }
+        }
+      } else {
+        const qrDataUrl = await QRCode.toDataURL(qr);
+        await setConnectionState(chave, { status: "qr_pending", qrDataUrl, pairingCode: null });
+      }
     }
 
     if (connection === "open") {
       quedas.delete(chave);
+      pareamentoPedido.delete(chave);
       const phoneNumber = sock.user?.id?.split(":")[0]?.split("@")[0] ?? null;
-      await setConnectionState(chave, { status: "connected", qrDataUrl: null, phoneNumber, lastError: null });
+      await setConnectionState(chave, {
+        status: "connected",
+        qrDataUrl: null,
+        phoneNumber,
+        lastError: null,
+        pairingPhone: null,
+        pairingCode: null,
+        reconnectAttempts: 0,
+        lastConnectedAt: new Date(),
+      });
       logger.info({ chave, phoneNumber }, "WhatsApp conectado");
+      agendarSincDeGrupos(chave, sock, 2000);
     }
 
     if (connection === "close") {
       sessions.delete(chave);
+      pareamentoPedido.delete(chave);
+      clearTimeout(sincGrupos.get(chave));
+      sincGrupos.delete(chave);
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
 
@@ -324,12 +393,14 @@ async function startSession(chave) {
       } else if (decisao.acao === "parar") {
         quedas.delete(chave);
         logger.warn({ chave, statusCode }, "Sessão parada");
-        await setConnectionState(chave, { status: "disconnected", qrDataUrl: null, lastError: decisao.erro });
+        await setConnectionState(chave, { status: "disconnected", qrDataUrl: null, pairingCode: null, lastError: decisao.erro, lastDisconnectedAt: new Date() });
       } else {
         if (decisao.erro) quedas.set(chave, tentativas + 1);
         logger.warn({ chave, statusCode, atrasoMs: decisao.atrasoMs }, decisao.erro ? "Conexão caiu" : "Sessão reiniciando (normal)");
         // O QR da sessão que caiu já não vale: sai da tela até vir o novo.
-        await setConnectionState(chave, { status: "requesting", qrDataUrl: null, lastError: decisao.erro });
+        // Quedas seguidas e hora da última queda: a tela mostra "tentando de novo (n)" e o alerta usa a hora.
+        const historico = decisao.erro ? { reconnectAttempts: tentativas + 1, lastDisconnectedAt: new Date() } : {};
+        await setConnectionState(chave, { status: "requesting", qrDataUrl: null, pairingCode: null, lastError: decisao.erro, ...historico });
         setTimeout(() => startSession(chave).catch((err) => logger.error({ err, chave }, "Falha ao reconectar")), decisao.atrasoMs);
       }
     }
@@ -343,7 +414,9 @@ async function startSession(chave) {
       const msg = { ...bruta, message: desembrulhar(bruta.message) };
       // Status, transmissão e canal ficam de fora; grupo entra, e o agente só
       // responde nele quando marcam o número ou respondem a uma mensagem dele.
-      const analise = analisarMensagem(msg, sock.user);
+      const jidDaMensagem = msg.key.remoteJid ?? "";
+      const modoGrupo = MODO === "canal" && TEM_GRUPOS && jidDaMensagem.endsWith("@g.us") ? await modoDoGrupo(pool, chave, jidDaMensagem) : "mention";
+      const analise = analisarMensagem(msg, sock.user, modoGrupo);
       if (!analise) continue;
       const { contato, grupo, responder } = analise;
       logarAnuncio(msg.message);
@@ -552,7 +625,9 @@ async function tickScheduler() {
 // Decide o modo antes de qualquer sessão: com a tabela de canais, uma sessão
 // por canal; sem ela, por agente (como antes do SQL 2026-10-22).
 MODO = await detectarModo(pool);
-logger.warn({ modo: MODO }, "Worker do WhatsApp por QR subindo");
+TEM_GRUPOS = MODO === "canal" && (await temTabelaDeGrupos(pool));
+TEM_PAREAMENTO = MODO === "canal" && (await temColunasDePareamento(pool));
+logger.warn({ modo: MODO, grupos: TEM_GRUPOS, pareamento: TEM_PAREAMENTO }, "Worker do WhatsApp por QR subindo");
 await resumeConnectedSessions();
 setInterval(pollForWork, 4000);
 setInterval(resumeDueWaits, 15000);

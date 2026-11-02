@@ -38,9 +38,11 @@ function contextoDa(mensagem) {
 /**
  * @param {{ key?: { remoteJid?: string | null, senderPn?: string | null }, message?: object } | undefined} msg
  * @param {{ id?: string, lid?: string } | undefined} eu  sock.user (o número conectado)
+ * @param {"mention" | "all" | "off"} [modoDoGrupo] só vale em grupo: mention = só quando marcado
+ *   ou respondido (padrão), all = responde a tudo, off = nunca responde (ver grupos.js)
  * @returns {{ contato: string, grupo: boolean, responder: boolean } | null}
  */
-export function analisarMensagem(msg, eu) {
+export function analisarMensagem(msg, eu, modoDoGrupo = "mention") {
   const key = msg?.key;
   const jid = key?.remoteJid ?? "";
   const servidor = jid.split("@")[1];
@@ -55,5 +57,6 @@ export function analisarMensagem(msg, eu) {
   const ctx = contextoDa(msg?.message);
   const marcado = (ctx?.mentionedJid ?? []).some((m) => meus.has(usuarioDoJid(m)));
   const respondeuAoAgente = !!ctx?.participant && meus.has(usuarioDoJid(ctx.participant));
-  return { contato: jid, grupo: true, responder: marcado || respondeuAoAgente };
+  const responder = modoDoGrupo === "off" ? false : modoDoGrupo === "all" ? true : marcado || respondeuAoAgente;
+  return { contato: jid, grupo: true, responder };
 }

@@ -79,9 +79,36 @@ export async function gravarEstado(pool, modo, chave, patch) {
   );
 }
 
-/** Limpa a sessão (logout): apaga credenciais e QR. */
+/** Limpa a sessão (logout): apaga credenciais, QR e o pareamento por código. */
 export async function limparSessao(pool, modo, chave) {
-  await gravarEstado(pool, modo, chave, { status: "disconnected", qrDataUrl: null, phoneNumber: null, creds: null, keys: null });
+  const extras = modo === "canal" && PAREAMENTO.ativo ? { pairingPhone: null, pairingCode: null } : {};
+  await gravarEstado(pool, modo, chave, { status: "disconnected", qrDataUrl: null, phoneNumber: null, creds: null, keys: null, ...extras });
+}
+
+/**
+ * As colunas do SQL 2026-11-07 (pairingPhone, pairingCode, reconnectAttempts,
+ * lastConnectedAt, lastDisconnectedAt) existem? Decidido na subida; sem elas o
+ * worker segue como antes, só por QR e sem histórico de quedas.
+ * @param {{ query: Function }} pool
+ */
+export async function temColunasDePareamento(pool) {
+  const { rows } = await pool.query(
+    `select 1 from information_schema.columns where table_schema = 'public' and table_name = 'eva_studio_canais_whatsapp_qr' and column_name = 'pairingPhone'`
+  );
+  PAREAMENTO.ativo = rows.length > 0;
+  return PAREAMENTO.ativo;
+}
+
+/** Estado compartilhado só com limparSessao (que não recebe o flag por parâmetro). */
+export const PAREAMENTO = { ativo: false };
+
+export const COLUNAS_DE_PAREAMENTO = ["pairingPhone", "pairingCode", "reconnectAttempts", "lastConnectedAt", "lastDisconnectedAt"];
+
+/** Número que a pessoa pediu para parear por código (só dígitos), ou null = modo QR. */
+export async function numeroDoPareamento(pool, canalId) {
+  const { rows } = await pool.query(`select "pairingPhone" from eva_studio_canais_whatsapp_qr where "canalId" = $1`, [canalId]);
+  const numero = String(rows[0]?.pairingPhone ?? "").replace(/\D/g, "");
+  return numero.length >= 10 && numero.length <= 15 ? numero : null;
 }
 
 /** Sessões a abrir/fechar agora. */
