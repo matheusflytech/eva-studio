@@ -1,5 +1,6 @@
 "use client";
 
+import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
 import * as React from "react";
 import Link from "@/components/contrato/link";
 import { Ellipsis, ListFilter, MessageSquare, PlayCircle, Plus } from "lucide-react";
@@ -133,12 +134,19 @@ export default function AgentStudioPage() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
       {/* Barra da tela: título, quantos atendem e, à direita, "…" e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Eva Studio</h1>
-        <span className="font-mono text-caption tabular-nums text-text-tertiary">
-          {resumo
-            ? `${resumo.ativos} atendendo`
-            : `${agents.length} ${agents.length === 1 ? "agente" : "agentes"}`}
-        </span>
+        <CabecalhoDeTela
+          titulo="Eva Studio"
+          numeros={
+            resumo
+              ? [
+                  { rotulo: "atendendo", valor: resumo.ativos },
+                  { rotulo: "conversas em 7 dias", valor: lista.reduce((n, x) => n + x.conversas7d, 0) },
+                  { rotulo: "esperando você", valor: resumo.aguardandoHumano, tom: resumo.aguardandoHumano > 0 ? "perigo" : "normal" },
+                  { rotulo: "execuções em 24 h", valor: lista.reduce((n, x) => n + x.execucoes24h, 0) },
+                ]
+              : undefined
+          }
+        />
         <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
