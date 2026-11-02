@@ -122,7 +122,7 @@ export function Calendario({ versao, onMudou, moldura }: { versao: number; onMud
   const [erro, setErro] = React.useState<string | null>(null);
   const [agora, setAgora] = React.useState(() => new Date());
   // Semana ou mês: lembrado no navegador.
-  const [modo, trocarModo] = usePreferencia<ModoDoCalendario>("eva.calendario.modo", "semana", MODOS);
+  const [modo, trocarModo] = usePreferencia<ModoDoCalendario>("eva.calendario.modo", "mes", MODOS);
   // Dia escolhido: a semana dele, o mês dele, a agenda e o detalhe partem daqui.
   const [dia, setDia] = React.useState<Dia>(() => diaEmSP(new Date()));
   const [mesDoMini, setMesDoMini] = React.useState<Mes>(() => {
