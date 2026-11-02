@@ -216,6 +216,15 @@ function NegociosConteudo() {
   const [legendaAberta, setLegendaAberta] = React.useState(false);
   const hoje = diaLocal(agora);
 
+  // Enquanto arrasta, o CSS tira o desfoque do vidro e para as luzes do fundo (ver globals.css).
+  const arrastando = !!dragging;
+  React.useEffect(() => {
+    if (!arrastando) return;
+    const html = document.documentElement;
+    html.setAttribute("data-arrastando-cartao", "");
+    return () => html.removeAttribute("data-arrastando-cartao");
+  }, [arrastando]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     // Teclado: espaço pega, setas movem, espaço solta (Enter fica para abrir).
