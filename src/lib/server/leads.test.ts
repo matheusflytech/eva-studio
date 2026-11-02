@@ -4,13 +4,17 @@ const db = vi.hoisted(() => ({
   contact: { updateMany: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   agent: { findFirst: vi.fn() },
   conversation: { findFirst: vi.fn() },
+  dealContact: { findFirst: vi.fn() },
 }));
 vi.mock("@/lib/db/prisma", () => ({ prisma: db }));
 vi.mock("@/lib/server/custom-fields", () => ({ normalizarCapturados: vi.fn(async () => undefined) }));
 const barramento = vi.hoisted(() => ({ publicarEvento: vi.fn() }));
 vi.mock("@/lib/server/eventos/barramento", () => barramento);
+const crm = vi.hoisted(() => ({ createDeal: vi.fn() }));
+vi.mock("@/lib/server/crm", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/server/crm")>()), createDeal: crm.createDeal }));
 
-import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead, atualizarLead, removerDosLeads } from "./leads";
+import { ErroDeCrm } from "@/lib/server/crm";
+import { marcarComoLead, serializarLead, salvarLeadExterno, resolverIdDoLead, atualizarLead, removerDosLeads, converterLeadEmNegocio } from "./leads";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -53,7 +57,7 @@ describe("serializarLead", () => {
       leadChannel: "website",
       updatedAt: new Date("2026-10-19T11:00:00Z"),
       conversations: [
-        { id: "conv1", agentId: "a1", channel: "website", contactId: "site-123", agent: { name: "Vendedor" }, messages: [{ text: "oi", role: "contact" }] },
+        { id: "conv1", agentId: "a1", channel: "website", contactId: "site-123", agent: { name: "Vendedor" }, messages: [{ text: "oi", role: "contact", createdAt: new Date("2026-10-19T10:30:00Z") }] },
       ],
     });
     expect(lead).toMatchObject({
@@ -66,7 +70,7 @@ describe("serializarLead", () => {
       externalId: "site-123",
       conversationId: "conv1",
       fields: { nome: "Ana", email: "ana@x.com", telefone: "+5511987654321", consumo: 300 },
-      lastMessage: { text: "oi", role: "contact" },
+      lastMessage: { text: "oi", role: "contact", createdAt: "2026-10-19T10:30:00.000Z" },
     });
   });
 });
@@ -224,5 +228,51 @@ describe("resolverIdDoLead", () => {
     db.contact.findFirst.mockResolvedValueOnce(null);
     db.conversation.findFirst.mockResolvedValueOnce(null);
     expect(await resolverIdDoLead("o1", "zzz")).toBeNull();
+  });
+});
+
+describe("converterLeadEmNegocio", () => {
+  const lead = { id: "c1", name: "Ana", email: "ana@x.com", phone: "5511999990001" };
+  beforeEach(() => {
+    db.contact.findFirst.mockResolvedValue(lead);
+    db.dealContact.findFirst.mockResolvedValue(null);
+    db.contact.update.mockResolvedValue({});
+    crm.createDeal.mockResolvedValue({ id: "d1" });
+  });
+
+  it("cria o negócio ligado ao contato, com o autor como responsável, e marca o lead como ganho", async () => {
+    expect(await converterLeadEmNegocio("o1", "c1", { userId: "u1" })).toEqual({ dealId: "d1" });
+    expect(db.contact.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "c1", orgId: "o1", leadStage: { not: null } } }));
+    expect(crm.createDeal).toHaveBeenCalledWith({ orgId: "o1", name: "Ana", contactId: "c1", ownerId: "u1" });
+    expect(db.contact.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { leadStage: "ganho" } });
+  });
+
+  it("sem nome, o negócio leva o telefone; sem nada, \"Novo lead\"", async () => {
+    db.contact.findFirst.mockResolvedValue({ ...lead, name: "  " });
+    await converterLeadEmNegocio("o1", "c1", { userId: "u1" });
+    expect(crm.createDeal.mock.calls[0][0].name).toContain("99999-0001");
+    db.contact.findFirst.mockResolvedValue({ id: "c1", name: "", email: "", phone: "" });
+    await converterLeadEmNegocio("o1", "c1", { userId: "u1" });
+    expect(crm.createDeal.mock.calls[1][0].name).toBe("Novo lead");
+  });
+
+  it("já tem negócio aberto: não cria outro, devolve 409 com o existente e marca o lead", async () => {
+    db.dealContact.findFirst.mockResolvedValue({ dealId: "d9" });
+    expect(await converterLeadEmNegocio("o1", "c1", { userId: "u1" })).toEqual({ error: "Esse lead já tem um negócio aberto.", status: 409, dealId: "d9" });
+    expect(crm.createDeal).not.toHaveBeenCalled();
+    expect(db.dealContact.findFirst.mock.calls[0][0].where).toEqual({ contactId: "c1", deal: { orgId: "o1", closedAt: null } });
+    expect(db.contact.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { leadStage: "ganho" } });
+  });
+
+  it("lead de outra org ou que não é lead: 404, nada criado", async () => {
+    db.contact.findFirst.mockResolvedValue(null);
+    expect(await converterLeadEmNegocio("o1", "c1", { userId: "u1" })).toEqual({ error: "Lead não encontrado.", status: 404 });
+    expect(crm.createDeal).not.toHaveBeenCalled();
+  });
+
+  it("falha do CRM (funil sem etapas): devolve o erro e o lead continua como estava", async () => {
+    crm.createDeal.mockRejectedValue(new ErroDeCrm("Funil sem etapas configuradas."));
+    expect(await converterLeadEmNegocio("o1", "c1", { userId: "u1" })).toEqual({ error: "Funil sem etapas configuradas.", status: 400 });
+    expect(db.contact.update).not.toHaveBeenCalled();
   });
 });
