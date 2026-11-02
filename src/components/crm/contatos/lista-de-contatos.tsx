@@ -490,10 +490,8 @@ export function ListaDeContatos({
             className={cn(
               "min-w-0 flex-1",
               "[&>div>div:first-child]:items-center [&>div>div:first-child]:border-b-0",
-              "[&_[role=tablist]]:items-center [&_[role=tablist]]:gap-1",
-              "[&_[role=tab]]:mb-0 [&_[role=tab]]:h-8 [&_[role=tab]]:rounded-full [&_[role=tab]]:border-0 [&_[role=tab]]:px-3 [&_[role=tab]]:text-small",
-              "[&_[role=tab][aria-selected=true]]:bg-raised [&_[role=tab][aria-selected=true]]:ring-1 [&_[role=tab][aria-selected=true]]:ring-border-subtle",
-              "[&_[role=tab]:hover]:bg-hover [&_[role=tablist]>span>span]:mb-0 [&>div>div:first-child>button]:mb-0"
+              "[&_[role=tablist]]:items-center",
+              "[&_[role=tablist]>span>span]:mb-0 [&>div>div:first-child>button]:mb-0"
             )}
           >
             <AbasDeVisoes

@@ -54,6 +54,35 @@ export function CabecalhoDeTela({ titulo, numeros, className }: { titulo: string
   );
 }
 
+export interface IndicadorDoCabecalho {
+  icone: React.ComponentType<{ size?: number; className?: string }>;
+  rotulo: string;
+  valor: number;
+  formatar?: (n: number) => string;
+}
+
+/** Cabeçalho do protótipo: título grande e, ao lado, indicadores com ícone em círculo de vidro, número grande e legenda. */
+export function CabecalhoComIndicadores({ titulo, indicadores, className }: { titulo: string; indicadores?: IndicadorDoCabecalho[]; className?: string }) {
+  return (
+    <div className={cn("flex min-w-0 flex-wrap items-center justify-center gap-x-10 gap-y-4", className)}>
+      <h1 className="max-w-[280px] text-[34px] font-bold leading-[1.02] tracking-[-0.035em] text-text-primary">{titulo}</h1>
+      {indicadores?.map((i) => (
+        <div key={i.rotulo} className="flex items-center gap-3">
+          <span className="vidro relative grid size-11 shrink-0 place-items-center rounded-full text-text-secondary">
+            <i.icone size={18} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <b className="block text-[22px] font-semibold leading-tight tracking-[-0.02em] text-text-primary">
+              <Contador valor={i.valor} formatar={i.formatar} />
+            </b>
+            <small className="text-small text-text-tertiary">{i.rotulo}</small>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** As pílulas de vidro com os números (a fila do cabeçalho; também usada na ficha do contato). */
 export function PilulasDeNumeros({ numeros, className }: { numeros: NumeroDoCabecalho[]; className?: string }) {
   return (

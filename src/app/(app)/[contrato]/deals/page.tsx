@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
+import { CabecalhoComIndicadores } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
 import { apiDoContrato, parametrosDaTela } from "@/lib/contrato/rotas";
 import {
   ChevronsLeftRight,
+  DollarSign,
+  Target,
+  TrendingUp,
   ChevronsRightLeft,
   ChevronsUpDown,
   CircleHelp,
@@ -656,21 +659,19 @@ function NegociosConteudo() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-5 pt-1 lg:px-8 2xl:px-10">
       {/* Barra da tela: título, funil, modo e, à direita, busca, filtros, "…" e a ação principal. */}
+      <CabecalhoComIndicadores
+        titulo="Quadro de negócios"
+        indicadores={
+          quadro
+            ? [
+                { icone: DollarSign, rotulo: "Pipeline aberto", valor: totalAberto, formatar: (n) => formatMoney(n / 100) },
+                { icone: TrendingUp, rotulo: "Previsto ponderado", valor: ponderado, formatar: (n) => formatMoney(n / 100) },
+                ...(contagens.fechando === undefined ? [] : [{ icone: Target, rotulo: "Fecham este mês", valor: contagens.fechando }]),
+              ]
+            : undefined
+        }
+      />
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
-        <CabecalhoDeTela
-          titulo="Negócios"
-          numeros={
-            quadro
-              ? [
-                  { rotulo: qtdAbertos === 1 ? "aberto" : "abertos", valor: qtdAbertos },
-                  { rotulo: "no funil", valor: totalAberto, formatar: (n) => formatMoney(n / 100) },
-                  { rotulo: "ponderado", valor: ponderado, formatar: (n) => formatMoney(n / 100) },
-                  ...(contagens.fechando === undefined ? [] : [{ rotulo: "fecham este mês", valor: contagens.fechando }]),
-                ]
-              : undefined
-          }
-        />
-        <span aria-hidden="true" className="h-5 w-px bg-border-subtle" />
         {pipelines.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -811,10 +812,8 @@ function NegociosConteudo() {
         <div
           className={cn(
             "min-w-0 flex-1",
-            "[&_[role=tablist]]:gap-1 [&_[role=tablist]]:pb-0.5 [&_div:has(>[role=tablist])]:border-b-0",
-            "[&_[role=tab]]:mb-0 [&_[role=tab]]:h-8 [&_[role=tab]]:rounded-full [&_[role=tab]]:border-b-0 [&_[role=tab]]:px-3 [&_[role=tab]]:text-small",
-            "[&_[role=tab][aria-selected=true]]:bg-raised [&_[role=tab][aria-selected=true]]:ring-1 [&_[role=tab][aria-selected=true]]:ring-border-subtle",
-            "[&_[role=tab]:hover]:bg-hover [&_[role=tab]>span:last-child]:font-mono [&_[role=tab]>span:last-child]:text-caption"
+            "[&_div:has(>[role=tablist])]:border-b-0",
+            "[&_[role=tab]>span:last-child]:font-mono [&_[role=tab]>span:last-child]:text-caption"
           )}
         >
           <AbasDeVisoes

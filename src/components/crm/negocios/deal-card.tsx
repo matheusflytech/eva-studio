@@ -159,9 +159,7 @@ function DealCardBase({
   const linhas = linhasDoCartao(layout.campos)
     .filter((c) => c !== "proximoPasso")
     .map((campo) => ({ campo, texto: textoDoCampo(campo, deal, ctx) }))
-    .filter((l) => l.texto || (!vidro && !l.campo.startsWith("cf:")))
-    .filter((l) => !(vidro && l.campo === "valor"));
-  const valorNoTopo = vidro && layout.campos.includes("valor") ? textoDoCampo("valor", deal, ctx) : "";
+    .filter((l) => l.texto || !l.campo.startsWith("cf:"));
   const rotulos = rotulosPersonalizados(defs);
   const acoes = acoesDisponiveis(deal, layout.acoes);
   const temSinal = !!sinalDoNegocio(deal, tipoDaEtapa, agora, prazoParado);
@@ -191,7 +189,6 @@ function DealCardBase({
           <p className="truncate text-small font-semibold text-text-primary">{topo.titulo}</p>
           {topo.subtitulo && <p className="truncate text-caption text-text-tertiary">{topo.subtitulo}</p>}
         </div>
-        {valorNoTopo && <span className="shrink-0 text-small font-semibold tabular-nums text-text-primary">{valorNoTopo}</span>}
         <MenuDoCartao deal={deal} />
       </div>
 
@@ -220,12 +217,10 @@ function DealCardBase({
 
       {/* Rodapé: ações e o próximo passo. */}
       {(acoes.length > 0 || temSinal) && (
-        <div className={cn(vidro && !temSinal ? "grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 group-hover/card:grid-rows-[1fr] group-focus-within/card:grid-rows-[1fr]" : "flex items-center gap-1.5 border-t border-border-subtle", !(vidro && !temSinal) && (compacto ? "pt-2" : "pt-2.5"))}>
-          <span className={cn("flex items-center gap-1.5", vidro && !temSinal && "min-h-0 overflow-hidden", vidro && temSinal && "opacity-0 transition-opacity duration-150 group-hover/card:opacity-100 group-focus-within/card:opacity-100")}>
+        <div className={cn("flex items-center gap-1.5 border-t border-border-subtle", compacto ? "pt-2" : "pt-2.5")}>
           {acoes.map((a) => (
             <BotaoDeAcao key={a.acao} acao={a.acao} href={a.href} deal={deal} interativo={!!quadro && !arrastando} />
           ))}
-          </span>
           {temSinal && (
             <span className="ml-auto flex min-w-0">
               <SinalDoProximoPasso deal={deal} tipoDaEtapa={tipoDaEtapa} agora={agora} prazoParado={prazoParado} variante="texto" />

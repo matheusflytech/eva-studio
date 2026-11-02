@@ -58,7 +58,7 @@ export function ViewTabs({
 
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
-      <div role="tablist" aria-label={label} className="flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+      <div role="tablist" aria-label={label} className="flex min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden px-1 py-1.5 [scrollbar-width:none]">
         {views.map((v, i) => {
           const ativo = v.id === value;
           return (
@@ -90,10 +90,10 @@ export function ViewTabs({
                   }
                 }}
                 className={cn(
-                  "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-small transition-colors duration-150",
+                  "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-small transition-[color,background-color] duration-150",
                   ativo
-                    ? "bg-raised font-medium text-text-primary ring-1 ring-border-subtle"
-                    : "text-text-secondary hover:bg-hover hover:text-text-primary",
+                    ? "bg-text-primary font-medium text-bg-base [&_span]:!text-current [&_span]:opacity-60"
+                    : "vidro relative text-text-secondary hover:text-text-primary",
                   focusRing
                 )}
               >
