@@ -198,7 +198,7 @@ export default function AjudaPage() {
           })}
         </nav>
 
-        <div className="vidro relative min-w-0 max-w-[820px] flex-1 rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-6">
+        <div className="relative min-w-0 max-w-[820px] flex-1 rounded-[22px] border border-border-subtle bg-panel p-6 shadow-[0_12px_40px_-20px_rgb(20_30_60/0.35)] sem-desfoque">
           {totalAchado === 0 ? (
             <EmptyState
               compact

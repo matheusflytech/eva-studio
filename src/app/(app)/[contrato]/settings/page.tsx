@@ -300,7 +300,7 @@ function Configuracoes() {
   const irPara = (v: string) => router.replace(`${pathname}?tab=${v}`);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 md:flex-row md:gap-8 lg:px-6">
+    <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-1 md:flex-row md:items-start md:gap-8 lg:px-6">
       {/* Seções agrupadas à esquerda; no celular, um seletor só. */}
       <div className="pb-4 md:hidden">
         <Select aria-label="Seção das configurações" value={aba} onChange={(e) => irPara(e.target.value)}>
@@ -344,7 +344,7 @@ function Configuracoes() {
         ))}
       </nav>
 
-      <div className="vidro relative mb-6 min-w-0 flex-1 rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-6 md:pt-6">
+      <div className="relative mb-6 min-w-0 flex-1 overflow-x-auto rounded-[22px] border border-border-subtle bg-panel p-6 shadow-[0_12px_40px_-20px_rgb(20_30_60/0.35)] sem-desfoque md:pt-6">
         <div className={cn("w-full", aba === "trash" || aba === "roles" || aba === "audit" ? "max-w-5xl" : "max-w-3xl")}>
           {aba === "contract" && <AbaContrato />}
           {aba === "account" && <AbaConta />}

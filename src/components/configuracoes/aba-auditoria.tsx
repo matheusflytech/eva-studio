@@ -247,7 +247,7 @@ export function AbaAuditoria() {
       ) : (
         dados && (
           <>
-            <ol aria-label="Ações registradas" className="flex flex-col divide-y divide-border-subtle rounded-[18px] border border-border-subtle bg-panel">
+            <ol aria-label="Ações registradas" className="flex flex-col divide-y divide-border-subtle rounded-[22px] border border-border-subtle bg-panel sem-desfoque">
               {dados.itens.map((h) => (
                 <LinhaDaAuditoria key={h.id} item={h} aberta={aberto === h.id} onAlternar={() => setAberto((a) => (a === h.id ? null : h.id))} />
               ))}
