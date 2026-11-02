@@ -81,7 +81,7 @@ describe("conectarWhatsAppQr", () => {
   it("cria o canal e pede a sessão ao worker", async () => {
     await conectarWhatsAppQr("o1");
     expect(db.canal.create.mock.calls[0][0].data).toMatchObject({ orgId: "o1", tipo: "whatsapp_qr", status: "pendente" });
-    expect(db.canalWhatsAppQr.create).toHaveBeenCalledWith({ data: { canalId: "novo", status: "requesting" } });
+    expect(db.canalWhatsAppQr.create).toHaveBeenCalledWith({ data: { canalId: "novo", status: "requesting" }, select: { canalId: true } });
   });
 });
 

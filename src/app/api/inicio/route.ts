@@ -43,6 +43,26 @@ function nomeDoWebhook(w: { url: string; descricao: string }): string {
   }
 }
 
+async function whatsAppsCaidos(orgId: string): Promise<Pendencia[]> {
+  try {
+    const canais = await prisma.canal.findMany({
+      where: { orgId, tipo: "whatsapp_qr", status: { in: ["desconectado", "atencao"] }, externalId: { not: null } },
+      select: { id: true, rotulo: true, detalhe: true },
+      take: 10,
+    });
+    return canais.map((c) => ({
+      id: `whatsapp-caiu-${c.id}`,
+      tipo: "urgente" as const,
+      titulo: `WhatsApp ${c.rotulo} desconectado`,
+      detalhe: c.detalhe || "O número parou de receber e enviar mensagens. Reconecte em Configurações → Canais.",
+      href: "/settings?tab=channels",
+    }));
+  } catch {
+    // Sem a tabela de canais (ambiente antes do SQL de canais): sem este aviso.
+    return [];
+  }
+}
+
 async function webhooksComProblema(orgId: string, agora: Date): Promise<Pendencia[]> {
   try {
     const lista = await prisma.webhookEndpoint.findMany({
@@ -192,6 +212,10 @@ export async function GET() {
   // recebe mais nada). Falha recente fica de fora: as novas tentativas
   // costumam resolver uma queda curta do outro lado.
   for (const w of await webhooksComProblema(ctx.orgId, agora)) pendencias.push(w);
+
+  // WhatsApp por QR que já esteve conectado e caiu: o número para de receber e enviar até alguém reconectar.
+  // (Canal que nunca foi pareado não tem número e fica de fora.)
+  for (const c of await whatsAppsCaidos(ctx.orgId)) pendencias.push(c);
 
   // Configuração: não é urgente, mas trava o agente de funcionar.
   for (const agente of agentes) {

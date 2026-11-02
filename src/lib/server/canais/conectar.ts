@@ -236,7 +236,7 @@ export async function conectarWhatsAppQr(orgId: string): Promise<ResultadoDeCone
   const canal = await prisma.canal.create({
     data: { orgId, tipo: "whatsapp_qr", rotulo: "Número ainda não lido", externalId: null, status: "pendente", segredos: cifrarSegredos({}) },
   });
-  await prisma.canalWhatsAppQr.create({ data: { canalId: canal.id, status: "requesting" } });
+  await prisma.canalWhatsAppQr.create({ data: { canalId: canal.id, status: "requesting" }, select: { canalId: true } });
   return { ok: true, canalId: canal.id };
 }
 

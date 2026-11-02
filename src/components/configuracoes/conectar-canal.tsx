@@ -279,6 +279,12 @@ interface EstadoDoQr {
   qrDataUrl: string | null;
   phoneNumber: string | null;
   lastError: string | null;
+  /** Pareamento por código de 8 dígitos (alternativa ao QR): número pedido e código gerado. */
+  pairingPhone?: string | null;
+  pairingCode?: string | null;
+  /** Quedas seguidas sem abrir (zera ao conectar) e quando a sessão caiu por último. */
+  reconnectAttempts?: number;
+  lastDisconnectedAt?: string | null;
   /** Quando o worker mexeu na sessão pela última vez. */
   atualizadoEm?: string | null;
   /** Há quanto tempo o worker não mexe na sessão, medido pelo servidor. */
@@ -357,21 +363,115 @@ export function ConectarWhatsAppQr({ aoConectar, canalInicial = null }: { aoCone
     );
   }
 
+  const porCodigo = !!estado?.pairingPhone;
+  const tentando = estado?.status === "requesting" && (estado.reconnectAttempts ?? 0) > 0;
   return (
     <div className="flex flex-col items-start gap-3">
-      {estado?.qrDataUrl ? (
+      {tentando && (
+        <p className="flex items-center gap-2 text-small text-text-secondary">
+          <Loader2 size={14} className="animate-spin" /> Tentando reconectar (tentativa {estado!.reconnectAttempts})...
+        </p>
+      )}
+      {porCodigo ? null : estado?.qrDataUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={estado.qrDataUrl} alt="QR code do WhatsApp" width={220} height={220} className="rounded-[12px] bg-white p-2" /* QR precisa de fundo branco para o celular ler */ />
       ) : (
-        <p className="flex items-center gap-2 text-small text-text-secondary">
-          <Loader2 size={14} className="animate-spin" /> Esperando o worker gerar o QR...
-        </p>
+        !tentando && (
+          <p className="flex items-center gap-2 text-small text-text-secondary">
+            <Loader2 size={14} className="animate-spin" /> Esperando o worker gerar o QR...
+          </p>
+        )
       )}
-      <p className="text-caption text-text-tertiary">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho.</p>
+      {!porCodigo && <p className="text-caption text-text-tertiary">No celular: WhatsApp → Aparelhos conectados → Conectar aparelho.</p>}
       {estado?.lastError && <Notice tone="warning">{estado.lastError}</Notice>}
-      <Button type="button" variant="ghost" size="sm" onClick={() => void fetch(`/api/canais/${canalId}/qr`, { method: "POST" })}>
-        <RefreshCw size={14} /> Gerar outro QR
-      </Button>
+      <PareamentoPorCodigo canalId={canalId} estado={estado} />
+      {!porCodigo && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => void fetch(`/api/canais/${canalId}/qr`, { method: "POST" })}>
+          <RefreshCw size={14} /> Gerar outro QR
+        </Button>
+      )}
     </div>
+  );
+}
+
+/** "ABCD1234" -> "ABCD-1234" (como o WhatsApp mostra). */
+function formatarCodigo(codigo: string) {
+  const s = codigo.replace(/[^A-Za-z0-9]/g, "");
+  return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4)}` : s;
+}
+
+// Alternativa ao QR: a pessoa informa o número do celular e digita no WhatsApp
+// um código de 8 dígitos (Aparelhos conectados > Conectar com número de telefone).
+// Útil quando não dá para apontar a câmera para a tela (o celular é o próprio aparelho).
+function PareamentoPorCodigo({ canalId, estado }: { canalId: string; estado: EstadoDoQr | null }) {
+  const [numero, setNumero] = React.useState("");
+  const [enviando, setEnviando] = React.useState(false);
+  const [erro, setErro] = React.useState<string | null>(null);
+  const porCodigo = !!estado?.pairingPhone;
+
+  async function pedir(pairingPhone: string | null) {
+    setEnviando(true);
+    setErro(null);
+    try {
+      const res = await fetch(`/api/canais/${canalId}/qr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pairingPhone }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setErro(d.error ?? "Não deu para pedir o código.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (porCodigo) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        {estado?.pairingCode ? (
+          <>
+            <p className="font-mono text-[28px] font-semibold tracking-[0.18em] text-text-primary" aria-label={`Código ${estado.pairingCode.split("").join(" ")}`}>
+              {formatarCodigo(estado.pairingCode)}
+            </p>
+            <p className="text-caption text-text-tertiary">
+              No celular de {estado.pairingPhone}: WhatsApp → Aparelhos conectados → Conectar aparelho → Conectar com número de telefone, e digite o código.
+            </p>
+          </>
+        ) : (
+          <p className="flex items-center gap-2 text-small text-text-secondary">
+            <Loader2 size={14} className="animate-spin" /> Pedindo o código ao WhatsApp...
+          </p>
+        )}
+        {erro && <Notice tone="danger">{erro}</Notice>}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" size="sm" disabled={enviando} onClick={() => void pedir(estado?.pairingPhone ?? null)}>
+            <RefreshCw size={14} /> Gerar outro código
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={enviando} onClick={() => void pedir(null)}>
+            <QrCode size={14} /> Voltar ao QR
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex w-full max-w-[360px] flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void pedir(numero);
+      }}
+    >
+      <Label htmlFor={`pareamento-${canalId}`}>Prefere conectar com o número do celular?</Label>
+      <div className="flex gap-2">
+        <Input id={`pareamento-${canalId}`} inputMode="tel" autoComplete="tel" placeholder="5511999990001" value={numero} onChange={(e) => setNumero(e.target.value)} />
+        <Button type="submit" variant="secondary" disabled={enviando || numero.replace(/\D/g, "").length < 10}>
+          Gerar código
+        </Button>
+      </div>
+      <p className="text-caption text-text-tertiary">Com DDI e DDD, só números. Em vez do QR, o WhatsApp mostra um código de 8 caracteres para digitar no celular.</p>
+      {erro && <Notice tone="danger">{erro}</Notice>}
+    </form>
   );
 }
