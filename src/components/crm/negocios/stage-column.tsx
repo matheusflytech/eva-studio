@@ -56,6 +56,9 @@ function CartaoArrastavel({
       onPointerDownCapture={(e) => {
         origem.current = { x: e.clientX, y: e.clientY };
       }}
+      // Safari: pegar o cartão pela foto do responsável (ou por um texto) inicia o arrasto NATIVO de
+      // imagem/seleção, que cancela os eventos do ponteiro: o cartão anda uns pixels e congela.
+      onDragStart={(e) => e.preventDefault()}
       onClick={(e) => {
         const p = origem.current;
         if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6) return;

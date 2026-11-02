@@ -1100,3 +1100,11 @@ body {
 .app-conteudo .bg-panel.sem-desfoque {
   background: color-mix(in srgb, var(--surface-panel) 90%, transparent);
 }
+
+/* Cartões do quadro: imagem e link dentro dele não iniciam arrasto nativo do navegador (Safari
+   cancelava o arrasto do dnd-kit ao pegar o cartão pela foto do responsável). */
+[data-deal-id] img,
+[data-deal-id] a {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
