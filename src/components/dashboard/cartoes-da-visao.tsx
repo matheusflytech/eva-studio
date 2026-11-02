@@ -49,7 +49,7 @@ function nomeDoMes(mes: string, curto = false) {
 
 /**
  * O número conta do valor anterior até o novo (de zero na primeira vez).
- * Sem animação para quem pediu menos movimento.
+ * Vale também com "reduzir movimento": contar não é movimento de tela.
  */
 export function useContagem(valor: number | null): number | null {
   const [visto, setVisto] = React.useState<number | null>(valor === null ? null : 0);
@@ -58,7 +58,7 @@ export function useContagem(valor: number | null): number | null {
     const de = anterior.current;
     if (valor !== null) anterior.current = valor;
     // Sem animação (nada a contar ou menos movimento): o valor entra direto, no próximo quadro.
-    const direto = valor === null || de === valor || reduzMovimento();
+    const direto = valor === null || de === valor;
     const inicio = performance.now();
     let quadro = 0;
     const passo = (agora: number) => {

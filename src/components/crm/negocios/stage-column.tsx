@@ -245,8 +245,8 @@ export function StageColumn({
             type="button"
             onClick={() => onNovo(etapa.id)}
             className={cn(
-              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-default text-small font-medium text-text-tertiary",
-              "transition-colors duration-150 hover:border-accent-solid/50 hover:bg-accent-subtle/40 hover:text-accent-fg",
+              "flex h-8 items-center justify-center gap-1.5 rounded-[10px] bg-hover/40 text-small font-medium text-text-tertiary",
+              "transition-colors duration-150 hover:bg-hover hover:text-text-primary",
               focusRing
             )}
           >
@@ -272,8 +272,8 @@ export function StageColumn({
         {etapa.deals.length === 0 && (
           <div
             className={cn(
-              "grid flex-1 place-items-center rounded-[14px] border border-dashed px-3 py-6 text-center text-small",
-              arrastandoAlgo ? "border-accent-solid text-accent-fg" : "border-border-default text-text-tertiary"
+              "grid flex-1 place-items-center rounded-[14px] px-3 py-6 text-center text-small",
+              arrastandoAlgo ? "border border-dashed border-accent-solid text-accent-fg" : "text-text-tertiary"
             )}
           >
             {arrastandoAlgo ? (

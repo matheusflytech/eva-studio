@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { elastico } from "./abas-de-luz";
 
 export interface NumeroDoCabecalho {
   rotulo: string;
@@ -15,8 +14,8 @@ const inteiro = (n: number) => Math.round(n).toLocaleString("pt-BR");
 
 /**
  * Número que sobe do zero até o valor ao abrir a tela e, depois, rola do valor
- * antigo ao novo. Com "reduzir movimento" no sistema, mostra o valor direto
- * (o mesmo interruptor das abas: localStorage["eva:arco"] = "elastico").
+ * antigo ao novo. Contar não é movimento de tela (não gira nem desliza), então
+ * vale também com "reduzir movimento" ligado no sistema.
  */
 export function Contador({ valor, formatar = inteiro }: { valor: number; formatar?: (n: number) => string }) {
   const [mostrado, setMostrado] = React.useState(valor);
@@ -25,7 +24,7 @@ export function Contador({ valor, formatar = inteiro }: { valor: number; formata
   React.useEffect(() => {
     const de = primeira.current ? 0 : atual.current;
     primeira.current = false;
-    if (!elastico() || de === valor) {
+    if (de === valor) {
       atual.current = valor;
       setMostrado(valor);
       return;

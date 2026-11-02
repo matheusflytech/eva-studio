@@ -964,6 +964,7 @@ body {
 /* Fundo colorido atrás do quadro: é o que o vidro desfoca. Não rola com os cartões. */
 .quadro-vidro { position: relative; isolation: isolate; }
 .quadro-vidro::before {
+  display: none; /* a casca já tem luzes e montanhas; a mancha do quadro sobrava */
   content: ""; position: absolute; inset: -12px -16px; z-index: -1; pointer-events: none;
   /* As bordas somem aos poucos: sem isso o fundo vira uma caixa colorida com canto. */
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent), linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
@@ -979,8 +980,8 @@ body {
 
 /* Faixa da coluna: sem desfoque, com um fio de luz e a cor da etapa só no topo. */
 .vidro-faixa {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 15%, transparent), transparent 46%), var(--vidro-faixa);
-  box-shadow: inset 0 0 0 1px var(--vidro-faixa-borda);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 12%, transparent), transparent 40%), color-mix(in srgb, var(--vidro-faixa) 55%, transparent);
+  box-shadow: none;
 }
 
 /* Cartão. Sem suporte a backdrop-filter, fica o painel sólido de antes. */

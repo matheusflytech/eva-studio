@@ -38,6 +38,7 @@ import {
 } from "@/lib/exportar/cartao";
 import { FunnelChart, type EtapaDoFunil } from "@/components/charts/funnel-chart";
 import { AreaChart } from "@/components/charts/area-chart";
+import { useSondagem } from "@/components/inbox/use-sondagem";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { ConstrutorDeConsulta, type ResultadoDoConstrutor } from "@/components/dashboard/construtor-de-consulta";
@@ -427,6 +428,21 @@ function Painel() {
   }, [globais, canal]);
 
   React.useEffect(() => { void carregarDados(); }, [carregarDados]);
+
+  // Tempo real: de 15 em 15 s os números se atualizam sozinhos, sem esqueleto,
+  // e o contador rola do valor antigo ao novo. Só com a aba à vista.
+  useSondagem(async () => {
+    if (carregadoEm === null) return;
+    const q = filtrosGlobaisParaQuery(globais);
+    const daVisao = new URLSearchParams(q);
+    if (canal) daVisao.set("channel", canal);
+    const [fontes, visaoNova] = await Promise.all([
+      fetch(`/api/analytics/fontes${q ? `?${q}` : ""}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/dashboard/overview?${daVisao}`).then((r) => (r.ok ? r.json() : null)),
+    ]);
+    if (fontes) setDados(fontes);
+    if (visaoNova) setVisao(visaoNova);
+  }, 15_000);
 
   // ── Layout: carrega, salva sozinho, volta se falhar ──
   const ultimoSalvo = React.useRef<Widget[] | null>(null);
