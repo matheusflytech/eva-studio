@@ -5,6 +5,8 @@ import { normalizarCapturados } from "@/lib/server/custom-fields";
 import { validarEmail, validarNome, normalizarTelefoneBR } from "@/lib/capture-validation";
 import { mapCaptureField, normalizePhone } from "@/lib/server/contacts";
 import { publicarEvento } from "@/lib/server/eventos/barramento";
+import { ErroDeCrm, createDeal } from "@/lib/server/crm";
+import { formatarTelefone } from "@/lib/telefone";
 
 // Lead = Contact com leadStage. Todo lugar que lê ou grava lead (tela, API
 // pública, motor) passa por aqui, pra regra ser uma só.
@@ -40,7 +42,7 @@ interface ContatoComConversa {
     channel: string;
     contactId: string;
     agent: { name: string };
-    messages: { text: string; role: string }[];
+    messages: { text: string; role: string; createdAt: Date }[];
   }[];
 }
 
@@ -60,7 +62,8 @@ export interface LeadDto {
   fields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-  lastMessage: { text: string; role: string } | null;
+  /** createdAt: quando foi dita (a tela calcula "sem resposta há X" quando o cliente falou por último). */
+  lastMessage: { text: string; role: string; createdAt: string } | null;
 }
 
 export const INCLUDE_LEAD = {
@@ -94,7 +97,7 @@ export function serializarLead(c: ContatoComConversa): LeadDto {
     },
     createdAt: (c.leadAt ?? c.updatedAt).toISOString(),
     updatedAt: c.updatedAt.toISOString(),
-    lastMessage: conv?.messages[0] ? { text: conv.messages[0].text, role: conv.messages[0].role } : null,
+    lastMessage: conv?.messages[0] ? { text: conv.messages[0].text, role: conv.messages[0].role, createdAt: conv.messages[0].createdAt.toISOString() } : null,
   };
 }
 
@@ -322,4 +325,40 @@ export function serializarLeadPublico(l: LeadDto) {
     createdAt: l.createdAt,
     updatedAt: l.updatedAt,
   };
+}
+
+export type ResultadoConversao = { dealId: string } | { error: string; status: 400 | 404 | 409; dealId?: string };
+
+/**
+ * Lead vira negócio: cria o negócio na primeira etapa aberta do funil padrão, ligado ao
+ * contato (nome, telefone e a conversa já estão nele), e marca o lead como "ganho" (na tela:
+ * "Virou negócio"). Um lead que já tem negócio aberto não ganha outro: devolve 409 com o
+ * negócio que já existe, para a tela levar a pessoa até ele.
+ */
+export async function converterLeadEmNegocio(orgId: string, contactId: string, quem: { userId: string }): Promise<ResultadoConversao> {
+  const lead = await prisma.contact.findFirst({
+    where: { id: contactId, orgId, leadStage: { not: null } },
+    select: { id: true, name: true, email: true, phone: true },
+  });
+  if (!lead) return { error: "Lead não encontrado.", status: 404 };
+
+  const aberto = await prisma.dealContact.findFirst({
+    where: { contactId: lead.id, deal: { orgId, closedAt: null } },
+    orderBy: { deal: { createdAt: "desc" } },
+    select: { dealId: true },
+  });
+  if (aberto) {
+    await prisma.contact.update({ where: { id: lead.id }, data: { leadStage: "ganho" } });
+    return { error: "Esse lead já tem um negócio aberto.", status: 409, dealId: aberto.dealId };
+  }
+
+  const nome = lead.name.trim() || formatarTelefone(lead.phone)?.texto || lead.email.trim() || "Novo lead";
+  try {
+    const deal = await createDeal({ orgId, name: nome, contactId: lead.id, ownerId: quem.userId });
+    await prisma.contact.update({ where: { id: lead.id }, data: { leadStage: "ganho" } });
+    return { dealId: deal.id };
+  } catch (e) {
+    if (e instanceof ErroDeCrm) return { error: e.message, status: e.status };
+    throw e;
+  }
 }

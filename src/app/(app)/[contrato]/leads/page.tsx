@@ -5,8 +5,10 @@ import Link from "@/components/contrato/link";
 import { useApiBase } from "@/components/integrations/api-docs";
 import {
   Download, X, Plus, Trash2, Code2, MessageCircle, MoreHorizontal, Zap, ChevronDown, ChevronRight,
-  ListFilter, SquareKanban,
+  ListFilter, SquareKanban, Handshake, Clock, UserPlus,
 } from "lucide-react";
+import { CabecalhoComIndicadores } from "@/components/layout/cabecalho-de-tela";
+import { useRouter } from "@/lib/contrato/navegacao";
 import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type DragOverEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -51,7 +53,7 @@ interface Lead {
   fields: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-  lastMessage: { text: string; role: string } | null;
+  lastMessage: { text: string; role: string; createdAt?: string } | null;
 }
 
 interface Message {
@@ -83,9 +85,29 @@ const STAGE_LABEL: Record<string, string> = {
   novo: "Novo",
   contatado: "Contatado",
   qualificado: "Qualificado",
-  ganho: "Ganho",
-  perdido: "Perdido",
+  // "ganho" e "perdido" são os valores guardados (a API pública usa os mesmos); na tela, lead não
+  // "ganha" nem "perde": vira negócio (e passa a ser acompanhado em Negócios) ou é descartado.
+  ganho: "Virou negócio",
+  perdido: "Descartado",
 };
+
+// O que está em trabalho. Virou negócio e descartado saem do quadro e ficam nas visões próprias.
+const ETAPAS_ATIVAS = ["novo", "contatado", "qualificado"] as const;
+
+/** Minutos que o cliente espera resposta. Só conta quando ele falou por último. */
+function minutosSemResposta(lead: Lead, agora: number): number | null {
+  const m = lead.lastMessage;
+  if (!m || m.role !== "contact" || !m.createdAt) return null;
+  return Math.max(0, Math.floor((agora - new Date(m.createdAt).getTime()) / 60_000));
+}
+
+function textoDaEspera(min: number): string {
+  if (min < 60) return `${Math.max(1, min)} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.floor(h / 24);
+  return `${d} ${d === 1 ? "dia" : "dias"}`;
+}
 
 // Cor da etapa: é dado (onde o lead está no funil), então ganha cor. Só no
 // ponto do cabeçalho e no seletor de etapa do detalhe, nunca no cartão.
@@ -195,12 +217,13 @@ function exportCsv(leads: Lead[]) {
 // Cartão do quadro: só avatar, nome, tempo e a primeira mensagem. E-mail,
 // origem e dados capturados moram no detalhe (LeadDetail).
 function LeadCardContent({
-  lead, anySelected, selected, onToggleSelect,
+  lead, anySelected, selected, onToggleSelect, agora, onConvert,
 }: {
-  lead: Lead; anySelected: boolean; selected: boolean; onToggleSelect?: () => void;
+  lead: Lead; anySelected: boolean; selected: boolean; onToggleSelect?: () => void; agora?: number; onConvert?: () => void;
 }) {
   const name = leadName(lead);
   const selecionavel = !!onToggleSelect;
+  const espera = agora !== undefined && (ETAPAS_ATIVAS as readonly string[]).includes(lead.stage || "novo") ? minutosSemResposta(lead, agora) : null;
 
   return (
     <>
@@ -232,19 +255,40 @@ function LeadCardContent({
         </span>
         <p className="min-w-0 flex-1 truncate text-small font-semibold text-text-primary">{name}</p>
         <span className="shrink-0 font-mono text-caption text-text-tertiary">{formatRelativeDate(lead.updatedAt)}</span>
+        {onConvert && (
+          <button
+            type="button"
+            title="Virar negócio"
+            aria-label={`Virar negócio: ${name}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onConvert();
+            }}
+            className="flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-caption font-medium text-accent-fg opacity-0 transition-opacity hover:bg-hover focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            <Handshake size={12} aria-hidden="true" /> Negócio
+          </button>
+        )}
       </div>
 
       {lead.lastMessage && (
         <p className="line-clamp-2 text-caption text-text-secondary">{semMarcacao(lead.lastMessage.text)}</p>
+      )}
+
+      {espera !== null && espera >= 5 && (
+        <p className={cn("flex items-center gap-1 text-caption font-medium", espera >= 1440 ? "text-danger" : espera >= 60 ? "text-warning" : "text-text-tertiary")}>
+          <Clock size={11} aria-hidden="true" /> Sem resposta há {textoDaEspera(espera)}
+        </p>
       )}
     </>
   );
 }
 
 function DraggableLeadCard({
-  lead, onOpen, selected, onToggleSelect, anySelected,
+  lead, onOpen, selected, onToggleSelect, anySelected, agora, onConvert,
 }: {
-  lead: Lead; onOpen: () => void; selected: boolean; onToggleSelect: () => void; anySelected: boolean;
+  lead: Lead; onOpen: () => void; selected: boolean; onToggleSelect: () => void; anySelected: boolean; agora: number; onConvert: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id, data: { lead } });
 
@@ -261,7 +305,7 @@ function DraggableLeadCard({
         selected && "ring-1 ring-accent-solid"
       )}
     >
-      <LeadCardContent lead={lead} selected={selected} anySelected={anySelected} onToggleSelect={onToggleSelect} />
+      <LeadCardContent lead={lead} selected={selected} anySelected={anySelected} onToggleSelect={onToggleSelect} agora={agora} onConvert={onConvert} />
     </div>
   );
 }
@@ -272,7 +316,7 @@ function DroppableColumn({ stage, isOver, children }: { stage: string; isOver: b
     <div
       ref={setNodeRef}
       className={cn(
-        "vidro-faixa flex w-[272px] shrink-0 flex-col rounded-[22px] p-2 transition-shadow",
+        "vidro-faixa flex min-w-[272px] flex-1 basis-[272px] shrink-0 flex-col rounded-[22px] p-2 transition-shadow 2xl:max-w-[460px]",
         isOver && "ring-1 ring-border-strong"
       )}
     >
@@ -352,7 +396,7 @@ function Dado({ rotulo, children }: { rotulo: string; children: React.ReactNode 
   );
 }
 
-function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void }) {
+function LeadDetail({ lead, onClose, onStageChange, onDelete, onConvert }: { lead: Lead; onClose: () => void; onStageChange: (stage: string) => void; onDelete: () => void; onConvert: () => void }) {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const name = leadName(lead);
   const email = leadEmail(lead);
@@ -388,6 +432,9 @@ function LeadDetail({ lead, onClose, onStageChange, onDelete }: { lead: Lead; on
               </Link>
             </p>
           </div>
+          <Button type="button" size="sm" onClick={onConvert}>
+            <Handshake size={14} aria-hidden="true" /> {lead.stage === "ganho" ? "Abrir negócio" : "Converter em negócio"}
+          </Button>
           <IconButton aria-label="Remover dos leads (o contato continua em Contatos)" tooltip onClick={onDelete} className="hover:text-danger">
             <Trash2 />
           </IconButton>
@@ -601,7 +648,7 @@ function NewLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <div>
           <Label htmlFor="lead-stage">Estágio</Label>
           <Select id="lead-stage" value={stage} onChange={(e) => setStage(e.target.value as (typeof STAGES)[number])}>
-            {STAGES.map((s) => (
+            {ETAPAS_ATIVAS.map((s) => (
               <option key={s} value={s}>{STAGE_LABEL[s]}</option>
             ))}
           </Select>
@@ -713,6 +760,15 @@ export default function LeadsPage() {
   const remocoesPendentes = React.useRef(new Map<number, string[]>());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const router = useRouter();
+  // Visões do quadro: o que está em trabalho, quem espera resposta, e os que já saíram da fila.
+  const [visao, setVisao] = React.useState<"ativos" | "sem-resposta" | "convertidos" | "descartados">("ativos");
+  // "Agora" para o "sem resposta há X": atualizado a cada minuto (não dá para ler o relógio no render).
+  const [agora, setAgora] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = React.useCallback(async () => {
     const [res, resPipes] = await Promise.all([fetch("/api/leads"), fetch("/api/leads/pipes")]);
@@ -760,6 +816,31 @@ export default function LeadsPage() {
   async function erroDaResposta(res: Response, padrao: string): Promise<string> {
     const data = await res.json().catch(() => null);
     return (data && typeof data.error === "string" && data.error) || padrao;
+  }
+
+  // Lead vira negócio (primeira etapa de Negócios) e sai da fila de trabalho. Se já havia um negócio
+  // aberto, a API devolve 409 com ele: a pessoa é levada até lá em vez de ganhar um duplicado.
+  async function converterEmNegocio(id: string) {
+    const lead = leads?.find((l) => l.id === id);
+    if (!lead) return;
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/leads/${id}/convert`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && !(res.status === 409 && data.dealId)) throw new Error(data.error ?? "Não foi possível converter em negócio.");
+      setLeads((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, stage: "ganho" } : l)));
+      setOpenId(null);
+      const nome = leadName(lead);
+      avisarNaIlha({
+        titulo: res.ok ? `${nome} virou negócio` : `${nome} já tinha um negócio`,
+        detalhe: res.ok ? "Criado na primeira etapa de Negócios" : "Abra o negócio que já estava aberto",
+        avatar: iniciais(nome) || undefined,
+        duracao: 6000,
+        acao: { rotulo: "Abrir negócio", aoClicar: () => router.push(`/deals/${data.dealId}`) },
+      });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Não foi possível converter em negócio.");
+    }
   }
 
   // Otimista: muda na hora e desfaz se o servidor recusar.
@@ -899,6 +980,15 @@ export default function LeadsPage() {
     return true;
   });
 
+  const ativos = filtered.filter((l) => (ETAPAS_ATIVAS as readonly string[]).includes(l.stage || "novo"));
+  const semResposta = ativos.filter((l) => (minutosSemResposta(l, agora) ?? 0) >= 5);
+  const convertidos = filtered.filter((l) => l.stage === "ganho");
+  const descartados = filtered.filter((l) => l.stage === "perdido");
+  const noQuadro = visao === "sem-resposta" ? semResposta : ativos;
+  const inicioDoDia = new Date(agora);
+  inicioDoDia.setHours(0, 0, 0, 0);
+  const novosHoje = leads.filter((l) => new Date(l.createdAt).getTime() >= inicioDoDia.getTime()).length;
+
   const opened = leads.find((l) => l.id === openId && !ocultos.has(l.id)) ?? null;
   const activeLead = leads.find((l) => l.id === activeDragId) ?? null;
   const anySelected = selectedIds.size > 0;
@@ -908,9 +998,16 @@ export default function LeadsPage() {
     <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
       {/* Barra única: título e contagem à esquerda; busca, Filtros, "…" e a
           ação principal à direita. */}
+      <CabecalhoComIndicadores
+        titulo="Leads"
+        className="pb-3 pt-1"
+        indicadores={[
+          { icone: UserPlus, rotulo: "Novos hoje", valor: novosHoje },
+          { icone: Clock, rotulo: "Esperando resposta", valor: semResposta.length },
+          { icone: Handshake, rotulo: "Viraram negócio", valor: convertidos.length },
+        ]}
+      />
       <div className="flex h-[58px] shrink-0 items-center gap-2.5">
-        <h1 className="text-heading font-semibold tracking-tight text-text-primary">Leads</h1>
-        <span className="mt-1 font-mono text-caption text-text-tertiary">{filtered.length}</span>
         <div className="ml-auto flex items-center gap-2">
           <SearchInput value={search} onValueChange={setSearch} placeholder="Buscar lead" aria-label="Buscar lead" className="w-[200px]" />
           <DropdownMenu>
@@ -978,7 +1075,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="flex h-11 shrink-0 items-center">
+      <div className="flex h-11 shrink-0 items-center gap-3">
         <SegmentedControl
           label="Visão dos leads"
           value={aba}
@@ -989,6 +1086,32 @@ export default function LeadsPage() {
             { value: "conversas", label: `Conversas ${totalDeConversas}`, icon: <MessageCircle /> },
           ]}
         />
+        {aba === "leads" && (
+          <div role="tablist" aria-label="Visões do quadro" className="flex flex-wrap items-center gap-2">
+            {(
+              [
+                ["ativos", "Em trabalho", ativos.length],
+                ["sem-resposta", "Sem resposta", semResposta.length],
+                ["convertidos", "Viraram negócio", convertidos.length],
+                ["descartados", "Descartados", descartados.length],
+              ] as const
+            ).map(([valor, rotulo, n]) => (
+              <button
+                key={valor}
+                type="button"
+                role="tab"
+                aria-selected={visao === valor}
+                onClick={() => setVisao(valor)}
+                className={cn(
+                  "relative h-9 rounded-full px-4 text-small font-medium transition-colors",
+                  visao === valor ? "bg-text-primary text-bg-base [&_span]:!text-current [&_span]:opacity-60" : "vidro text-text-secondary hover:text-text-primary"
+                )}
+              >
+                {rotulo} <span className="ml-1 font-mono text-caption text-text-tertiary">{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {actionError && (
@@ -1002,11 +1125,28 @@ export default function LeadsPage() {
 
       {aba === "conversas" ? (
         <ConversasDoPipe agentId={pipeAtivo || null} />
+      ) : visao === "convertidos" || visao === "descartados" ? (
+        <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto pb-2 pt-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {(visao === "convertidos" ? convertidos : descartados).length === 0 ? (
+            <p className="col-span-full rounded-[14px] border border-border-subtle px-3 py-6 text-center text-caption text-text-tertiary">
+              {visao === "convertidos" ? "Nenhum lead virou negócio ainda. Abra um lead e use Converter em negócio." : "Nenhum lead descartado."}
+            </p>
+          ) : (
+            (visao === "convertidos" ? convertidos : descartados).map((lead) => (
+              <div key={lead.id} data-lead-id={lead.id} onClick={() => setOpenId(lead.id)} className="group vidro relative flex cursor-pointer flex-col gap-2 rounded-[16px] p-3">
+                <LeadCardContent lead={lead} selected={false} anySelected={false} />
+              </div>
+            ))
+          )}
+        </div>
       ) : (
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2 pt-2">
-          {STAGES.map((stage) => {
-            const stageLeads = filtered.filter((l) => (l.stage || "novo") === stage);
+          {ETAPAS_ATIVAS.map((stage) => {
+            // Quem espera há mais tempo fica no topo da coluna; o resto segue a ordem de chegada.
+            const stageLeads = noQuadro
+              .filter((l) => (l.stage || "novo") === stage)
+              .sort((a, b) => (minutosSemResposta(b, agora) ?? -1) - (minutosSemResposta(a, agora) ?? -1));
             const aberta = colunasAbertas.has(stage);
             const visiveis = aberta ? stageLeads : stageLeads.slice(0, LIMITE_DA_COLUNA);
             const escondidos = stageLeads.length - visiveis.length;
@@ -1038,6 +1178,8 @@ export default function LeadsPage() {
                             selected={selectedIds.has(lead.id)}
                             onToggleSelect={() => toggleSelect(lead.id)}
                             anySelected={anySelected}
+                            agora={agora}
+                            onConvert={() => void converterEmNegocio(lead.id)}
                           />
                         </motion.div>
                       ))
@@ -1082,6 +1224,7 @@ export default function LeadsPage() {
           onClose={() => setOpenId(null)}
           onStageChange={(stage) => handleStageChange(opened.id, stage)}
           onDelete={() => handleDelete(opened.id)}
+          onConvert={() => void converterEmNegocio(opened.id)}
         />
       )}
 
