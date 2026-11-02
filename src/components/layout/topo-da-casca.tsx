@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { useSearchParams } from "next/navigation";
 import { Bell, Check, Mail } from "lucide-react";
 import { usePathname } from "@/lib/contrato/navegacao";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -89,13 +88,7 @@ function Sino() {
 export function TopoDaCasca({ className }: { className?: string }) {
   const pathname = usePathname();
   const naoLidas = useNaoLidas();
-  const aba = useSearchParams().get("tab");
-  const naAgenda = pathname === "/tasks" && aba === "calendar";
-  const ativo = ABAS.findIndex((a) => {
-    if (a.href.includes("?")) return naAgenda;
-    if (a.href === "/tasks" && naAgenda) return false;
-    return pathname === a.href || pathname.startsWith(`${a.href}/`);
-  });
+  const ativo = ABAS.findIndex((a) => pathname === a.href || pathname.startsWith(`${a.href}/`));
   return (
     <header className={cn("relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 pb-3 pt-3", className)} data-print-ocultar>
       <Link href="/home" className="flex items-center gap-2.5 justify-self-start" aria-label="Eva, início">

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "next/navigation";
 import { usePathname } from "@/lib/contrato/navegacao";
-import { CalendarCheck, CalendarDays, Contact, Handshake, Plus, Search, Settings, Aperture } from "lucide-react";
+import { CalendarDays, Contact, Handshake, Plus, Search, Settings, Aperture } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { ThemeToggle } from "@/components/ui/theme";
@@ -48,7 +48,6 @@ export function Trilho({ className }: { className?: string }) {
   const pathname = usePathname();
   const aba = useSearchParams().get("tab");
   const naAgenda = pathname === "/tasks" && aba === "calendar";
-  const naTarefas = pathname === "/tasks" && !naAgenda;
   return (
     <aside
       aria-label="Atalhos"
@@ -90,9 +89,6 @@ export function Trilho({ className }: { className?: string }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AtalhoDeTela href="/tasks" rotulo="Meu dia" ativo={naTarefas}>
-        <CalendarCheck size={19} aria-hidden />
-      </AtalhoDeTela>
       <AtalhoDeTela href="/tasks?tab=calendar" rotulo="Agenda" ativo={naAgenda}>
         <CalendarDays size={19} aria-hidden />
       </AtalhoDeTela>
