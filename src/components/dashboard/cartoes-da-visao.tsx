@@ -56,15 +56,19 @@ export function useContagem(valor: number | null): number | null {
   const anterior = React.useRef<number>(0);
   React.useEffect(() => {
     const de = anterior.current;
-    if (valor !== null) anterior.current = valor;
     // Sem animação (nada a contar ou menos movimento): o valor entra direto, no próximo quadro.
     const direto = valor === null || de === valor;
     const inicio = performance.now();
     let quadro = 0;
     const passo = (agora: number) => {
-      if (direto) return setVisto(valor);
-      const t = Math.min(1, (agora - inicio) / 600);
-      setVisto(de + (valor - de) * (1 - (1 - t) ** 3));
+      if (direto) {
+        if (valor !== null) anterior.current = valor;
+        return setVisto(valor);
+      }
+      const t = Math.min(1, Math.max(0, (agora - inicio) / 600));
+      const v = de + (valor - de) * (1 - (1 - t) ** 3);
+      anterior.current = v;
+      setVisto(v);
       if (t < 1) quadro = requestAnimationFrame(passo);
     };
     quadro = requestAnimationFrame(passo);

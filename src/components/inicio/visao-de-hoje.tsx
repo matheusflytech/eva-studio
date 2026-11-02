@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CabecalhoDeTela } from "@/components/layout/cabecalho-de-tela";
+import { useSondagem } from "@/components/inbox/use-sondagem";
+import { CabecalhoDeTela, Contador } from "@/components/layout/cabecalho-de-tela";
 import { ConteudoDaVisao, curva, reais, ROTULO_DO_GRUPO, type Visao } from "@/components/dashboard/cartoes-da-visao";
 import { DonutChart, type DonutSegment } from "@/components/charts/donut-chart";
 
@@ -40,7 +41,7 @@ function ReceitaDoPeriodo({ visao }: { visao: Visao }) {
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <b className="text-[40px] font-medium leading-none tracking-[-0.035em] tabular-nums text-text-primary">{reais(visao.receita.atual)}</b>
+        <b className="text-[40px] font-medium leading-none tracking-[-0.035em] tabular-nums text-text-primary"><Contador valor={visao.receita.atual} formatar={reais} /></b>
         <span className="text-small text-text-tertiary">nos últimos {dias.length} dias</span>
       </div>
       {dias.length > 1 ? (
@@ -79,7 +80,7 @@ function Fila({ pendencias }: { pendencias: PendenciaDaFila[] }) {
               <b className="block truncate text-small font-semibold text-text-primary">{p.titulo}</b>
               <span className="mt-0.5 line-clamp-2 text-caption text-text-secondary">{p.detalhe}</span>
             </span>
-            {p.quantidade !== undefined && <b className={cn("tabular-nums", p.tipo === "urgente" ? "text-danger" : "text-text-primary")}>{p.quantidade}</b>}
+            {p.quantidade !== undefined && <b className={cn("tabular-nums", p.tipo === "urgente" ? "text-danger" : "text-text-primary")}><Contador valor={p.quantidade} /></b>}
             <ChevronRight size={14} aria-hidden className="shrink-0 text-text-tertiary" />
           </Link>
         </li>
@@ -103,15 +104,14 @@ function OrigemDasConversas({ canais }: { canais: DonutSegment[] }) {
 /** "Visão de hoje": números do topo e quatro painéis de vidro, tudo do banco do contrato. */
 export function VisaoDeHoje({ pendencias, escuro }: { pendencias: PendenciaDaFila[]; escuro: boolean }) {
   const [visao, setVisao] = React.useState<Visao | null>(null);
-  const [erro, setErro] = React.useState(false);
   const [canais, setCanais] = React.useState<DonutSegment[] | null>(null);
 
-  React.useEffect(() => {
-    fetch("/api/dashboard/overview")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then(setVisao)
-      .catch(() => setErro(true));
-  }, []);
+  // Tempo real: busca agora e de 15 em 15 s (só com a aba à vista); o número rola até o novo valor.
+  useSondagem(async () => {
+    const r = await fetch("/api/dashboard/overview");
+    if (!r.ok) throw new Error("overview");
+    setVisao(await r.json());
+  }, 15_000);
 
   React.useEffect(() => {
     fetch("/api/analytics/fontes")
@@ -120,7 +120,6 @@ export function VisaoDeHoje({ pendencias, escuro }: { pendencias: PendenciaDaFil
       .catch(() => setCanais([]));
   }, []);
 
-  if (erro) return null;
   const taxa = visao?.conversao.atual ?? null;
   return (
     <section aria-label="Visão de hoje" className="flex flex-col gap-4 px-6">

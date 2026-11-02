@@ -18,12 +18,11 @@ const inteiro = (n: number) => Math.round(n).toLocaleString("pt-BR");
  * vale também com "reduzir movimento" ligado no sistema.
  */
 export function Contador({ valor, formatar = inteiro }: { valor: number; formatar?: (n: number) => string }) {
-  const [mostrado, setMostrado] = React.useState(valor);
-  const atual = React.useRef(valor);
-  const primeira = React.useRef(true);
+  const [mostrado, setMostrado] = React.useState(0);
+  // Começa em 0: o efeito roda duas vezes em desenvolvimento (StrictMode) e a segunda não pode achar que já chegou.
+  const atual = React.useRef(0);
   React.useEffect(() => {
-    const de = primeira.current ? 0 : atual.current;
-    primeira.current = false;
+    const de = atual.current;
     if (de === valor) {
       atual.current = valor;
       setMostrado(valor);
@@ -32,7 +31,7 @@ export function Contador({ valor, formatar = inteiro }: { valor: number; formata
     const t0 = performance.now();
     const duracao = 1400;
     let raf = requestAnimationFrame(function passo(agora) {
-      const t = Math.min(1, (agora - t0) / duracao);
+      const t = Math.min(1, Math.max(0, (agora - t0) / duracao));
       atual.current = de + (valor - de) * (1 - Math.pow(1 - t, 3));
       setMostrado(atual.current);
       if (t < 1) raf = requestAnimationFrame(passo);
