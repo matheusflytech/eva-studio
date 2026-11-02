@@ -69,7 +69,10 @@ function CartaoArrastavel({
         }
         listeners?.onKeyDown?.(e);
       }}
-      className={cn("group/card relative cursor-grab rounded-[16px] active:cursor-grabbing", focusRing, isDragging && "opacity-30")}
+      // touch-none (só com mouse/trackpad): sem isso o navegador trata o arrasto para os lados como
+      // rolagem horizontal do quadro e cancela o gesto (o cartão sobe e desce, mas não anda para o lado).
+      // select-none: arrastar por cima de outras colunas não seleciona texto.
+      className={cn("group/card relative cursor-grab select-none rounded-[16px] active:cursor-grabbing [@media(pointer:fine)]:touch-none", focusRing, isDragging && "opacity-30")}
     >
       <DealCard deal={deal} tipoDaEtapa={tipoDaEtapa} nomeDaEtapa={nomeDaEtapa} defs={defs} agora={agora} layout={layout} prazoParado={prazoParado} />
     </div>

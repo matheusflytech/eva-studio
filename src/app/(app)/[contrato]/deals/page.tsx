@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { CabecalhoComIndicadores } from "@/components/layout/cabecalho-de-tela";
 import Link from "@/components/contrato/link";
 import { useContrato, useRouter, useSearchParams } from "@/lib/contrato/navegacao";
@@ -933,14 +934,19 @@ function NegociosConteudo() {
             </div>
             {/* Sem dropAnimation: quem pousa o cartão é o Flip (useFlipDoQuadro). A do dnd-kit
                 deixava opacity 0 presa no cartão que mudou de coluna. */}
-            <DragOverlay dropAnimation={null}>
-              {dragging && (
-                // Wrapper interno: a inclinação mora aqui, não no nó que o dnd-kit posiciona.
-                <div ref={refDoOverlay} data-flip-id={dragging.deal.id}>
-                  <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
-                </div>
-              )}
-            </DragOverlay>
+            {/* No body: dentro da casca, qualquer ancestral com filtro, desfoque ou recorte vira o "ecrã" do
+                position:fixed do overlay (no Safari o cartão ficava preso entre as colunas e só andava para cima e para baixo). */}
+            {createPortal(
+              <DragOverlay dropAnimation={null}>
+                {dragging && (
+                  // Wrapper interno: a inclinação mora aqui, não no nó que o dnd-kit posiciona.
+                  <div ref={refDoOverlay} data-flip-id={dragging.deal.id}>
+                    <DealCard deal={dragging.deal} tipoDaEtapa={dragging.tipo} prazoParado={dragging.prazo} defs={quadro.defs} agora={agora} layout={quadro.layout} arrastando />
+                  </div>
+                )}
+              </DragOverlay>,
+              document.body
+            )}
           </DndContext>
           </QuadroVidro>
           </QuadroContexto.Provider>
