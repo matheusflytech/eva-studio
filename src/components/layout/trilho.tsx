@@ -12,8 +12,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NAV_AVANCADO } from "./navegacao";
 
+/** Texto do atalho: só aparece quando o trilho abre (mouse em cima ou foco dentro). */
+function Rotulo({ texto }: { texto: string }) {
+  return (
+    <span className="whitespace-nowrap text-[13px] font-medium opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-focus-within/trilho:opacity-100">
+      {texto}
+    </span>
+  );
+}
+
 const BOTAO = cn(
-  "relative grid size-[42px] place-items-center rounded-full text-text-secondary transition-[background-color,color,scale] duration-150",
+  "relative flex h-[42px] w-full shrink-0 items-center gap-3 overflow-hidden rounded-full px-[12.5px] text-text-secondary transition-[background-color,color,scale] duration-150",
   "hover:bg-hover hover:text-text-primary active:scale-[0.92] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
 );
 
@@ -32,6 +41,7 @@ function AtalhoDeTela({ href, rotulo, ativo, children }: { href: string; rotulo:
     <Dica texto={rotulo}>
       <Link href={href} aria-label={rotulo} aria-current={ativo ? "page" : undefined} className={cn(BOTAO, ativo && "bg-hover text-text-primary")}>
         {children}
+        <Rotulo texto={rotulo} />
       </Link>
     </Dica>
   );
@@ -51,13 +61,14 @@ export function Trilho({ className }: { className?: string }) {
   return (
     <aside
       aria-label="Atalhos"
-      className={cn("vidro absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-center gap-1 rounded-[30px] py-2.5", className)}
+      className={cn("vidro group/trilho absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-stretch gap-1 overflow-hidden rounded-[30px] px-2 py-2.5 transition-[width] duration-200 ease-out hover:w-[212px] focus-within:w-[212px] motion-reduce:transition-none", className)}
       style={{ height: "calc(100% - 12px)", maxHeight: 820 }}
       data-print-ocultar
     >
       <Dica texto={`Buscar (${mac ? "⌘K" : "Ctrl+K"})`}>
         <button type="button" onClick={abrir} aria-label="Buscar" aria-keyshortcuts={mac ? "Meta+K" : "Control+K"} className={BOTAO}>
-          <Search size={19} aria-hidden />
+          <Search size={19} aria-hidden className="shrink-0" />
+          <Rotulo texto="Buscar" />
         </button>
       </Dica>
 
@@ -65,7 +76,8 @@ export function Trilho({ className }: { className?: string }) {
         <Dica texto="Criar">
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="Criar" className={BOTAO}>
-              <Plus size={19} aria-hidden />
+              <Plus size={19} aria-hidden className="shrink-0" />
+              <Rotulo texto="Criar" />
             </button>
           </DropdownMenuTrigger>
         </Dica>
@@ -93,27 +105,27 @@ export function Trilho({ className }: { className?: string }) {
         <CalendarDays size={19} aria-hidden />
       </AtalhoDeTela>
 
-      <span aria-hidden="true" className="my-2 h-px w-6 bg-border-subtle" />
+      <span aria-hidden="true" className="my-2 h-px w-6 shrink-0 self-center bg-border-subtle" />
 
       {/* As ferramentas direto no trilho, em grupos; rola quando a janela é baixa. */}
-      <nav aria-label="Ferramentas" className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav aria-label="Ferramentas" className="flex min-h-0 w-full flex-1 flex-col items-stretch gap-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {NAV_AVANCADO.map((grupo) => (
           <React.Fragment key={grupo.label}>
             {grupo.items.map((item) => {
               const ativo = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <AtalhoDeTela key={item.href} href={item.href} rotulo={item.label} ativo={ativo}>
-                  <item.icon size={19} aria-hidden />
+                  <item.icon size={19} aria-hidden className="shrink-0" />
                 </AtalhoDeTela>
               );
             })}
-            <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 bg-border-subtle last:hidden" />
+            <span aria-hidden="true" className="my-1.5 h-px w-6 shrink-0 self-center bg-border-subtle last:hidden" />
           </React.Fragment>
         ))}
       </nav>
 
             <AtalhoDeTela href="/settings" rotulo="Configurações" ativo={pathname === "/settings" || pathname.startsWith("/settings/")}>
-        <Settings size={19} aria-hidden />
+        <Settings size={19} aria-hidden className="shrink-0" />
       </AtalhoDeTela>
       <ThemeToggle className="size-[42px] rounded-full border-0 bg-transparent hover:bg-hover" />
     </aside>

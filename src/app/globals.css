@@ -955,10 +955,10 @@ body {
   --vidro-sombra-alta: 0 2px 2px rgba(0, 0, 0, 0.35), 0 28px 54px -16px rgba(0, 0, 0, 0.7);
   --vidro-faixa: rgba(255, 255, 255, 0.035);
   --vidro-faixa-borda: rgba(255, 255, 255, 0.09);
-  --vidro-luz-1: rgba(48, 140, 232, 0.32);
-  --vidro-luz-2: rgba(130, 96, 255, 0.26);
-  --vidro-luz-3: rgba(255, 128, 90, 0.2);
-  --vidro-luz-4: rgba(30, 190, 150, 0.2);
+  --vidro-luz-1: rgba(48, 140, 232, 0.18);
+  --vidro-luz-2: rgba(130, 96, 255, 0.15);
+  --vidro-luz-3: rgba(255, 128, 90, 0.11);
+  --vidro-luz-4: rgba(30, 190, 150, 0.11);
 }
 
 /* Fundo colorido atrás do quadro: é o que o vidro desfoca. Não rola com os cartões. */

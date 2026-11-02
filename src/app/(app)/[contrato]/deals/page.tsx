@@ -907,9 +907,11 @@ function NegociosConteudo() {
         <VozDoQuadro.Provider value={estilo === "v2" || estilo === "v3"}>
           <QuadroContexto.Provider value={acoesDoQuadro}>
           <QuadroVidro>
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
+          {/* Rolagem automática nas bordas: borda larga (25%) e aceleração maior, senão o quadro não anda para os lados. */}
+          <DndContext sensors={sensors} autoScroll={{ threshold: { x: 0.25, y: 0.12 }, acceleration: 18 }} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
             <div className="quadro-vidro relative">
-              <div ref={quadroRef} className="flex min-h-96 snap-x gap-4 overflow-x-auto pb-3 [height:calc(100dvh-210px)] xl:gap-5">
+              {/* O encaixe (snap) devolve o scrollLeft a cada quadro e anula a rolagem automática: desligado enquanto arrasta. */}
+              <div ref={quadroRef} className={`flex min-h-96 gap-4 overflow-x-auto pb-3 [height:calc(100dvh-210px)] xl:gap-5 ${dragging ? "snap-none" : "snap-x"}`}>
                 {stages.map((stage, i) => (
                   <StageColumn
                     key={stage.id}
