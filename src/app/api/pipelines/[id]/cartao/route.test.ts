@@ -62,7 +62,7 @@ describe("GET /api/pipelines/[id]/cartao", () => {
     expect(d.disponivel).toBe(false);
     expect(d.layout.campos).toEqual([...LAYOUT_PADRAO.campos, "cf:origem"]);
     expect(d.layout.previa).toContain("cf:origem");
-    expect(d.layout.densidade).toBe("confortavel");
+    expect(d.layout.densidade).toBe("compacto");
   });
 
   it("layout salvo é normalizado (campo personalizado apagado sai)", async () => {
