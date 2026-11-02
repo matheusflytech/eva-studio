@@ -451,6 +451,11 @@ export function ListaDeContatos({
   return (
     <div className={cn("flex flex-col gap-4", vista === "lista" && "min-h-0 flex-1")}>
       <CabecalhoDeContatos
+        numeros={contagens.todos === undefined ? undefined : [
+          { rotulo: "contatos", valor: contagens.todos },
+          ...(contagens.meus === undefined ? [] : [{ rotulo: "meus", valor: contagens.meus }]),
+          ...(contagens["sem-dono"] === undefined ? [] : [{ rotulo: "sem responsável", valor: contagens["sem-dono"] }]),
+        ]}
         rotulo={dados ? `${numero.format(total)} ${filtrandoAlgo(estado) ? (total === 1 ? "encontrado" : "encontrados") : "no total"}` : undefined}
         aba={aba}
         onAba={onAba}
