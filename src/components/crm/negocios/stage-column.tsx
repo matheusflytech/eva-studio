@@ -210,7 +210,7 @@ export function StageColumn({
       data-etapa={etapa.name}
       style={faixaCor}
       aria-label={`${etapa.name}, ${total} itens`}
-      className={cn("flex max-h-full w-72 shrink-0 snap-start flex-col rounded-[20px] transition-colors duration-200 xl:w-80", destaque)}
+      className={cn("flex max-h-full min-w-[272px] flex-1 basis-[272px] shrink-0 snap-start flex-col rounded-[22px] transition-colors duration-200 2xl:max-w-[460px]", destaque)}
     >
       <header className="group/cab flex flex-col gap-2.5 px-3.5 pb-3 pt-3.5">
         <div className="flex h-7 items-center gap-2">
