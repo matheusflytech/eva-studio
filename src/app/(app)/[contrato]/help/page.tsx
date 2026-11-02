@@ -169,7 +169,7 @@ export default function AjudaPage() {
         {/* Uma seção por vez. Tudo num scroll só transformava a tela num
             documento longo — dá pra rolar até achar, mas não dá pra saber onde
             você está nem quanto falta. */}
-        <nav aria-label="Seções da ajuda" className="sticky top-2 hidden h-fit w-[230px] shrink-0 flex-col gap-0.5 lg:flex">
+        <nav aria-label="Seções da ajuda" className="vidro sticky top-2 hidden h-fit w-[230px] shrink-0 flex-col gap-0.5 rounded-[22px] p-3 lg:flex">
           {SECOES.map((s) => {
             const n = contagem.get(s.id) ?? 0;
             const ativa = s.id === secaoAtiva;
@@ -198,7 +198,7 @@ export default function AjudaPage() {
           })}
         </nav>
 
-        <div className="min-w-0 max-w-[820px] flex-1">
+        <div className="vidro relative min-w-0 max-w-[820px] flex-1 rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-6">
           {totalAchado === 0 ? (
             <EmptyState
               compact

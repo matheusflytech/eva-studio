@@ -315,7 +315,7 @@ function Configuracoes() {
           ))}
         </Select>
       </div>
-      <nav aria-label="Configurações" className="hidden w-[210px] shrink-0 flex-col gap-px border-r border-border-subtle pr-3 md:flex">
+      <nav aria-label="Configurações" className="vidro relative hidden h-fit w-[210px] shrink-0 flex-col gap-px rounded-[22px] p-3 md:flex">
         {grupos.map((g, gi) => (
           <div key={g.rotulo} className="flex flex-col gap-px">
             <p className={cn("px-2.5 pb-1.5 font-mono text-caption text-text-tertiary", gi === 0 ? "pt-1" : "pt-3")}>{g.rotulo}</p>
@@ -344,7 +344,7 @@ function Configuracoes() {
         ))}
       </nav>
 
-      <div className="min-w-0 flex-1 pb-10 md:pt-1">
+      <div className="vidro relative mb-6 min-w-0 flex-1 rounded-[22px] !bg-[var(--vidro-fundo-forte)] p-6 md:pt-6">
         <div className={cn("w-full", aba === "trash" || aba === "roles" || aba === "audit" ? "max-w-5xl" : "max-w-3xl")}>
           {aba === "contract" && <AbaContrato />}
           {aba === "account" && <AbaConta />}

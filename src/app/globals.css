@@ -1083,3 +1083,13 @@ body {
 .vidro-faixa {
   background: linear-gradient(180deg, color-mix(in srgb, var(--faixa-cor, transparent) 16%, transparent), transparent 150px), color-mix(in srgb, var(--vidro-faixa) 45%, transparent);
 }
+
+/* Dentro da casca toda superfície de painel é vidro (como no protótipo): as
+   telas antigas tinham cartões brancos e chapados sobre as montanhas. */
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .app-conteudo .bg-panel {
+    background: var(--vidro-fundo-forte);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
