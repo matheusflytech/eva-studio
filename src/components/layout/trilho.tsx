@@ -61,7 +61,7 @@ export function Trilho({ className }: { className?: string }) {
   return (
     <aside
       aria-label="Atalhos"
-      className={cn("vidro group/trilho absolute left-3.5 top-1/2 z-30 -translate-y-1/2 flex w-[60px] flex-col items-stretch gap-1 overflow-hidden rounded-[30px] px-2 py-2.5 transition-[width] duration-200 ease-out hover:w-[212px] focus-within:w-[212px] motion-reduce:transition-none", className)}
+      className={cn("vidro group/trilho absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-stretch gap-1 overflow-hidden rounded-[30px] px-2 py-2.5 transition-[width] duration-200 ease-out hover:w-[212px] focus-within:w-[212px] motion-reduce:transition-none", className)}
       style={{ maxHeight: "min(820px, calc(100% - 12px))" }}
       data-print-ocultar
     >
