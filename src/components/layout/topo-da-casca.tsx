@@ -28,7 +28,6 @@ function Relogio() {
       className="vidro relative hidden h-9 items-center gap-2 rounded-full px-3.5 font-mono text-small tabular-nums text-text-secondary xl:inline-flex"
       title="Hora do seu computador"
     >
-      <span aria-hidden="true" className="size-2 rounded-full bg-success" />
       {hora || "--:--"}
     </span>
   );
@@ -91,12 +90,9 @@ export function TopoDaCasca({ className }: { className?: string }) {
   const ativo = ABAS.findIndex((a) => pathname === a.href || pathname.startsWith(`${a.href}/`));
   return (
     <header className={cn("relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 pb-3 pt-3", className)} data-print-ocultar>
-      <Link href="/home" className="flex items-center gap-2.5 justify-self-start" aria-label="Eva, início">
-        <MarcaEva size={26} title="Eva" className="text-text-primary" />
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-[17px] font-semibold tracking-[-0.02em] text-text-primary">Eva</span>
-          <small className="text-caption font-normal tracking-wide text-text-tertiary">CRM</small>
-        </span>
+      {/* Só a marca, no mesmo eixo do trilho (60px de largura, 14px da borda; o topo tem 20px de padding). */}
+      <Link href="/home" className="-ml-1.5 flex w-[60px] items-center justify-center justify-self-start" aria-label="Eva, início">
+        <MarcaEva size={28} title="Eva" className="text-text-primary" />
       </Link>
 
       <AbasDeLuz itens={ABAS} ativo={ativo} etiqueta={(item) => (item.href === "/conversations" ? rotuloDeNaoLidas(naoLidas) : item.badge)} />

@@ -22,6 +22,7 @@ import {
   ListFilter,
   Pencil,
   Plus,
+  Check,
   Rows3,
   Search,
   Settings,
@@ -53,7 +54,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -691,21 +691,29 @@ function NegociosConteudo() {
                 <ChevronsUpDown size={14} aria-hidden="true" className="text-text-tertiary" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuContent align="start" className="w-64">
               <DropdownMenuLabel>Funis</DropdownMenuLabel>
-              {pipelines.map((p) => (
-                <DropdownMenuCheckboxItem
-                  key={p.id}
-                  checked={p.id === pipelineId}
-                  onCheckedChange={() => {
-                    if (p.id === pipelineId) return;
-                    setPrevia(null);
-                    gravarParametro("pipeline", String(p.numero ?? p.id));
-                  }}
-                >
-                  {p.name}
-                </DropdownMenuCheckboxItem>
-              ))}
+              {pipelines.map((p) => {
+                const atual = p.id === pipelineId;
+                return (
+                  <DropdownMenuItem
+                    key={p.id}
+                    aria-current={atual ? "true" : undefined}
+                    onSelect={() => {
+                      if (atual) return;
+                      setPrevia(null);
+                      gravarParametro("pipeline", String(p.numero ?? p.id));
+                    }}
+                    className="gap-2.5"
+                  >
+                    <span aria-hidden="true" className={cn("grid size-6 shrink-0 place-items-center rounded-md text-caption font-semibold", atual ? "bg-text-primary text-bg-base" : "bg-hover text-text-secondary")}>
+                      {p.name.trim().charAt(0).toUpperCase()}
+                    </span>
+                    <span className={cn("min-w-0 flex-1 truncate", atual && "font-medium text-text-primary")}>{p.name}</span>
+                    {atual && <Check aria-hidden="true" className="size-4 shrink-0 text-text-primary" />}
+                  </DropdownMenuItem>
+                );
+              })}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href={`/deals/configure?tab=pipelines${pipeline ? `&pipeline=${pipeline.numero ?? pipeline.id}` : ""}`}>
