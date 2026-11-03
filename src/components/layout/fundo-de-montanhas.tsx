@@ -10,9 +10,11 @@ import { useTheme } from "@/components/ui/theme";
  */
 export function FundoDeMontanhas() {
   const escuro = useTheme().resolved === "dark";
+  // No escuro o fundo é preto fosco: as montanhas de gelo davam um tom azulado.
+  if (escuro) return null;
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      <FundoGelo escuro={escuro} realce={escuro ? 0.8 : 2} className={`h-full w-full scale-110 blur-[6px] ${escuro ? "opacity-70" : ""}`} />
+      <FundoGelo escuro={false} realce={2} className="h-full w-full scale-110 blur-[6px]" />
     </div>
   );
 }
