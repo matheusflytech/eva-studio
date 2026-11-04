@@ -91,7 +91,7 @@ ${textoDoResultado(r)}`;
     try {
       bruta = JSON.parse(call.arguments.consulta ?? "");
     } catch {
-      return "Erro: a consulta não é um JSON válido. Mande só o JSON.";
+      return "Erro: a consulta não é um JSON válido ou faltou o parâmetro consulta. Mande o JSON no parâmetro consulta.";
     }
     const query = sanearReportQuery({ v: 2, ...(bruta && typeof bruta === "object" ? bruta : {}) });
     if (!query) return "Erro: consulta inválida. Use só bases, campos, operadores e medidas da lista.";

@@ -51,6 +51,8 @@ describe("POST /api/analytics/ia/chat", () => {
     expect(o).toMatchObject({ provider: "xai", apiKey: "dec:segredo", userMessage: "quantos negócios em aberto?" });
     expect(o.history).toHaveLength(2);
     expect(o.tools.map((t: { name: string }) => t.name)).toEqual(["consultar_dados", "mostrar_relatorio"]);
+    // Groq derruba o turno inteiro se a IA esquecer um campo obrigatório: o erro volta pela ferramenta, para ela corrigir.
+    expect(o.tools.flatMap((t: { params: { required?: boolean }[] }) => t.params).every((p: { required?: boolean }) => p.required === false)).toBe(true);
     expect(o.systemPrompt).toContain("Vendas B2B");
     expect(o.systemPrompt).toContain("/deals");
   });
