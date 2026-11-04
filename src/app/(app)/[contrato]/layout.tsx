@@ -16,6 +16,7 @@ import { FundoDeMontanhas } from "@/components/layout/fundo-de-montanhas";
 import { Ilha } from "@/components/layout/ilha";
 import { pulsar } from "@/lib/fundo/eventos";
 import { MarcaEva } from "@/components/layout/marca-eva";
+import { ChatDaEva } from "@/components/chat/chat-da-eva";
 
 // Tudo dentro de /<idDoContrato>/... A URL é a fonte da verdade do contrato:
 // o /api/me recebe o id pelo cabeçalho e confere o vínculo no servidor. Aqui só
@@ -111,6 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         </div>
+        <ChatDaEva />
       </div>
     </BuscaGlobal>
   );

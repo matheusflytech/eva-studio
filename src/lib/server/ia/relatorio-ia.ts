@@ -32,7 +32,7 @@ const personalizadosDa = (dataset: string, c: CatalogoDoCrm) =>
     ? c.campos.map((x) => ({ key: x.key, label: x.label, type: x.type, options: x.options ?? [] }))
     : [];
 
-function linhasDasBases(c: CatalogoDoCrm): string[] {
+export function linhasDasBases(c: CatalogoDoCrm): string[] {
   return DATASETS.map((d) => {
     const campos = camposDoDataset(d.key, personalizadosDa(d.key, c))
       .map((f) => `${f.key}:${f.type}`)
@@ -41,7 +41,7 @@ function linhasDasBases(c: CatalogoDoCrm): string[] {
   });
 }
 
-function linhasDosValores(c: CatalogoDoCrm): string[] {
+export function linhasDosValores(c: CatalogoDoCrm): string[] {
   const nomes = (l: { name: string }[]) => l.map((x) => x.name).join(" | ") || "(nenhum)";
   return [
     `Funis: ${nomes(c.funis)}`,
