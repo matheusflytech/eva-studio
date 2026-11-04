@@ -38,7 +38,13 @@ import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 /** Pedidos por contrato a cada 10 minutos. */
 const LIMITE_POR_ORG = 40;
 const JANELA_S = 600;
-const RODADAS_DE_FERRAMENTA = 6;
+const RODADAS_DE_FERRAMENTA = 4;
+/**
+ * Perguntas por minuto, somando todos os contratos, na chave da Eva. Cada pergunta gasta uns 5 mil
+ * tokens e o plano grátis da Groq dá 8 mil por minuto: passar disso só queima token e dá 429.
+ * Com plano pago, suba pela variável CHAT_IA_LIMITE_POR_MINUTO na Vercel.
+ */
+const LIMITE_DA_EVA_POR_MINUTO = Math.max(1, Number(process.env.CHAT_IA_LIMITE_POR_MINUTO) || 1);
 
 export async function POST(request: Request) {
   const ctx = await requirePermission("read");
@@ -66,6 +72,13 @@ export async function POST(request: Request) {
 
   const limite = await checkRateLimit(`ia-chat:${orgId}`, LIMITE_POR_ORG, JANELA_S);
   if (!limite.allowed) return NextResponse.json({ error: "Muitas perguntas seguidas. Espera uns minutinhos e tenta de novo." }, { status: 429 });
+
+  if (origem === "eva") {
+    const fila = await checkRateLimit("ia-chat:eva", LIMITE_DA_EVA_POR_MINUTO, 60);
+    if (!fila.allowed) {
+      return NextResponse.json({ error: "A Eva está atendendo outra pergunta agora. Espere um minutinho e pergunte de novo." }, { status: 429 });
+    }
+  }
 
   const catalogo = await carregarCatalogo(orgId);
   const globais = sanearFiltrosGlobais({});

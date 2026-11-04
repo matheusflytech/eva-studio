@@ -133,6 +133,17 @@ describe("POST /api/analytics/ia/chat", () => {
     erro.mockRestore();
   });
 
+  it("chave da Eva: passou do limite por minuto → 429 sem gastar token; chave do contrato não entra nessa fila", async () => {
+    rl.checkRateLimit.mockImplementation(async (chave: string) => (chave === "ia-chat:eva" ? { allowed: false, count: 2, limit: 1 } : { allowed: true, count: 1, limit: 40 }));
+    const res = await post({ mensagens });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/outra pergunta/);
+    expect(llm.callLlmWithTools).not.toHaveBeenCalled();
+    db.organization.findUnique.mockResolvedValue({ chatAiSource: "contract" });
+    llm.callLlmWithTools.mockResolvedValue({ text: "ok" });
+    expect((await post({ mensagens })).status).toBe(200);
+  });
+
   it("400 sem pergunta, 429 acima do limite, e a sessão inválida devolve o erro dela", async () => {
     expect((await post({ mensagens: [] })).status).toBe(400);
     rl.checkRateLimit.mockResolvedValue({ allowed: false, count: 41, limit: 40 });
