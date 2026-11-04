@@ -22,6 +22,8 @@ model Organization {
   name      String
   logoUrl   String?
   createdAt DateTime @default(now())
+  // De quem é a chave do chat da Eva: "eva" (GROQ_API_KEY) ou "contract" (Integrações). 2026-11-08-chat-ai-source.sql
+  chatAiSource String @default("eva")
 
   profiles    Profile[]
   agents      Agent[]

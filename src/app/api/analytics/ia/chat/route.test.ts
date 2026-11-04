@@ -5,6 +5,7 @@ const db = vi.hoisted(() => {
   const lista = () => vi.fn<(a: { where: Record<string, unknown> }) => Promise<unknown[]>>(async () => []);
   return {
     credential: { findMany: lista() },
+    organization: { findUnique: vi.fn(async () => ({ chatAiSource: "eva" })) },
     pipeline: { findMany: lista() },
     profile: { findMany: lista() },
     tag: { findMany: lista() },
@@ -35,6 +36,7 @@ const mensagens = [{ role: "user", content: "quantos negócios em aberto?" }];
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.GROQ_API_KEY = "chave-da-eva";
+  db.organization.findUnique.mockResolvedValue({ chatAiSource: "eva" });
   perm.requirePermission.mockResolvedValue({ orgId: "org-A", userId: "u", role: "viewer" });
   rl.checkRateLimit.mockResolvedValue({ allowed: true, count: 1, limit: 40 });
   // Mesmo com chave cadastrada no contrato, o chat usa só a da Eva.
@@ -100,6 +102,17 @@ describe("POST /api/analytics/ia/chat", () => {
     expect(d.resposta).toMatch(/Aqui está/);
     expect(d.cartoes).toHaveLength(1);
     expect(d.cartoes[0]).toMatchObject({ titulo: "Negócios", viz: "number", result: { rows: [[12]] } });
+  });
+
+  it("contrato que escolheu a própria chave: usa a dele; sem chave cadastrada → 503 que explica", async () => {
+    db.organization.findUnique.mockResolvedValue({ chatAiSource: "contract" });
+    llm.callLlmWithTools.mockResolvedValue({ text: "ok" });
+    await post({ mensagens });
+    expect(llm.callLlmWithTools.mock.calls[0][0]).toMatchObject({ provider: "xai", apiKey: "dec:segredo" });
+    db.credential.findMany.mockResolvedValue([]);
+    const res = await post({ mensagens });
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/própria chave/);
   });
 
   it("sem chave de IA → 503 com o código sem_chave", async () => {
