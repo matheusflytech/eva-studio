@@ -25,7 +25,10 @@ const CartaoDoChat = dynamic(() => import("@/components/chat/cartao-do-chat"), {
 // janela vira uma folha na base da tela. A conversa vive na tela: recarregar
 // começa de novo.
 
-type Mensagem = { role: "user" | "assistant"; content: string; cartoes?: CartaoMostrado[] };
+type Mensagem = { role: "user" | "assistant"; content: string; cartoes?: CartaoMostrado[]; sugestoes?: string[] };
+
+/** Quando a IA não sugere nada, estas servem para quase qualquer resposta. */
+const SEGUIR_COM = ["Mostre isso em um gráfico", "Compare com o período anterior", "Quais negócios estão parados?"];
 type Falha = { texto: string };
 
 const LANCADOR = 56;
@@ -219,7 +222,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
         return;
       }
       setAnimarIdx(conversa.length);
-      setMensagens([...conversa, { role: "assistant", content: d.resposta, cartoes: Array.isArray(d.cartoes) ? d.cartoes : undefined }]);
+      setMensagens([...conversa, { role: "assistant", content: d.resposta, cartoes: Array.isArray(d.cartoes) ? d.cartoes : undefined, sugestoes: Array.isArray(d.sugestoes) ? d.sugestoes : undefined }]);
       if (!abertoRef.current) setNaoLida(true);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setFalha({ texto: "Sem conexão com o servidor. Confere a internet e tenta de novo." });
@@ -357,6 +360,20 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
                         <CartaoDoChat cartao={c} atraso={0.15 + k * 0.1} />
                       </div>
                     ))}
+                    {i === mensagens.length - 1 && !carregando && (
+                      <div className="flex flex-wrap gap-2 pl-8">
+                        {(m.sugestoes?.length ? m.sugestoes : SEGUIR_COM).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => enviar(t)}
+                            className="rounded-full border border-border-subtle bg-raised/60 px-3 py-1.5 text-caption text-text-secondary backdrop-blur-md transition-colors hover:bg-hover hover:text-text-primary focus-visible:outline-2 focus-visible:outline-focus"
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               )}

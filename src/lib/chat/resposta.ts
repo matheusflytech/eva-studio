@@ -47,3 +47,17 @@ export function blocosDaResposta(bruto: string): Bloco[] {
   while (blocos.length && blocos[blocos.length - 1].tipo === "espaco") blocos.pop();
   return blocos;
 }
+
+/** Perguntas que a Eva sugere no fim da resposta: uma linha "SUGESTOES: a | b | c" que sai do texto mostrado. */
+export function separarSugestoes(bruto: string): { texto: string; sugestoes: string[] } {
+  const linhas = bruto.split("\n");
+  const i = linhas.findLastIndex((l) => /^\s*(?:[-*•]\s*)?\**sugest(?:ões|oes)\**\s*:/i.test(l));
+  if (i < 0) return { texto: bruto.trim(), sugestoes: [] };
+  const sugestoes = linhas[i]
+    .replace(/^[^:]*:/, "")
+    .split("|")
+    .map((t) => t.replace(/\*\*/g, "").trim())
+    .filter((t) => t.length >= 4 && t.length <= 80)
+    .slice(0, 3);
+  return { texto: [...linhas.slice(0, i), ...linhas.slice(i + 1)].join("\n").trim(), sugestoes };
+}
