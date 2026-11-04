@@ -24,6 +24,7 @@ export const FERRAMENTA_CONSULTAR: LlmTool = {
       name: "consulta",
       description:
         'Texto JSON: {"dataset": "<base>", "filters": {"logic": "and", "conditions": [{"field": "<campo>", "op": "<op>", "value": "<texto>", "to": "<texto>", "values": ["<texto>"]}]}, "metrics": [{"op": "<medida>", "field": "<campo>"}], "groupBy": [{"field": "<campo>", "grain": "day"|"week"|"month"|"quarter"|"year"}], "columns": ["<campo>"], "sort": [{"key": "<campo ou m0>", "dir": "asc"|"desc"}], "limit": <1-1000>}',
+      required: false,
     },
   ],
 };
@@ -33,12 +34,13 @@ export const FERRAMENTA_RELATORIO: LlmTool = {
   description:
     "Mostra um cartão de relatório (gráfico, tabela ou número) para a pessoa e devolve os dados dele. Use quando pedirem relatório, gráfico, tabela ou comparação.",
   params: [
-    { name: "consulta", description: "O mesmo JSON de consultar_dados." },
+    { name: "consulta", description: "O mesmo JSON de consultar_dados.", required: false },
     {
       name: "visual",
       description: `Um destes: ${VIZ_TYPES.map((v) => v.key).join(", ")}. number para um número só; line ou area para tempo; bar, bar_h ou pie para categorias; funnel para etapas; table para lista.`,
+      required: false,
     },
-    { name: "titulo", description: "Título do cartão, até 60 letras." },
+    { name: "titulo", description: "Título do cartão, até 60 letras.", required: false },
   ],
 };
 
