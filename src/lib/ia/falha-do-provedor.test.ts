@@ -15,6 +15,10 @@ describe("mensagemDeFalhaDaIa", () => {
     expect(m("Groq demorou mais de 30 s para responder.")).toMatch(/demorou demais/);
   });
 
+  it("400 mostra a frase do provedor", () => {
+    expect(m('groq 400: {"error":{"message":"Failed to call a function","type":"invalid_request_error"}}')).toMatch(/recusou o pedido: Failed to call a function\./);
+  });
+
   it("sem pista, cai na frase genérica e nunca ecoa o corpo", () => {
     expect(m(undefined)).toMatch(/não conseguiu responder/);
     expect(m("groq 400: gsk_segredo")).not.toContain("gsk_");

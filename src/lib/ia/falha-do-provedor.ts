@@ -18,6 +18,11 @@ export function mensagemDeFalhaDaIa(provider: LlmProvider, model: string, erro: 
   if (status === 404 || corpo.includes("model_not_found") || corpo.includes("does not exist")) {
     return `O modelo ${model} não está liberado nessa conta ${nome}. Libere o modelo na ${nome} ou cadastre a chave de outro provedor.`;
   }
+  if (status === 400) {
+    // Pedido recusado (ferramenta mal chamada, limite de tokens do modelo...): a frase do provedor ajuda a achar a causa.
+    const motivo = /"message"\s*:\s*"((?:[^"\\]|\\.){1,160})/.exec(erro ?? "")?.[1];
+    return `A ${nome} recusou o pedido${motivo ? `: ${motivo}` : ""}. Tente de novo; se repetir, avise o suporte com esta frase.`;
+  }
   if (status === 429) return `A conta ${nome} chegou no limite de uso. Espere alguns minutos ou aumente o plano na ${nome}.`;
   if (status === 413) return `O pedido ficou grande demais para o plano da conta ${nome}. Tente um pedido mais curto ou um plano maior.`;
   if (status >= 500) return `A ${nome} está instável agora. Tente de novo em instantes.`;
