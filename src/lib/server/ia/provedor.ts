@@ -39,6 +39,27 @@ export interface ProvedorDeIa {
   credentialId?: string;
 }
 
+/** Só a chave da Eva (GROQ_API_KEY). */
+export function provedorDaPlataforma(): ProvedorDeIa | null {
+  const apiKey = process.env.GROQ_API_KEY;
+  return apiKey ? { provider: "groq", apiKey, model: MODELO_POR_PROVEDOR.groq, origem: "plataforma" } : null;
+}
+
+export type OrigemDaIaDoChat = "eva" | "contract";
+
+/**
+ * IA do chat: a Eva (padrão) ou a chave do contrato, conforme o contrato escolheu.
+ * Escolhendo a do contrato sem ter chave cadastrada, devolve null (não cai na da Eva sem avisar).
+ */
+export async function provedorDoChat(orgId: string): Promise<{ provedor: ProvedorDeIa | null; origem: OrigemDaIaDoChat }> {
+  // Coluna ainda não criada no banco (SQL pendente): segue o padrão, a chave da Eva.
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { chatAiSource: true } }).catch(() => null);
+  const origem: OrigemDaIaDoChat = org?.chatAiSource === "contract" ? "contract" : "eva";
+  if (origem === "eva") return { provedor: provedorDaPlataforma(), origem };
+  const escolhido = await escolherProvedorDeIa(orgId);
+  return { provedor: escolhido?.origem === "organizacao" ? escolhido : null, origem };
+}
+
 export async function escolherProvedorDeIa(orgId: string): Promise<ProvedorDeIa | null> {
   const tipos = LLM_PROVIDERS.map((p) => p.credentialType);
   const credenciais = await prisma.credential.findMany({

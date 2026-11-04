@@ -11,6 +11,7 @@ import { EsqueletoDeLista, ItemDeConfig, ListaDeConfig, RotuloDeGrupo, VazioDeCo
 import { LLM_PROVIDERS } from "@/lib/llm-providers";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn } from "@/lib/utils";
+import { OrigemDaIaDoChat } from "./origem-da-ia-do-chat";
 import { ConexaoIaPanel } from "./conexao-ia-panel";
 import { AvisoDoOpenRouter, NovaCredencial, TYPE_LABEL, formatAge, useCredenciais, type CredentialRow } from "./credentials-panel";
 import { BarraDoLimite, LimiteDaChave, UsoPorAgente, compacto, reais, useUsoDaIa, type UsoDaChave } from "./uso-ia-panel";
@@ -110,6 +111,7 @@ export function CentralDeIa({
   return (
     <div className="flex flex-col gap-8">
       <AvisoDoOpenRouter />
+      <OrigemDaIaDoChat />
 
       {resumo && !resumo.disponivel && (
         <Notice tone="warning">O controle de uso ainda não foi ativado no banco deste ambiente: nada está sendo contado e nenhum limite vale.</Notice>

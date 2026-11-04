@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, animate, motion, useDragControls, useMotionValue, useReducedMotion, type PanInfo } from "framer-motion";
 import { ArrowUp, CircleDollarSign, Funnel, Maximize2, MessagesSquare, Minimize2, Trash2, UserPlus, X } from "lucide-react";
-import Link from "@/components/contrato/link";
 import { IconButton } from "@/components/ui/icon-button";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { OrbeEva } from "@/components/layout/orbe-eva";
@@ -27,7 +26,7 @@ const CartaoDoChat = dynamic(() => import("@/components/chat/cartao-do-chat"), {
 // começa de novo.
 
 type Mensagem = { role: "user" | "assistant"; content: string; cartoes?: CartaoMostrado[] };
-type Falha = { texto: string; semChave?: boolean };
+type Falha = { texto: string };
 
 const LANCADOR = 56;
 const MARGEM = 16;
@@ -216,7 +215,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
       });
       const d = await res.json().catch(() => null);
       if (!res.ok || typeof d?.resposta !== "string") {
-        setFalha({ texto: d?.error ?? "Não deu certo agora. Tenta de novo em instantes.", semChave: d?.codigo === "sem_chave" });
+        setFalha({ texto: d?.error ?? "Não deu certo agora. Tenta de novo em instantes." });
         return;
       }
       setAnimarIdx(conversa.length);
@@ -370,12 +369,6 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
                   className="self-start rounded-[16px] bg-danger-subtle px-3.5 py-2.5 text-small text-danger"
                 >
                   {falha.texto}
-                  {falha.semChave && (
-                    <>
-                      {" "}
-                      <Link href="/integrations" className="underline">Abrir Integrações</Link>
-                    </>
-                  )}
                 </motion.p>
               )}
             </div>
