@@ -1,7 +1,7 @@
-import { METRICAS_POR_TIPO, OPS_POR_TIPO, formatarValor, type ReportResult } from "@/lib/report-query";
+import { METRICAS_POR_TIPO, OPS_POR_TIPO, VIZ_TYPES, formatarValor, type ReportQuery, type ReportResult, type VizType } from "@/lib/report-query";
 import type { LlmTool } from "@/lib/server/llm";
 import type { CatalogoDoCrm } from "@/lib/server/ia/consulta-ia";
-import { linhasDasBases, linhasDosValores } from "@/lib/server/ia/relatorio-ia";
+import { linhasDasBases, linhasDosValores, validarRelatorioDaIa } from "@/lib/server/ia/relatorio-ia";
 
 // ---------------------------------------------------------------------------
 // Chat da Eva (botão flutuante): conversa em português que lê os dados do
@@ -28,6 +28,43 @@ export const FERRAMENTA_CONSULTAR: LlmTool = {
   ],
 };
 
+export const FERRAMENTA_RELATORIO: LlmTool = {
+  name: "mostrar_relatorio",
+  description:
+    "Mostra um cartão de relatório (gráfico, tabela ou número) para a pessoa e devolve os dados dele. Use quando pedirem relatório, gráfico, tabela ou comparação.",
+  params: [
+    { name: "consulta", description: "O mesmo JSON de consultar_dados." },
+    {
+      name: "visual",
+      description: `Um destes: ${VIZ_TYPES.map((v) => v.key).join(", ")}. number para um número só; line ou area para tempo; bar, bar_h ou pie para categorias; funnel para etapas; table para lista.`,
+    },
+    { name: "titulo", description: "Título do cartão, até 60 letras." },
+  ],
+};
+
+export const MAX_CARTOES = 3;
+/** Linhas do cartão que vão para a tela (o resto só pesa na resposta). */
+export const LINHAS_DO_CARTAO = 500;
+
+export interface CartaoDoChat {
+  query: ReportQuery;
+  viz: VizType;
+  titulo: string;
+}
+
+/** Argumentos da ferramenta → cartão saneado (o mesmo filtro dos cartões do painel); null se não der. */
+export function validarCartaoDoChat(args: Record<string, string>): CartaoDoChat | null {
+  let query: unknown;
+  try {
+    query = JSON.parse(args.consulta ?? "");
+  } catch {
+    return null;
+  }
+  if (!query || typeof query !== "object") return null;
+  const r = validarRelatorioDaIa({ query, viz: args.visual, titulo: args.titulo, explicacao: "" });
+  return r ? { query: r.query, viz: r.viz, titulo: r.titulo } : null;
+}
+
 export function montarPromptDoChat(c: CatalogoDoCrm, o: { hoje: string; pagina?: string }): string {
   const ops = Object.entries(OPS_POR_TIPO).map(([t, l]) => `${t}: ${l.join(", ")}`);
   const metricas = Object.entries(METRICAS_POR_TIPO).map(([t, l]) => `${t}: ${l.join(", ")}`);
@@ -38,6 +75,7 @@ export function montarPromptDoChat(c: CatalogoDoCrm, o: { hoje: string; pagina?:
     "COMO RESPONDER:",
     "- Para qualquer número ou lista, chame consultar_dados. Nunca invente valor, nome ou data; sem dado, diga que não achou.",
     "- Pode chamar a ferramenta várias vezes (por exemplo, comparar dois períodos). Prefira medidas e agrupamentos a listas longas.",
+    "- Quando pedirem relatório, gráfico, tabela ou comparação, ou quando a resposta ficar melhor vista num gráfico, chame mostrar_relatorio: ela mostra o cartão para a pessoa e devolve os dados. Depois escreva 1 a 3 frases com a leitura do resultado, sem repetir todos os números. No máximo 3 cartões por resposta.",
     "- Você só lê. Não cria, muda nem apaga nada. Se pedirem isso, explique que ainda não faz.",
     "- Diga o período e o critério que usou (por exemplo: \"negócios ganhos em outubro, pela data de fechamento\").",
     "- Texto simples: frases curtas e linhas com hífen. Sem tabelas, sem negrito, sem blocos de código.",
@@ -59,6 +97,7 @@ export function montarPromptDoChat(c: CatalogoDoCrm, o: { hoje: string; pagina?:
     "- \"Quantos\" = count. \"Quanto vendi\" = sum do valor dos negócios com status Ganho, filtrando a data de fechamento.",
     "- Por mês ou semana = groupBy no campo de data com grain. No máximo 2 agrupamentos e 4 medidas.",
     "- Lista de registros = sem metrics e sem groupBy, com columns.",
+    "- Em gráfico, use uma medida só, ou medidas na mesma escala (não ponha contagem e valor em reais juntos: o gráfico fica ilegível). Para as duas, mostre dois cartões.",
     "",
     "VALORES DA ORGANIZAÇÃO:",
     ...linhasDosValores(c),

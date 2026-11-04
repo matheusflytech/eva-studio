@@ -5,9 +5,19 @@ import { callLlmWithTools, type LlmToolCall } from "@/lib/server/llm";
 import { escolherProvedorDeIa } from "@/lib/server/ia/provedor";
 import { registrarUso } from "@/lib/server/ia/uso";
 import { carregarCatalogo } from "@/lib/server/ia/catalogo";
-import { FERRAMENTA_CONSULTAR, montarPromptDoChat, textoDoResultado, validarMensagens } from "@/lib/server/ia/chat-ia";
+import {
+  FERRAMENTA_CONSULTAR,
+  FERRAMENTA_RELATORIO,
+  LINHAS_DO_CARTAO,
+  MAX_CARTOES,
+  montarPromptDoChat,
+  textoDoResultado,
+  validarCartaoDoChat,
+  validarMensagens,
+  type CartaoDoChat,
+} from "@/lib/server/ia/chat-ia";
 import { rodarReportQuery } from "@/lib/server/report-sql";
-import { sanearReportQuery } from "@/lib/report-query";
+import { sanearReportQuery, type ReportQuery, type ReportResult } from "@/lib/report-query";
 import { sanearFiltrosGlobais, diaLocal } from "@/lib/consulta";
 import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 
@@ -15,7 +25,7 @@ import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 // Chat da Eva (botão flutuante).
 //
 // Corpo: { mensagens: [{ role: "user" | "assistant", content }], pagina?: string }
-// Resposta: { resposta: string }
+// Resposta: { resposta: string, cartoes: [{ query, viz, titulo, result }] }
 //
 // A IA só lê: a única ferramenta é consultar_dados, que roda o mesmo motor dos
 // cartões de relatório, sempre no contrato da sessão. Erros: 400 conversa
@@ -53,7 +63,30 @@ export async function POST(request: Request) {
   const catalogo = await carregarCatalogo(orgId);
   const globais = sanearFiltrosGlobais({});
 
+  // Cartões que a IA mostrou nesta resposta, já com os dados (a tela não precisa consultar de novo).
+  const cartoes: (CartaoDoChat & { result: ReportResult })[] = [];
+
+  async function rodar(query: ReportQuery): Promise<ReportResult | string> {
+    try {
+      return (await rodarReportQuery(orgId, query, globais)) ?? "Erro: escolha ao menos uma medida, um agrupamento ou colunas.";
+    } catch (e) {
+      return String((e as Error)?.message ?? "").includes("statement timeout")
+        ? "Erro: a consulta demorou demais. Filtre um período menor."
+        : "Erro: não deu para calcular essa consulta.";
+    }
+  }
+
   async function executarFerramenta(call: LlmToolCall): Promise<string> {
+    if (call.name === FERRAMENTA_RELATORIO.name) {
+      if (cartoes.length >= MAX_CARTOES) return `Erro: já mostrei ${MAX_CARTOES} cartões nesta resposta.`;
+      const cartao = validarCartaoDoChat(call.arguments);
+      if (!cartao) return "Erro: relatório inválido. Confira a consulta (bases, campos, operadores e medidas da lista) e o visual.";
+      const r = await rodar(cartao.query);
+      if (typeof r === "string") return r;
+      cartoes.push({ ...cartao, result: { columns: r.columns, rows: r.rows.slice(0, LINHAS_DO_CARTAO), truncated: r.truncated || r.rows.length > LINHAS_DO_CARTAO } });
+      return `Cartão "${cartao.titulo}" mostrado à pessoa.
+${textoDoResultado(r)}`;
+    }
     let bruta: unknown;
     try {
       bruta = JSON.parse(call.arguments.consulta ?? "");
@@ -62,14 +95,8 @@ export async function POST(request: Request) {
     }
     const query = sanearReportQuery({ v: 2, ...(bruta && typeof bruta === "object" ? bruta : {}) });
     if (!query) return "Erro: consulta inválida. Use só bases, campos, operadores e medidas da lista.";
-    try {
-      const resultado = await rodarReportQuery(orgId, query, globais);
-      return resultado ? textoDoResultado(resultado) : "Erro: escolha ao menos uma medida, um agrupamento ou colunas.";
-    } catch (e) {
-      return String((e as Error)?.message ?? "").includes("statement timeout")
-        ? "Erro: a consulta demorou demais. Filtre um período menor."
-        : "Erro: não deu para calcular essa consulta.";
-    }
+    const r = await rodar(query);
+    return typeof r === "string" ? r : textoDoResultado(r);
   }
 
   const resultado = await callLlmWithTools({
@@ -79,7 +106,7 @@ export async function POST(request: Request) {
     systemPrompt: montarPromptDoChat(catalogo, { hoje: diaLocal(new Date()), pagina }),
     history: conversa.historico,
     userMessage: conversa.pergunta,
-    tools: [FERRAMENTA_CONSULTAR],
+    tools: [FERRAMENTA_CONSULTAR, FERRAMENTA_RELATORIO],
     executeTool: executarFerramenta,
     maxIterations: RODADAS_DE_FERRAMENTA,
     effort: "low",
@@ -97,10 +124,12 @@ export async function POST(request: Request) {
     ok: !resultado.error && !!resultado.text,
   }]);
 
-  if (resultado.error || !resultado.text) {
+  // A IA mostrou cartões e não escreveu nada: o cartão fala por si.
+  const resposta = resultado.text || (cartoes.length ? "Aqui está o que encontrei." : null);
+  if (resultado.error || !resposta) {
     // Só o provedor e o começo do erro dele (status HTTP): nada da conversa.
     console.error(`[ia/chat] ${provedor.provider} falhou: ${(resultado.error ?? "resposta vazia").slice(0, 80)}`);
     return NextResponse.json({ error: mensagemDeFalhaDaIa(provedor.provider, provedor.model, resultado.error) }, { status: 502 });
   }
-  return NextResponse.json({ resposta: resultado.text });
+  return NextResponse.json({ resposta, cartoes });
 }

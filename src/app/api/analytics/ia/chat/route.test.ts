@@ -50,7 +50,7 @@ describe("POST /api/analytics/ia/chat", () => {
     const o = llm.callLlmWithTools.mock.calls[0][0];
     expect(o).toMatchObject({ provider: "xai", apiKey: "dec:segredo", userMessage: "quantos negócios em aberto?" });
     expect(o.history).toHaveLength(2);
-    expect(o.tools.map((t: { name: string }) => t.name)).toEqual(["consultar_dados"]);
+    expect(o.tools.map((t: { name: string }) => t.name)).toEqual(["consultar_dados", "mostrar_relatorio"]);
     expect(o.systemPrompt).toContain("Vendas B2B");
     expect(o.systemPrompt).toContain("/deals");
   });
@@ -70,6 +70,33 @@ describe("POST /api/analytics/ia/chat", () => {
 
     motor.rodarReportQuery.mockRejectedValue(new Error("canceling statement due to statement timeout"));
     expect(await executeTool({ id: "4", name: "consultar_dados", arguments: { consulta: JSON.stringify({ dataset: "deals", metrics: [{ op: "count" }] }) } })).toMatch(/demorou demais/);
+  });
+
+  it("mostrar_relatorio devolve o cartão com os dados, no máximo 3, e a IA recebe o texto dos dados", async () => {
+    llm.callLlmWithTools.mockResolvedValue({ text: "Resumo." });
+    await post({ mensagens });
+    const { executeTool } = llm.callLlmWithTools.mock.calls[0][0];
+    motor.rodarReportQuery.mockResolvedValue({ columns: [{ key: "m0", label: "Contagem", type: "number", role: "metric" }], rows: [[12]], truncated: false });
+    const args = { consulta: JSON.stringify({ dataset: "deals", metrics: [{ op: "count" }] }), visual: "number", titulo: "Negócios" };
+    expect(await executeTool({ id: "1", name: "mostrar_relatorio", arguments: args })).toBe("Cartão \"Negócios\" mostrado à pessoa.\nContagem\n12");
+    expect(await executeTool({ id: "2", name: "mostrar_relatorio", arguments: { ...args, consulta: "nada" } })).toMatch(/relatório inválido/);
+    await executeTool({ id: "3", name: "mostrar_relatorio", arguments: args });
+    await executeTool({ id: "4", name: "mostrar_relatorio", arguments: args });
+    expect(await executeTool({ id: "5", name: "mostrar_relatorio", arguments: args })).toMatch(/já mostrei 3 cartões/);
+  });
+
+  it("a resposta leva os cartões que a IA mostrou; sem texto da IA, o cartão basta", async () => {
+    motor.rodarReportQuery.mockResolvedValue({ columns: [{ key: "m0", label: "Contagem", type: "number", role: "metric" }], rows: [[12]], truncated: false });
+    llm.callLlmWithTools.mockImplementation(async (o: { executeTool: (c: unknown) => Promise<string> }) => {
+      await o.executeTool({ id: "1", name: "mostrar_relatorio", arguments: { consulta: JSON.stringify({ dataset: "deals", metrics: [{ op: "count" }] }), visual: "number", titulo: "Negócios" } });
+      return { text: null };
+    });
+    const res = await post({ mensagens });
+    const d = await res.json();
+    expect(res.status).toBe(200);
+    expect(d.resposta).toMatch(/Aqui está/);
+    expect(d.cartoes).toHaveLength(1);
+    expect(d.cartoes[0]).toMatchObject({ titulo: "Negócios", viz: "number", result: { rows: [[12]] } });
   });
 
   it("sem chave de IA → 503 com o código sem_chave", async () => {

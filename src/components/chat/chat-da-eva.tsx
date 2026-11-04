@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, animate, motion, useDragControls, useMotionValue, useReducedMotion, type PanInfo } from "framer-motion";
 import { ArrowUp, CircleDollarSign, Funnel, Maximize2, MessagesSquare, Minimize2, Trash2, UserPlus, X } from "lucide-react";
@@ -9,7 +10,14 @@ import { IconButton } from "@/components/ui/icon-button";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { OrbeEva } from "@/components/layout/orbe-eva";
 import { BolhaDaPessoa, Pensando, RespostaDaEva } from "@/components/chat/mensagens";
+import type { CartaoMostrado } from "@/components/chat/cartao-do-chat";
 import { cn } from "@/lib/utils";
+
+// O gráfico (echarts) pesa: só carrega quando a Eva mostra o primeiro cartão.
+const CartaoDoChat = dynamic(() => import("@/components/chat/cartao-do-chat"), {
+  ssr: false,
+  loading: () => <div aria-busy="true" className="h-48 w-full animate-pulse rounded-[20px] bg-raised/60" />,
+});
 
 // Chat da Eva: orbe flutuante em todas as telas. Pergunta em português, a Eva
 // consulta os dados do contrato (só lê) e responde. O orbe e a janela se
@@ -18,7 +26,7 @@ import { cn } from "@/lib/utils";
 // janela vira uma folha na base da tela. A conversa vive na tela: recarregar
 // começa de novo.
 
-type Mensagem = { role: "user" | "assistant"; content: string };
+type Mensagem = { role: "user" | "assistant"; content: string; cartoes?: CartaoMostrado[] };
 type Falha = { texto: string; semChave?: boolean };
 
 const LANCADOR = 56;
@@ -33,7 +41,7 @@ const bordas = (largura: number) => ({ esq: largura >= 860 ? 96 : MARGEM, topo: 
 const SUGESTOES = [
   { icone: Funnel, texto: "Como está o funil de vendas?" },
   { icone: UserPlus, texto: "Quantos leads novos tivemos nos últimos 7 dias?" },
-  { icone: CircleDollarSign, texto: "Quanto vendemos neste mês?" },
+  { icone: CircleDollarSign, texto: "Mostre um gráfico das vendas por mês" },
   { icone: MessagesSquare, texto: "Como estão as conversas de hoje?" },
 ];
 
@@ -176,9 +184,13 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
   const rolar = React.useCallback((suave: boolean) => {
     corpo.current?.scrollTo({ top: corpo.current.scrollHeight, behavior: suave && !reduz ? "smooth" : "auto" });
   }, [reduz]);
+  // Resposta com cartões é alta: mostra o começo dela, não o fim.
   React.useEffect(() => {
-    rolar(true);
-  }, [mensagens, carregando, falha, rolar]);
+    const ultima = mensagens.at(-1);
+    const inicio = ultima?.cartoes?.length ? corpo.current?.querySelector<HTMLElement>(`[data-msg="${mensagens.length - 1}"]`) : null;
+    if (inicio && corpo.current) corpo.current.scrollTo({ top: Math.max(0, inicio.offsetTop - 8), behavior: reduz ? "auto" : "smooth" });
+    else rolar(true);
+  }, [mensagens, carregando, falha, rolar, reduz]);
   React.useEffect(() => {
     if (aberto) campo.current?.focus();
   }, [aberto]);
@@ -200,7 +212,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
         // Só a tela, sem o id do contrato.
-        body: JSON.stringify({ mensagens: conversa, pagina: "/" + pathname.split("/").slice(2).join("/") }),
+        body: JSON.stringify({ mensagens: conversa.map(({ role, content }) => ({ role, content })), pagina: "/" + pathname.split("/").slice(2).join("/") }),
       });
       const d = await res.json().catch(() => null);
       if (!res.ok || typeof d?.resposta !== "string") {
@@ -208,7 +220,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
         return;
       }
       setAnimarIdx(conversa.length);
-      setMensagens([...conversa, { role: "assistant", content: d.resposta }]);
+      setMensagens([...conversa, { role: "assistant", content: d.resposta, cartoes: Array.isArray(d.cartoes) ? d.cartoes : undefined }]);
       if (!abertoRef.current) setNaoLida(true);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setFalha({ texto: "Sem conexão com o servidor. Confere a internet e tenta de novo." });
@@ -339,7 +351,14 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
                 m.role === "user" ? (
                   <BolhaDaPessoa key={i} texto={m.content} />
                 ) : (
-                  <RespostaDaEva key={i} texto={m.content} animar={i === animarIdx} aoAvancar={() => rolar(false)} />
+                  <div key={i} data-msg={i} className="flex flex-col gap-3">
+                    <RespostaDaEva texto={m.content} animar={i === animarIdx} aoAvancar={() => rolar(false)} />
+                    {m.cartoes?.map((c, k) => (
+                      <div key={k} className="pl-8">
+                        <CartaoDoChat cartao={c} atraso={0.15 + k * 0.1} />
+                      </div>
+                    ))}
+                  </div>
                 )
               )}
               {carregando && <Pensando />}
