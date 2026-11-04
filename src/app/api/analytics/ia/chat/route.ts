@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/server/permissions";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { callLlmWithTools, type LlmToolCall } from "@/lib/server/llm";
-import { escolherProvedorDeIa } from "@/lib/server/ia/provedor";
+import { provedorDaPlataforma } from "@/lib/server/ia/provedor";
 import { registrarUso } from "@/lib/server/ia/uso";
 import { carregarCatalogo } from "@/lib/server/ia/catalogo";
 import {
@@ -27,9 +27,10 @@ import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 // Corpo: { mensagens: [{ role: "user" | "assistant", content }], pagina?: string }
 // Resposta: { resposta: string, cartoes: [{ query, viz, titulo, result }] }
 //
+// Usa só a chave da plataforma (GROQ_API_KEY), nunca a de um contrato.
 // A IA só lê: a única ferramenta é consultar_dados, que roda o mesmo motor dos
 // cartões de relatório, sempre no contrato da sessão. Erros: 400 conversa
-// inválida · 429 limite · 503 sem chave de IA · 502 provedor falhou.
+// inválida · 429 limite · 503 sem chave da Eva (GROQ_API_KEY) · 502 provedor falhou.
 //
 // A conversa e as respostas não vão para o log: têm nome de cliente e valores.
 // ---------------------------------------------------------------------------
@@ -49,10 +50,10 @@ export async function POST(request: Request) {
   if (!conversa) return NextResponse.json({ error: "Me diz o que você quer saber." }, { status: 400 });
   const pagina = typeof body?.pagina === "string" ? body.pagina.slice(0, 60) : undefined;
 
-  const provedor = await escolherProvedorDeIa(orgId);
+  const provedor = provedorDaPlataforma();
   if (!provedor) {
     return NextResponse.json(
-      { error: "A IA ainda não está ligada neste contrato. Cadastre uma chave de IA em Integrações e volte aqui.", codigo: "sem_chave" },
+      { error: "A IA da Eva está desligada no momento. Avise o suporte.", codigo: "sem_chave" },
       { status: 503 }
     );
   }

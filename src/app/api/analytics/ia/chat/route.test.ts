@@ -34,21 +34,22 @@ const mensagens = [{ role: "user", content: "quantos negócios em aberto?" }];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  delete process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = "chave-da-eva";
   perm.requirePermission.mockResolvedValue({ orgId: "org-A", userId: "u", role: "viewer" });
   rl.checkRateLimit.mockResolvedValue({ allowed: true, count: 1, limit: 40 });
+  // Mesmo com chave cadastrada no contrato, o chat usa só a da Eva.
   db.credential.findMany.mockResolvedValue([{ type: "xai", secretEnc: "segredo" }]);
   db.pipeline.findMany.mockResolvedValue([{ id: "p1", name: "Vendas B2B", stages: [{ id: "s1", name: "Proposta", type: "open" }] }]);
 });
 
 describe("POST /api/analytics/ia/chat", () => {
-  it("sucesso: usa a chave do contrato, manda o histórico e devolve o texto", async () => {
+  it("sucesso: usa só a chave da Eva, manda o histórico e devolve o texto", async () => {
     llm.callLlmWithTools.mockResolvedValue({ text: "Há 12 negócios em aberto." });
     const res = await post({ mensagens: [{ role: "user", content: "oi" }, { role: "assistant", content: "olá" }, ...mensagens], pagina: "/deals" });
     expect(res.status).toBe(200);
     expect((await res.json()).resposta).toBe("Há 12 negócios em aberto.");
     const o = llm.callLlmWithTools.mock.calls[0][0];
-    expect(o).toMatchObject({ provider: "xai", apiKey: "dec:segredo", userMessage: "quantos negócios em aberto?" });
+    expect(o).toMatchObject({ provider: "groq", apiKey: "chave-da-eva", userMessage: "quantos negócios em aberto?" });
     expect(o.history).toHaveLength(2);
     expect(o.tools.map((t: { name: string }) => t.name)).toEqual(["consultar_dados", "mostrar_relatorio"]);
     // Groq derruba o turno inteiro se a IA esquecer um campo obrigatório: o erro volta pela ferramenta, para ela corrigir.
@@ -102,7 +103,7 @@ describe("POST /api/analytics/ia/chat", () => {
   });
 
   it("sem chave de IA → 503 com o código sem_chave", async () => {
-    db.credential.findMany.mockResolvedValue([]);
+    delete process.env.GROQ_API_KEY;
     const res = await post({ mensagens });
     expect(res.status).toBe(503);
     expect((await res.json()).codigo).toBe("sem_chave");

@@ -39,6 +39,12 @@ export interface ProvedorDeIa {
   credentialId?: string;
 }
 
+/** Só a chave da Eva (GROQ_API_KEY): o chat não usa chave de contrato. */
+export function provedorDaPlataforma(): ProvedorDeIa | null {
+  const apiKey = process.env.GROQ_API_KEY;
+  return apiKey ? { provider: "groq", apiKey, model: MODELO_POR_PROVEDOR.groq, origem: "plataforma" } : null;
+}
+
 export async function escolherProvedorDeIa(orgId: string): Promise<ProvedorDeIa | null> {
   const tipos = LLM_PROVIDERS.map((p) => p.credentialType);
   const credenciais = await prisma.credential.findMany({
