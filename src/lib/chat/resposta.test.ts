@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blocosDaResposta, destacarNumeros } from "./resposta";
+import { blocosDaResposta, destacarNumeros, separarSugestoes } from "./resposta";
 
 describe("destacarNumeros", () => {
   it("marca dinheiro, porcentagem, número e data inteiros", () => {
@@ -45,5 +45,17 @@ describe("blocosDaResposta", () => {
   it("dois pontos longe do começo não viram rótulo", () => {
     const b = blocosDaResposta("- uma frase bem longa que passa de quarenta e oito letras antes dos dois pontos: 5");
     expect(b[0]).toMatchObject({ rotulo: null });
+  });
+});
+
+describe("separarSugestoes", () => {
+  it("tira a linha SUGESTOES do texto e devolve até 3 perguntas", () => {
+    const r = separarSugestoes("Funil: 3 negócios.\nSUGESTOES: Mostre em gráfico | Compare com o mês passado | Quais estão parados? | quarta que sobra");
+    expect(r.texto).toBe("Funil: 3 negócios.");
+    expect(r.sugestoes).toEqual(["Mostre em gráfico", "Compare com o mês passado", "Quais estão parados?"]);
+  });
+  it("aceita acento e negrito; sem a linha, não muda nada", () => {
+    expect(separarSugestoes("Oi.\n**Sugestões:** Uma pergunta aqui | Outra pergunta aqui").sugestoes).toHaveLength(2);
+    expect(separarSugestoes("Só texto.")).toEqual({ texto: "Só texto.", sugestoes: [] });
   });
 });

@@ -19,13 +19,14 @@ import {
 import { rodarReportQuery } from "@/lib/server/report-sql";
 import { sanearReportQuery, type ReportQuery, type ReportResult } from "@/lib/report-query";
 import { sanearFiltrosGlobais, diaLocal } from "@/lib/consulta";
+import { separarSugestoes } from "@/lib/chat/resposta";
 import { mensagemDeFalhaDaIa } from "@/lib/ia/falha-do-provedor";
 
 // ---------------------------------------------------------------------------
 // Chat da Eva (botão flutuante).
 //
 // Corpo: { mensagens: [{ role: "user" | "assistant", content }], pagina?: string }
-// Resposta: { resposta: string, cartoes: [{ query, viz, titulo, result }] }
+// Resposta: { resposta: string, cartoes: [{ query, viz, titulo, result }], sugestoes: string[] }
 //
 // Chave: a da Eva (GROQ_API_KEY) por padrão, ou a do contrato se ele escolheu (Integrações → IA).
 // A IA só lê: a única ferramenta é consultar_dados, que roda o mesmo motor dos
@@ -138,5 +139,6 @@ ${textoDoResultado(r)}`;
     console.error(`[ia/chat] ${provedor.provider} falhou: ${(resultado.error ?? "resposta vazia").slice(0, 80)}`);
     return NextResponse.json({ error: mensagemDeFalhaDaIa(provedor.provider, provedor.model, resultado.error) }, { status: 502 });
   }
-  return NextResponse.json({ resposta, cartoes });
+  const { texto, sugestoes } = separarSugestoes(resposta);
+  return NextResponse.json({ resposta: texto || resposta, cartoes, sugestoes });
 }
