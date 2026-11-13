@@ -236,3 +236,23 @@ describe("disparo grande sai em partes", () => {
     expect(db.$executeRaw).not.toHaveBeenCalled();
   });
 });
+
+describe("personalização no WhatsApp via QR", () => {
+  it("lista manual acha a ficha pelo telefone e troca {firstname}", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo({ text: "Olá, {firstname},", manualRecipients: ["5511999990001@s.whatsapp.net", "5511999990002@s.whatsapp.net"] }));
+    db.contact.findMany.mockResolvedValueOnce([{ name: "MARIA SILVA", email: "", phone: "551199990001", customFields: {} }] as never);
+    deliver.mockResolvedValue({ ok: true, queued: true, id: "q" });
+    await runBroadcast("b1");
+    const textos = deliver.mock.calls.map((c) => (c[0] as { text: string }).text);
+    expect(textos).toEqual(["Olá, Maria,", "Olá,"]);
+  });
+
+  it("etiqueta: contato sem conversa entra pelo telefone", async () => {
+    db.broadcast.findUnique.mockResolvedValue(disparo({ audience: "tags", tagIds: ["t1"], text: "Oi {firstname}" }));
+    db.contact.findMany.mockResolvedValueOnce([{ name: "joão", email: "", phone: "5511999990003", customFields: {}, channels: [] }] as never);
+    deliver.mockResolvedValue({ ok: true, queued: true, id: "q" });
+    await runBroadcast("b1");
+    expect(deliver.mock.calls[0][0]).toMatchObject({ text: "Oi João" });
+    expect(JSON.stringify(deliver.mock.calls[0][0])).toContain("5511999990003@s.whatsapp.net");
+  });
+});

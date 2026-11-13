@@ -1,29 +1,35 @@
 // Montagem do público e da mensagem do disparo (funções puras, usadas pela tela).
 
 /**
- * Números de um CSV/TXT: um por linha. Com cabeçalho, usa a coluna cujo nome
- * parece telefone (telefone, phone, celular, whatsapp, numero); sem, o primeiro
- * trecho da linha com 10 a 15 dígitos. Repetidos saem.
+ * Contatos de um CSV/TXT: um por linha. Com cabeçalho, usa a coluna cujo nome
+ * parece telefone (telefone, phone, celular, whatsapp, numero) e, se houver, a
+ * de nome ("Nome", "Primeiro nome"; senão "Nome completo"); sem cabeçalho, o
+ * primeiro trecho da linha com 10 a 15 dígitos. Repetidos saem.
  */
-export function numerosDoArquivo(conteudo: string): string[] {
+export function contatosDoArquivo(conteudo: string): { numero: string; nome: string }[] {
   const linhas = conteudo.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
   if (linhas.length === 0) return [];
   const sep = [";", ",", "\t"].find((s) => linhas[0].includes(s));
   const celulas = (l: string) => (sep ? l.split(sep) : [l]).map((c) => c.trim().replace(/^"|"$/g, ""));
 
-  let coluna = -1;
   const cab = celulas(linhas[0]).map((c) => c.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""));
-  coluna = cab.findIndex((c) => /telefone|phone|celular|whatsapp|numero|fone/.test(c));
+  const coluna = cab.findIndex((c) => /telefone|phone|celular|whatsapp|numero|fone/.test(c));
+  const colNome = [/^(primeiro )?nome$|^first ?name$/, /nome|name/].map((re) => cab.findIndex((c) => re.test(c))).find((i) => i >= 0) ?? -1;
   const corpo = coluna >= 0 ? linhas.slice(1) : linhas;
 
-  const vistos = new Set<string>();
+  const vistos = new Map<string, string>();
   for (const l of corpo) {
     const cs = celulas(l);
     const candidato = coluna >= 0 ? cs[coluna] ?? "" : cs.find((c) => /^\+?[\d\s().-]{10,}$/.test(c) && digitos(c).length >= 10) ?? "";
     const d = digitos(candidato);
-    if (d.length >= 10 && d.length <= 15) vistos.add(d);
+    if (d.length >= 10 && d.length <= 15 && !vistos.has(d)) vistos.set(d, coluna >= 0 && colNome >= 0 ? (cs[colNome] ?? "").trim() : "");
   }
-  return [...vistos];
+  return [...vistos].map(([numero, nome]) => ({ numero, nome }));
+}
+
+/** Só os números de {@link contatosDoArquivo}. */
+export function numerosDoArquivo(conteudo: string): string[] {
+  return contatosDoArquivo(conteudo).map((c) => c.numero);
 }
 
 const digitos = (s: string) => s.replace(/\D/g, "");

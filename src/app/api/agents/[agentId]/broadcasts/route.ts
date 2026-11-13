@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { qrConectado } from "@/lib/server/canais/qr";
 import { requirePermission } from "@/lib/server/permissions";
-import { runBroadcast } from "@/lib/server/broadcast-runner";
+import { alcanceDoCanal, runBroadcast } from "@/lib/server/broadcast-runner";
+import { primeiroNome, telefonesPossiveis } from "@/lib/disparos/personalizar";
+import { chaveDoDestino } from "@/lib/disparos/reenvio";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { validarHorario } from "@/lib/server/agendamento";
 import { jidDoWhatsApp } from "@/lib/telefone";
@@ -101,6 +103,32 @@ async function gruposDoAgente(agentId: string, orgId: string) {
 }
 
 const TIPOS_DE_MIDIA = new Set(["image", "video", "document"]);
+
+/**
+ * Nome digitado na lista ("5511999998888 Maria") vai para a ficha do contato
+ * (acha pelo telefone; cria se não existe), e o {firstname} do disparo sai dele.
+ */
+async function guardarNomes(orgId: string, nomes: unknown) {
+  if (!nomes || typeof nomes !== "object") return;
+  const pares = Object.entries(nomes as Record<string, unknown>)
+    .map(([numero, nome]) => ({ jid: jidDoWhatsApp(numero), nome: String(nome ?? "").trim().slice(0, 120) }))
+    .filter((p): p is { jid: string; nome: string } => !!p.jid && !p.jid.endsWith("@g.us") && !!primeiroNome(p.nome))
+    .slice(0, 5000);
+  if (!pares.length) return;
+  const fichas = await prisma.contact.findMany({
+    where: { orgId, phone: { in: [...new Set(pares.flatMap((p) => telefonesPossiveis(p.jid)))] } },
+    select: { id: true, phone: true },
+  });
+  const porChave = new Map(fichas.map((c) => [chaveDoDestino(c.phone), c.id]));
+  const novos: { orgId: string; name: string; phone: string; source: string }[] = [];
+  for (const p of pares) {
+    const chave = chaveDoDestino(p.jid);
+    const id = porChave.get(chave);
+    if (id) await prisma.contact.update({ where: { id }, data: { name: p.nome } });
+    else if (!novos.some((n) => chaveDoDestino(n.phone) === chave)) novos.push({ orgId, name: p.nome, phone: p.jid.split("@")[0], source: "disparo" });
+  }
+  if (novos.length) await prisma.contact.createMany({ data: novos });
+}
 
 interface VariantInput {
   label?: string;
@@ -202,7 +230,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   let estimatedCount = 0;
 
   // No e-mail o público é quem tem e-mail (não um canal de conversa do agente).
-  const alcance = channel === "email" ? { email: { not: "" } } : { channels: { some: { agentId, channel } } };
+  const alcance = channel === "email" ? { email: { not: "" } } : alcanceDoCanal(agentId, channel);
 
   if (audience === "manual") {
     manualRecipients = Array.isArray(body.contactIds)
@@ -217,6 +245,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       const invalidos = manualRecipients.filter((_, i) => !jids[i]);
       if (invalidos.length) return NextResponse.json({ error: `Número inválido: ${invalidos.slice(0, 3).join(", ")}` }, { status: 400 });
       manualRecipients = [...new Set(jids as string[])];
+      await guardarNomes(ctx.orgId, body.names);
     }
     if (manualRecipients.length === 0) {
       return NextResponse.json({ error: "Informe pelo menos um contato." }, { status: 400 });
