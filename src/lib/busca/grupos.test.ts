@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { combina, montarGrupos, type ContextoDoRegistro, type EntradaDosGrupos } from "./grupos";
+import { combina, montarGrupos, paginaNoApp, type ContextoDoRegistro, type EntradaDosGrupos } from "./grupos";
 import { RESULTADO_VAZIO } from "./resultado";
 import { permissoesDoPapelDeSistema } from "@/lib/permissoes/catalogo";
 
@@ -107,5 +107,16 @@ describe("combina", () => {
     expect(combina("Negócios funil", ["neg", "fun"])).toBe(true);
     expect(combina("Negócios", ["gocios"])).toBe(false);
     expect(combina("Configurações", ["configuracoes"])).toBe(true);
+  });
+});
+
+describe("paginaNoApp", () => {
+  it("no app de disparos só as telas dele; no Eva tudo menos Chips", () => {
+    expect(paginaNoApp("/broadcasts", "disparos")).toBe(true);
+    expect(paginaNoApp("/chips", "disparos")).toBe(true);
+    expect(paginaNoApp("/deals", "disparos")).toBe(false);
+    expect(paginaNoApp("/companies", "disparos")).toBe(false);
+    expect(paginaNoApp("/deals", "eva")).toBe(true);
+    expect(paginaNoApp("/chips", "eva")).toBe(false);
   });
 });

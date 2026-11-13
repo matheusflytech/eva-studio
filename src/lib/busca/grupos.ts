@@ -1,6 +1,7 @@
 import { normalizarConsulta, semAcento } from "./consulta";
 import type { Recente } from "./recentes";
 import type { RegistroEncontrado, ResultadoDaBusca, TrechoEncontrado } from "./resultado";
+import { APP_VARIANT, SECOES_DO_APP_DE_DISPAROS, ehAppDeDisparos, type VarianteDoApp } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // O que a paleta mostra e em que ordem. Puro: a tela passa permissões,
@@ -40,7 +41,18 @@ export const PAGINAS: Pagina[] = [
   { caminho: "/playground", rotulo: "Playground", permissao: "agentes:ver" },
   { caminho: "/settings", rotulo: "Configurações", palavras: "ajustes funis campos membros lixeira" },
   { caminho: "/help", rotulo: "Eva Help", palavras: "ajuda suporte" },
+  { caminho: "/chips", rotulo: "Chips", permissao: "integracoes:gerenciar", palavras: "numeros whatsapp qr" },
 ];
+
+/** Telas que este app tem (no de disparos, só as dele: lib/app-variant.ts). */
+export function paginaNoApp(caminho: string, variante: VarianteDoApp = APP_VARIANT): boolean {
+  if (variante !== "disparos") return caminho !== "/chips";
+  return SECOES_DO_APP_DE_DISPAROS.has(caminho.split("/")[1]);
+}
+
+/** Ações e grupos de CRM (negócio, empresa, tarefa) que o app de disparos não tem. */
+const SEM_CRM = ehAppDeDisparos;
+const ROTULO_NO_DISPARO: Record<string, string> = { "/agent-studio": "Agentes", "/help": "Ajuda" };
 
 export type IdDaAcao = "criar-negocio" | "criar-contato" | "criar-tarefa" | "enviar-whatsapp" | "mudar-etapa" | "atribuir";
 
@@ -101,7 +113,7 @@ function acoesDoRegistro(ctx: ContextoDoRegistro, pode: (p: string) => boolean):
   if (ctx.tipo === "negocio" && ctx.mudarEtapa && pode("negocios:editar")) add("mudar-etapa", "Mudar etapa para…");
   if (ctx.atribuir && pode(EDITAR_DO_TIPO[ctx.tipo])) add("atribuir", "Atribuir a…");
   if (ctx.whatsappPara && pode("contatos:ver")) add("enviar-whatsapp", `Enviar WhatsApp para ${ctx.whatsappPara}`);
-  if (ctx.tipo !== "empresa" && pode("tarefas:gerenciar"))
+  if (!SEM_CRM && ctx.tipo !== "empresa" && pode("tarefas:gerenciar"))
     add("criar-tarefa", ctx.tipo === "negocio" ? "Criar tarefa neste negócio" : `Criar tarefa para ${ctx.titulo}`);
   return itens;
 }
@@ -131,12 +143,14 @@ export function montarGrupos(e: EntradaDosGrupos): GrupoDaPaleta[] {
     : [];
 
   const acoes: ItemDaPaleta[] = ACOES_GLOBAIS.filter((a) => pode(PERMISSAO_DA_ACAO[a.acao]))
+    .filter((a) => !SEM_CRM || a.acao === "criar-contato" || a.acao === "enviar-whatsapp")
     .filter((a) => combina(`${a.rotulo} ${a.palavras}`, filtro))
     .map((a) => ({ chave: `acao:${a.acao}`, tipo: "acao", acao: a.acao, rotulo: a.rotulo, doRegistro: false }));
 
-  const ir: ItemDaPaleta[] = PAGINAS.filter((p) => !p.permissao || pode(p.permissao))
+  const ir: ItemDaPaleta[] = PAGINAS.filter((p) => paginaNoApp(p.caminho))
+    .filter((p) => !p.permissao || pode(p.permissao))
     .filter((p) => combina(`${p.rotulo} ${p.palavras ?? ""}`, filtro))
-    .map((p) => ({ chave: `ir:${p.caminho}`, tipo: "pagina", rotulo: p.rotulo, caminho: p.caminho }));
+    .map((p) => ({ chave: `ir:${p.caminho}`, tipo: "pagina", rotulo: (SEM_CRM && ROTULO_NO_DISPARO[p.caminho]) || p.rotulo, caminho: p.caminho }));
 
   const recentes: ItemDaPaleta[] = e.recentes
     .filter((r) => combina(`${r.titulo} ${r.subtitulo ?? ""}`, filtro))
@@ -164,9 +178,9 @@ export function montarGrupos(e: EntradaDosGrupos): GrupoDaPaleta[] {
     (lista ?? []).map((x) => ({ chave: `${x.tipo}:${x.id}`, tipo: "registro", registro: x }));
   add("acoes", "Ações", acoes);
   add("ir", "Ir para", ir);
-  add("negocios", "Negócios", reg(r?.negocios));
+  if (!SEM_CRM) add("negocios", "Negócios", reg(r?.negocios));
   add("contatos", "Contatos", reg(r?.contatos));
-  add("empresas", "Empresas", reg(r?.empresas));
+  if (!SEM_CRM) add("empresas", "Empresas", reg(r?.empresas));
   add(
     "notas",
     "Notas e mensagens",

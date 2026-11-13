@@ -43,6 +43,7 @@ import {
 } from "@/lib/busca/atalhos";
 import { acaoDeUmClique } from "@/lib/tarefas/tipos";
 import { contextoDoRegistro, useRegistroEmFocoStore, type RegistroEmFoco } from "./registro-em-foco";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Busca global: Ctrl+K (⌘K no Mac) ou o botão "Buscar" do menu. Um só
@@ -336,7 +337,7 @@ const ICONE_DA_ACAO: Record<IdDaAcao, LucideIcon> = {
 const ICONE_DO_REGISTRO = { negocio: Handshake, contato: Contact, empresa: Building2 } as const;
 
 const PLACEHOLDER: Record<Exclude<Modo, "tarefa">, string> = {
-  principal: "Buscar negócios, contatos, empresas, telefone, CNPJ… ou digite uma ação",
+  principal: ehAppDeDisparos ? "Buscar contatos, telefone e mensagens… ou digite uma ação" : "Buscar negócios, contatos, empresas, telefone, CNPJ… ou digite uma ação",
   etapas: "Mudar para qual etapa?",
   atribuir: "Atribuir a quem?",
   whatsapp: "Enviar WhatsApp para quem? (nome ou telefone)",

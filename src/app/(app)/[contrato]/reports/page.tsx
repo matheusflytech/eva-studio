@@ -13,6 +13,8 @@ import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { cn } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
 import { ReportsPanel } from "@/components/agent-studio/builder/reports-panel";
+import { ehAppDeDisparos } from "@/lib/app-variant";
+import { RelatorioDeDisparos } from "@/components/disparos/relatorio-de-disparos";
 
 // ---------------------------------------------------------------------------
 // Relatórios (antes "Insights").
@@ -70,7 +72,12 @@ interface Payload {
   porHora: { label: string; value: number }[];
 }
 
+// App de disparos (lib/app-variant.ts): relatório só de disparos.
 export default function ReportsPage() {
+  return ehAppDeDisparos ? <RelatorioDeDisparos /> : <RelatoriosDoEva />;
+}
+
+function RelatoriosDoEva() {
   const [dias, setDias] = React.useState(30);
   const [dados, setDados] = React.useState<Payload | null>(null);
   const [carregando, setCarregando] = React.useState(true);

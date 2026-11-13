@@ -73,6 +73,7 @@ export const SECOES_DO_APP_DE_DISPAROS = new Set([
   "home",
   "chips",
   "broadcasts",
+  "reports",
   "conversations",
   "contacts",
   "agent-studio",
