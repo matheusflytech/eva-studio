@@ -234,7 +234,7 @@ function Conversas() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 px-3 pb-3 pt-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_240px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 px-3 pb-3 pt-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_240px] 2xl:grid-cols-[380px_minmax(0,1fr)_320px]">
         <ListaDeConversas
           className={cn("vidro relative overflow-hidden rounded-[22px]", selecionada ? "hidden lg:flex" : "flex")}
           itens={lista}
@@ -272,7 +272,8 @@ function Conversas() {
             onAbrirCliente={() => setPainelAberto(true)}
           />
         ) : (
-          <section className={cn("vidro relative overflow-hidden rounded-[22px] min-h-0 flex-col items-center justify-center p-10 text-center", selecionada ? "flex" : "hidden lg:flex")}>
+          // Sem conversa aberta não há painel do cliente: o aviso ocupa também essa coluna (senão sobra um buraco à direita).
+          <section className={cn("vidro relative overflow-hidden rounded-[22px] min-h-0 flex-col items-center justify-center p-10 text-center xl:col-span-2", selecionada ? "flex" : "hidden lg:flex")}>
             <MessagesSquare size={24} className="mb-3 text-text-tertiary" aria-hidden="true" />
             <h2 className="text-title-sm font-semibold tracking-tight text-text-primary">
               {selecionada ? "Carregando a conversa..." : "Escolha uma conversa"}
