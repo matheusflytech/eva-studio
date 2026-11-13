@@ -31,6 +31,7 @@ import {
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens, somarNoDisparo } from "./fila.js";
 import { RITMO, agentesComDisparo, falharPendentesDoChip, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
 import { decidirReconexao } from "./desconexao.js";
+import { cacheSimples, criarMemoriaDeEnviadas, mensagemParaReenvio } from "./retentativa.js";
 import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
@@ -288,6 +289,11 @@ async function enviarResposta(sock, jid, reply, agentId, contactId, citar) {
 // Quedas seguidas de cada sessão sem chegar a abrir (para esperar mais a cada vez).
 const quedas = new Map();
 
+// Mensagens enviadas e tentativas de reenvio: quem recebe e não decifrou pede de novo
+// (senão fica "Aguardando mensagem" até a pessoa responder). Ver retentativa.js.
+const enviadas = criarMemoriaDeEnviadas();
+const tentativasDeReenvio = cacheSimples();
+
 async function startSession(chave) {
   if (sessions.has(chave)) return;
   sessions.set(chave, { starting: true });
@@ -301,6 +307,8 @@ async function startSession(chave) {
       auth: state,
       logger,
       printQRInTerminal: false,
+      msgRetryCounterCache: tentativasDeReenvio,
+      getMessage: (key) => mensagemParaReenvio(pool, enviadas, key).catch(() => undefined),
     });
   } catch (err) {
     // Sem isto o "starting" ficava para sempre: o polling e a reconexão pulavam
@@ -313,6 +321,9 @@ async function startSession(chave) {
   sessions.set(chave, { sock });
 
   sock.ev.on("creds.update", saveCreds);
+  sock.ev.on("messages.upsert", ({ messages }) => {
+    for (const m of messages ?? []) enviadas.lembrar(m);
+  });
 
   // Entrou, saiu ou renomearam um grupo: a lista do banco acompanha.
   sock.ev.on("groups.upsert", () => agendarSincDeGrupos(chave, sock));
