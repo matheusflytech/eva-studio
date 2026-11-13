@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "@/components/contrato/link";
-import { Download, MessageSquare } from "lucide-react";
+import { Download, MessageSquare, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ROTULO_DA_SITUACAO, type Situacao } from "@/lib/disparos/situacao";
 import { cn } from "@/lib/utils";
@@ -83,6 +83,8 @@ export function Destinatarios({ agentId, broadcastId }: { agentId: string; broad
         </button>
       </div>
 
+      {dados.contagem.falhou > 0 && <Reenviar agentId={agentId} broadcastId={broadcastId} />}
+
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por situação">
         <Filtro ativo={!filtro} onClick={() => setFiltro(null)}>Todos {dados.total}</Filtro>
         {ORDEM.filter((s) => dados.contagem[s] > 0).map((s) => (
@@ -127,6 +129,92 @@ export function Destinatarios({ agentId, broadcastId }: { agentId: string; broad
       )}
       {dados.truncado && <p className="text-caption text-text-tertiary">Mostrando os primeiros 10.000. O CSV traz o mesmo recorte.</p>}
     </section>
+  );
+}
+
+interface Chip {
+  agentId: string | null;
+  numero: string | null;
+  agente: string | null;
+  sessao: string;
+}
+
+// Quem não chegou (ex.: o chip caiu) sai de novo por outro chip conectado.
+// O servidor tira quem já recebeu em qualquer disparo: ninguém recebe duas vezes.
+function Reenviar({ agentId, broadcastId }: { agentId: string; broadcastId: string }) {
+  const [chips, setChips] = React.useState<Chip[] | null>(null);
+  const [alvo, setAlvo] = React.useState("");
+  const [enviando, setEnviando] = React.useState(false);
+  const [aviso, setAviso] = React.useState<{ ok: boolean; texto: string } | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/chips", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const conectados = ((j.chips ?? []) as Chip[]).filter((c) => c.agentId && c.sessao === "connected");
+        setChips(conectados);
+        setAlvo(conectados.find((c) => c.agentId !== agentId)?.agentId ?? conectados[0]?.agentId ?? "");
+      })
+      .catch(() => setChips([]));
+  }, [agentId]);
+
+  async function reenviar() {
+    setEnviando(true);
+    setAviso(null);
+    try {
+      const r = await fetch(`/api/agents/${agentId}/broadcasts/${broadcastId}/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetAgentId: alvo }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Não consegui reenviar.");
+      const partes = [`${j.reenviados} na fila do novo chip`];
+      if (j.jaReceberam) partes.push(`${j.jaReceberam} já tinham recebido`);
+      if (j.semWhatsApp) partes.push(`${j.semWhatsApp} sem WhatsApp`);
+      setAviso({ ok: true, texto: j.reenviados ? `Reenvio criado: ${partes.join(", ")}.` : `Nada para reenviar: ${partes.slice(1).join(", ") || "ninguém pendente"}.` });
+    } catch (e) {
+      setAviso({ ok: false, texto: e instanceof Error ? e.message : "Não consegui reenviar." });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (!chips) return null;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-raised p-3">
+      <p className="text-small text-text-primary">
+        <strong>Reenviar quem não chegou</strong> por outro chip. Quem já recebeu (em qualquer disparo) fica de fora.
+      </p>
+      {chips.length === 0 ? (
+        <p className="text-caption text-text-tertiary">Nenhum chip conectado agora. Conecte outro chip em Chips e volte aqui.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor={`reenvio-${broadcastId}`}>Chip que vai reenviar</label>
+          <select
+            id={`reenvio-${broadcastId}`}
+            value={alvo}
+            onChange={(e) => setAlvo(e.target.value)}
+            className="h-9 rounded-lg border border-border-default bg-bg-base px-2 text-small text-text-primary"
+          >
+            {chips.map((c) => (
+              <option key={c.agentId} value={c.agentId!}>
+                {c.numero ?? c.agente ?? "Chip"}{c.agentId === agentId ? " (o mesmo)" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void reenviar()}
+            disabled={enviando || !alvo}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-text-primary px-4 text-small font-medium text-bg-base disabled:opacity-50"
+          >
+            <RotateCcw size={14} aria-hidden /> {enviando ? "Reenviando…" : "Reenviar"}
+          </button>
+        </div>
+      )}
+      {aviso && <p role="status" className={cn("text-caption", aviso.ok ? "text-text-secondary" : "text-danger")}>{aviso.texto}</p>}
+    </div>
   );
 }
 

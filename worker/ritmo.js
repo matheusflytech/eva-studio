@@ -38,6 +38,29 @@ export function paraJid(contato) {
   return digitos + "@s.whatsapp.net";
 }
 
+export const MOTIVO_CHIP_CAIU = "O chip foi desconectado ou banido (o WhatsApp encerrou a sessão). Reenvie por outro chip.";
+
+/**
+ * Sessão encerrada de vez (logout ou número recusado): o que estava na fila de
+ * disparo deste chip falha de uma vez, com o motivo, em vez de ir falhando um a
+ * um no ritmo do freio. Assim a tela já mostra quem reenviar por outro chip.
+ * @returns as linhas marcadas (para somar no placar de cada disparo)
+ */
+export async function falharPendentesDoChip(pool, modo, chave) {
+  const { rows } = await pool.query(
+    modo === "agente"
+      ? `update eva_studio_outbound_queue set status = 'failed', error = $2
+          where status = 'pending' and "broadcastId" is not null and "agentId" = $1
+          returning id, "broadcastId", "variantId"`
+      : `update eva_studio_outbound_queue set status = 'failed', error = $2
+          where status = 'pending' and "broadcastId" is not null
+            and "agentId" in (select "agentId" from eva_studio_canais where id = $1 and "agentId" is not null)
+          returning id, "broadcastId", "variantId"`,
+    [chave, MOTIVO_CHIP_CAIU]
+  );
+  return rows;
+}
+
 /** Agentes com item de disparo esperando na fila. */
 export async function agentesComDisparo(pool) {
   const { rows } = await pool.query(

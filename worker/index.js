@@ -28,8 +28,8 @@ import {
   sessoesConectadas,
   sessoesPendentes,
 } from "./fonte.js";
-import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
-import { RITMO, agentesComDisparo, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
+import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens, somarNoDisparo } from "./fila.js";
+import { RITMO, agentesComDisparo, falharPendentesDoChip, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
 import { decidirReconexao } from "./desconexao.js";
 import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
@@ -384,6 +384,15 @@ async function startSession(chave) {
       // mais a cada queda.
       const tentativas = quedas.get(chave) ?? 0;
       const decisao = loggedOut ? { acao: "logout" } : decidirReconexao(statusCode, { pareado: !!state.creds?.registered, tentativas });
+      if (decisao.acao === "logout" || decisao.acao === "parar") {
+        // Sessão encerrada de vez (ban/logout/recusa): a fila de disparo deste chip falha agora.
+        const falhos = await falharPendentesDoChip(pool, MODO, chave).catch((err) => {
+          logger.error({ err, chave }, "Falha ao marcar a fila do chip que caiu");
+          return [];
+        });
+        for (const f of falhos) await somarNoDisparo(pool, f.broadcastId, f.variantId, "failedCount");
+        if (falhos.length) logger.warn({ chave, itens: falhos.length }, "Fila de disparo do chip marcada como falha");
+      }
       if (decisao.acao === "logout") {
         quedas.delete(chave);
         await limparSessao(pool, MODO, chave);
