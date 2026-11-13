@@ -171,7 +171,8 @@ const CHANNEL_LABEL: Record<string, string> = {
 
 const AUDIENCE_LABEL: Record<string, string> = {
   manual: "Lista manual",
-  tags: "Por etiqueta",
+  // Disparo chama a etiqueta de lista (aba Contatos > Listas).
+  tags: ehAppDeDisparos ? "Por lista" : "Por etiqueta",
   segment: "Por segmento",
 };
 
@@ -656,7 +657,8 @@ export default function DisparosPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6">
+    // [&>*]:shrink-0: com a tela mais baixa que o conteúdo (celular), os blocos encolhiam um por cima do outro.
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 pt-1 lg:px-6 [&>*]:shrink-0">
       {/* Barra: título, contagem, agente e, à direita, a ajuda e a ação principal. */}
       <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-heading font-semibold tracking-tight text-text-primary">Disparos</h1>
@@ -670,7 +672,7 @@ export default function DisparosPage() {
         <div className="ml-auto flex items-center gap-2">
           <IconButton
             aria-label="Como funcionam os disparos"
-            tooltip="Uma campanha para uma lista, uma etiqueta ou um segmento, agora ou com hora marcada."
+            tooltip={ehAppDeDisparos ? "Uma campanha para números colados ou uma lista de contatos, agora ou com hora marcada." : "Uma campanha para uma lista, uma etiqueta ou um segmento, agora ou com hora marcada."}
           >
             <CircleHelp />
           </IconButton>
@@ -828,7 +830,7 @@ export default function DisparosPage() {
       <Drawer open={formAberto} onOpenChange={setFormAberto}>
         <DrawerContent
           title="Nova campanha"
-          description="Em público por etiqueta ou segmento, só entra quem aceita receber mensagem."
+          description={ehAppDeDisparos ? "Por lista ou segmento, só entra quem aceita receber mensagem." : "Em público por etiqueta ou segmento, só entra quem aceita receber mensagem."}
           size="md"
           footer={
             <Button type="button" variant="primary" onClick={handleSend} disabled={isSending}>
@@ -960,9 +962,11 @@ export default function DisparosPage() {
 
             {audience === "tags" && (
               <div>
-                <Label>Etiquetas</Label>
+                <Label>{ehAppDeDisparos ? "Listas" : "Etiquetas"}</Label>
                 {tags.length === 0 ? (
-                  <p className="mt-1.5 text-small text-text-tertiary">Nenhuma etiqueta ainda. Crie em Contatos &gt; Etiquetas.</p>
+                  <p className="mt-1.5 text-small text-text-tertiary">
+                    {ehAppDeDisparos ? "Nenhuma lista ainda. Crie em Contatos > Listas." : "Nenhuma etiqueta ainda. Crie em Contatos > Etiquetas."}
+                  </p>
                 ) : (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {tags.map((t) => {
@@ -980,7 +984,9 @@ export default function DisparosPage() {
                     })}
                   </div>
                 )}
-                <p className="mt-1.5 text-caption text-text-tertiary">Quem tiver qualquer uma das etiquetas selecionadas entra na campanha.</p>
+                <p className="mt-1.5 text-caption text-text-tertiary">
+                  {ehAppDeDisparos ? "Quem estiver em qualquer uma das listas escolhidas entra na campanha." : "Quem tiver qualquer uma das etiquetas selecionadas entra na campanha."}
+                </p>
               </div>
             )}
 

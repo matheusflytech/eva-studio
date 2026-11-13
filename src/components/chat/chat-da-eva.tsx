@@ -11,6 +11,7 @@ import { OrbeEva } from "@/components/layout/orbe-eva";
 import { BolhaDaPessoa, Pensando, RespostaDaEva } from "@/components/chat/mensagens";
 import type { CartaoMostrado } from "@/components/chat/cartao-do-chat";
 import { cn } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 // O gráfico (echarts) pesa: só carrega quando a Eva mostra o primeiro cartão.
 const CartaoDoChat = dynamic(() => import("@/components/chat/cartao-do-chat"), {
@@ -106,8 +107,10 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
   const [falha, setFalha] = React.useState<Falha | null>(null);
 
   const { esq, topo } = bordas(vp.w);
+  // Disparo no celular: a barra de navegação ocupa o pé da tela; a esfera fica acima dela.
+  const BARRA = ehAppDeDisparos && vp.w < 860 ? 76 : 0;
   const lx = useMotionValue(dir ? vp.w - LANCADOR - MARGEM : esq);
-  const ly = useMotionValue(limitar(salvo.y ?? vp.h - LANCADOR - MARGEM, topo, vp.h - LANCADOR - MARGEM));
+  const ly = useMotionValue(limitar(salvo.y ?? vp.h - LANCADOR - MARGEM - BARRA, topo, vp.h - LANCADOR - MARGEM - BARRA));
   const px = useMotionValue(0);
   const py = useMotionValue(0);
   const controles = useDragControls();
@@ -128,12 +131,12 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
   // Tela redimensionada: o orbe e a janela voltam para dentro dela.
   React.useLayoutEffect(() => {
     lx.set(dir ? vp.w - LANCADOR - MARGEM : esq);
-    ly.set(limitar(ly.get(), topo, vp.h - LANCADOR - MARGEM));
+    ly.set(limitar(ly.get(), topo, vp.h - LANCADOR - MARGEM - BARRA));
     if (aberto && movel) {
       px.set(limitar(px.get(), esq, vp.w - tam.w - MARGEM));
       py.set(limitar(py.get(), topo, vp.h - tam.h - MARGEM));
     }
-  }, [vp.w, vp.h, dir, aberto, movel, tam.w, tam.h, esq, topo, lx, ly, px, py]);
+  }, [vp.w, vp.h, dir, aberto, movel, tam.w, tam.h, esq, topo, lx, ly, px, py, BARRA]);
 
   // A janela abre ao lado do orbe: acima dele, ou abaixo se não houver espaço.
   function encaixar() {
@@ -176,7 +179,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
     setArrastando(false);
     const x = lx.get() + info.velocity.x * 0.2;
     const noLadoDireito = x + LANCADOR / 2 > vp.w / 2;
-    const y = limitar(ly.get() + info.velocity.y * 0.2, topo, vp.h - LANCADOR - MARGEM);
+    const y = limitar(ly.get() + info.velocity.y * 0.2, topo, vp.h - LANCADOR - MARGEM - BARRA);
     setDir(noLadoDireito);
     animate(lx, noLadoDireito ? vp.w - LANCADOR - MARGEM : esq, mola);
     animate(ly, y, mola);
@@ -442,7 +445,7 @@ function Chat({ vp }: { vp: { w: number; h: number } }) {
           drag
           dragMomentum={false}
           dragElastic={0.12}
-          dragConstraints={{ left: esq, top: topo, right: vp.w - LANCADOR - MARGEM, bottom: vp.h - LANCADOR - MARGEM }}
+          dragConstraints={{ left: esq, top: topo, right: vp.w - LANCADOR - MARGEM, bottom: vp.h - LANCADOR - MARGEM - BARRA }}
           onDragStart={() => setArrastando(true)}
           onDragEnd={soltouOrbe}
           onTap={() => (aberto ? fechar() : abrir())}

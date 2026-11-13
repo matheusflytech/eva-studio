@@ -186,6 +186,10 @@ export function ContactActivity({
           Nada registrado ainda. Crie um negócio, uma tarefa ou escreva a primeira nota.
         </p>
       )}
+      {/* Ficha do Disparo: só conversas; sem nenhuma, diz isso em vez de ficar em branco. */}
+      {vazio && secoes.length === 1 && secoes[0] === "conversas" && (
+        <p className={cn(bloco, "py-3 text-small text-text-tertiary")}>Nenhuma conversa com este contato ainda.</p>
+      )}
 
       {mostra("tarefas") && (
         <section className="flex flex-col gap-2">

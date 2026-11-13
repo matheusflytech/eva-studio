@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ContactActivity } from "@/components/crm/contact-activity";
 import { linkDoWhatsAppWeb } from "@/lib/telefone";
 import { cn } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 import { nomeDoContato, type Contact, type TagRow } from "./tipos";
 import { DadosDoContato } from "./dados-do-contato";
 import { EtiquetasDoContato } from "./etiquetas-do-contato";
@@ -26,6 +27,11 @@ type AbaDaFicha = "resumo" | "atividade" | "dados";
 const ABAS: { value: AbaDaFicha; label: string }[] = [
   { value: "resumo", label: "Resumo" },
   { value: "atividade", label: "Atividade" },
+  { value: "dados", label: "Dados" },
+];
+// Disparo: sem tarefa, negócio, nota e etiqueta. Fica a conversa e os dados.
+const ABAS_DISPARO: { value: AbaDaFicha; label: string }[] = [
+  { value: "atividade", label: "Conversas" },
   { value: "dados", label: "Dados" },
 ];
 
@@ -174,7 +180,7 @@ function CorpoDaFicha({
   /** Na gaveta o nome já está no título dela. */
   mostrarNome: boolean;
 }) {
-  const [aba, setAba] = React.useState<AbaDaFicha>("resumo");
+  const [aba, setAba] = React.useState<AbaDaFicha>(ehAppDeDisparos ? "atividade" : "resumo");
   // Botão redondo "Tarefa": vai ao Resumo e abre o campo de nova tarefa.
   const [pedidoDeTarefa, setPedidoDeTarefa] = React.useState(0);
   const nome = nomeDoContato(contact);
@@ -201,20 +207,22 @@ function CorpoDaFicha({
             <BotaoRedondo rotulo="E-mail" href={contact.email ? `mailto:${contact.email}` : null}>
               <Mail aria-hidden />
             </BotaoRedondo>
-            <BotaoRedondo
-              rotulo="Nova tarefa"
-              onClick={() => {
-                setAba("resumo");
-                setPedidoDeTarefa((n) => n + 1);
-              }}
-            >
-              <ListTodo aria-hidden />
-            </BotaoRedondo>
+            {!ehAppDeDisparos && (
+              <BotaoRedondo
+                rotulo="Nova tarefa"
+                onClick={() => {
+                  setAba("resumo");
+                  setPedidoDeTarefa((n) => n + 1);
+                }}
+              >
+                <ListTodo aria-hidden />
+              </BotaoRedondo>
+            )}
           </div>
         </div>
       </div>
 
-      <EtiquetasDoContato contact={contact} tags={tags} onChanged={onChanged} />
+      {!ehAppDeDisparos && <EtiquetasDoContato contact={contact} tags={tags} onChanged={onChanged} />}
 
       {erro && <Notice tone="danger">{erro}</Notice>}
 
@@ -229,10 +237,10 @@ function CorpoDaFicha({
         <Bloco icone={<UserRound aria-hidden />}>{contact.owner?.name ? `Dono: ${contact.owner.name}` : "Sem proprietário"}</Bloco>
       </div>
 
-      <SegmentedControl label="Seções da ficha" options={ABAS} value={aba} onChange={setAba} className="self-start" />
+      <SegmentedControl label="Seções da ficha" options={ehAppDeDisparos ? ABAS_DISPARO : ABAS} value={aba} onChange={setAba} className="self-start" />
 
       {aba === "resumo" && <ContactActivity contactId={contact.id} secoes={["tarefas", "negocios"]} pedidoDeTarefa={pedidoDeTarefa} />}
-      {aba === "atividade" && <ContactActivity contactId={contact.id} secoes={["notas", "conversas", "sequencias"]} />}
+      {aba === "atividade" && <ContactActivity contactId={contact.id} secoes={ehAppDeDisparos ? ["conversas"] : ["notas", "conversas", "sequencias"]} />}
       {aba === "dados" && <DadosDoContato contact={contact} onChanged={onChanged} />}
     </div>
   );

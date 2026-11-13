@@ -9,14 +9,13 @@ import { ehAppDeDisparos } from "@/lib/app-variant";
 import { cn } from "@/lib/utils";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { ThemeToggle } from "@/components/ui/theme";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NAV_AVANCADO } from "./navegacao";
 
 /** Texto do atalho: só aparece quando o trilho abre (mouse em cima ou foco dentro). */
 function Rotulo({ texto }: { texto: string }) {
   return (
-    <span className="whitespace-nowrap text-[13px] font-medium opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-focus-within/trilho:opacity-100">
+    <span className="whitespace-nowrap text-[13px] font-medium opacity-0 transition-opacity duration-150 group-hover/trilho:opacity-100 group-hover/trilho:delay-200 group-hover/trilho:duration-300 group-focus-within/trilho:opacity-100">
       {texto}
     </span>
   );
@@ -27,13 +26,9 @@ const BOTAO = cn(
   "hover:bg-hover hover:text-text-primary active:scale-[0.92] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
 );
 
-function Dica({ texto, children }: { texto: string; children: React.ReactElement }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right">{texto}</TooltipContent>
-    </Tooltip>
-  );
+/** O rótulo já aparece quando o trilho abre; dica por cima só repetia o texto. */
+function Dica({ children }: { texto: string; children: React.ReactElement }) {
+  return children;
 }
 
 /** Atalho do trilho que leva a uma tela; fica "aceso" quando é a tela atual. */
@@ -62,7 +57,7 @@ export function Trilho({ className }: { className?: string }) {
   return (
     <aside
       aria-label="Atalhos"
-      className={cn("vidro group/trilho absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-stretch gap-1 overflow-hidden rounded-[30px] px-2 py-2.5 transition-[width] duration-200 ease-out hover:w-[212px] focus-within:w-[212px] motion-reduce:transition-none", className)}
+      className={cn("vidro trilho group/trilho absolute left-3.5 top-1 z-30 flex w-[60px] flex-col items-stretch gap-1 overflow-hidden rounded-[30px] px-2 py-2.5 hover:w-[212px] focus-within:w-[212px]", className)}
       style={{ maxHeight: "min(820px, calc(100% - 12px))" }}
       data-print-ocultar
     >

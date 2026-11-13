@@ -18,6 +18,7 @@ import {
   CheckSquare,
   Megaphone,
   Smartphone,
+  CalendarClock,
 } from "lucide-react";
 import { ehAppDeDisparos } from "@/lib/app-variant";
 
@@ -62,6 +63,7 @@ const NAV_DISPAROS: GrupoDeNavegacao[] = [
     items: [
       { href: "/home", label: "Início", icon: Home },
       { href: "/broadcasts", label: "Disparos", icon: Send },
+      { href: "/scheduled", label: "Agendamentos", icon: CalendarClock },
       { href: "/conversations", label: "Conversas", icon: MessageSquare },
       { href: "/contacts", label: "Contatos", icon: Contact },
       { href: "/reports", label: "Relatórios", icon: ChartColumn },

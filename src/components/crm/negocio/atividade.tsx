@@ -26,6 +26,7 @@ import { mensagemDeErro, type NegocioDaFicha } from "./use-ficha";
 import { useConcluirTarefa } from "@/components/tarefas/concluir";
 import { TIPOS_DE_TAREFA } from "@/lib/tarefas/tipos";
 import { IconeDoAtor, ListaDeMudancas } from "@/components/historico/pecas";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 /** Mantido por compatibilidade: a ficha v5 troca as abas pelo filtro da linha do tempo. */
 export type AbaDaAtividade = "atividade" | "notas" | "tarefas";
@@ -190,7 +191,8 @@ export function LinhaDoTempoView({
     <div className={cn(!semFiltros && "mt-4")}>
       {!semFiltros && (
         <div role="radiogroup" aria-label="Filtrar atividade" className="mb-4 flex flex-wrap gap-1">
-          {FILTROS.map((f) => {
+          {/* Disparo não tem nota, negócio nem tarefa: esses filtros somem. */}
+          {FILTROS.filter((f) => !ehAppDeDisparos || !["notas", "etapas", "tarefas"].includes(f.id)).map((f) => {
             const n = f.id === "tudo" ? itens.length : filtrarItens(itens, f.id).length;
             const ativo = filtro === f.id;
             return (

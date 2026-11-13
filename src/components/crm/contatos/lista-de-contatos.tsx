@@ -33,6 +33,7 @@ import { chaveDasColunas, colunasValidas } from "@/lib/listas/colunas";
 import { filtrandoAlgo, montarFiltro, totalAvancado, type EstadoDaLista, type FiltroDaBarra } from "@/lib/listas/estado-da-lista";
 import { clampPage } from "@/lib/design-system/pagination";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 import { CHANNEL_LABEL, SOURCE_LABEL, nomeDoContato, type Contact } from "./tipos";
 import { CabecalhoDeContatos, type AbaDeContatos } from "./cabecalho";
 import { FotoDoContato } from "./foto-do-contato";
@@ -507,13 +508,14 @@ export function ListaDeContatos({
               padraoDaLista={PADRAO}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {/* No celular a busca encolhe para caber Filtros e a vista na mesma linha. */}
             <SearchInput
               aria-label="Buscar contatos"
               placeholder="Buscar nome, e-mail ou telefone"
               value={estado.busca}
               onValueChange={(q) => setEstado({ ...estado, busca: q, pagina: 1 })}
-              className="w-56"
+              className="w-56 min-w-0 shrink"
             />
             <Button variant="secondary" aria-expanded={filtrosAbertos} aria-controls="filtros-de-contatos" onClick={() => setFiltrosAbertos((v) => !v)}>
               <ListFilter size={14} aria-hidden="true" />
@@ -522,7 +524,8 @@ export function ListaDeContatos({
                 <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-accent-solid px-1 text-caption tabular-nums text-text-on-accent">{nFiltros}</span>
               )}
             </Button>
-            {vista === "lista" && (
+            {/* Atividades = tarefas: o Disparo não tem. */}
+            {vista === "lista" && !ehAppDeDisparos && (
               <Button variant="secondary" aria-pressed={atividadesAbertas} onClick={onAtividades} className={cn(atividadesAbertas && "bg-raised ring-1 ring-border-strong")}>
                 <CalendarClock size={14} aria-hidden="true" />
                 Atividades

@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 export type AbaDeContatos = "contatos" | "etiquetas" | "segmentos";
 
 const ABAS: { value: AbaDeContatos; label: string }[] = [
   { value: "contatos", label: "Contatos" },
-  { value: "etiquetas", label: "Etiquetas" },
+  // Disparo: a etiqueta é a lista do disparo (ex.: Lista Scudeler Interior).
+  { value: "etiquetas", label: ehAppDeDisparos ? "Listas" : "Etiquetas" },
   { value: "segmentos", label: "Segmentos" },
 ];
 

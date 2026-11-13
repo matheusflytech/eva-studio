@@ -5,6 +5,7 @@ import {
   Bot, UserRound, Inbox, Bell, BellOff, ChevronsUpDown, Check, ListFilter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
@@ -166,6 +167,63 @@ function ItemDaCaixa({
   );
 }
 
+type ChipDaLista = { agentId: string | null; agente: string | null; numero: string; sessao: string };
+
+/** Número curto do chip: (11) 95506-1290. */
+function numeroCurto(n: string): string {
+  const d = n.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return n;
+}
+
+/**
+ * Disparo: uma aba por chip (cada chip é um agente), para as conversas de um
+ * número não se misturarem com as de outro. "Todas" junta tudo.
+ */
+function AbasDeChip({ agente, onAgente }: { agente: string; onAgente: (v: string) => void }) {
+  const [chips, setChips] = React.useState<ChipDaLista[]>([]);
+  React.useEffect(() => {
+    let vivo = true;
+    fetch("/api/chips")
+      .then((r) => (r.ok ? r.json() : { chips: [] }))
+      .then((d: { chips?: ChipDaLista[] }) => vivo && setChips((d.chips ?? []).filter((c) => c.agentId)))
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  const abas = [{ id: "", titulo: "Todas", detalhe: null as string | null, ligado: false }, ...chips.map((c) => ({
+    id: c.agentId!, titulo: numeroCurto(c.numero), detalhe: c.agente, ligado: c.sessao === "connected",
+  }))];
+  return (
+    <div role="tablist" aria-label="Chip" className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {abas.map((a) => {
+        const ativo = a.id === agente;
+        return (
+          <button
+            key={a.id || "todas"}
+            type="button"
+            role="tab"
+            aria-selected={ativo}
+            onClick={() => onAgente(a.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-small transition-colors duration-120",
+              ativo ? "border-transparent bg-inverse font-medium text-inverse-fg" : "border-border-subtle text-text-secondary hover:bg-hover hover:text-text-primary",
+              focusRing
+            )}
+            title={a.detalhe ?? undefined}
+          >
+            {a.id && <span className={cn("size-1.5 rounded-full", a.ligado ? "bg-success" : "bg-text-tertiary")} aria-hidden="true" />}
+            <span className="tabular-nums">{a.titulo}</span>
+            {a.id && <span className="sr-only">{a.ligado ? "conectado" : "desconectado"}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Abas em cápsula, no desenho do SegmentedControl, com contador ao lado do rótulo. */
 function AbasDeStatus({
   filtro, onFiltro, contadores,
@@ -320,7 +378,7 @@ function LinhaDeConversa({
         <span className="relative mt-0.5 shrink-0">
           <AvatarDoContato chave={c.contactId} nome={c.nome} />
           {/* Canal da conversa: logo oficial no canto de baixo à direita. */}
-          <SeloDoCanal canal={c.channel} className="absolute -bottom-0.5 -right-0.5" />
+          {!ehAppDeDisparos && <SeloDoCanal canal={c.channel} className="absolute -bottom-0.5 -right-0.5" />}
         </span>
 
         <span className="flex min-w-0 flex-1 flex-col gap-px">
@@ -335,9 +393,11 @@ function LinhaDeConversa({
           <span className={cn("truncate text-small", naoLida ? "text-text-secondary" : "text-text-tertiary")}>
             {c.lastMessageText ? `${prefixoDaPrevia(c.lastMessageRole)}${c.lastMessageText}` : "Sem mensagens"}
           </span>
-          <span className="mt-1 flex items-center">
-            <EstadoDaConversa c={c} />
-          </span>
+          {!ehAppDeDisparos && (
+            <span className="mt-1 flex items-center">
+              <EstadoDaConversa c={c} />
+            </span>
+          )}
           {naoLida && (
             <span className="sr-only">
               {c.naoLidas === 1 ? "1 mensagem não lida" : `${c.naoLidas} mensagens não lidas`}
@@ -395,13 +455,22 @@ export function ListaDeConversas({
   return (
     <section className={cn("flex min-h-0 flex-col overflow-hidden", className)}>
       <div className="flex flex-col gap-2 border-b border-border-subtle px-3 pb-2.5 pt-2.5">
-        <SeletorDeCaixa
-          agente={agente}
-          onAgente={onAgente}
-          agentes={agentes}
-          totalDeConversas={totalDeConversas}
-          esperando={esperando}
-        />
+        {ehAppDeDisparos ? (
+          <>
+            <h2 className="text-body-lg font-semibold tracking-tight text-text-primary">
+              Conversas <span className="text-caption font-normal text-text-tertiary">{totalDeConversas}</span>
+            </h2>
+            <AbasDeChip agente={agente} onAgente={onAgente} />
+          </>
+        ) : (
+          <SeletorDeCaixa
+            agente={agente}
+            onAgente={onAgente}
+            agentes={agentes}
+            totalDeConversas={totalDeConversas}
+            esperando={esperando}
+          />
+        )}
 
         <div className="flex items-center gap-1.5">
           {/* 16px no celular: abaixo disso o iPhone dá zoom ao tocar no campo. */}
@@ -412,14 +481,16 @@ export function ListaDeConversas({
             aria-label="Buscar conversas"
             className="min-w-0 flex-1 [&_input]:h-10 [&_input]:text-body-lg lg:[&_input]:h-8 lg:[&_input]:text-body"
           />
-          <BotaoDeFiltros
-            filtro={filtro}
-            onFiltro={onFiltro}
-            canal={canal}
-            onCanal={onCanal}
-            testes={testes}
-            onTestes={onTestes}
-          />
+          {!ehAppDeDisparos && (
+            <BotaoDeFiltros
+              filtro={filtro}
+              onFiltro={onFiltro}
+              canal={canal}
+              onCanal={onCanal}
+              testes={testes}
+              onTestes={onTestes}
+            />
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -432,7 +503,7 @@ export function ListaDeConversas({
           </Button>
         </div>
 
-        <AbasDeStatus filtro={filtro} onFiltro={onFiltro} contadores={contadores} />
+        {!ehAppDeDisparos && <AbasDeStatus filtro={filtro} onFiltro={onFiltro} contadores={contadores} />}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

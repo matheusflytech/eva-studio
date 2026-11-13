@@ -178,9 +178,13 @@ export interface FiltroDeAgendadas {
   agentId?: string | null;
   channel?: string | null;
   to?: string | null;
+  /** Tela Agendamentos: todas do contrato (próximas + últimos 7 dias), de pessoas ou de grupos. */
+  todas?: "individual" | "grupo" | null;
 }
 
-/** Avulsas de um contato/negócio/conversa: as próximas e as últimas que saíram. */
+const ehGrupo = (to: string) => to.endsWith("@g.us");
+
+/** Avulsas de um contato/negócio/conversa (ou todas): as próximas e as últimas que saíram. */
 export async function listarAgendadas(f: FiltroDeAgendadas) {
   const ou: Prisma.BroadcastWhereInput[] = [];
   if (f.contactRecordId) ou.push({ contactRecordId: f.contactRecordId });
@@ -188,16 +192,27 @@ export async function listarAgendadas(f: FiltroDeAgendadas) {
   if (f.agentId && f.channel && f.to) {
     ou.push({ agentId: f.agentId, channel: f.channel, manualRecipients: { array_contains: [f.to] } });
   }
+  if (f.todas) {
+    ou.push({ status: "scheduled" }, { scheduledAt: { gte: new Date(Date.now() - 7 * 24 * 60 * MINUTO) } });
+  }
   if (ou.length === 0) return [];
 
   const linhas = await prisma.broadcast.findMany({
-    where: { kind: "single", agent: { orgId: f.orgId }, OR: ou },
+    where: { kind: "single", agent: { orgId: f.orgId }, OR: ou, ...(f.todas && f.agentId ? { agentId: f.agentId } : {}) },
     include: { agent: { select: { name: true } } },
     orderBy: [{ scheduledAt: "desc" }],
-    take: 30,
+    take: f.todas ? 300 : 30,
   });
 
-  return linhas.map((b) => ({
+  // shortcut: grupo x pessoa separado aqui (JSON não filtra por sufixo no Prisma); 300 basta para a tela.
+  const daTela = f.todas
+    ? linhas.filter((b) => {
+        const to = (Array.isArray(b.manualRecipients) ? (b.manualRecipients as string[]) : [])[0] ?? "";
+        return f.todas === "grupo" ? ehGrupo(to) : !ehGrupo(to);
+      })
+    : linhas;
+
+  return daTela.map((b) => ({
     id: b.id,
     agentId: b.agentId,
     agentName: b.agent.name,
