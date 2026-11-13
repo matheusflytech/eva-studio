@@ -87,7 +87,7 @@ export function ListaDeChips() {
   const conectados = dados?.chips.filter((c) => c.sessao === "connected").length ?? 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:pt-6">
+    <div className="flex w-full flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:px-8 lg:pt-6">
       <header className="flex flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[32px] font-semibold leading-tight tracking-tight text-text-primary">Chips</h1>
@@ -116,7 +116,7 @@ export function ListaDeChips() {
         </Link>
       )}
 
-      <ul className="grid gap-3 md:grid-cols-2">
+      <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {dados?.chips.map((c) => {
           const st = SITUACAO[c.sessao] ?? SITUACAO.disconnected;
           const uso = dados.limiteDia > 0 ? Math.min(100, Math.round((c.usadosHoje / dados.limiteDia) * 100)) : 0;
