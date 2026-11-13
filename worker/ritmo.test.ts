@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
+import { MOTIVO_CHIP_CAIU, falharPendentesDoChip, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
 
 describe("paraJid", () => {
   it("número puro, com máscara ou sem DDI vira jid brasileiro", () => {
@@ -42,5 +42,22 @@ describe("SQL do disparo", () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ n: 7 }] });
     expect(await soltosHoje({ query }, "ag1")).toBe(7);
     expect(String(query.mock.calls[0][0])).toMatch(/America\/Sao_Paulo/);
+  });
+});
+
+describe("falharPendentesDoChip", () => {
+  it("modo agente: falha só a fila de disparo pendente do agente, com o motivo", async () => {
+    const query = vi.fn(async () => ({ rows: [{ id: "q1", broadcastId: "b1", variantId: null }] }));
+    const r = await falharPendentesDoChip({ query }, "agente", "ag1");
+    expect(r).toHaveLength(1);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toMatch(/status = 'pending' and "broadcastId" is not null and "agentId" = \$1/);
+    expect(params).toEqual(["ag1", MOTIVO_CHIP_CAIU]);
+  });
+  it("modo canal: acha o agente pelo canal", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    await falharPendentesDoChip({ query }, "canal", "c1");
+    const [sql] = query.mock.calls[0] as unknown as [string];
+    expect(sql).toMatch(/select "agentId" from eva_studio_canais where id = \$1/);
   });
 });
