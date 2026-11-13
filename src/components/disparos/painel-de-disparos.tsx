@@ -84,9 +84,11 @@ export function PainelDeDisparos() {
   const hoje = dados?.hoje;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:gap-6 lg:px-8 lg:pt-6">
+    // Monitor grande: usa a largura (até 1800px) em vez de virar uma ilha no meio.
+    <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:gap-6 lg:px-8 lg:pt-6 2xl:px-12">
+
       <header className="flex items-center gap-3">
-        <h1 className="min-w-0 flex-1 font-display text-[30px] leading-[1.05] tracking-tight text-text-primary sm:text-[40px]">
+        <h1 className="min-w-0 flex-1 font-display text-[30px] leading-[1.05] tracking-tight text-text-primary sm:text-[40px] 2xl:text-[52px]">
           <span className="font-normal">{saudacao(new Date().getHours())}</span>
           <br />
           <b className="font-semibold">{primeiroNome || "tudo pronto"}!</b>
@@ -102,7 +104,8 @@ export function PainelDeDisparos() {
 
       {erro && <p className="rounded-2xl bg-danger-subtle px-4 py-3 text-small text-danger">{erro}</p>}
 
-      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
+      {/* Computador: destaque e disparos à esquerda (2/3), chips e relatório à direita (1/3). */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6 2xl:gap-8">
         {/* O dia de hoje: um número grande e uma linha de apoio. */}
         <section
           aria-label="Disparos de hoje"
@@ -110,7 +113,7 @@ export function PainelDeDisparos() {
           style={{ background: "linear-gradient(135deg, #8fc0ff 0%, #c8b4ff 52%, #ffc6e0 100%)" }}
         >
           <p className="text-small font-medium opacity-75">Enviados hoje</p>
-          <p className="mt-1 font-display text-[48px] font-semibold leading-none tracking-tight lg:text-[64px]">{dados ? fmt(hoje!.enviados) : "—"}</p>
+          <p className="mt-1 font-display text-[48px] font-semibold leading-none tracking-tight lg:text-[64px] 2xl:text-[88px]">{dados ? fmt(hoje!.enviados) : "—"}</p>
           <p className="mt-3 text-small opacity-75">
             {dados
               ? [
@@ -123,8 +126,9 @@ export function PainelDeDisparos() {
           </p>
         </section>
 
-        {/* Chips: quantos cada um disparou hoje. */}
-        <section aria-labelledby="chips-titulo" className="self-start rounded-[24px] border border-border-subtle bg-panel p-4 lg:p-5">
+        {/* Coluna da direita: chips e, logo abaixo, o relatório completo. */}
+        <div className="flex flex-col gap-5 lg:row-span-2 lg:gap-6">
+        <section aria-labelledby="chips-titulo" className="rounded-[24px] border border-border-subtle bg-panel p-4 lg:p-5">
           <div className="mb-3 flex items-center gap-2">
             <h2 id="chips-titulo" className="text-body font-semibold text-text-primary">Chips</h2>
             <Link href="/chips" className="ml-auto text-small font-medium text-accent-fg">Ver</Link>
@@ -153,6 +157,13 @@ export function PainelDeDisparos() {
             </ul>
           )}
         </section>
+        <Link
+          href="/reports"
+          className="flex items-center gap-2 rounded-[22px] border border-border-subtle bg-panel px-4 py-3.5 text-small font-medium text-text-secondary transition-colors hover:bg-raised hover:text-text-primary"
+        >
+          Relatório completo <ChevronRight size={16} className="ml-auto" aria-hidden />
+        </Link>
+        </div>
 
         {/* Últimos disparos: título, quando, barra e uma linha de números. */}
         <section aria-labelledby="disparos-titulo" className="flex flex-col gap-3 lg:col-span-2">
@@ -190,13 +201,6 @@ export function PainelDeDisparos() {
             );
           })}
         </section>
-
-        <Link
-          href="/reports"
-          className="flex items-center gap-2 self-start rounded-[22px] border border-border-subtle bg-panel px-4 py-3.5 text-small font-medium text-text-secondary transition-colors hover:bg-raised hover:text-text-primary"
-        >
-          Relatório completo <ChevronRight size={16} className="ml-auto" aria-hidden />
-        </Link>
       </div>
     </div>
   );

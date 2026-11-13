@@ -347,7 +347,7 @@ export function TelaDeAgendamentos() {
   const nome = (to: string) => (tipo === "grupo" ? nomesDosGrupos.get(to) ?? "Grupo" : numeroLegivel(to));
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-24 pt-4 sm:px-6 lg:pt-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pb-24 pt-4 sm:px-6 lg:pt-6 xl:max-w-5xl 2xl:max-w-6xl">
       <header className="flex flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-text-primary sm:text-[32px]">Agendamentos</h1>
