@@ -672,6 +672,26 @@ async function tickScheduler() {
   }
 }
 
+http
+  .createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    // Commit em execução (o Render preenche RENDER_GIT_COMMIT): confere se o deploy pegou.
+    res.end(`eva-studio whatsapp worker ok ${(process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7)}\n`);
+  })
+  .listen(process.env.PORT || 3010, () => {
+    logger.info(`Health check ouvindo na porta ${process.env.PORT || 3010}`);
+  });
+
+// No deploy o Render sobe esta instância enquanto a anterior ainda está
+// conectada; duas conexões do mesmo chip gravam as chaves de criptografia por
+// cima uma da outra e quem recebe fica com "Aguardando mensagem". O health
+// check já responde (o Render derruba a velha) e só depois abrimos as sessões.
+const ESPERA_INICIAL_S = Number(process.env.WORKER_ESPERA_INICIAL_S ?? (process.env.RENDER ? 45 : 0));
+if (ESPERA_INICIAL_S > 0) {
+  logger.warn({ segundos: ESPERA_INICIAL_S }, "Esperando a instância anterior sair antes de conectar");
+  await new Promise((r) => setTimeout(r, ESPERA_INICIAL_S * 1000));
+}
+
 // Decide o modo antes de qualquer sessão: com a tabela de canais, uma sessão
 // por canal; sem ela, por agente (como antes do SQL 2026-10-22).
 MODO = await detectarModo(pool);
@@ -685,13 +705,3 @@ setInterval(drainOutboundQueue, 4000);
 // 60s: passo de régua e disparo agendado são medidos em minutos, não em
 // segundos — varrer mais rápido só gastaria conexão do banco à toa.
 setInterval(tickScheduler, 60000);
-
-http
-  .createServer((req, res) => {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    // Commit em execução (o Render preenche RENDER_GIT_COMMIT): confere se o deploy pegou.
-    res.end(`eva-studio whatsapp worker ok ${(process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7)}\n`);
-  })
-  .listen(process.env.PORT || 3010, () => {
-    logger.info(`Health check ouvindo na porta ${process.env.PORT || 3010}`);
-  });
