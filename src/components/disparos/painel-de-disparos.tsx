@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { OrbeEva } from "@/components/layout/orbe-eva";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatRelativeDate } from "@/lib/utils";
+import { RelatorioDeDisparos } from "./relatorio-de-disparos";
 
 // Tela inicial do app de disparos. Celular primeiro (referência aprovada em
 // 13/11/2026): saudação grande, um cartão de destaque com o dia, três ações
@@ -241,6 +242,11 @@ export function PainelDeDisparos() {
             );
           })}
         </section>
+      </div>
+
+      {/* Relatórios logo abaixo, para acompanhar sem trocar de tela. */}
+      <div className="mt-2 border-t border-border-subtle pt-6">
+        <RelatorioDeDisparos embutido />
       </div>
     </div>
   );
