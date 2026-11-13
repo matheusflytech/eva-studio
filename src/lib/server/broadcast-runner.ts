@@ -5,6 +5,9 @@ import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { decidirEnvio } from "@/lib/whatsapp/janela";
 import { rodarDisparoDeEmail } from "@/lib/server/email/disparo";
 import { checkRateLimit } from "@/lib/server/rate-limit";
+import { interpolar, primeiroNome, telefonesPossiveis } from "@/lib/disparos/personalizar";
+import { chaveDoDestino } from "@/lib/disparos/reenvio";
+import { jidDoWhatsApp } from "@/lib/telefone";
 
 // ---------------------------------------------------------------------------
 // Execução de um disparo.
@@ -39,12 +42,7 @@ interface Recipient {
   values: Record<string, unknown>;
 }
 
-function interpolate(template: string, values: Record<string, unknown>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => {
-    const value = values[key];
-    return value === undefined || value === null ? "" : String(value);
-  });
-}
+const interpolate = interpolar;
 
 /** Sorteio ponderado. Sem variantes, devolve null (usa o texto do disparo). */
 function pickVariant<T extends { weight: number }>(variants: T[]): T | null {
@@ -78,6 +76,21 @@ async function resolveRecipients(broadcast: {
       include: { contact: true },
     });
     const byId = new Map(known.map((ch) => [ch.externalId, ch.contact]));
+    // WhatsApp via QR: número sem conversa ainda acha a ficha pelo telefone
+    // (base importada), para o {firstname} sair com o nome.
+    if (broadcast.channel === "whatsapp_qr") {
+      const faltam = ids.filter((id) => !byId.has(id) && !id.endsWith("@g.us"));
+      if (faltam.length) {
+        const fichas = await prisma.contact.findMany({
+          where: { orgId: broadcast.orgId, phone: { in: [...new Set(faltam.flatMap(telefonesPossiveis))] } },
+        });
+        const porChave = new Map(fichas.map((c) => [chaveDoDestino(c.phone), c]));
+        for (const id of faltam) {
+          const c = porChave.get(chaveDoDestino(id));
+          if (c) byId.set(id, c);
+        }
+      }
+    }
     return ids.map((externalId) => {
       const c = byId.get(externalId);
       return { externalId, values: c ? contactValues(c) : {} };
@@ -98,14 +111,11 @@ async function resolveRecipients(broadcast: {
 
   // Só entra quem é ALCANÇÁVEL por este agente neste canal. Um contato da org
   // sem ContactChannel do agente que está disparando não tem para onde
-  // receber, e incluí-lo só geraria falha de envio.
+  // receber, e incluí-lo só geraria falha de envio. No WhatsApp via QR o
+  // telefone da ficha basta (base importada que nunca conversou).
   const contacts = await prisma.contact.findMany({
     where: {
-      AND: [
-        where,
-        { optIn: true },
-        { channels: { some: { agentId: broadcast.agentId, channel: broadcast.channel } } },
-      ],
+      AND: [where, { optIn: true }, alcanceDoCanal(broadcast.agentId, broadcast.channel)],
     },
     include: {
       channels: { where: { agentId: broadcast.agentId, channel: broadcast.channel }, take: 1 },
@@ -113,13 +123,22 @@ async function resolveRecipients(broadcast: {
     take: 20_000,
   });
 
-  return contacts.map((c) => ({
-    externalId: c.channels[0].externalId,
-    values: contactValues(c),
-  }));
+  const vistos = new Set<string>();
+  return contacts.flatMap((c) => {
+    const externalId = c.channels[0]?.externalId ?? (broadcast.channel === "whatsapp_qr" ? jidDoWhatsApp(c.phone) : null);
+    if (!externalId || vistos.has(externalId)) return [];
+    vistos.add(externalId);
+    return [{ externalId, values: contactValues(c) }];
+  });
 }
 
-/** Campos disponíveis para interpolar {nome}, {email}, ... na mensagem. */
+/** Quem o agente alcança no canal: tem conversa nele, ou (WhatsApp via QR) tem telefone. */
+export function alcanceDoCanal(agentId: string, channel: string) {
+  const temCanal = { channels: { some: { agentId, channel } } };
+  return channel === "whatsapp_qr" ? { OR: [temCanal, { phone: { not: "" } }] } : temCanal;
+}
+
+/** Campos disponíveis para interpolar {nome}, {firstname}, {email}, ... na mensagem. */
 function contactValues(contact: {
   name: string;
   email: string;
@@ -130,6 +149,8 @@ function contactValues(contact: {
     ...((contact.customFields as Record<string, unknown>) ?? {}),
     nome: contact.name,
     name: contact.name,
+    primeiro_nome: primeiroNome(contact.name),
+    firstname: primeiroNome(contact.name),
     email: contact.email,
     telefone: contact.phone,
     phone: contact.phone,

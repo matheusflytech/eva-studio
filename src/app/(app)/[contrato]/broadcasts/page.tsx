@@ -23,9 +23,10 @@ import { cn, formatRelativeDate } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { Destinatarios } from "@/components/disparos/destinatarios";
 import { useSearchParams } from "@/lib/contrato/navegacao";
-import { dividirLista, numerosDoArquivo, textoComOpcoes } from "@/lib/disparos/lista";
+import { contatosDoArquivo, dividirLista, textoComOpcoes } from "@/lib/disparos/lista";
+import { lerContatos } from "@/lib/disparos/personalizar";
 import { subirArquivo } from "@/lib/disparos/subir-arquivo";
-import { ModelosDeDisparo, useModelos, type Modelo } from "@/components/disparos/modelos-de-disparo";
+import { InserirNome, ModelosDeDisparo, useModelos, type Modelo } from "@/components/disparos/modelos-de-disparo";
 import { ehAppDeDisparos } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
@@ -480,7 +481,10 @@ export default function DisparosPage() {
     const payload: Record<string, unknown> = { channel, audience };
     if (isQr && midia) payload.media = midia;
     if (audience === "manual") {
-      payload.contactIds = recipients.split(/[\n,]/).map((c) => c.trim()).filter(Boolean);
+      const lidos = lerContatos(recipients);
+      payload.contactIds = lidos.map((c) => c.numero);
+      // Nome digitado ao lado do número vai para a ficha e sai no {firstname}.
+      if (isQr) payload.names = Object.fromEntries(lidos.filter((c) => c.nome).map((c) => [c.numero, c.nome]));
     } else if (audience === "tags") {
       payload.tagIds = selectedTags;
     } else {
@@ -588,13 +592,14 @@ export default function DisparosPage() {
   }
 
   async function importarLista(file: File) {
-    const numeros = numerosDoArquivo(await file.text());
-    if (numeros.length === 0) {
+    const contatos = contatosDoArquivo(await file.text());
+    if (contatos.length === 0) {
       setError('Não achei números nesse arquivo. Use uma coluna "telefone" ou um número por linha.');
       return;
     }
     setError(null);
-    setRecipients((atual) => [...new Set([...separarLista(atual), ...numeros])].join("\n"));
+    const linhas = contatos.map((c) => (c.nome ? `${c.numero} ${c.nome}` : c.numero));
+    setRecipients((atual) => [...new Set([...separarLista(atual), ...linhas])].join("\n"));
   }
 
   async function subirMidia(file: File) {
@@ -614,7 +619,7 @@ export default function DisparosPage() {
     setRecipients((linhas.includes(jid) ? linhas.filter((l) => l !== jid) : [...linhas, jid]).join("\n"));
   }
 
-  const naLista = separarLista(recipients);
+  const naLista = lerContatos(recipients).map((c) => c.numero);
 
   // ── Lista: ordem (envio em curso no topo), busca e filtros, tudo no navegador ──
   const visiveis = React.useMemo(() => {
@@ -860,12 +865,12 @@ export default function DisparosPage() {
 
             {audience === "manual" && (
               <div>
-                <Label htmlFor="disparo-recipients">{isEmail ? "E-mails (um por linha)" : "Contatos (um por linha, com DDI)"}</Label>
+                <Label htmlFor="disparo-recipients">{isEmail ? "E-mails (um por linha)" : channel === "whatsapp_qr" ? "Contatos (um por linha: número com DDI e, se quiser, o nome)" : "Contatos (um por linha, com DDI)"}</Label>
                 <Textarea
                   id="disparo-recipients"
                   rows={4}
                   className="font-mono text-small"
-                  placeholder={isEmail ? "ana@empresa.com\nbeto@empresa.com" : "5511999998888\n5511999997777"}
+                  placeholder={isEmail ? "ana@empresa.com\nbeto@empresa.com" : channel === "whatsapp_qr" ? "5511999998888 Maria\n5511999997777 João" : "5511999998888\n5511999997777"}
                   value={recipients}
                   onChange={(e) => setRecipients(e.target.value)}
                 />
@@ -1080,11 +1085,14 @@ export default function DisparosPage() {
                   </div>
                 )}
                 <div>
-                  <Label htmlFor="disparo-text">Texto</Label>
-                  <Textarea id="disparo-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Oi {nome}, tudo bem?" />
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <Label htmlFor="disparo-text" className="mb-0">Texto</Label>
+                    <span className="ml-auto"><InserirNome alvoId="disparo-text" valor={text} mudar={setText} /></span>
+                  </div>
+                  <Textarea id="disparo-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Olá, {firstname}, tudo bem?" />
                   <p className="mt-1.5 text-caption text-text-tertiary">
-                    {"{nome}"}, {"{email}"} e os campos capturados no fluxo são trocados pelos dados de cada contato. Link no texto chega
-                    clicável.
+                    {"{firstname}"} é o primeiro nome do contato (da base ou o que você digitou ao lado do número); sem nome, some junto com a
+                    vírgula. {"{nome}"}, {"{email}"} e os campos do fluxo também valem. Link no texto chega clicável.
                   </p>
                 </div>
                 {channel === "whatsapp_qr" && (
@@ -1166,7 +1174,7 @@ export default function DisparosPage() {
 
 /** Lista colada: uma entrada por linha (ou separada por vírgula), sem vazias. */
 function separarLista(texto: string): string[] {
-  return texto.split(/[\n,]/).map((c) => c.trim()).filter(Boolean);
+  return texto.split("\n").map((c) => c.trim()).filter(Boolean);
 }
 
 /** Opção em cápsula (filtros, etiquetas): ativa no polegar invertido. */

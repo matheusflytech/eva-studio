@@ -33,3 +33,14 @@ describe("dividirLista", () => {
     expect(dividirLista([1, 2], 5)).toEqual([[1], [2]]);
   });
 });
+
+describe("contatosDoArquivo", () => {
+  it("traz o nome quando há coluna Nome", async () => {
+    const { contatosDoArquivo } = await import("./lista");
+    const csv = "Nome;Nome completo;Telefone;Cidade\nMaria;Maria da Silva;5511999990001;SP\nJoão;João Souza;5511999990002;SP\n";
+    expect(contatosDoArquivo(csv)).toEqual([
+      { numero: "5511999990001", nome: "Maria" },
+      { numero: "5511999990002", nome: "João" },
+    ]);
+  });
+});

@@ -45,6 +45,28 @@ function comNegrito(texto: string): React.ReactNode[] {
   return texto.split(/(\*[^*\n]+\*)/g).map((parte, i) => (/^\*[^*\n]+\*$/.test(parte) ? <b key={i}>{parte.slice(1, -1)}</b> : parte));
 }
 
+/** Botão que põe {firstname} onde está o cursor do campo `alvoId`. */
+export function InserirNome({ alvoId, valor, mudar }: { alvoId: string; valor: string; mudar: (v: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const campo = document.getElementById(alvoId) as HTMLTextAreaElement | null;
+        const ini = campo?.selectionStart ?? valor.length;
+        const fim = campo?.selectionEnd ?? valor.length;
+        mudar(valor.slice(0, ini) + "{firstname}" + valor.slice(fim));
+        requestAnimationFrame(() => {
+          campo?.focus();
+          campo?.setSelectionRange(ini + 11, ini + 11);
+        });
+      }}
+      className="inline-flex items-center gap-1 rounded-full bg-raised px-2.5 py-1 text-caption font-medium text-text-secondary hover:text-text-primary"
+    >
+      <Plus size={12} aria-hidden /> Primeiro nome
+    </button>
+  );
+}
+
 /** Balão do WhatsApp com a imagem, o texto e as opções. `compacta`: imagem menor e texto recolhido (lista de modelos). */
 export function PreviaDoWhatsApp({ text, options, mediaPath, mediaType, mediaName, compacta = false }: Pick<Modelo, "text" | "options" | "mediaPath" | "mediaType" | "mediaName"> & { compacta?: boolean }) {
   const corpo = textoComOpcoes(text, options);
@@ -193,8 +215,12 @@ function EditorDeModelo({ modelo, fechar, salvo }: { modelo: Modelo | null; fech
           <Input id="modelo-nome" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Lista 1 · Interior (com Scudeler)" />
         </div>
         <div>
-          <Label htmlFor="modelo-texto">Texto</Label>
+          <div className="mb-1.5 flex items-center gap-2">
+            <Label htmlFor="modelo-texto" className="mb-0">Texto</Label>
+            <span className="ml-auto"><InserirNome alvoId="modelo-texto" valor={text} mudar={setText} /></span>
+          </div>
           <Textarea id="modelo-texto" rows={7} value={text} onChange={(e) => setText(e.target.value)} />
+          <p className="mt-1.5 text-caption text-text-tertiary">{"{firstname}"} vira o primeiro nome de cada contato; sem nome, some (e a vírgula antes dele também).</p>
         </div>
         <div>
           <Label>Opções de resposta (opcional)</Label>
