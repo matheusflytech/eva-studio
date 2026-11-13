@@ -84,7 +84,9 @@ export function PainelDeDisparos() {
   const tentados = (hoje?.enviados ?? 0) + (hoje?.falhas ?? 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:pt-6">
+    // Celular: uma coluna na ordem da referência. Computador: a tela inteira, em
+    // três colunas (destaque + ações em cima, disparos + chips embaixo).
+    <div className="flex w-full flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:gap-6 lg:px-8 lg:pt-6">
       {/* Saudação grande, como na referência; a esfera da Eva no canto. */}
       <header className="flex items-center gap-3">
         <h1 className="min-w-0 flex-1 font-display text-[32px] leading-[1.05] tracking-tight text-text-primary sm:text-[40px]">
@@ -92,25 +94,30 @@ export function PainelDeDisparos() {
           <br />
           <b className="font-semibold">{primeiroNome || "tudo pronto"}!</b>
         </h1>
+        <Link
+          href="/broadcasts?new=1"
+          className="hidden h-11 items-center gap-2 rounded-full bg-text-primary px-5 text-small font-semibold text-bg-base transition-transform active:scale-[0.97] lg:inline-flex"
+        >
+          <Plus size={16} aria-hidden /> Novo disparo
+        </Link>
         <OrbeEva className="h-[72px] w-[72px] shrink-0" />
       </header>
 
       {erro && <p className="rounded-2xl bg-danger-subtle px-4 py-3 text-small text-danger">{erro}</p>}
 
-      <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
-        <div className="flex flex-col gap-5">
+      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
           {/* Cartão de destaque: o dia de hoje. */}
           <section
             aria-label="Disparos de hoje"
-            className="relative overflow-hidden rounded-[28px] p-5 text-[#0d0d14] shadow-[0_24px_60px_-24px_rgb(110_120_255/0.55)]"
+            className="relative overflow-hidden rounded-[28px] p-5 text-[#0d0d14] shadow-[0_24px_60px_-24px_rgb(110_120_255/0.55)] lg:col-span-2 lg:p-7"
             style={{ background: "linear-gradient(135deg, #8fc0ff 0%, #c8b4ff 52%, #ffc6e0 100%)" }}
           >
             <p className="text-small font-medium opacity-75">Enviados hoje</p>
-            <p className="mt-1 font-display text-[44px] font-semibold leading-none tracking-tight">{dados ? fmt(hoje!.enviados) : "—"}</p>
+            <p className="mt-1 font-display text-[44px] font-semibold leading-none tracking-tight lg:text-[64px]">{dados ? fmt(hoje!.enviados) : "—"}</p>
             <p className="mt-2 text-small opacity-75">
               {dados ? `${fmt(hoje!.naFila)} na fila · ${pct(hoje!.entregues, hoje!.enviados)}% entregues` : "Carregando…"}
             </p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2 lg:mt-6 lg:gap-3">
               {[
                 { rotulo: "Entregues", valor: hoje?.entregues },
                 { rotulo: "Lidos", valor: hoje?.lidos },
@@ -130,7 +137,7 @@ export function PainelDeDisparos() {
           </section>
 
           {/* Três ações grandes. */}
-          <nav aria-label="Atalhos" className="grid grid-cols-3 gap-2.5">
+          <nav aria-label="Atalhos" className="grid grid-cols-3 gap-2.5 lg:grid-cols-1 lg:grid-rows-3 lg:gap-3">
             {[
               { href: "/broadcasts?new=1", acima: "Criar", rotulo: "Disparo", icone: <Plus size={16} /> },
               { href: "/contacts", acima: "Ver", rotulo: "Contatos", icone: <Contact size={16} /> },
@@ -139,9 +146,9 @@ export function PainelDeDisparos() {
               <Link
                 key={a.href}
                 href={a.href}
-                className="flex h-[104px] flex-col justify-between rounded-[22px] border border-border-subtle bg-panel p-3.5 transition-[transform,background-color] duration-150 hover:bg-raised active:scale-[0.97]"
+                className="flex h-[104px] flex-col justify-between rounded-[22px] border border-border-subtle bg-panel p-3.5 transition-[transform,background-color] duration-150 hover:bg-raised active:scale-[0.97] lg:h-auto lg:flex-row-reverse lg:items-center lg:px-5"
               >
-                <span className="flex h-8 w-8 items-center justify-center self-end rounded-full border border-border-default text-text-secondary">{a.icone}</span>
+                <span className="flex h-8 w-8 items-center justify-center self-end rounded-full border border-border-default text-text-secondary lg:self-auto">{a.icone}</span>
                 <span>
                   <span className="block text-caption text-text-tertiary">{a.acima}</span>
                   <span className="block text-body font-semibold text-text-primary">{a.rotulo}</span>
@@ -151,7 +158,7 @@ export function PainelDeDisparos() {
           </nav>
 
           {/* Chips: uso de hoje contra o limite do anti-ban. */}
-          <section aria-labelledby="chips-titulo" className="rounded-[24px] border border-border-subtle bg-panel p-4">
+          <section aria-labelledby="chips-titulo" className="order-3 self-start rounded-[24px] border border-border-subtle bg-panel p-4 lg:order-4 lg:p-5">
             <div className="mb-3 flex items-center gap-2">
               <h2 id="chips-titulo" className="text-body font-semibold text-text-primary">Chips hoje</h2>
               <span className="text-caption text-text-tertiary">limite de {dados?.limiteDia ?? 200} por chip</span>
@@ -182,10 +189,9 @@ export function PainelDeDisparos() {
               </ul>
             )}
           </section>
-        </div>
 
         {/* Lista de disparos, como a "lista de metas" da referência. */}
-        <section aria-labelledby="disparos-titulo" className="flex flex-col gap-3">
+        <section aria-labelledby="disparos-titulo" className="order-4 flex flex-col gap-3 lg:order-3 lg:col-span-2">
           <div className="flex items-center">
             <h2 id="disparos-titulo" className="text-body-lg font-semibold text-text-primary">Disparos</h2>
             <Link href="/broadcasts" className="ml-auto text-small font-medium text-accent-fg">Ver todos</Link>
