@@ -51,7 +51,8 @@ const fmt = (n: number) => n.toLocaleString("pt-BR");
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const pctDe = (parte: number, todo: number) => (todo > 0 ? pct(parte / todo) : "—");
 
-export function RelatorioDeDisparos() {
+/** `embutido`: dentro do painel inicial (sem margens próprias, título menor, link para a tela). */
+export function RelatorioDeDisparos({ embutido = false }: { embutido?: boolean } = {}) {
   const [dias, setDias] = React.useState<(typeof PERIODOS)[number]>(7);
   const [dados, setDados] = React.useState<Relatorio | null>(null);
   const [erro, setErro] = React.useState<string | null>(null);
@@ -88,10 +89,17 @@ export function RelatorioDeDisparos() {
   const t = dados?.totais;
 
   return (
-    <div className="flex w-full flex-col gap-5 px-4 pb-10 pt-4 sm:px-6 lg:gap-6 lg:px-8 lg:pt-6">
+    <div className={cn("flex w-full flex-col gap-5 lg:gap-6", !embutido && "px-4 pb-10 pt-4 sm:px-6 lg:px-8 lg:pt-6")}>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0 sm:flex-1">
-          <h1 className="font-display text-[32px] font-semibold leading-tight tracking-tight text-text-primary">Relatórios</h1>
+          {embutido ? (
+            <h2 className="flex items-center gap-3 text-body-lg font-semibold text-text-primary">
+              Relatórios
+              <Link href="/reports" className="text-small font-medium text-accent-fg">Abrir</Link>
+            </h2>
+          ) : (
+            <h1 className="font-display text-[32px] font-semibold leading-tight tracking-tight text-text-primary">Relatórios</h1>
+          )}
           <p className="text-small text-text-tertiary">
             {dados ? `${formatarDia(dados.periodo.de)} a ${formatarDia(dados.periodo.ate)} · comparado aos ${dados.periodo.dias} dias anteriores` : "Carregando…"}
           </p>
