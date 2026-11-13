@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/server/permissions";
 import { runBroadcast } from "@/lib/server/broadcast-runner";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { validarHorario } from "@/lib/server/agendamento";
+import { jidDoWhatsApp } from "@/lib/telefone";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Canais que aceitam disparo. Instagram fica de fora de propósito: a Meta
@@ -176,6 +177,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     if (channel === "email") {
       const invalidos = manualRecipients.filter((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
       if (invalidos.length) return NextResponse.json({ error: `E-mail inválido: ${invalidos.slice(0, 3).join(", ")}` }, { status: 400 });
+    }
+    if (channel === "whatsapp_qr") {
+      const jids = manualRecipients.map(jidDoWhatsApp);
+      const invalidos = manualRecipients.filter((_, i) => !jids[i]);
+      if (invalidos.length) return NextResponse.json({ error: `Número inválido: ${invalidos.slice(0, 3).join(", ")}` }, { status: 400 });
+      manualRecipients = [...new Set(jids as string[])];
     }
     if (manualRecipients.length === 0) {
       return NextResponse.json({ error: "Informe pelo menos um contato." }, { status: 400 });
