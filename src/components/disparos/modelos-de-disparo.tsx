@@ -119,7 +119,8 @@ export function ModelosDeDisparo({ modelos, aviso, carregar, onUsar }: { modelos
           Nenhum modelo ainda. Salve a mensagem (texto, imagem e opções) para mostrar e reusar.
         </p>
       )}
-      <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      {/* items-start: abrir a mensagem inteira de um modelo não estica o card do lado. */}
+      <ul className="grid items-start gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {modelos?.map((m) => (
           <li key={m.id} className="flex flex-col gap-3 rounded-[24px] border border-border-subtle bg-panel p-4">
             <div className="flex items-center gap-1">
