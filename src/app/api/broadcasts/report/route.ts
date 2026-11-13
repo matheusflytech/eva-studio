@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       where: { kind: "campaign", agent: { orgId: ctx.orgId }, createdAt: { gte: p.de, lt: p.ate } },
       orderBy: { createdAt: "desc" },
       take: 50,
-      select: { id: true, agentId: true, text: true, status: true, createdAt: true, totalCount: true, sentCount: true, failedCount: true, deliveredCount: true, readCount: true, agent: { select: { name: true } } },
+      select: { id: true, name: true, agentId: true, text: true, status: true, createdAt: true, totalCount: true, sentCount: true, failedCount: true, deliveredCount: true, readCount: true, agent: { select: { name: true } } },
     }),
   ]);
 
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
       id: d.id,
       agentId: d.agentId,
       agente: d.agent.name,
-      texto: d.text.slice(0, 120),
+      texto: (d.name?.trim() || d.text).slice(0, 120),
       status: d.status,
       criadoEm: d.createdAt.toISOString(),
       total: d.totalCount,

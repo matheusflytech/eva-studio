@@ -53,6 +53,7 @@ interface Variant {
 
 interface BroadcastRow {
   id: string;
+  name: string | null;
   channel: string;
   text: string;
   audience: string;
@@ -215,8 +216,9 @@ function IconeDoCanal({ canal }: { canal: string }) {
   );
 }
 
-/** Nome da campanha na lista: a primeira linha do texto (e-mail e modelo não têm texto). */
+/** Nome da campanha na lista: o que foi dado ou a primeira linha do texto (e-mail e modelo não têm texto). */
 function nomeDaCampanha(b: BroadcastRow): string {
+  if (b.name?.trim()) return b.name.trim();
   const linha = b.text.trim().split("\n")[0]?.trim();
   if (linha) return linha;
   const publico = `${AUDIENCE_LABEL[b.audience] ?? b.audience}${b.segmentName ? `: ${b.segmentName}` : ""}`;
@@ -377,6 +379,7 @@ export default function DisparosPage() {
   const [segmentId, setSegmentId] = React.useState("");
 
   const [text, setText] = React.useState("");
+  const [nomeCampanha, setNomeCampanha] = React.useState("");
   const [templateId, setTemplateId] = React.useState("");
   const [scheduledAt, setScheduledAt] = React.useState("");
   const [abEnabled, setAbEnabled] = React.useState(false);
@@ -478,7 +481,7 @@ export default function DisparosPage() {
     setIsSending(true);
 
     const isQr = channel === "whatsapp_qr";
-    const payload: Record<string, unknown> = { channel, audience };
+    const payload: Record<string, unknown> = { channel, audience, name: nomeCampanha.trim() || undefined };
     if (isQr && midia) payload.media = midia;
     if (audience === "manual") {
       const lidos = lerContatos(recipients);
@@ -536,6 +539,7 @@ export default function DisparosPage() {
       else {
         setRecipients("");
         setText("");
+        setNomeCampanha("");
         setOpcoes(["", "", ""]);
         setMidia(null);
         setFormAberto(false);
@@ -567,6 +571,7 @@ export default function DisparosPage() {
       );
       setRecipients("");
       setText("");
+      setNomeCampanha("");
       setOpcoes(["", "", ""]);
       setMidia(null);
       setScheduledAt("");
@@ -586,6 +591,7 @@ export default function DisparosPage() {
     setChannel("whatsapp_qr");
     setAbEnabled(false);
     setText(m.text);
+    setNomeCampanha(m.name);
     setOpcoes([0, 1, 2].map((i) => m.options[i] ?? ""));
     setMidia(m.mediaPath && m.mediaType ? { path: m.mediaPath, type: m.mediaType, mime: m.mediaMime ?? "", name: m.mediaName ?? "arquivo" } : null);
     setFormAberto(true);
@@ -628,7 +634,7 @@ export default function DisparosPage() {
       .map((b, i) => ({ b, i }))
       .filter(({ b }) => filtroStatus === "todos" || b.status === filtroStatus)
       .filter(({ b }) => filtroCanal === "todos" || b.channel === filtroCanal)
-      .filter(({ b }) => !q || `${b.text} ${b.segmentName ?? ""}`.toLowerCase().includes(q))
+      .filter(({ b }) => !q || `${b.name ?? ""} ${b.text} ${b.segmentName ?? ""}`.toLowerCase().includes(q))
       .sort((x, y) => (ORDEM_DO_STATUS[x.b.status] ?? 2) - (ORDEM_DO_STATUS[y.b.status] ?? 2) || x.i - y.i)
       .map(({ b }) => b);
   }, [broadcasts, busca, filtroStatus, filtroCanal]);
@@ -831,6 +837,16 @@ export default function DisparosPage() {
           }
         >
           <div className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="disparo-nome">Nome da campanha</Label>
+              <Input
+                id="disparo-nome"
+                value={nomeCampanha}
+                onChange={(e) => setNomeCampanha(e.target.value)}
+                maxLength={120}
+                placeholder="Ex.: Lista 1 · Interior · 1º lote"
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="disparo-agent">Agente</Label>

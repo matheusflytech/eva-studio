@@ -651,6 +651,8 @@ model Broadcast {
   // agendada pra um contato (a partir da conversa ou da ficha do negócio).
   // Mesmo relógio, mesma fila, mesmo envio — só muda onde aparece.
   kind            String  @default("campaign") // campaign | single
+  // Nome da campanha (opcional); sem nome, a lista usa a 1ª linha do texto.
+  name            String?
   // Contexto da mensagem avulsa (sem FK de propósito: só pra listar na
   // conversa/ficha; apagar o contato ou o negócio não deve travar nada).
   contactRecordId String?

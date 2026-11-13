@@ -59,6 +59,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
     segments: segments.map((s) => ({ id: s.id, name: s.name })),
     broadcasts: broadcasts.map((b) => ({
       id: b.id,
+      name: b.name,
       channel: b.channel,
       text: b.text,
       audience: b.audience,
@@ -308,6 +309,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const broadcast = await prisma.broadcast.create({
     data: {
       agentId,
+      name: String(body.name ?? "").trim().slice(0, 120) || null,
       channel,
       text: resolvedText,
       templateId,

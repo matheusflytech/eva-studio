@@ -48,6 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const novo = await prisma.broadcast.create({
     data: {
       agentId: alvo.id,
+      name: `${origem.name?.trim() || origem.text.trim().split("\n")[0].slice(0, 80)} · reenvio`,
       channel: "whatsapp_qr",
       text: origem.text,
       audience: "manual",
