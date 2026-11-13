@@ -24,6 +24,9 @@ import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
 import { Destinatarios } from "@/components/disparos/destinatarios";
 import { useSearchParams } from "@/lib/contrato/navegacao";
 import { dividirLista, numerosDoArquivo, textoComOpcoes } from "@/lib/disparos/lista";
+import { subirArquivo } from "@/lib/disparos/subir-arquivo";
+import { ModelosDeDisparo, useModelos, type Modelo } from "@/components/disparos/modelos-de-disparo";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Disparos.
@@ -389,6 +392,7 @@ export default function DisparosPage() {
   const [chipsExtras, setChipsExtras] = React.useState<string[]>([]);
   const arquivoListaRef = React.useRef<HTMLInputElement>(null);
   const arquivoMidiaRef = React.useRef<HTMLInputElement>(null);
+  const modelos = useModelos();
 
   const [isSending, setIsSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -573,6 +577,16 @@ export default function DisparosPage() {
     }
   }
 
+  // Modelo salvo (app de disparos): preenche o formulário do WhatsApp via QR e abre.
+  function usarModelo(m: Modelo) {
+    setChannel("whatsapp_qr");
+    setAbEnabled(false);
+    setText(m.text);
+    setOpcoes([0, 1, 2].map((i) => m.options[i] ?? ""));
+    setMidia(m.mediaPath && m.mediaType ? { path: m.mediaPath, type: m.mediaType, mime: m.mediaMime ?? "", name: m.mediaName ?? "arquivo" } : null);
+    setFormAberto(true);
+  }
+
   async function importarLista(file: File) {
     const numeros = numerosDoArquivo(await file.text());
     if (numeros.length === 0) {
@@ -587,19 +601,7 @@ export default function DisparosPage() {
     setSubindo(true);
     setError(null);
     try {
-      const r = await fetch("/api/conversations/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, mime: file.type, size: file.size }),
-      });
-      const auth = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(auth.error ?? "Não foi possível enviar o arquivo.");
-      const form = new FormData();
-      form.append("cacheControl", "3600");
-      form.append("", file);
-      const up = await fetch(auth.uploadUrl, { method: "PUT", body: form });
-      if (!up.ok) throw new Error("O envio do arquivo falhou.");
-      setMidia({ path: auth.path, type: auth.type, mime: file.type, name: file.name });
+      setMidia(await subirArquivo(file));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível enviar o arquivo.");
     } finally {
@@ -689,6 +691,9 @@ export default function DisparosPage() {
           {notice}
         </Notice>
       )}
+
+      {ehAppDeDisparos && <ModelosDeDisparo modelos={modelos.modelos} aviso={modelos.aviso} carregar={modelos.carregar} onUsar={usarModelo} />}
+      {ehAppDeDisparos && <h2 className="-mb-2 text-body-lg font-semibold text-text-primary">Campanhas</h2>}
 
       {!channels ? (
         <div className="flex flex-col gap-2" aria-busy="true" aria-label="Carregando campanhas">
