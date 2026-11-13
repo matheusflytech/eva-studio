@@ -103,7 +103,7 @@ export function Destinatarios({ agentId, broadcastId }: { agentId: string; broad
               <div className="min-w-0 flex-1">
                 <p className="truncate font-mono text-small text-text-primary">{d.numero}</p>
                 {d.motivo && <p className="truncate text-caption text-danger">{d.motivo}</p>}
-                {!d.motivo && d.situacao === "fila" && <p className="text-caption text-text-tertiary">Sai no ritmo do chip (limite diário)</p>}
+                {!d.motivo && d.situacao === "fila" && <p className="text-caption text-text-tertiary">Aguardando a vez de sair</p>}
               </div>
               {d.respondeu && <Badge variant="accent">Respondeu</Badge>}
               <Badge variant={VARIANTE[d.situacao]}>{ROTULO_DA_SITUACAO[d.situacao]}</Badge>

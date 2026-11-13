@@ -9,6 +9,7 @@ import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Notice } from "@/components/ui/notice";
 import { textoComOpcoes } from "@/lib/disparos/lista";
 import { subirArquivo, type ArquivoEnviado } from "@/lib/disparos/subir-arquivo";
+import { cn } from "@/lib/utils";
 
 // Modelos de disparo do contrato: texto, até 3 opções numeradas e um arquivo.
 // Cada um aparece como ficaria no WhatsApp; "Usar" preenche o novo disparo.
@@ -44,23 +45,30 @@ function comNegrito(texto: string): React.ReactNode[] {
   return texto.split(/(\*[^*\n]+\*)/g).map((parte, i) => (/^\*[^*\n]+\*$/.test(parte) ? <b key={i}>{parte.slice(1, -1)}</b> : parte));
 }
 
-/** Balão do WhatsApp com a imagem, o texto e as opções. */
-export function PreviaDoWhatsApp({ text, options, mediaPath, mediaType, mediaName }: Pick<Modelo, "text" | "options" | "mediaPath" | "mediaType" | "mediaName">) {
+/** Balão do WhatsApp com a imagem, o texto e as opções. `compacta`: imagem menor e texto recolhido (lista de modelos). */
+export function PreviaDoWhatsApp({ text, options, mediaPath, mediaType, mediaName, compacta = false }: Pick<Modelo, "text" | "options" | "mediaPath" | "mediaType" | "mediaName"> & { compacta?: boolean }) {
   const corpo = textoComOpcoes(text, options);
+  const [aberta, setAberta] = React.useState(false);
+  const recolher = compacta && !aberta;
   return (
     <div className="rounded-[18px] bg-[#0b141a] p-3">
       <div className="ml-auto max-w-[300px] overflow-hidden rounded-[12px] rounded-tr-[4px] bg-[#005c4b] text-[13px] leading-snug text-[#e9edef] shadow">
         {mediaPath && mediaType === "image" && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={`/api/media?path=${encodeURIComponent(mediaPath)}`} alt={mediaName ?? "Imagem do disparo"} className="max-h-[360px] w-full object-cover" />
+          <img src={`/api/media?path=${encodeURIComponent(mediaPath)}`} alt={mediaName ?? "Imagem do disparo"} className={cn("w-full object-cover", recolher ? "max-h-[160px]" : "max-h-[360px]")} />
         )}
         {mediaPath && mediaType !== "image" && (
           <p className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-[12px] opacity-80">
             <ImageIcon size={14} aria-hidden /> {mediaName ?? "arquivo"}
           </p>
         )}
-        {corpo && <p className="whitespace-pre-wrap px-3 py-2">{comNegrito(corpo)}</p>}
+        {corpo && <p className={cn("whitespace-pre-wrap px-3 py-2", recolher && "line-clamp-6")}>{comNegrito(corpo)}</p>}
       </div>
+      {compacta && (
+        <button type="button" onClick={() => setAberta((v) => !v)} aria-expanded={aberta} className="mt-2 block w-full text-center text-caption font-medium text-[#8696a0] hover:text-[#e9edef]">
+          {aberta ? "Recolher" : "Ver mensagem inteira"}
+        </button>
+      )}
     </div>
   );
 }
@@ -101,7 +109,7 @@ export function ModelosDeDisparo({ modelos, aviso, carregar, onUsar }: { modelos
                 <Trash2 />
               </IconButton>
             </div>
-            <PreviaDoWhatsApp {...m} />
+            <PreviaDoWhatsApp {...m} compacta />
             <Button type="button" variant="primary" size="sm" onClick={() => onUsar(m)}>
               <Send size={13} aria-hidden /> Usar no disparo
             </Button>

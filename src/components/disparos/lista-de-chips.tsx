@@ -92,7 +92,7 @@ export function ListaDeChips() {
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-[32px] font-semibold leading-tight tracking-tight text-text-primary">Chips</h1>
           <p className="text-small text-text-tertiary">
-            {dados ? `${conectados} de ${dados.chips.length} conectados · limite de ${dados.limiteDia} por chip/dia` : "Carregando…"}
+            {dados ? `${conectados} de ${dados.chips.length} conectados` : "Carregando…"}
           </p>
         </div>
         <Link
@@ -119,7 +119,6 @@ export function ListaDeChips() {
       <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {dados?.chips.map((c) => {
           const st = SITUACAO[c.sessao] ?? SITUACAO.disconnected;
-          const uso = dados.limiteDia > 0 ? Math.min(100, Math.round((c.usadosHoje / dados.limiteDia) * 100)) : 0;
           return (
             <li key={c.canalId} className="flex flex-col gap-4 rounded-[24px] border border-border-subtle bg-panel p-4">
               <div className="flex items-start gap-3">
@@ -133,17 +132,10 @@ export function ListaDeChips() {
                 <Badge variant={st.variante}>{st.rotulo}</Badge>
               </div>
 
-              <div>
-                <div className="mb-1 flex justify-between text-caption text-text-tertiary">
-                  <span>Uso de hoje</span>
-                  <span className="tabular-nums">
-                    {fmt(c.usadosHoje)} de {fmt(dados.limiteDia)}
-                  </span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={uso} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="h-full rounded-full bg-[linear-gradient(90deg,#6eaaff,#b48cff)]" style={{ width: `${uso}%` }} />
-                </div>
-              </div>
+              <p className="flex items-baseline justify-between text-caption text-text-tertiary">
+                <span>Disparados hoje</span>
+                <span className="font-display text-body-lg font-semibold tabular-nums text-text-primary">{fmt(c.usadosHoje)}</span>
+              </p>
 
               <dl className="grid grid-cols-3 gap-2 text-caption">
                 <div>

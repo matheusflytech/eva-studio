@@ -158,11 +158,10 @@ export function PainelDeDisparos() {
             ))}
           </nav>
 
-          {/* Chips: uso de hoje contra o limite do anti-ban. */}
+          {/* Chips: quantos cada um disparou hoje. */}
           <section aria-labelledby="chips-titulo" className="order-3 self-start rounded-[24px] border border-border-subtle bg-panel p-4 lg:order-4 lg:p-5">
             <div className="mb-3 flex items-center gap-2">
               <h2 id="chips-titulo" className="text-body font-semibold text-text-primary">Chips hoje</h2>
-              <span className="text-caption text-text-tertiary">limite de {dados?.limiteDia ?? 200} por chip</span>
               <Link href="/chips" className="ml-auto text-small font-medium text-accent-fg">Ver chips</Link>
             </div>
             {!dados ? (
@@ -182,8 +181,7 @@ export function PainelDeDisparos() {
                         <span className="min-w-0 flex-1 truncate font-medium text-text-primary">{c.agente ?? "Sem agente"} <span className="font-normal text-text-tertiary">· {c.numero}</span></span>
                         <Badge variant={st.variante}>{st.rotulo}</Badge>
                       </div>
-                      <Barra valor={c.usadosHoje} total={dados.limiteDia} />
-                      <p className="text-caption text-text-tertiary">{fmt(c.usadosHoje)} de {fmt(dados.limiteDia)} hoje</p>
+                      <p className="text-caption text-text-tertiary">{fmt(c.usadosHoje)} disparados hoje</p>
                     </li>
                   );
                 })}
