@@ -17,7 +17,9 @@ import { Ilha } from "@/components/layout/ilha";
 import { pulsar } from "@/lib/fundo/eventos";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { ChatDaEva } from "@/components/chat/chat-da-eva";
-import { NOME_DO_APP } from "@/lib/app-variant";
+import { NOME_DO_APP, ehAppDeDisparos } from "@/lib/app-variant";
+import { BarraDoCelular } from "@/components/layout/barra-do-celular";
+import { cn } from "@/lib/utils";
 
 // Tudo dentro de /<idDoContrato>/... A URL é a fonte da verdade do contrato:
 // o /api/me recebe o id pelo cabeçalho e confere o vínculo no servidor. Aqui só
@@ -68,14 +70,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <TopoDaCasca className="hidden min-[860px]:grid" />
 
         <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-border-subtle bg-panel/80 px-3 py-2 backdrop-blur min-[860px]:hidden" data-print-ocultar>
-          <button
-            type="button"
-            onClick={() => setMenuAberto(true)}
-            aria-label="Abrir o menu"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2 hover:text-text-primary"
-          >
-            <Menu size={20} />
-          </button>
+          {/* Disparo: o menu abre pelo "Mais" da barra de baixo. */}
+          {ehAppDeDisparos ? (
+            <span className="w-9" aria-hidden="true" />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMenuAberto(true)}
+              aria-label="Abrir o menu"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+            >
+              <Menu size={20} />
+            </button>
+          )}
           <span className="flex items-center gap-2">
             <MarcaEva size={18} className="text-text-primary" />
             <span className="font-display text-body font-bold text-text-primary">{NOME_DO_APP}</span>
@@ -105,7 +112,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="app-conteudo relative z-10 flex min-h-0 min-w-0 flex-1 flex-col min-[860px]:pl-[88px]">
           {/* Notificações: descem do topo só quando acontece algo (nada fixo aqui). */}
           <Ilha />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto min-[860px]:pt-2">
+          <main
+            className={cn(
+              "flex min-h-0 flex-1 flex-col overflow-y-auto min-[860px]:pt-2",
+              // Espaço da barra de baixo do celular, para nada ficar escondido atrás dela.
+              ehAppDeDisparos && "pb-[calc(76px+env(safe-area-inset-bottom))] min-[860px]:pb-0"
+            )}
+          >
             {/* key: a cada tela nova a entrada roda de novo (cascata em globals.css). */}
             <ViewTransition key={pathname} enter="none" exit="eva-tela-sai" default="none">
               <div className="entrada-de-tela flex min-h-0 flex-1 flex-col">{children}</div>
@@ -113,6 +126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         </div>
+        {ehAppDeDisparos && <BarraDoCelular onMais={() => setMenuAberto(true)} className="min-[860px]:hidden" />}
         <ChatDaEva />
       </div>
     </BuscaGlobal>

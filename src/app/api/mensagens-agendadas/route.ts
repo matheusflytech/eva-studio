@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     agentId: q.get("agentId"),
     channel: q.get("channel"),
     to: q.get("to"),
+    todas: q.get("todas") === "grupo" ? "grupo" : q.get("todas") === "individual" ? "individual" : null,
   });
   return NextResponse.json({ agendadas });
 }

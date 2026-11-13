@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { tamanhoLegivel, type Conversa } from "./tipos";
 import { AgendarMensagem } from "@/components/whatsapp/agendar-mensagem";
 import { CANAIS_AGENDAVEIS } from "@/lib/whatsapp/janela";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 export interface AnexoPreparado {
   path: string;
@@ -367,7 +368,8 @@ export function Compositor({
       )}
 
       <div className="mb-2 flex items-center gap-4">
-        {(["responder", "nota"] as const).map((m) => (
+        {/* Disparo não tem nota interna: só responder. */}
+        {!ehAppDeDisparos && (["responder", "nota"] as const).map((m) => (
           <button
             key={m}
             type="button"

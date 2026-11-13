@@ -9,6 +9,7 @@ import { horaDaMensagem, tamanhoLegivel, type Mensagem } from "./tipos";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { OrbeDoAgente } from "@/components/agent-studio/orbe-do-agente";
 import { PlayerDeAudio } from "./player-de-audio";
+import { VisualizadorDeImagem } from "@/components/ui/visualizador-de-imagem";
 
 /** Os tiques que todo mundo já conhece do WhatsApp. Ficam dentro do balão azul. */
 function Entrega({ m, onReenviar }: { m: Mensagem; onReenviar: () => void }) {
@@ -60,7 +61,7 @@ function Anexo({ m, doContato }: { m: Mensagem; doContato: boolean }) {
 
   if (md.type === "image" || md.type === "sticker") {
     return (
-      <a href={md.url} target="_blank" rel="noreferrer" className="block">
+      <VisualizadorDeImagem src={md.url} alt={md.name ?? "Imagem recebida"}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={md.url}
@@ -71,7 +72,7 @@ function Anexo({ m, doContato }: { m: Mensagem; doContato: boolean }) {
             md.type === "sticker" ? "h-28 w-28 object-contain" : "max-h-[260px] max-w-full"
           )}
         />
-      </a>
+      </VisualizadorDeImagem>
     );
   }
 

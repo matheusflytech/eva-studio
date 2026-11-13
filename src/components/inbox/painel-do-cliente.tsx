@@ -17,6 +17,8 @@ import { AvatarDoContato } from "./avatar";
 import { dinheiro, type Conversa, type Contexto } from "./tipos";
 import { useSondagem } from "./use-sondagem";
 import { useMudancaDeEtapa } from "@/components/crm/negocios/mudanca-de-etapa";
+import { ehAppDeDisparos } from "@/lib/app-variant";
+import { AgendadasDaConversa } from "@/components/disparos/agendamentos";
 
 interface Funil {
   id: string;
@@ -134,6 +136,7 @@ export function PainelDoCliente({
 
   // Funis e etiquetas mudam raramente: uma vez só.
   React.useEffect(() => {
+    if (ehAppDeDisparos) return;
     fetch("/api/pipelines").then((r) => r.json()).then((d) => setFunis(d.pipelines ?? [])).catch(() => {});
     fetch("/api/tags").then((r) => r.json()).then((d) => setEtiquetas(d.tags ?? [])).catch(() => {});
   }, []);
@@ -278,6 +281,11 @@ export function PainelDoCliente({
               </dl>
             </Secao>
 
+            {/* Disparo: sem negócio, tarefa e etiqueta; no lugar, o que está agendado para esta pessoa. */}
+            {ehAppDeDisparos ? (
+              <AgendadasDaConversa agentId={conversa.agentId} to={conversa.contactId} nome={contato.name || conversa.nome} />
+            ) : (
+            <>
             <Secao
               titulo="Negócio"
               acao={
@@ -503,6 +511,8 @@ export function PainelDoCliente({
                 </Recolhivel>
               )}
             </div>
+            </>
+            )}
           </div>
         )}
       </div>

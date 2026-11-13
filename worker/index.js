@@ -32,6 +32,7 @@ import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindic
 import { RITMO, agentesComDisparo, falharPendentesDoChip, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
 import { decidirReconexao } from "./desconexao.js";
 import { cacheSimples, criarMemoriaDeEnviadas, mensagemParaReenvio } from "./retentativa.js";
+import { conteudoDeVoz } from "./voz.js";
 import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
 import { anotarIdDaResposta, aplicarRecibo, statusDoRecibo } from "./entrega.js";
@@ -624,7 +625,8 @@ async function enviarItem(row, session, doDisparo = false) {
       let conteudo;
       if (row.mediaType === "image") conteudo = { image: { url }, caption: legenda };
       else if (row.mediaType === "video") conteudo = { video: { url }, caption: legenda };
-      else if (row.mediaType === "audio") conteudo = { audio: { url }, mimetype: row.mediaMime || "audio/mpeg" };
+      // Áudio sai como nota de voz (gravado agora), não como arquivo; ver voz.js.
+      else if (row.mediaType === "audio") conteudo = await conteudoDeVoz(url, row.mediaMime);
       else if (row.mediaType === "sticker") conteudo = { sticker: { url } };
       else conteudo = { document: { url }, mimetype: row.mediaMime || "application/octet-stream", fileName: row.mediaName || "arquivo", caption: legenda };
 

@@ -9,6 +9,7 @@ import { PainelDoCliente } from "@/components/inbox/painel-do-cliente";
 import { useSondagem } from "@/components/inbox/use-sondagem";
 import type { Conversa, IdDoFiltro, Membro, Resumo } from "@/components/inbox/tipos";
 import { cn } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 import { Button } from "@/components/ui/button";
 import { useAgentsStore } from "@/lib/stores/agents-store";
 
@@ -278,7 +279,9 @@ function Conversas() {
             </h2>
             {!selecionada && (
               <p className="mt-1.5 max-w-sm text-small text-text-secondary">
-                Você vê o histórico, responde, deixa notas para a equipe e mexe no negócio do cliente sem sair daqui.
+                {ehAppDeDisparos
+                  ? "Você vê o histórico, responde e agenda a próxima mensagem sem sair daqui."
+                  : "Você vê o histórico, responde, deixa notas para a equipe e mexe no negócio do cliente sem sair daqui."}
               </p>
             )}
           </section>

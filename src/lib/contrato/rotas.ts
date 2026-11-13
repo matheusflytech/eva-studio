@@ -25,6 +25,7 @@ export const SECOES_DO_CONTRATO = [
   "sequences",
   "automations",
   "broadcasts",
+  "scheduled",
   "approvals",
   "library",
   "companies",

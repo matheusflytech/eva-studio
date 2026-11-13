@@ -1006,6 +1006,12 @@ body {
     box-shadow: inset 0 1px 0 var(--vidro-topo), 0 0 0 0.5px var(--vidro-aro), var(--vidro-sombra), inset 0 0 20px var(--vidro-luz-interna);
     transition: background-color 0.25s ease, box-shadow 0.25s ease, translate 0.25s var(--ease-out), scale 0.12s var(--ease-out);
   }
+  /* Trilho abre por cima do conteúdo: quase sólido, senão o texto de trás suja os rótulos. */
+  .vidro.trilho {
+    background: color-mix(in srgb, var(--surface-panel) 94%, transparent);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    backdrop-filter: blur(28px) saturate(140%);
+  }
   /* Borda de luz: um fio de 1px com degradê, só nas pontas da diagonal. */
   .vidro::before {
     content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
@@ -1031,6 +1037,18 @@ body {
     -webkit-backdrop-filter: url(#eva-vidro-lente) blur(8px) saturate(200%);
     backdrop-filter: url(#eva-vidro-lente) blur(8px) saturate(200%);
   }
+}
+/* O .vidro (fora de camada) apaga o transition-[width] do Tailwind: o trilho abria de estalo.
+   Abre com um respiro (passar o mouse de raspão não abre) e devagar; fecha mais rápido. */
+.vidro.trilho {
+  transition: width 0.22s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.25s ease, box-shadow 0.25s ease;
+}
+.vidro.trilho:hover,
+.vidro.trilho:focus-within {
+  transition: width 0.42s cubic-bezier(0.32, 0.72, 0, 1) 0.15s, background-color 0.25s ease, box-shadow 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vidro.trilho, .vidro.trilho:hover, .vidro.trilho:focus-within { transition: none; }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .vidro { background: var(--surface-panel); border: 1px solid var(--border-default); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }

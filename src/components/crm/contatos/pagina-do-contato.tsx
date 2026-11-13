@@ -32,6 +32,7 @@ import { Bloco, cidadeDo, linkDeLigar } from "./ficha-do-contato";
 import { FunilDoContato, type NegocioDoContato } from "./funil-do-contato";
 import { PilulasDeNumeros } from "@/components/layout/cabecalho-de-tela";
 import { formatMoney } from "@/lib/design-system/format";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 interface Ficha {
   contact: Contact;
@@ -235,7 +236,8 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
           <TrocarFoto endpoint={`/api/contacts/${contato.id}/foto`} temFoto={!!contato.avatarPath} rotulo={nome} onMudou={() => void carregar()}>
             <FotoDoContato nome={nome} semente={contato.id} tamanho="xl" foto={contato.avatarPath} />
           </TrocarFoto>
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {/* basis-48: no celular o nome fica inteiro e os botões descem para a linha de baixo. */}
+          <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
             <h1 className="truncate text-heading font-semibold tracking-tight text-text-primary">{nome}</h1>
             <p className="truncate text-small text-text-tertiary">
               {contato.jobTitle && <>{contato.jobTitle} · </>}
@@ -247,7 +249,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
                 "Sem empresa"
               )}
             </p>
-            <EtiquetasDoContato contact={contato} tags={tags} onChanged={mudouContato} className="mt-1.5" />
+            {!ehAppDeDisparos && <EtiquetasDoContato contact={contato} tags={tags} onChanged={mudouContato} className="mt-1.5" />}
           </div>
           <div className="flex shrink-0 gap-3.5">
             {/* Sem o círculo de destaque (acento): o logo oficial já tem a cor dele. */}
@@ -260,25 +262,27 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
             <AcaoRedonda rotulo="E-mail" href={contato.email ? `mailto:${contato.email}` : null}>
               <Mail aria-hidden />
             </AcaoRedonda>
-            <AcaoRedonda
-              rotulo="Tarefa"
-              onClick={() => {
-                setAba("resumo");
-                setPedidoDeTarefa((n) => n + 1);
-              }}
-            >
-              <ListTodo aria-hidden />
-            </AcaoRedonda>
+            {!ehAppDeDisparos && (
+              <AcaoRedonda
+                rotulo="Tarefa"
+                onClick={() => {
+                  setAba("resumo");
+                  setPedidoDeTarefa((n) => n + 1);
+                }}
+              >
+                <ListTodo aria-hidden />
+              </AcaoRedonda>
+            )}
           </div>
         </header>
 
-        <PilulasDeNumeros
+        {!ehAppDeDisparos && <PilulasDeNumeros
           numeros={[
             { rotulo: "ganho", valor: negocios.filter((n) => n.stageType === "won").reduce((s, n) => s + n.amountCents, 0), formatar: (n) => formatMoney(n / 100) },
             { rotulo: "em aberto", valor: negocios.filter((n) => n.stageType === "open").reduce((s, n) => s + n.amountCents, 0), formatar: (n) => formatMoney(n / 100) },
             { rotulo: "tarefas abertas", valor: (ficha.tasks ?? []).filter((t) => !t.doneAt).length },
           ]}
-        />
+        />}
 
         {erro && <Notice tone="danger">{erro}</Notice>}
 
@@ -299,10 +303,10 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
               </div>
               {canais.length > 0 && <p className="font-mono text-caption text-text-tertiary">Canais: {canais.join(" · ")}</p>}
             </div>
-            <FunilDoContato negocios={negocios} />
+            {!ehAppDeDisparos && <FunilDoContato negocios={negocios} />}
             <ContactActivity
               contactId={contato.id}
-              secoes={["tarefas", "negocios", "conversas", "sequencias"]}
+              secoes={ehAppDeDisparos ? ["conversas"] : ["tarefas", "negocios", "conversas", "sequencias"]}
               pedidoDeTarefa={pedidoDeTarefa}
               onCountsChange={aoMudarTarefas}
             />
@@ -311,7 +315,7 @@ export function PaginaDoContato({ contactId }: { contactId: string }) {
 
         {abaVisivel === "atividade" && (
           <section aria-label="Linha do tempo do contato" className="flex flex-col gap-3">
-            <NovaNota vinculo={{ contactId: contato.id }} onCriada={carregar} compacto />
+            {!ehAppDeDisparos && <NovaNota vinculo={{ contactId: contato.id }} onCriada={carregar} compacto />}
             <LinhaDoTempoView itens={linha.itens} falhou={linhaFalhou} agora={agora} rotulos={{ etapas: "Negócios" }} />
           </section>
         )}

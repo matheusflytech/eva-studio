@@ -159,7 +159,8 @@ export function RelatorioDeDisparos({ embutido = false }: { embutido?: boolean }
         })}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
+      {/* grid-cols-1 = minmax(0,1fr): sem ele o gráfico de 560px alarga a coluna e a tela rola de lado no celular. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6">
         {/* Por dia */}
         <section aria-labelledby="rel-dia" className="rounded-[24px] border border-border-subtle bg-panel p-4 lg:col-span-2 lg:p-5">
           <h2 id="rel-dia" className="mb-2 text-body font-semibold text-text-primary">Por dia</h2>
