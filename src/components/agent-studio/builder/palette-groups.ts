@@ -1,4 +1,5 @@
 import type { IconKey } from "./icon-registry";
+import { blocoNoApp } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Como a paleta se apresenta.
@@ -34,7 +35,7 @@ export interface PaletteGroup {
   items: PaletteItem[];
 }
 
-export const PALETTE_GROUPS: PaletteGroup[] = [
+const TODOS_OS_GRUPOS: PaletteGroup[] = [
   {
     id: "conversa",
     label: "Conversa",
@@ -96,6 +97,11 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
     ],
   },
 ];
+
+// App de disparos: sem CRM nem agenda (lib/app-variant.ts); grupo que esvazia some.
+export const PALETTE_GROUPS: PaletteGroup[] = TODOS_OS_GRUPOS.map((g) => ({ ...g, items: g.items.filter((i) => blocoNoApp(i.key)) })).filter(
+  (g) => g.items.length > 0
+);
 
 /** Texto de busca de um item, sem acento e em minúscula. */
 export function searchable(item: PaletteItem): string {

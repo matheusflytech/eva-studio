@@ -42,9 +42,36 @@ export function destinoNoAmbienteUnico(org: string | null, pathname: string): st
   return null;
 }
 
+/**
+ * Blocos do construtor que o app de disparos não oferece: tudo de CRM (o CRM é o
+ * Beeno) e agenda. Ficam API, MCP, requisição HTTP e o n8n.
+ */
+export const BLOCOS_SEM_DISPARO = new Set([
+  "crm-deal",
+  "crm-stage",
+  "crm-task",
+  "crm-tag",
+  "crm-update",
+  "crm-note",
+  "crm-lookup",
+  "tool-crm",
+  "tool-calendar",
+]);
+
+/** O bloco aparece neste app? (no Eva, todos) */
+export function blocoNoApp(tipo: string, variante: VarianteDoApp = APP_VARIANT): boolean {
+  return variante !== "disparos" || !BLOCOS_SEM_DISPARO.has(tipo);
+}
+
+/** Tipos de canal que este app conecta (no de disparos, só WhatsApp via QR). */
+export function canalNoApp(tipo: string, variante: VarianteDoApp = APP_VARIANT): boolean {
+  return variante !== "disparos" || tipo === "whatsapp_qr";
+}
+
 /** Seções do contrato que o app de disparos mostra; o resto vai para /home. */
 export const SECOES_DO_APP_DE_DISPAROS = new Set([
   "home",
+  "chips",
   "broadcasts",
   "conversations",
   "contacts",

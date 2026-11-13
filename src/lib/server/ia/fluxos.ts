@@ -10,6 +10,7 @@ import { validateFlow } from "@/components/agent-studio/builder/block-validation
 import { organizarFluxo } from "@/components/agent-studio/builder/auto-layout";
 import { SAIDA_INVALIDA, variavelDaCaptura } from "@/lib/capture-validation";
 import { normalizarTipoDeTarefa } from "@/lib/tarefas/tipos";
+import { blocoNoApp } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Rascunho de fluxo do agente (construtor de blocos) montado pela IA.
@@ -41,6 +42,8 @@ export const BLOCOS_PERMITIDOS = [
   "crm-lookup",
 ] as const satisfies readonly IconKey[];
 type BlocoPermitido = (typeof BLOCOS_PERMITIDOS)[number];
+/** O que a IA pode montar neste app (no de disparos, sem CRM: lib/app-variant.ts). */
+const BLOCOS_DO_APP: readonly string[] = BLOCOS_PERMITIDOS.filter((b) => blocoNoApp(b));
 
 /** Existem no construtor, mas pedem credencial/URL/servidor: só à mão. */
 const BLOCOS_MANUAIS: Record<string, string> = {
@@ -230,7 +233,7 @@ export function normalizarFluxo(raw: unknown, cat: CatalogoFluxo): NormalizacaoD
       avisos.push(`Havia dois blocos com o mesmo id ("${rawId}"); fiquei com o primeiro.`);
       return;
     }
-    if (!(BLOCOS_PERMITIDOS as readonly string[]).includes(tipo)) {
+    if (!BLOCOS_DO_APP.includes(tipo)) {
       avisos.push(
         BLOCOS_MANUAIS[tipo]
           ? `O bloco "${BLOCOS_MANUAIS[tipo]}" precisa de configuração sua (credencial ou endereço). Adicione pela paleta depois de aplicar.`
@@ -665,7 +668,7 @@ const ESQUEMA = `{
   "nodes": [
     {
       "id": "texto curto e único, ex.: b1",
-      "bloco": "${BLOCOS_PERMITIDOS.join(" | ")}",
+      "bloco": "${BLOCOS_DO_APP.join(" | ")}",
       "label": "título curto do bloco (até 60 caracteres)",
       "detail": "texto que o agente diz (message, capture, human, end)",
       "...": "campos do bloco, conforme a lista abaixo"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { destinoNoAmbienteUnico, redirecionarSecao, varianteDe } from "./app-variant";
+import { blocoNoApp, canalNoApp, destinoNoAmbienteUnico, redirecionarSecao, varianteDe } from "./app-variant";
 
 describe("app de disparos", () => {
   it("só 'disparos' liga o modo; o resto é o Eva", () => {
@@ -39,5 +39,18 @@ describe("ambiente único do app de disparos", () => {
   });
   it("sem org configurada (Eva) nada muda", () => {
     expect(destinoNoAmbienteUnico(null, "/contracts")).toBeNull();
+  });
+});
+
+describe("o que o app de disparos não oferece", () => {
+  it("sem CRM nem agenda no construtor; API, MCP e n8n ficam", () => {
+    for (const b of ["crm-deal", "crm-task", "tool-crm", "tool-calendar"]) expect(blocoNoApp(b, "disparos")).toBe(false);
+    for (const b of ["http", "tool-http", "tool-mcp", "agent", "message"]) expect(blocoNoApp(b, "disparos")).toBe(true);
+    expect(blocoNoApp("crm-deal", "eva")).toBe(true);
+  });
+  it("canais: só WhatsApp via QR no app de disparos", () => {
+    expect(canalNoApp("whatsapp_qr", "disparos")).toBe(true);
+    expect(canalNoApp("whatsapp_meta", "disparos")).toBe(false);
+    expect(canalNoApp("instagram", "eva")).toBe(true);
   });
 });

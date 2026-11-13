@@ -39,6 +39,7 @@ import { CabecalhoDaSecao, LinhaDeConfig, RodapeDaSecao } from "@/components/con
 import { SecaoGoogleAgenda } from "@/components/configuracoes/google-agenda";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn } from "@/lib/utils";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Configurações (v5): as nove abas viram um menu de seções à esquerda, em
@@ -241,7 +242,8 @@ function AbaConta() {
         </RodapeDaSecao>
       </form>
 
-      <SecaoGoogleAgenda />
+      {/* App de disparos: sem agenda. */}
+      {!ehAppDeDisparos && <SecaoGoogleAgenda />}
 
       <section aria-labelledby="titulo-aparencia">
         <CabecalhoDaSecao

@@ -10,6 +10,7 @@ import { MarcaEva } from "@/components/layout/marca-eva";
 import { LogoOficial } from "@/components/ui/logo-oficial";
 import { ICON_REGISTRY, type IconKey } from "./icon-registry";
 import { PALETTE_GROUPS } from "./palette-groups";
+import { blocoNoApp } from "@/lib/app-variant";
 import { cn } from "@/lib/utils";
 import type { FlowNodeData } from "./flow-node";
 
@@ -527,7 +528,7 @@ function ItemDaConversa({
  * dessas. O resto continua a um clique de distância, na aba Editor.
  */
 function PaletaRapida({ onPick, onClose }: { onPick: (k: IconKey) => void; onClose: () => void }) {
-  const comuns: IconKey[] = ["message", "capture", "condition", "ai-agent", "crm-deal", "crm-task", "human", "end"];
+  const comuns = (["message", "capture", "condition", "ai-agent", "crm-deal", "crm-task", "human", "end"] as IconKey[]).filter((k) => blocoNoApp(k));
   const rotulos = new Map<IconKey, string>();
   PALETTE_GROUPS.forEach((g) => g.items.forEach((i) => rotulos.set(i.key, i.label)));
 

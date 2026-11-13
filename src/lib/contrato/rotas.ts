@@ -15,6 +15,7 @@ export const CABECALHO_CONTRATO = "x-eva-contrato";
 /** Primeiro segmento das telas que existem dentro de um contrato. */
 export const SECOES_DO_CONTRATO = [
   "home",
+  "chips",
   "conversations",
   "deals",
   "contacts",
