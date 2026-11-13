@@ -683,6 +683,26 @@ model Broadcast {
 // entrega fica por variante — e assim que se compara duas mensagens de
 // verdade, em vez de no olho. Sem variantes, o disparo usa Broadcast.text
 // normalmente.
+// Modelo de disparo (app de disparos, WhatsApp via QR): texto, opções numeradas
+// e um arquivo opcional, guardados para reusar e mostrar antes de disparar.
+// SQL 2026-11-13-broadcast-templates.sql.
+model BroadcastTemplate {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  text      String   @db.Text
+  options   Json     @default("[]")
+  mediaPath String?
+  mediaType String?
+  mediaMime String?
+  mediaName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@map("eva_studio_broadcast_templates")
+}
+
 model BroadcastVariant {
   id          String   @id @default(uuid())
   broadcastId String
