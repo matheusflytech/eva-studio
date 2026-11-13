@@ -7,6 +7,7 @@ import { Pin, PinOff, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNaoLidas } from "@/components/inbox/use-nao-lidas";
 import { NAV_PRINCIPAL, NAV_AVANCADO } from "./navegacao";
+import { NOME_DO_APP } from "@/lib/app-variant";
 import { SidebarNavItem } from "./sidebar-nav-item";
 import { OrgSwitcher } from "./org-switcher";
 import { ThemeToggle } from "@/components/ui/theme";
@@ -139,7 +140,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
         ) : (
           <Link href="/home" className="flex items-center gap-2">
             <MarcaEva size={20} className="text-text-primary" />
-            <span className="text-body font-semibold tracking-tight text-text-primary">Eva</span>
+            <span className="text-body font-semibold tracking-tight text-text-primary">{NOME_DO_APP}</span>
           </Link>
         )}
         {!mobile && !collapsed && (
@@ -172,6 +173,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
           </div>
         ))}
 
+        {NAV_AVANCADO.length > 0 && (
         <div className="flex flex-col gap-0.5 border-t border-border-subtle pt-3">
           <button
             type="button"
@@ -207,6 +209,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
               </div>
             ))}
         </div>
+        )}
       </nav>
 
       {/* Rodapé: você e o contrato (abre o menu da conta por cima da tela) e o

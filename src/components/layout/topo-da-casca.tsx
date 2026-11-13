@@ -10,6 +10,7 @@ import { useNaoLidas, rotuloDeNaoLidas } from "@/components/inbox/use-nao-lidas"
 import { MarcaEva } from "./marca-eva";
 import { OrgSwitcher } from "./org-switcher";
 import { NAV_PRINCIPAL } from "./navegacao";
+import { NOME_DO_APP } from "@/lib/app-variant";
 import { AbasDeLuz } from "./abas-de-luz";
 
 const ABAS = NAV_PRINCIPAL[0].items;
@@ -91,8 +92,8 @@ export function TopoDaCasca({ className }: { className?: string }) {
   return (
     <header className={cn("relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 pb-3 pt-3", className)} data-print-ocultar>
       {/* Só a marca, no mesmo eixo do trilho (60px de largura, 14px da borda; o topo tem 20px de padding). */}
-      <Link href="/home" className="-ml-1.5 flex w-[60px] items-center justify-center justify-self-start" aria-label="Eva, início">
-        <MarcaEva size={28} title="Eva" className="text-text-primary" />
+      <Link href="/home" className="-ml-1.5 flex w-[60px] items-center justify-center justify-self-start" aria-label={`${NOME_DO_APP}, início`}>
+        <MarcaEva size={28} title={NOME_DO_APP} className="text-text-primary" />
       </Link>
 
       <AbasDeLuz itens={ABAS} ativo={ativo} etiqueta={(item) => (item.href === "/conversations" ? rotuloDeNaoLidas(naoLidas) : item.badge)} />

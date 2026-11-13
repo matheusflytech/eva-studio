@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { pulsar } from "@/lib/fundo/eventos";
+import { NOME_DO_APP, ehAppDeDisparos } from "@/lib/app-variant";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col text-left">
       <h1 className="text-title font-semibold tracking-tight text-text-primary">Entrar</h1>
-      <p className="mt-1 text-small text-text-secondary">Acesse o painel da Eva Holding.</p>
+      <p className="mt-1 text-small text-text-secondary">{ehAppDeDisparos ? `Acesse o ${NOME_DO_APP}.` : "Acesse o painel da Eva Holding."}</p>
 
       {/* O fundo reage quando a pessoa entra num campo. */}
       <form onSubmit={handleSubmit} onFocus={(e) => pulsar(e.target, 0.9)} className="mt-6 flex flex-col gap-3 text-left">

@@ -658,6 +658,12 @@ model Broadcast {
   createdById     String?
   // Último motivo de falha legível (ex.: janela de 24h fechada sem modelo).
   lastError       String?
+  // Arquivo do disparo (WhatsApp via QR): caminho no storage; o texto vira legenda.
+  // SQL 2026-11-13-broadcast-media.sql.
+  mediaPath       String?
+  mediaType       String?
+  mediaMime       String?
+  mediaName       String?
   createdAt   DateTime @default(now())
 
   agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)

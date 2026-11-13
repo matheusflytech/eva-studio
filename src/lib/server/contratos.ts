@@ -13,6 +13,7 @@ import {
   type PermissaoGranular,
 } from "@/lib/permissoes/catalogo";
 import { ehIdCompletoDeContrato, ehIdCurtoDeContrato } from "@/lib/contrato/rotas";
+import { ORG_DO_APP, ehAppDeDisparos, ehOrgDoApp } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Contrato ativo: qual Organization esta requisição enxerga.
@@ -215,6 +216,15 @@ export async function resolverContratoAtivo(
   pedido: string | null | undefined,
   cookie: string | null | undefined
 ): Promise<ResultadoDoContrato> {
+  // App de disparos: ambiente único. Só o contrato do app, pedido ou não; nenhum
+  // outro contrato (do Eva) é aberto por este deploy.
+  if (ehAppDeDisparos) {
+    if (!ORG_DO_APP) return { ok: false, motivo: "sem_contrato" };
+    if (pedido && !ehOrgDoApp(ORG_DO_APP, pedido)) return { ok: false, motivo: "sem_acesso" };
+    const acesso = await acessoAoContrato(pessoa, ORG_DO_APP);
+    return acesso ? { ok: true, acesso } : { ok: false, motivo: "sem_acesso" };
+  }
+
   if (pedido) {
     const completo = await expandirIdDoContrato(pedido);
     const acesso = completo ? await acessoAoContrato(pessoa, completo) : null;
@@ -253,6 +263,11 @@ export interface ContratoResumo {
 /** Contratos que a pessoa pode abrir (para o seletor do menu). */
 export async function contratosDaPessoa(pessoa: { id: string; profileOrgId: string }): Promise<ContratoResumo[]> {
   const select = { id: true, name: true, logoUrl: true } as const;
+  // App de disparos: o seletor só conhece o contrato do app.
+  if (ehAppDeDisparos) {
+    const org = ORG_DO_APP ? await prisma.organization.findUnique({ where: { id: ORG_DO_APP }, select }) : null;
+    return org ? [org] : [];
+  }
   return comFallbackLegado(
     async () => {
       const vinculos = await prisma.membership.findMany({

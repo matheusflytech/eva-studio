@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { FundoGelo } from "@/components/entrada/fundo-gelo";
 import { BustoConstelacao } from "@/components/entrada/busto-constelacao";
+import { NOME_DO_APP, ehAppDeDisparos } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Entrar (v6; conta nova só por convite): o cartão escuro flutua sobre o fundo "gelo"
@@ -18,12 +19,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#eef2f6] px-6 py-16">
       <FundoGelo className="pointer-events-none absolute inset-0 h-full w-full" />
 
-      <span className="absolute left-8 top-7 z-10 text-small font-semibold text-[#121214]">Eva Holding</span>
+      <span className="absolute left-8 top-7 z-10 text-small font-semibold text-[#121214]">{ehAppDeDisparos ? NOME_DO_APP : "Eva Holding"}</span>
 
       <div data-theme="dark" className="cartao-de-entrada relative z-10 grid w-full max-w-[1040px] lg:min-h-[min(600px,calc(100vh-160px))] lg:grid-cols-[420px_1fr]">
         <div className="relative z-10 flex flex-col justify-center px-8 py-10 sm:px-14">
           <span className="mb-7 grid h-12 w-12 place-items-center rounded-[14px] bg-[#f2f2f4]">
-            <MarcaEva size={26} title="Eva" className="text-[#0c0c0e]" />
+            <MarcaEva size={26} title={NOME_DO_APP} className="text-[#0c0c0e]" />
           </span>
           {children}
         </div>
