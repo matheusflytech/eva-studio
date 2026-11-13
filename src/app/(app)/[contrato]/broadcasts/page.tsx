@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Send, Clock, FlaskConical, Plus, X, CalendarClock, Ban, CircleHelp, ListFilter, Mail, MessageCircle, Check, Megaphone } from "lucide-react";
+import { Send, Clock, FlaskConical, Plus, X, CalendarClock, Ban, CircleHelp, ListFilter, Mail, MessageCircle, Check, Megaphone, Upload, Users, Smartphone, Image as ImageIcon } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CampoDataSP } from "@/components/whatsapp/campo-data-sp";
 import { deSaoPaulo, formatarSaoPaulo, paraCampoSaoPaulo } from "@/lib/fuso-sp";
@@ -21,6 +21,9 @@ import { LogoOficial, marcaDoCanal } from "@/components/ui/logo-oficial";
 import { pulsar } from "@/lib/fundo/eventos";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import { listTemplates, type MessageTemplate } from "@/lib/data/templates";
+import { Destinatarios } from "@/components/disparos/destinatarios";
+import { useSearchParams } from "@/lib/contrato/navegacao";
+import { dividirLista, numerosDoArquivo, textoComOpcoes } from "@/lib/disparos/lista";
 
 // ---------------------------------------------------------------------------
 // Disparos.
@@ -325,6 +328,8 @@ function DetalheDaCampanha({ b, agentId, onMudou }: { b: BroadcastRow; agentId: 
         </p>
       </section>
 
+      {!agendado && agentId && <Destinatarios agentId={agentId} broadcastId={b.id} />}
+
       {b.text.trim() && (
         <section className="flex flex-col gap-2">
           <p className="font-mono text-caption text-text-tertiary">Mensagem</p>
@@ -376,6 +381,15 @@ export default function DisparosPage() {
     { label: "B", text: "", templateId: null, weight: 1 },
   ]);
 
+  // WhatsApp via QR: grupos do chip, opções numeradas, imagem e divisão entre chips.
+  const [grupos, setGrupos] = React.useState<{ jid: string; subject: string; participantsCount: number }[]>([]);
+  const [opcoes, setOpcoes] = React.useState<string[]>(["", "", ""]);
+  const [midia, setMidia] = React.useState<{ path: string; type: string; mime: string; name: string } | null>(null);
+  const [subindo, setSubindo] = React.useState(false);
+  const [chipsExtras, setChipsExtras] = React.useState<string[]>([]);
+  const arquivoListaRef = React.useRef<HTMLInputElement>(null);
+  const arquivoMidiaRef = React.useRef<HTMLInputElement>(null);
+
   const [isSending, setIsSending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -394,6 +408,18 @@ export default function DisparosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
+  // Links do painel: ?new=1 abre o formulário, ?agent=&b= abre um disparo.
+  const params = useSearchParams();
+  const pedido = React.useRef(false);
+  React.useEffect(() => {
+    if (pedido.current || agents.length === 0) return;
+    pedido.current = true;
+    const doLink = params.get("agent");
+    if (doLink && agents.some((a) => a.id === doLink)) setAgentId(doLink);
+    if (params.get("b")) setAbertaId(params.get("b"));
+    if (params.get("new") === "1") setFormAberto(true);
+  }, [agents, params]);
+
   React.useEffect(() => {
     if (!agentId && agents.length > 0) setAgentId(agents[0].id);
   }, [agentId, agents]);
@@ -405,6 +431,7 @@ export default function DisparosPage() {
     setBroadcasts(data.broadcasts ?? []);
     setTags(data.tags ?? []);
     setSegments(data.segments ?? []);
+    setGrupos(data.groups ?? []);
   }, []);
 
   React.useEffect(() => {
@@ -445,7 +472,9 @@ export default function DisparosPage() {
     setNotice(null);
     setIsSending(true);
 
+    const isQr = channel === "whatsapp_qr";
     const payload: Record<string, unknown> = { channel, audience };
+    if (isQr && midia) payload.media = midia;
     if (audience === "manual") {
       payload.contactIds = recipients.split(/[\n,]/).map((c) => c.trim()).filter(Boolean);
     } else if (audience === "tags") {
@@ -462,7 +491,7 @@ export default function DisparosPage() {
         weight: v.weight,
       }));
     } else {
-      payload.text = isEmail ? "" : text;
+      payload.text = isEmail ? "" : isQr ? textoComOpcoes(text, opcoes) : text;
       payload.templateId = isMeta || isEmail ? templateId : undefined;
     }
 
@@ -475,6 +504,37 @@ export default function DisparosPage() {
         return;
       }
       payload.scheduledAt = quando.toISOString();
+    }
+
+    // Dividir entre chips: um disparo por agente (cada um com o seu chip), com a lista em partes iguais.
+    const chips = isQr && audience === "manual" ? [agentId, ...chipsExtras.filter((c) => c !== agentId)] : [agentId];
+    if (chips.length > 1) {
+      const partes = dividirLista(payload.contactIds as string[], chips.length);
+      const resultados = await Promise.all(
+        partes.map(async (parte, i) => {
+          const r = await fetch(`/api/agents/${chips[i]}/broadcasts`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...payload, contactIds: parte }),
+          });
+          const d = await r.json().catch(() => ({}));
+          const nome = agents.find((a) => a.id === chips[i])?.name ?? "chip";
+          return r.ok ? { ok: true, texto: `${nome}: ${parte.length}` } : { ok: false, texto: `${nome}: ${d.error ?? "erro"}` };
+        })
+      );
+      const falhas = resultados.filter((r) => !r.ok);
+      setNotice(`Dividido entre ${partes.length} chips. ${resultados.filter((r) => r.ok).map((r) => r.texto).join(" · ")}`);
+      if (falhas.length) setError(`Não saiu: ${falhas.map((f) => f.texto).join(" · ")}`);
+      else {
+        setRecipients("");
+        setText("");
+        setOpcoes(["", "", ""]);
+        setMidia(null);
+        setFormAberto(false);
+      }
+      setIsSending(false);
+      await refresh(agentId);
+      return;
     }
 
     try {
@@ -499,6 +559,8 @@ export default function DisparosPage() {
       );
       setRecipients("");
       setText("");
+      setOpcoes(["", "", ""]);
+      setMidia(null);
       setScheduledAt("");
       // Saiu (ou agendou): fecha o formulário e o fundo pulsa do "Nova campanha".
       setFormAberto(false);
@@ -510,6 +572,47 @@ export default function DisparosPage() {
       setIsSending(false);
     }
   }
+
+  async function importarLista(file: File) {
+    const numeros = numerosDoArquivo(await file.text());
+    if (numeros.length === 0) {
+      setError('Não achei números nesse arquivo. Use uma coluna "telefone" ou um número por linha.');
+      return;
+    }
+    setError(null);
+    setRecipients((atual) => [...new Set([...separarLista(atual), ...numeros])].join("\n"));
+  }
+
+  async function subirMidia(file: File) {
+    setSubindo(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/conversations/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, mime: file.type, size: file.size }),
+      });
+      const auth = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(auth.error ?? "Não foi possível enviar o arquivo.");
+      const form = new FormData();
+      form.append("cacheControl", "3600");
+      form.append("", file);
+      const up = await fetch(auth.uploadUrl, { method: "PUT", body: form });
+      if (!up.ok) throw new Error("O envio do arquivo falhou.");
+      setMidia({ path: auth.path, type: auth.type, mime: file.type, name: file.name });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível enviar o arquivo.");
+    } finally {
+      setSubindo(false);
+    }
+  }
+
+  function alternarGrupo(jid: string) {
+    const linhas = separarLista(recipients);
+    setRecipients((linhas.includes(jid) ? linhas.filter((l) => l !== jid) : [...linhas, jid]).join("\n"));
+  }
+
+  const naLista = separarLista(recipients);
 
   // ── Lista: ordem (envio em curso no topo), busca e filtros, tudo no navegador ──
   const visiveis = React.useMemo(() => {
@@ -761,6 +864,71 @@ export default function DisparosPage() {
                   value={recipients}
                   onChange={(e) => setRecipients(e.target.value)}
                 />
+                {channel === "whatsapp_qr" && (
+                  <div className="mt-2 flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        ref={arquivoListaRef}
+                        type="file"
+                        accept=".csv,.txt,text/csv,text/plain"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void importarLista(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Button type="button" variant="secondary" size="sm" onClick={() => arquivoListaRef.current?.click()}>
+                        <Upload size={13} aria-hidden="true" /> Importar CSV/TXT
+                      </Button>
+                      <span className="font-mono text-caption tabular-nums text-text-tertiary">{naLista.length} na lista</span>
+                    </div>
+                    {grupos.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 flex items-center gap-1.5 text-caption text-text-tertiary">
+                          <Users size={12} aria-hidden="true" /> Grupos deste chip (toque para incluir)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {grupos.map((g) => {
+                            const on = naLista.includes(g.jid);
+                            return (
+                              <Pilula key={g.jid} ativa={on} onClick={() => alternarGrupo(g.jid)}>
+                                {on && <Check size={12} aria-hidden="true" />}
+                                {g.subject || "Grupo sem nome"}
+                                <span className="opacity-60">· {g.participantsCount}</span>
+                              </Pilula>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {agents.length > 1 && (
+                      <div>
+                        <p className="mb-1.5 flex items-center gap-1.5 text-caption text-text-tertiary">
+                          <Smartphone size={12} aria-hidden="true" /> Dividir entre chips (um disparo por agente, lista em partes iguais)
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {agents
+                            .filter((a) => a.id !== agentId)
+                            .map((a) => {
+                              const on = chipsExtras.includes(a.id);
+                              return (
+                                <Pilula key={a.id} ativa={on} onClick={() => setChipsExtras(on ? chipsExtras.filter((x) => x !== a.id) : [...chipsExtras, a.id])}>
+                                  {on && <Check size={12} aria-hidden="true" />}
+                                  {a.name}
+                                </Pilula>
+                              );
+                            })}
+                        </div>
+                        {chipsExtras.length > 0 && naLista.length > 0 && (
+                          <p className="mt-1.5 text-caption text-text-tertiary">
+                            {chipsExtras.length + 1} chips · cerca de {Math.ceil(naLista.length / (chipsExtras.length + 1))} por chip
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -910,9 +1078,59 @@ export default function DisparosPage() {
                   <Label htmlFor="disparo-text">Texto</Label>
                   <Textarea id="disparo-text" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Oi {nome}, tudo bem?" />
                   <p className="mt-1.5 text-caption text-text-tertiary">
-                    {"{nome}"}, {"{email}"} e os campos capturados no fluxo são trocados pelos dados de cada contato.
+                    {"{nome}"}, {"{email}"} e os campos capturados no fluxo são trocados pelos dados de cada contato. Link no texto chega
+                    clicável.
                   </p>
                 </div>
+                {channel === "whatsapp_qr" && (
+                  <>
+                    <div>
+                      <Label>Opções de resposta (opcional)</Label>
+                      <div className="flex flex-col gap-1.5">
+                        {opcoes.map((o, i) => (
+                          <Input
+                            key={i}
+                            value={o}
+                            aria-label={`Opção ${i + 1}`}
+                            placeholder={`${i + 1}. ${["Quero saber mais", "Falar com atendente", "Não tenho interesse"][i]}`}
+                            onChange={(e) => setOpcoes(opcoes.map((x, j) => (j === i ? e.target.value : x)))}
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-caption text-text-tertiary">
+                        Pelo QR o WhatsApp não mostra botão em muitos aparelhos; as opções vão numeradas no fim da mensagem.
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Imagem ou arquivo (opcional)</Label>
+                      <input
+                        ref={arquivoMidiaRef}
+                        type="file"
+                        accept="image/*,video/*,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void subirMidia(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      {midia ? (
+                        <div className="flex items-center gap-2 rounded-[14px] bg-raised px-3 py-2 text-small">
+                          <ImageIcon size={15} aria-hidden="true" className="text-text-tertiary" />
+                          <span className="min-w-0 flex-1 truncate text-text-primary">{midia.name}</span>
+                          <IconButton size="sm" aria-label="Tirar arquivo" onClick={() => setMidia(null)}>
+                            <X />
+                          </IconButton>
+                        </div>
+                      ) : (
+                        <Button type="button" variant="secondary" size="sm" disabled={subindo} onClick={() => arquivoMidiaRef.current?.click()}>
+                          <ImageIcon size={13} aria-hidden="true" /> {subindo ? "Enviando arquivo..." : "Escolher arquivo"}
+                        </Button>
+                      )}
+                      <p className="mt-1.5 text-caption text-text-tertiary">O texto vai como legenda da imagem.</p>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -939,6 +1157,11 @@ export default function DisparosPage() {
       </Drawer>
     </div>
   );
+}
+
+/** Lista colada: uma entrada por linha (ou separada por vírgula), sem vazias. */
+function separarLista(texto: string): string[] {
+  return texto.split(/[\n,]/).map((c) => c.trim()).filter(Boolean);
 }
 
 /** Opção em cápsula (filtros, etiquetas): ativa no polegar invertido. */

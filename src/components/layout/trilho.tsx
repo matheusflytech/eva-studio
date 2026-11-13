@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "@/components/contrato/link";
 import { useSearchParams } from "next/navigation";
 import { usePathname } from "@/lib/contrato/navegacao";
-import { CalendarDays, Contact, Handshake, Plus, Search, Settings, Aperture } from "lucide-react";
+import { CalendarDays, Contact, Handshake, Plus, Search, Send, Settings, Aperture } from "lucide-react";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 import { cn } from "@/lib/utils";
 import { useBuscaGlobal } from "@/components/busca/paleta-de-busca";
 import { ThemeToggle } from "@/components/ui/theme";
@@ -83,11 +84,19 @@ export function Trilho({ className }: { className?: string }) {
         </Dica>
         <DropdownMenuContent side="right" align="start" sideOffset={12} className="w-52">
           <DropdownMenuLabel>Criar</DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/deals?new=1">
-              <Handshake size={15} aria-hidden /> Novo negócio
-            </Link>
-          </DropdownMenuItem>
+          {ehAppDeDisparos ? (
+            <DropdownMenuItem asChild>
+              <Link href="/broadcasts?new=1">
+                <Send size={15} aria-hidden /> Novo disparo
+              </Link>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link href="/deals?new=1">
+                <Handshake size={15} aria-hidden /> Novo negócio
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem asChild>
             <Link href="/contacts?new=1">
               <Contact size={15} aria-hidden /> Novo contato
@@ -101,9 +110,11 @@ export function Trilho({ className }: { className?: string }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AtalhoDeTela href="/tasks?tab=calendar" rotulo="Agenda" ativo={naAgenda}>
-        <CalendarDays size={19} aria-hidden className="shrink-0" />
-      </AtalhoDeTela>
+      {!ehAppDeDisparos && (
+        <AtalhoDeTela href="/tasks?tab=calendar" rotulo="Agenda" ativo={naAgenda}>
+          <CalendarDays size={19} aria-hidden className="shrink-0" />
+        </AtalhoDeTela>
+      )}
 
       <span aria-hidden="true" className="my-2 h-px w-6 shrink-0 self-center bg-border-subtle" />
 

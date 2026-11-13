@@ -17,6 +17,7 @@ import { Ilha } from "@/components/layout/ilha";
 import { pulsar } from "@/lib/fundo/eventos";
 import { MarcaEva } from "@/components/layout/marca-eva";
 import { ChatDaEva } from "@/components/chat/chat-da-eva";
+import { NOME_DO_APP } from "@/lib/app-variant";
 
 // Tudo dentro de /<idDoContrato>/... A URL é a fonte da verdade do contrato:
 // o /api/me recebe o id pelo cabeçalho e confere o vínculo no servidor. Aqui só
@@ -77,7 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <span className="flex items-center gap-2">
             <MarcaEva size={18} className="text-text-primary" />
-            <span className="font-display text-body font-bold text-text-primary">Eva</span>
+            <span className="font-display text-body font-bold text-text-primary">{NOME_DO_APP}</span>
           </span>
           <BotaoBuscarNoTopo />
         </header>

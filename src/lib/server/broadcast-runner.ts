@@ -278,6 +278,9 @@ export async function runBroadcast(broadcastId: string, ate = Date.now() + ORCAM
       template: broadcast.channel === "whatsapp_meta" && usarModelo ? templatePayload : undefined,
       broadcastId: broadcast.id,
       variantId: variant?.id,
+      media: broadcast.mediaPath && broadcast.mediaType
+        ? { path: broadcast.mediaPath, type: broadcast.mediaType, mime: broadcast.mediaMime ?? "", name: broadcast.mediaName ?? undefined }
+        : undefined,
     });
 
     if (delivery.ok && delivery.queued) {

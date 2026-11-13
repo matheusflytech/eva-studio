@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE_CONTRATO, destinoDoCaminhoAntigo, ehCaminhoDeSecao } from "@/lib/contrato/rotas";
+import { COOKIE_CONTRATO, destinoDoCaminhoAntigo, ehCaminhoDeSecao, ehIdDeContrato } from "@/lib/contrato/rotas";
+import { APP_VARIANT, ORG_DO_APP, destinoNoAmbienteUnico, redirecionarSecao } from "@/lib/app-variant";
 
 // Refreshes the Supabase auth cookie on every request so server-side reads
 // (Route Handlers, Server Components) never see an expired access token.
@@ -14,6 +15,16 @@ export async function proxy(request: NextRequest) {
   const antigo = destinoDoCaminhoAntigo(pathname, search, request.cookies.get(COOKIE_CONTRATO)?.value);
   // 308 (permanente) só quando o destino não depende do cookie.
   if (antigo) return NextResponse.redirect(new URL(antigo, request.url), ehCaminhoDeSecao(pathname) ? 307 : 308);
+
+  // App de disparos: ambiente único (só o contrato do app, entrando direto)...
+  const unico = destinoNoAmbienteUnico(ORG_DO_APP, pathname);
+  if (unico) return NextResponse.redirect(new URL(unico + search, request.url), 307);
+  // ...e seção que não é dele (negócios, tarefas...) volta para o início.
+  const [, contrato, secao] = pathname.split("/");
+  if (ehIdDeContrato(contrato) && secao) {
+    const destino = redirecionarSecao(APP_VARIANT, contrato, secao);
+    if (destino) return NextResponse.redirect(new URL(destino, request.url), 307);
+  }
 
   let response = NextResponse.next({ request });
 

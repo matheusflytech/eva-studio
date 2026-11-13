@@ -6,6 +6,8 @@ import { runBroadcast } from "@/lib/server/broadcast-runner";
 import { buildSegmentWhere, parseRules } from "@/lib/server/segments";
 import { validarHorario } from "@/lib/server/agendamento";
 import { jidDoWhatsApp } from "@/lib/telefone";
+import { caminhoDaOrg } from "@/lib/server/storage";
+import { ehTabelaAusente } from "@/lib/server/contratos";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Canais que aceitam disparo. Instagram fica de fora de propósito: a Meta
@@ -40,6 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
   ]);
 
   return NextResponse.json({
+    groups: await gruposDoAgente(agent.id, ctx.orgId),
     channels: {
       whatsapp_qr: await qrConectado(agent.id, agent.whatsappConnection),
       whatsapp_meta: !!agent.metaConnection,
@@ -80,6 +83,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ age
   });
 }
 
+// Grupos do número (WhatsApp via QR) ligado ao agente: viram destino do disparo (jid @g.us).
+async function gruposDoAgente(agentId: string, orgId: string) {
+  try {
+    const canal = await prisma.canal.findFirst({ where: { agentId, orgId, tipo: "whatsapp_qr" }, select: { id: true } });
+    if (!canal) return [];
+    return await prisma.whatsAppGroup.findMany({
+      where: { channelId: canal.id, orgId, present: true },
+      orderBy: { subject: "asc" },
+      select: { jid: true, subject: true, participantsCount: true },
+      take: 500,
+    });
+  } catch (e) {
+    if (ehTabelaAusente(e)) return []; // sem o SQL 2026-11-07
+    throw e;
+  }
+}
+
+const TIPOS_DE_MIDIA = new Set(["image", "video", "document"]);
+
 interface VariantInput {
   label?: string;
   text?: string;
@@ -104,6 +126,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
   const text = typeof body.text === "string" ? body.text.trim() : "";
   const templateId = body.templateId || null;
 
+  // Arquivo (só WhatsApp via QR): caminho do upload já feito em /api/conversations/upload.
+  const m = body.media && typeof body.media === "object" ? body.media : null;
+  const media = m
+    ? { mediaPath: String(m.path ?? ""), mediaType: String(m.type ?? ""), mediaMime: String(m.mime ?? "").slice(0, 120), mediaName: String(m.name ?? "").slice(0, 200) || null }
+    : null;
+  if (media) {
+    if (channel !== "whatsapp_qr") return NextResponse.json({ error: "Imagem no disparo só no WhatsApp via QR." }, { status: 400 });
+    if (!caminhoDaOrg(media.mediaPath, ctx.orgId) || !TIPOS_DE_MIDIA.has(media.mediaType)) {
+      return NextResponse.json({ error: "Arquivo inválido." }, { status: 400 });
+    }
+  }
+
   if (!BROADCAST_CHANNELS.has(channel)) {
     return NextResponse.json({ error: "Canal inválido para disparo." }, { status: 400 });
   }
@@ -127,7 +161,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     .filter((v) => v.text.length > 0 || v.templateId);
   const hasAbTest = variants.length >= 2;
 
-  if (!hasAbTest && !text && !templateId) {
+  if (!hasAbTest && !text && !templateId && !media) {
     return NextResponse.json({ error: "Escreva a mensagem ou escolha um modelo." }, { status: 400 });
   }
 
@@ -256,6 +290,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       totalCount: estimatedCount,
       status: isScheduled ? "scheduled" : "sending",
       variants: hasAbTest ? { create: variants } : undefined,
+      ...(media ?? {}),
     },
   });
 

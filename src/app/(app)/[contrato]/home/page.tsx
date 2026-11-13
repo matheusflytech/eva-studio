@@ -15,6 +15,8 @@ import { Calendario } from "@/components/tarefas/calendario";
 import { ReportView, useReportResult } from "@/components/reports/report-view";
 import { FILTROS_GLOBAIS_PADRAO } from "@/lib/consulta";
 import type { ReportQuery, VizType } from "@/lib/report-query";
+import { ehAppDeDisparos } from "@/lib/app-variant";
+import { PainelDeDisparos } from "@/components/disparos/painel-de-disparos";
 
 // ---------------------------------------------------------------------------
 // Início.
@@ -109,7 +111,12 @@ function resumoDoDia(p: Pendencia[], conversas7d: number): string {
   return acao.join(". ") + ".";
 }
 
+// App de disparos (lib/app-variant.ts): o início é o painel de disparos.
 export default function InicioPage() {
+  return ehAppDeDisparos ? <PainelDeDisparos /> : <InicioDoEva />;
+}
+
+function InicioDoEva() {
   const { session } = useAuth();
   const escuro = useTheme().resolved === "dark";
   const [dados, setDados] = React.useState<Payload | null>(null);
