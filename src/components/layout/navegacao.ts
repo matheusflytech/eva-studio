@@ -65,7 +65,7 @@ const NAV_DISPAROS: GrupoDeNavegacao[] = [
       { href: "/conversations", label: "Conversas", icon: MessageSquare },
       { href: "/contacts", label: "Contatos", icon: Contact },
       { href: "/agent-studio", label: "Agentes", icon: Aperture, animated: true },
-      { href: "/settings?tab=channels", label: "Chips", icon: Smartphone },
+      { href: "/chips", label: "Chips", icon: Smartphone },
     ],
   },
 ];

@@ -15,6 +15,7 @@ import { WhatsAppConnect } from "./whatsapp-connect";
 import { InstagramConnect } from "./instagram-connect";
 import { TelegramConnect } from "./telegram-connect";
 import { MessengerConnect, TikTokConnect } from "./channel-connect";
+import { canalNoApp } from "@/lib/app-variant";
 
 interface CanalNaTela {
   id: string;
@@ -110,7 +111,7 @@ export function CanaisDoAgente({ agentId, agentNome }: { agentId: string; agentN
         <p className="text-small text-text-tertiary">Carregando…</p>
       ) : (
         <ul className="flex flex-col divide-y divide-border-subtle">
-          {CANAIS.map((info) => {
+          {CANAIS.filter((info) => canalNoApp(info.tipo)).map((info) => {
             const doTipo = dados.canais.filter((c) => c.tipo === info.tipo);
             const meu = doTipo.find((c) => c.agentId === agentId);
             const expandido = aberto === info.tipo;

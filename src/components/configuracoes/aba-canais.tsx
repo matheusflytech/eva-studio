@@ -11,6 +11,7 @@ import { CANAIS, type InfoDoCanal, type TipoDeCanal } from "@/lib/canais";
 import { ConectarCanal, ConectarWhatsAppQr } from "./conectar-canal";
 import { GruposDoCanal } from "./grupos-do-canal";
 import { CabecalhoDaSecao, EsqueletoDeLista } from "./secao";
+import { canalNoApp, ehAppDeDisparos } from "@/lib/app-variant";
 
 interface CanalNaTela {
   id: string;
@@ -119,7 +120,7 @@ export function AbaCanais() {
       </div>
 
       <ul className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle">
-        {CANAIS.map((info) => (
+        {CANAIS.filter((info) => canalNoApp(info.tipo)).map((info) => (
           <CartaoDoCanal
             key={info.tipo}
             info={info}
@@ -133,6 +134,7 @@ export function AbaCanais() {
           />
         ))}
 
+        {!ehAppDeDisparos && (
         <li className="flex items-start gap-3.5 px-1 py-4">
           <LogoDaMarca marca="site" />
           <div className="min-w-0 flex-1">
@@ -145,6 +147,7 @@ export function AbaCanais() {
             </p>
           </div>
         </li>
+        )}
       </ul>
     </div>
   );

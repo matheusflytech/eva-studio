@@ -21,6 +21,7 @@ import { PALETTE_GROUPS } from "./palette-groups";
 import { IconeDoBloco } from "./icone-do-bloco";
 import { CaptureConfig } from "./capture-config";
 import type { IconKey } from "./icon-registry";
+import { blocoNoApp } from "@/lib/app-variant";
 
 // ---------------------------------------------------------------------------
 // Painel do Bloco do Studio. Ordem no motor (flow-engine.ts): ações de entrada
@@ -514,11 +515,16 @@ function ListaDeAcoes({
           {ACOES.filter((k) => !k.startsWith("crm-")).map((k) => (
             <ItemDeAcao key={k} iconKey={k} escolher={adicionar} />
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>CRM</DropdownMenuLabel>
-          {ACOES.filter((k) => k.startsWith("crm-")).map((k) => (
-            <ItemDeAcao key={k} iconKey={k} escolher={adicionar} />
-          ))}
+          {/* App de disparos: sem CRM (lib/app-variant.ts). */}
+          {ACOES.some((k) => k.startsWith("crm-") && blocoNoApp(k)) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>CRM</DropdownMenuLabel>
+              {ACOES.filter((k) => k.startsWith("crm-") && blocoNoApp(k)).map((k) => (
+                <ItemDeAcao key={k} iconKey={k} escolher={adicionar} />
+              ))}
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </section>

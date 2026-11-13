@@ -4,6 +4,7 @@ import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { ehAppDeDisparos } from "@/lib/app-variant";
 
 const PRESET_TOOLS = [
   "Buscar CEP",
@@ -15,6 +16,9 @@ const PRESET_TOOLS = [
   "Buscar status de pedido",
   "Registrar atendimento",
 ];
+
+// App de disparos: sem CRM nem agenda (lib/app-variant.ts).
+const SEM_DISPARO = new Set(["Consultar CRM", "Criar evento na agenda"]);
 
 export function ToolsPicker({
   tools,
@@ -51,7 +55,7 @@ export function ToolsPicker({
         Ações que o agente pode executar durante a conversa — cada uma chama um webhook no seu workflow do n8n.
       </p>
       <div className="flex flex-wrap gap-2">
-        {PRESET_TOOLS.map((tool) => {
+        {PRESET_TOOLS.filter((t) => !ehAppDeDisparos || !SEM_DISPARO.has(t)).map((tool) => {
           const active = tools.includes(tool);
           return (
             <button

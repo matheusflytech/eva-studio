@@ -155,7 +155,7 @@ export function PainelDeDisparos() {
             <div className="mb-3 flex items-center gap-2">
               <h2 id="chips-titulo" className="text-body font-semibold text-text-primary">Chips hoje</h2>
               <span className="text-caption text-text-tertiary">limite de {dados?.limiteDia ?? 200} por chip</span>
-              <Link href="/settings?tab=channels" className="ml-auto text-small font-medium text-accent-fg">Gerenciar</Link>
+              <Link href="/chips" className="ml-auto text-small font-medium text-accent-fg">Ver chips</Link>
             </div>
             {!dados ? (
               <p className="text-small text-text-tertiary">Carregando…</p>
