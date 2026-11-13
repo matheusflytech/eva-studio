@@ -33,7 +33,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       take: 12,
       select: {
-        id: true, agentId: true, channel: true, text: true, status: true, createdAt: true, scheduledAt: true,
+        id: true, name: true, agentId: true, channel: true, text: true, status: true, createdAt: true, scheduledAt: true,
         totalCount: true, sentCount: true, failedCount: true, deliveredCount: true, readCount: true,
         agent: { select: { name: true } },
       },
@@ -62,7 +62,7 @@ export async function GET() {
       agentId: b.agentId,
       agente: b.agent.name,
       channel: b.channel,
-      texto: b.text.slice(0, 140),
+      texto: (b.name?.trim() || b.text).slice(0, 140),
       status: b.status,
       criadoEm: b.createdAt.toISOString(),
       agendadoPara: b.scheduledAt?.toISOString() ?? null,
