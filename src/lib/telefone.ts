@@ -109,6 +109,22 @@ export function formatarTelefone(bruto: string | null | undefined): TelefoneForm
  * número, 10 a 15 dígitos, padrão E.164); sem isso, null e a tela não mostra o
  * botão. Brasil sem DDI ganha o 55, como em formatarTelefone.
  */
+/**
+ * Destino no WhatsApp via QR (o mesmo formato de Conversation.contactId desse
+ * canal). Número puro, com máscara ou sem DDI (assume Brasil) vira
+ * "55...@s.whatsapp.net"; jid já pronto fica como está; inválido = null.
+ * Igual a paraJid em worker/ritmo.js.
+ */
+export function jidDoWhatsApp(bruto: string): string | null {
+  const t = bruto.trim();
+  if (!t) return null;
+  if (t.includes("@")) return t;
+  let digitos = t.replace(/\D/g, "");
+  if (digitos.length === 10 || digitos.length === 11) digitos = "55" + digitos;
+  if (digitos.length < 12 || digitos.length > 15) return null;
+  return `${digitos}@s.whatsapp.net`;
+}
+
 export function linkDoWhatsAppWeb(bruto: string | null | undefined): string | null {
   const t = formatarTelefone(bruto);
   if (!t || t.digitos.length < 10 || t.digitos.length > 15) return null;

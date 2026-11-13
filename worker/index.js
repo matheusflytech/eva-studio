@@ -29,6 +29,7 @@ import {
   sessoesPendentes,
 } from "./fonte.js";
 import { MINUTOS_TRAVADO, expirarTravados, marcarEnviado, marcarFalha, reivindicarItens } from "./fila.js";
+import { RITMO, agentesComDisparo, paraJid, pausaMs, reivindicarDoDisparo, soltosHoje } from "./ritmo.js";
 import { decidirReconexao } from "./desconexao.js";
 import { analisarMensagem, semMencaoAoAgente, usuarioDoJid } from "./contato.js";
 import { comCitacao, desembrulhar, textoDaMensagem, trechoCitado } from "./tipos.js";
@@ -542,53 +543,82 @@ async function drainOutboundQueue() {
   drenando = true;
   try {
     await expirarTravados(pool, MINUTOS_TRAVADO);
-    const rows = await reivindicarItens(pool, 20);
     // O item guarda o agente; a sessão é a do canal QR que ele atende agora.
     const chaves = new Map();
-    for (const row of rows) {
-      if (!chaves.has(row.agentId)) chaves.set(row.agentId, await sessaoDoAgente(pool, MODO, row.agentId));
-      const chave = chaves.get(row.agentId);
-      const session = chave ? sessions.get(chave) : null;
-      if (!session?.sock) {
-        await marcarFalha(pool, row, "WhatsApp não conectado");
-        continue;
-      }
-      let idNoWhatsApp = null;
-      try {
-        if (row.mediaPath) {
-          // O arquivo vive no storage do app; ele devolve um link temporário.
-          const r = await fetch(
-            `${EVA_STUDIO_URL}/api/internal/media?path=${encodeURIComponent(row.mediaPath)}`,
-            { headers: { "X-Internal-Secret": INTERNAL_API_SECRET } }
-          );
-          if (!r.ok) throw new Error("não consegui buscar o arquivo");
-          const { url } = await r.json();
+    const sessaoDe = async (agentId) => {
+      if (!chaves.has(agentId)) chaves.set(agentId, await sessaoDoAgente(pool, MODO, agentId));
+      const chave = chaves.get(agentId);
+      return chave ? sessions.get(chave) : null;
+    };
 
-          const legenda = row.text || undefined;
-          let conteudo;
-          if (row.mediaType === "image") conteudo = { image: { url }, caption: legenda };
-          else if (row.mediaType === "video") conteudo = { video: { url }, caption: legenda };
-          else if (row.mediaType === "audio") conteudo = { audio: { url }, mimetype: row.mediaMime || "audio/mpeg" };
-          else if (row.mediaType === "sticker") conteudo = { sticker: { url } };
-          else conteudo = { document: { url }, mimetype: row.mediaMime || "application/octet-stream", fileName: row.mediaName || "arquivo", caption: legenda };
+    // Atendimento (sem disparo): sai na hora.
+    for (const row of await reivindicarItens(pool, 20)) await enviarItem(row, await sessaoDe(row.agentId));
 
-          idNoWhatsApp = (await session.sock.sendMessage(row.contactId, conteudo))?.key?.id ?? null;
-          // Áudio e figurinha não levam legenda: o texto vai em mensagem à parte.
-          if (legenda && (row.mediaType === "audio" || row.mediaType === "sticker")) {
-            await session.sock.sendMessage(row.contactId, { text: legenda });
-          }
-        } else {
-          idNoWhatsApp = (await session.sock.sendMessage(row.contactId, { text: row.text }))?.key?.id ?? null;
-        }
-        await marcarEnviado(pool, row, idNoWhatsApp);
-      } catch (err) {
-        await marcarFalha(pool, row, String(err?.message ?? err));
-      }
+    // Disparo: 1 item por agente (chip) por vez, com pausa sorteada e limite diário (ritmo.js).
+    const agora = Date.now();
+    for (const agentId of await agentesComDisparo(pool)) {
+      if ((proximoDisparo.get(agentId) ?? 0) > agora) continue;
+      if ((await soltosHoje(pool, agentId)) >= RITMO.limiteDia) continue;
+      const row = await reivindicarDoDisparo(pool, agentId);
+      if (!row) continue;
+      proximoDisparo.set(agentId, agora + pausaMs(RITMO.pausaMinS, RITMO.pausaMaxS));
+      await enviarItem(row, await sessaoDe(agentId), true);
     }
   } catch (err) {
     logger.error({ err }, "Erro ao drenar fila de saída");
   } finally {
     drenando = false;
+  }
+}
+
+/** agentId -> quando o próximo item de disparo dele pode sair (ms). */
+const proximoDisparo = new Map();
+
+async function enviarItem(row, session, doDisparo = false) {
+  if (!session?.sock) {
+    await marcarFalha(pool, row, "WhatsApp não conectado (o chip caiu ou foi desconectado)");
+    return;
+  }
+  let idNoWhatsApp = null;
+  try {
+    // Lista manual vem como número puro; o WhatsApp quer o jid.
+    const destino = paraJid(row.contactId);
+    if (!destino) throw new Error("Número inválido");
+    row = { ...row, contactId: destino };
+    if (doDisparo && destino.endsWith("@s.whatsapp.net")) {
+      const [conferido] = await session.sock.onWhatsApp(destino.split("@")[0]);
+      if (!conferido?.exists) throw new Error("Número sem WhatsApp");
+      // shortcut: o jid conferido pode diferir (9º dígito); a resposta do contato pode abrir outra conversa. Ok por enquanto.
+      row = { ...row, contactId: conferido.jid || destino };
+    }
+    if (row.mediaPath) {
+      // O arquivo vive no storage do app; ele devolve um link temporário.
+      const r = await fetch(
+        `${EVA_STUDIO_URL}/api/internal/media?path=${encodeURIComponent(row.mediaPath)}`,
+        { headers: { "X-Internal-Secret": INTERNAL_API_SECRET } }
+      );
+      if (!r.ok) throw new Error("não consegui buscar o arquivo");
+      const { url } = await r.json();
+
+      const legenda = row.text || undefined;
+      let conteudo;
+      if (row.mediaType === "image") conteudo = { image: { url }, caption: legenda };
+      else if (row.mediaType === "video") conteudo = { video: { url }, caption: legenda };
+      else if (row.mediaType === "audio") conteudo = { audio: { url }, mimetype: row.mediaMime || "audio/mpeg" };
+      else if (row.mediaType === "sticker") conteudo = { sticker: { url } };
+      else conteudo = { document: { url }, mimetype: row.mediaMime || "application/octet-stream", fileName: row.mediaName || "arquivo", caption: legenda };
+
+      idNoWhatsApp = (await session.sock.sendMessage(row.contactId, conteudo))?.key?.id ?? null;
+      // Áudio e figurinha não levam legenda: o texto vai em mensagem à parte.
+      if (legenda && (row.mediaType === "audio" || row.mediaType === "sticker")) {
+        await session.sock.sendMessage(row.contactId, { text: legenda });
+      }
+    } else {
+      idNoWhatsApp = (await session.sock.sendMessage(row.contactId, { text: row.text }))?.key?.id ?? null;
+    }
+    await marcarEnviado(pool, row, idNoWhatsApp);
+  } catch (err) {
+    await marcarFalha(pool, row, String(err?.message ?? err));
   }
 }
 

@@ -24,7 +24,7 @@ export async function reivindicarItens(pool, limite = 20) {
         set status = 'sending', "claimedAt" = now()
       where q.id in (
         select id from eva_studio_outbound_queue
-         where status = 'pending'
+         where status = 'pending' and "broadcastId" is null
          order by "createdAt" asc
          limit $1
          for update skip locked

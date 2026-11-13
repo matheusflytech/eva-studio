@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { BANDEIRAS, formatarTelefone, linkDoWhatsAppWeb } from "./telefone";
+import { BANDEIRAS, formatarTelefone, jidDoWhatsApp, linkDoWhatsAppWeb } from "./telefone";
 
 describe("formatarTelefone", () => {
   it("celular brasileiro gravado com DDI vira +55 DD 9XXXX-XXXX com bandeira", () => {
@@ -61,5 +61,14 @@ describe("linkDoWhatsAppWeb", () => {
     expect(linkDoWhatsAppWeb(null)).toBeNull();
     expect(linkDoWhatsAppWeb("2345")).toBeNull();
     expect(linkDoWhatsAppWeb("ramal 12")).toBeNull();
+  });
+});
+
+describe("jidDoWhatsApp", () => {
+  it("normaliza para o formato do WhatsApp via QR", () => {
+    expect(jidDoWhatsApp("(11) 99999-0001")).toBe("5511999990001@s.whatsapp.net");
+    expect(jidDoWhatsApp("+55 11 99999-0001")).toBe("5511999990001@s.whatsapp.net");
+    expect(jidDoWhatsApp("5511999990001@s.whatsapp.net")).toBe("5511999990001@s.whatsapp.net");
+    expect(jidDoWhatsApp("123")).toBeNull();
   });
 });
